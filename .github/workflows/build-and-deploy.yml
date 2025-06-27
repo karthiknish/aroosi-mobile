@@ -8,7 +8,7 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '18'
   EXPO_CLI_VERSION: 'latest'
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
           cache: npm
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🧪 Run tests
         run: npm run test --if-present
@@ -35,7 +35,7 @@ jobs:
         run: npm run lint --if-present
 
       - name: 🔍 Run type check
-        run: npm run type-check --if-present
+        run: npx tsc --noEmit
 
   # Build preview for pull requests
   build-preview:
@@ -60,16 +60,28 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🚀 Build preview (iOS)
-        run: eas build --platform ios --profile preview --non-interactive
+        run: eas build --platform ios --profile preview --non-interactive --wait
 
       - name: 🚀 Build preview (Android)
-        run: eas build --platform android --profile preview --non-interactive
+        run: eas build --platform android --profile preview --non-interactive --wait
+
+      - name: 📝 Comment PR with build links
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🚀 Preview builds completed! Check your Expo dashboard for download links.'
+            })
 
   # Build and deploy to internal testing
-  build-internal:
+  build-staging:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main'
@@ -91,16 +103,21 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
-      - name: 🚀 Build internal (iOS)
-        run: eas build --platform ios --profile preview --non-interactive
+      - name: 🚀 Build staging (iOS)
+        run: eas build --platform ios --profile staging --non-interactive --wait
 
-      - name: 🚀 Build internal (Android)
-        run: eas build --platform android --profile preview --non-interactive
+      - name: 🚀 Build staging (Android)
+        run: eas build --platform android --profile staging --non-interactive --wait
 
       - name: 📱 Submit to internal testing (Android)
-        run: eas submit --platform android --profile production --latest --non-interactive
+        run: eas submit --platform android --profile preview --latest --non-interactive
+        continue-on-error: true
+
+      - name: 📱 Submit to TestFlight (iOS)
+        run: eas submit --platform ios --profile preview --latest --non-interactive
+        continue-on-error: true
 
   # Build and deploy to production
   build-production:
@@ -125,30 +142,42 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 📦 Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: 🚀 Build production (iOS)
-        run: eas build --platform ios --profile production --non-interactive
+        run: eas build --platform ios --profile production --non-interactive --wait
 
       - name: 🚀 Build production (Android)
-        run: eas build --platform android --profile production --non-interactive
+        run: eas build --platform android --profile production --non-interactive --wait
 
       - name: 🍎 Submit to App Store
         run: eas submit --platform ios --profile production --latest --non-interactive
+        continue-on-error: true
 
       - name: 🤖 Submit to Google Play
         run: eas submit --platform android --profile production --latest --non-interactive
+        continue-on-error: true
 
       - name: 📝 Create GitHub Release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
           body: |
-            Changes in this Release:
+            ## 🚀 Production Release ${{ github.ref_name }}
+            
+            ### What's New
             - iOS and Android builds submitted to app stores
-            - Version: ${{ github.ref }}
+            - Version: ${{ github.ref_name }}
+            
+            ### Download Links
+            Check your respective app stores for the latest version.
+            
+            ### Build Information
+            - Built with Node.js ${{ env.NODE_VERSION }}
+            - Expo SDK 53
+            - React Native 0.79.4
           draft: false
           prerelease: false

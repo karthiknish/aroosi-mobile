@@ -19,6 +19,7 @@ import {
   ErrorBoundary,
   ApiErrorDisplay,
 } from "../../components/ui/ErrorHandling";
+import { Conversation } from "../../../types/message";
 
 interface ConversationListScreenProps {
   navigation: any;
@@ -42,7 +43,7 @@ export default function ConversationListScreen({
     queryFn: async () => {
       const response = await apiClient.getConversations();
       return response.success
-        ? (response.data as { conversations: any[] }).conversations ||
+        ? (response.data as { conversations: Conversation[] }).conversations ||
             response.data
         : [];
     },
@@ -54,10 +55,13 @@ export default function ConversationListScreen({
 
   // Unread counts are now included in conversations response
   const unreadCounts =
-    (conversations as any[])?.reduce((acc: any, conv: any) => {
-      acc[conv._id || conv.id] = conv.unreadCount || 0;
-      return acc;
-    }, {}) || {};
+    (conversations as Conversation[])?.reduce(
+      (acc: Record<string, number>, conv: Conversation) => {
+        acc[conv._id || conv.id] = conv.unreadCount || 0;
+        return acc;
+      },
+      {}
+    ) || {};
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -65,15 +69,16 @@ export default function ConversationListScreen({
     setRefreshing(false);
   };
 
-  const handleConversationPress = (conversation: any) => {
-    const otherParticipant = conversation.participants?.find(
-      (p: any) => p.userId !== userId
+  const handleConversationPress = (conversation: Conversation) => {
+    // Since participants is string[], find the participant that is not the current user
+    const otherParticipantId = conversation.participants?.find(
+      (p) => p !== userId
     );
 
     navigation.navigate("Chat", {
       conversationId: conversation._id || conversation.id,
-      partnerName: otherParticipant?.firstName || "Unknown",
-      partnerId: otherParticipant?.userId,
+      partnerName: otherParticipantId || "Unknown",
+      partnerId: otherParticipantId,
     });
   };
 
@@ -96,9 +101,9 @@ export default function ConversationListScreen({
     }
   };
 
-  const renderConversation = (conversation: any) => {
-    const otherParticipant = conversation.participants?.find(
-      (p: any) => p.userId !== userId
+  const renderConversation = (conversation: Conversation) => {
+    const otherParticipantId = conversation.participants?.find(
+      (p) => p !== userId
     );
 
     const unreadCount = conversation.unreadCount || 0;
@@ -122,7 +127,7 @@ export default function ConversationListScreen({
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {otherParticipant?.firstName?.charAt(0) || "?"}
+              {otherParticipantId?.charAt(0) || "?"}
             </Text>
           </View>
           {hasUnread && <View style={styles.onlineIndicator} />}
@@ -136,7 +141,7 @@ export default function ConversationListScreen({
                 hasUnread && styles.unreadParticipantName,
               ]}
             >
-              {otherParticipant?.firstName || "Unknown User"}
+              {otherParticipantId || "Unknown User"}
             </Text>
 
             {lastMessage && (
@@ -262,11 +267,12 @@ export default function ConversationListScreen({
         >
           {error ? (
             <ApiErrorDisplay error={error} onRetry={refetch} />
-          ) : !conversations || (conversations as any[]).length === 0 ? (
+          ) : !conversations ||
+            (conversations as Conversation[]).length === 0 ? (
             <NoMessages onActionPress={() => navigation.navigate("Search")} />
           ) : (
             <View style={styles.conversationsList}>
-              {(conversations as any[]).map(renderConversation)}
+              {(conversations as Conversation[]).map(renderConversation)}
             </View>
           )}
         </ScrollView>

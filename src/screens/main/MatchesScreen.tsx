@@ -29,9 +29,24 @@ import {
   AnimatedButton,
   StaggeredList,
 } from "../../components/ui/AnimatedComponents";
+import { Profile } from "../../../types/profile";
 
 interface MatchesScreenProps {
   navigation: any;
+}
+
+// Local types for matches and interests
+interface Match extends Profile {
+  conversationId?: string;
+  matchedAt?: number;
+  lastActivity?: number;
+}
+
+interface Interest {
+  _id: string;
+  fromUserId: string;
+  fromProfile?: Profile;
+  createdAt?: number;
 }
 
 export default function MatchesScreen({ navigation }: MatchesScreenProps) {
@@ -45,11 +60,11 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     isLoading: matchesLoading,
     error: matchesError,
     refetch: refetchMatches,
-  } = useQuery({
+  } = useQuery<Match[]>({
     queryKey: ["matches"],
     queryFn: async () => {
       const response = await apiClient.getMatches();
-      return response.success ? response.data : [];
+      return response.success ? (response.data as Match[]) : [];
     },
     enabled: !!userId,
     retry: 2,
@@ -61,12 +76,12 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     isLoading: interestsLoading,
     error: interestsError,
     refetch: refetchInterests,
-  } = useQuery({
+  } = useQuery<Interest[]>({
     queryKey: ["receivedInterests"],
     queryFn: async () => {
       if (!userId) return [];
       const response = await apiClient.getReceivedInterests(userId);
-      return response.success ? response.data : [];
+      return response.success ? (response.data as Interest[]) : [];
     },
     enabled: !!userId,
     retry: 2,
@@ -79,7 +94,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     setRefreshing(false);
   };
 
-  const handleMatchPress = (match: any) => {
+  const handleMatchPress = (match: Match) => {
     navigation.navigate("Chat", {
       screen: "Chat",
       params: {
@@ -90,7 +105,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     });
   };
 
-  const handleInterestPress = (interest: any) => {
+  const handleInterestPress = (interest: Interest) => {
     navigation.navigate("ProfileDetail", { profileId: interest.fromUserId });
   };
 
@@ -107,7 +122,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     }
   };
 
-  const renderMatch = (match: any, index: number) => (
+  const renderMatch = (match: Match, index: number) => (
     <FadeInView key={match._id} delay={index * 100}>
       <AnimatedButton
         style={[
@@ -181,7 +196,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     </FadeInView>
   );
 
-  const renderInterest = (interest: any) => (
+  const renderInterest = (interest: Interest) => (
     <View key={interest._id} style={styles.interestCard}>
       <TouchableOpacity
         style={styles.interestProfile}
@@ -303,7 +318,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             </View>
           ) : (
             receivedInterests &&
-            (receivedInterests as any).length > 0 && (
+            (receivedInterests as Interest[]).length > 0 && (
               <View style={styles.section}>
                 <Text
                   style={[
@@ -321,7 +336,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                 >
                   People who are interested in connecting with you
                 </Text>
-                {(receivedInterests as any).map(renderInterest)}
+                {(receivedInterests as Interest[]).map(renderInterest)}
               </View>
             )
           )}
@@ -347,11 +362,11 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
             {matchesError ? (
               <ApiErrorDisplay error={matchesError} onRetry={refetchMatches} />
-            ) : !matches || (matches as any).length === 0 ? (
+            ) : !matches || (matches as Match[]).length === 0 ? (
               <NoMatches onActionPress={() => navigation.navigate("Search")} />
             ) : (
               <View style={styles.matchesList}>
-                {(matches as any).map((match: any, index: number) =>
+                {(matches as Match[]).map((match: Match, index: number) =>
                   renderMatch(match, index)
                 )}
               </View>
@@ -360,7 +375,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
           {/* Show no interests state if no interests and no error */}
           {!interestsError &&
-            (!receivedInterests || (receivedInterests as any).length === 0) && (
+            (!receivedInterests ||
+              (receivedInterests as Interest[]).length === 0) && (
               <View style={styles.section}>
                 <NoInterests
                   onActionPress={() => navigation.navigate("Search")}

@@ -28,8 +28,20 @@ export function useMessaging({
       setLoading(true);
       const response = await apiClient.getMatches();
       if (response.success && response.data) {
-        const conversationsList =
-          (response.data as any).matches || response.data;
+        let conversationsList: Conversation[];
+        if (Array.isArray(response.data)) {
+          conversationsList = response.data;
+        } else if (
+          typeof response.data === "object" &&
+          response.data !== null &&
+          "matches" in response.data &&
+          Array.isArray((response.data as { matches?: unknown }).matches)
+        ) {
+          conversationsList = (response.data as { matches: Conversation[] })
+            .matches;
+        } else {
+          conversationsList = [];
+        }
         const normalizedConversations = conversationsList.map(
           normalizeConversation
         );
@@ -59,7 +71,19 @@ export function useMessaging({
       try {
         const response = await apiClient.getMessages(conversationId);
         if (response.success && response.data) {
-          const messagesList = (response.data as any).messages || response.data;
+          let messagesList: Message[];
+          if (Array.isArray(response.data)) {
+            messagesList = response.data;
+          } else if (
+            typeof response.data === "object" &&
+            response.data !== null &&
+            "messages" in response.data &&
+            Array.isArray((response.data as { messages?: unknown }).messages)
+          ) {
+            messagesList = (response.data as { messages: Message[] }).messages;
+          } else {
+            messagesList = [];
+          }
           const normalizedMessages = messagesList.map(normalizeMessage);
 
           if (conversationId === matchId) {

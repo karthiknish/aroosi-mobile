@@ -5,7 +5,19 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build": "expo export",
+    "build:ios": "eas build --platform ios",
+    "build:android": "eas build --platform android",
+    "build:all": "eas build --platform all",
+    "submit:ios": "eas submit --platform ios",
+    "submit:android": "eas submit --platform android",
+    "submit:all": "eas submit --platform all",
+    "tsc": "tsc --noEmit",
+    "type-check": "tsc --noEmit",
+    "lint": "echo 'No linter configured'",
+    "test": "echo 'No tests configured'"
   },
   "dependencies": {
     "@clerk/clerk-expo": "^2.13.2",
