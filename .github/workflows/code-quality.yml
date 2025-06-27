@@ -1,0 +1,101 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install ESLint
+        run: npm install -g eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin
+
+      - name: Run ESLint
+        run: npx eslint . --ext .ts,.tsx,.js,.jsx --max-warnings 0
+        continue-on-error: true
+
+  prettier:
+    name: Prettier
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Prettier
+        run: npm install -g prettier
+
+      - name: Check formatting
+        run: npx prettier --check "**/*.{js,jsx,ts,tsx,json,md}"
+
+  typescript:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript compilation
+        run: npx tsc --noEmit --skipLibCheck
+
+  bundle-size:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install bundle analyzer
+        run: npm install -g react-native-bundle-visualizer
+
+      - name: Check bundle size
+        run: |
+          echo "📦 Analyzing bundle size..."
+          npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android-release.bundle
+          ls -lh android-release.bundle || true

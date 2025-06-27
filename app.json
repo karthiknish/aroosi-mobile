@@ -1,29 +1,176 @@
 {
   "expo": {
-    "name": "aroosi-mobile",
+    "name": "Aroosi",
     "slug": "aroosi-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "description": "Find your perfect match in the Afghan community. Connect with like-minded individuals for meaningful relationships and marriage.",
+    "keywords": ["matrimony", "dating", "afghan", "muslim", "marriage", "relationships"],
+    "privacy": "public",
+    "platforms": ["ios", "android"],
+    "primaryColor": "#BFA67A",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#BFA67A"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aroosi.mobile",
+      "buildNumber": "1",
+      "deploymentTarget": "13.0",
+      "requireFullScreen": false,
+      "userInterfaceStyle": "automatic",
+      "statusBarStyle": "auto",
+      "backgroundColor": "#F9F7F5",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Aroosi needs access to your photo library to upload beautiful profile pictures that help you find your perfect match.",
+        "NSCameraUsageDescription": "Aroosi needs access to your camera to take profile pictures and share moments with your matches.",
+        "NSMicrophoneUsageDescription": "Aroosi needs access to your microphone to record voice messages for more personal conversations.",
+        "NSFaceIDUsageDescription": "Aroosi uses Face ID to keep your account secure and protect your privacy.",
+        "NSContactsUsageDescription": "Aroosi can access your contacts to help you find friends who are also using the app (optional).",
+        "NSLocationWhenInUseUsageDescription": "Aroosi uses your location to show you matches nearby and improve your experience.",
+        "NSUserNotificationsUsageDescription": "Aroosi sends notifications about new matches, messages, and important updates.",
+        "NSCalendarsUsageDescription": "Aroosi can access your calendar to help you schedule dates with your matches (optional).",
+        "NSPhotoLibraryAddUsageDescription": "Aroosi can save photos shared by your matches to your photo library.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleLocalizations": ["en", "fa", "ps"],
+        "UIBackgroundModes": ["background-fetch", "remote-notification"],
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
+        "UISupportedInterfaceOrientations~ipad": [
+          "UIInterfaceOrientationPortrait",
+          "UIInterfaceOrientationPortraitUpsideDown",
+          "UIInterfaceOrientationLandscapeLeft",
+          "UIInterfaceOrientationLandscapeRight"
+        ],
+        "UIRequiredDeviceCapabilities": ["armv7"],
+        "UIFileSharingEnabled": false,
+        "UISupportsDocumentBrowser": false,
+        "LSRequiresIPhoneOS": true
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.networking.wifi-info": true,
+        "com.apple.developer.kernel.increased-memory-limit": true
+      },
+      "associatedDomains": [
+        "applinks:aroosi.app",
+        "applinks:www.aroosi.app"
+      ],
+      "scheme": "aroosi"
     },
     "android": {
+      "package": "com.aroosi.mobile",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 21,
+      "buildToolsVersion": "34.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#BFA67A",
+        "monochromeImage": "./assets/adaptive-icon.png"
       },
-      "edgeToEdgeEnabled": true
+      "icon": "./assets/icon.png",
+      "backgroundColor": "#F9F7F5",
+      "statusBarStyle": "auto",
+      "navigationBarStyle": "dark-content",
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "RECORD_AUDIO",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE",
+        "VIBRATE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "POST_NOTIFICATIONS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_CONTACTS"
+      ],
+      "blockedPermissions": [
+        "ACCESS_BACKGROUND_LOCATION",
+        "SYSTEM_ALERT_WINDOW"
+      ],
+      "edgeToEdgeEnabled": true,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "aroosi.app"
+            },
+            {
+              "scheme": "https", 
+              "host": "www.aroosi.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
+      "scheme": "aroosi",
+      "googleServicesFile": "./google-services.json",
+      "config": {
+        "branch": {
+          "apikey": "key_live_your_branch_key"
+        }
+      }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Aroosi needs access to your photo library to upload beautiful profile pictures that help you find your perfect match.",
+          "cameraPermission": "Aroosi needs access to your camera to take profile pictures and share moments with your matches."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Aroosi uses Face ID to keep your account secure and protect your privacy."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#EC4899",
+          "defaultChannel": "default",
+          "sounds": ["notification.wav"]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
     }
   }
 }

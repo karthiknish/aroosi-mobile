@@ -1,0 +1,71 @@
+
+<!-- Additional Info.plist configurations for Aroosi -->
+<key>CFBundleDisplayName</key>
+<string>Aroosi</string>
+<key>CFBundleName</key>
+<string>Aroosi</string>
+<key>CFBundleShortVersionString</key>
+<string>1.0.0</string>
+<key>CFBundleVersion</key>
+<string>1</string>
+
+<!-- URL Schemes -->
+<key>CFBundleURLTypes</key>
+<array>
+  <dict>
+    <key>CFBundleURLName</key>
+    <string>com.aroosi.mobile</string>
+    <key>CFBundleURLSchemes</key>
+    <array>
+      <string>aroosi</string>
+    </array>
+  </dict>
+</array>
+
+<!-- App Transport Security -->
+<key>NSAppTransportSecurity</key>
+<dict>
+  <key>NSExceptionDomains</key>
+  <dict>
+    <key>aroosi.app</key>
+    <dict>
+      <key>NSExceptionAllowsInsecureHTTPLoads</key>
+      <false/>
+      <key>NSExceptionMinimumTLSVersion</key>
+      <string>TLSv1.2</string>
+      <key>NSExceptionRequiresForwardSecrecy</key>
+      <true/>
+    </dict>
+  </dict>
+</dict>
+
+<!-- Background Modes -->
+<key>UIBackgroundModes</key>
+<array>
+  <string>background-fetch</string>
+  <string>remote-notification</string>
+</array>
+
+<!-- Interface Orientations -->
+<key>UISupportedInterfaceOrientations</key>
+<array>
+  <string>UIInterfaceOrientationPortrait</string>
+</array>
+
+<key>UISupportedInterfaceOrientations~ipad</key>
+<array>
+  <string>UIInterfaceOrientationPortrait</string>
+  <string>UIInterfaceOrientationPortraitUpsideDown</string>
+  <string>UIInterfaceOrientationLandscapeLeft</string>
+  <string>UIInterfaceOrientationLandscapeRight</string>
+</array>
+
+<!-- Status Bar -->
+<key>UIViewControllerBasedStatusBarAppearance</key>
+<true/>
+<key>UIStatusBarStyle</key>
+<string>UIStatusBarStyleDefault</string>
+
+<!-- Launch Screen -->
+<key>UILaunchStoryboardName</key>
+<string>SplashScreen</string>

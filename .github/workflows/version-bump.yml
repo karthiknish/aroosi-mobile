@@ -1,0 +1,100 @@
+name: Version Bump and Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  version-bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 🔄 Configure git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: 📈 Bump version
+        id: version
+        run: |
+          # Get current version from package.json
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Bump version
+          npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "New version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Update app.json version
+          node -e "
+            const fs = require('fs');
+            const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            appJson.expo.version = '$NEW_VERSION';
+            fs.writeFileSync('app.json', JSON.stringify(appJson, null, 2));
+          "
+          
+          # Increment build numbers
+          node -e "
+            const fs = require('fs');
+            const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            const currentBuildNumber = parseInt(appJson.expo.ios.buildNumber || '1');
+            const currentVersionCode = parseInt(appJson.expo.android.versionCode || 1);
+            appJson.expo.ios.buildNumber = (currentBuildNumber + 1).toString();
+            appJson.expo.android.versionCode = currentVersionCode + 1;
+            fs.writeFileSync('app.json', JSON.stringify(appJson, null, 2));
+          "
+
+      - name: 📝 Commit changes
+        run: |
+          git add package.json package-lock.json app.json
+          git commit -m "chore: bump version to v${{ steps.version.outputs.new_version }}"
+          git tag "v${{ steps.version.outputs.new_version }}"
+
+      - name: 🚀 Push changes
+        run: |
+          git push origin main
+          git push origin "v${{ steps.version.outputs.new_version }}"
+
+      - name: 📄 Create changelog
+        run: |
+          echo "## Version ${{ steps.version.outputs.new_version }}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Changes" >> RELEASE_NOTES.md
+          git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 HEAD~1)..HEAD >> RELEASE_NOTES.md || echo "- Initial release" >> RELEASE_NOTES.md
+
+      - name: 📤 Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md

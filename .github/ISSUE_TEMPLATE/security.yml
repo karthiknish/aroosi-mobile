@@ -1,0 +1,96 @@
+name: 🔒 Security Issue
+description: Report a security vulnerability (private)
+title: "[SECURITY] "
+labels: ["security", "urgent"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **IMPORTANT**: If this is a critical security vulnerability, please do not file a public issue. 
+        Instead, please email us directly at security@aroosi.com with the details.
+
+  - type: textarea
+    id: vulnerability-description
+    attributes:
+      label: Vulnerability Description
+      description: Provide a clear description of the security issue
+      placeholder: Describe the security vulnerability...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity Level
+      description: How severe is this security issue?
+      options:
+        - Low - Minor security concern
+        - Medium - Moderate security risk
+        - High - Significant security risk
+        - Critical - Immediate security threat
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Provide steps to reproduce the vulnerability
+      placeholder: |
+        1. First step...
+        2. Second step...
+        3. See vulnerability
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact Assessment
+      description: What is the potential impact of this vulnerability?
+      placeholder: This vulnerability could allow...
+    validations:
+      required: true
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested Mitigation
+      description: If you have suggestions for fixing this issue, please share them
+      placeholder: This could be mitigated by...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Affected Platform
+      description: Which platform is affected?
+      options:
+        - iOS
+        - Android
+        - Both
+        - Backend/API
+        - Web Components
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: Provide details about the environment where this was discovered
+      placeholder: App version, device, OS version, etc.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: responsible-disclosure
+    attributes:
+      label: Responsible Disclosure
+      description: Please confirm your commitment to responsible disclosure
+      options:
+        - label: I commit to responsible disclosure and will not share this vulnerability publicly until it is resolved
+          required: true
+        - label: I agree to follow this project's Code of Conduct
+          required: true

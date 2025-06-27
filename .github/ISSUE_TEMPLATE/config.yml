@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 General Questions & Support
+    url: https://github.com/aroosi/aroosi-mobile/discussions
+    about: Ask questions and get help from the community
+  - name: 📖 Documentation
+    url: https://docs.aroosi.com
+    about: Check the documentation for usage examples and guides
+  - name: 🔒 Security Issues
+    url: mailto:security@aroosi.com
+    about: Report security vulnerabilities privately via email

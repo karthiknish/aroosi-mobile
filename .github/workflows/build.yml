@@ -1,0 +1,84 @@
+name: EAS Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build for'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build for Android
+        if: ${{ github.event.inputs.platform == 'android' || github.event.inputs.platform == 'all' || github.event_name == 'push' }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'preview' }}
+          eas build --platform android --profile $PROFILE --non-interactive --no-wait
+
+      - name: Build for iOS
+        if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'all' || github.event_name == 'push' }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'preview' }}
+          eas build --platform ios --profile $PROFILE --non-interactive --no-wait
+
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: always()
+    
+    steps:
+      - name: Notify Success
+        if: needs.build.result == 'success'
+        run: |
+          echo "✅ Build completed successfully"
+          
+      - name: Notify Failure
+        if: needs.build.result == 'failure'
+        run: |
+          echo "❌ Build failed"
+          exit 1

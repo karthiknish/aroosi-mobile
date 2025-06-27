@@ -1,12 +1,78 @@
+import React, { useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { ClerkProvider } from '@clerk/clerk-expo';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SecureStore from 'react-native-secure-store';
+
+// Import navigation and providers
+import RootNavigator from './src/navigation/RootNavigator';
+import { NotificationProvider } from './src/providers/NotificationProvider';
+
+// Initialize React Query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 2,
+    },
+  },
+});
+
+// Token cache for Clerk
+const tokenCache = {
+  async getToken(key: string) {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (err) {
+      console.error('Error getting token:', err);
+      return null;
+    }
+  },
+  async saveToken(key: string, value: string) {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (err) {
+      console.error('Error saving token:', err);
+    }
+  },
+};
 
 export default function App() {
+  const [isReady, setIsReady] = React.useState(false);
+  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+
+  React.useEffect(() => {
+    // Add any initialization logic here
+    setIsReady(true);
+  }, []);
+
+  if (!isReady) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <ClerkProvider
+      publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
+      tokenCache={tokenCache}
+    >
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <NavigationContainer ref={navigationRef}>
+            <NotificationProvider navigationRef={navigationRef}>
+              <StatusBar style="auto" />
+              <RootNavigator />
+            </NotificationProvider>
+          </NavigationContainer>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </ClerkProvider>
   );
 }
 
@@ -16,5 +82,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });

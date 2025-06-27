@@ -1,0 +1,154 @@
+name: Build and Deploy to App Stores
+
+on:
+  push:
+    branches: [main, release/*]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
+  EXPO_CLI_VERSION: 'latest'
+
+jobs:
+  # Run tests and linting
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: npm run test --if-present
+
+      - name: 🔍 Run linter
+        run: npm run lint --if-present
+
+      - name: 🔍 Run type check
+        run: npm run type-check --if-present
+
+  # Build preview for pull requests
+  build-preview:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: ${{ env.EXPO_CLI_VERSION }}
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Build preview (iOS)
+        run: eas build --platform ios --profile preview --non-interactive
+
+      - name: 🚀 Build preview (Android)
+        run: eas build --platform android --profile preview --non-interactive
+
+  # Build and deploy to internal testing
+  build-internal:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: ${{ env.EXPO_CLI_VERSION }}
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Build internal (iOS)
+        run: eas build --platform ios --profile preview --non-interactive
+
+      - name: 🚀 Build internal (Android)
+        run: eas build --platform android --profile preview --non-interactive
+
+      - name: 📱 Submit to internal testing (Android)
+        run: eas submit --platform android --profile production --latest --non-interactive
+
+  # Build and deploy to production
+  build-production:
+    runs-on: ubuntu-latest
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: 🏗 Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: ${{ env.EXPO_CLI_VERSION }}
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🚀 Build production (iOS)
+        run: eas build --platform ios --profile production --non-interactive
+
+      - name: 🚀 Build production (Android)
+        run: eas build --platform android --profile production --non-interactive
+
+      - name: 🍎 Submit to App Store
+        run: eas submit --platform ios --profile production --latest --non-interactive
+
+      - name: 🤖 Submit to Google Play
+        run: eas submit --platform android --profile production --latest --non-interactive
+
+      - name: 📝 Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: |
+            Changes in this Release:
+            - iOS and Android builds submitted to app stores
+            - Version: ${{ github.ref }}
+          draft: false
+          prerelease: false
