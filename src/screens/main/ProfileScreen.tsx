@@ -18,6 +18,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Colors } from "../../../constants";
 import { Profile, ProfileImage } from "../../../types";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { useResponsiveSpacing, useResponsiveTypography } from "../../../hooks/useResponsive";
 
 const { width } = Dimensions.get("window");
 
@@ -30,6 +31,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const apiClient = useApiClient();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const {
     subscription,
     hasActiveSubscription,
@@ -92,6 +95,229 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   });
 
   const isLoading = profileLoading || subscriptionLoading;
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      fontSize: fontSize.base,
+      marginTop: spacing.md,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+    },
+    headerTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: "bold",
+    },
+    settingsButton: {
+      padding: spacing.xs,
+    },
+    settingsText: {
+      fontSize: fontSize.base,
+    },
+    actionButtonsRow: {
+      flexDirection: "row",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      gap: spacing.md,
+    },
+    actionBtn: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xs,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    actionBtnText: {
+      color: "#fff",
+      fontSize: fontSize.xs,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    section: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.lg,
+      padding: spacing.md,
+      borderRadius: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    sectionTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+      marginBottom: spacing.md,
+    },
+    imageGallery: {
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    imageContainer: {
+      width: width - 40,
+      marginHorizontal: 4,
+      borderRadius: 12,
+      overflow: "hidden",
+      position: "relative",
+    },
+    profileImage: {
+      width: width - 48,
+      height: (width - 48) * 1.2,
+      resizeMode: "cover",
+    },
+    mainBadge: {
+      position: "absolute",
+      top: spacing.md,
+      right: spacing.md,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs / 2,
+      borderRadius: 12,
+    },
+    mainBadgeText: {
+      color: "#fff",
+      fontSize: fontSize.xs,
+      fontWeight: "600",
+    },
+    imageIndicators: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: spacing.md,
+    },
+    indicator: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginHorizontal: 4,
+    },
+    infoGrid: {
+      gap: spacing.md,
+    },
+    infoRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      paddingVertical: spacing.xs,
+    },
+    infoLabel: {
+      fontSize: fontSize.sm,
+      flex: 1,
+      fontWeight: "500",
+    },
+    infoValue: {
+      fontSize: fontSize.base,
+      flex: 2,
+      textAlign: "right",
+      fontWeight: "500",
+    },
+    premiumBadge: {
+      color: "#007AFF",
+      fontWeight: "bold",
+    },
+    aboutText: {
+      fontSize: fontSize.base,
+      lineHeight: spacing.xl,
+    },
+    noDataText: {
+      fontSize: fontSize.base,
+      textAlign: "center",
+      fontStyle: "italic",
+    },
+    subscriptionWidget: {
+      gap: spacing.md,
+    },
+    subscriptionHeader: {
+      alignItems: "center",
+    },
+    subscriptionPlan: {
+      fontSize: fontSize.lg,
+      fontWeight: "bold",
+      marginBottom: spacing.xs / 2,
+    },
+    subscriptionExpiry: {
+      fontSize: fontSize.sm,
+    },
+    subscriptionActions: {
+      gap: spacing.md,
+    },
+    subscriptionButton: {
+      paddingVertical: spacing.sm,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    subscriptionButtonText: {
+      color: "#fff",
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    boostButton: {
+      paddingVertical: spacing.sm,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    viewersList: {
+      gap: spacing.xs,
+    },
+    viewerItem: {
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.md,
+      backgroundColor: "#f0f0f0",
+      borderRadius: 8,
+    },
+    viewerText: {
+      fontSize: fontSize.sm,
+    },
+    moreViewersText: {
+      fontSize: fontSize.sm,
+      fontWeight: "600",
+      textAlign: "center",
+      marginTop: spacing.xs,
+    },
+    statsGrid: {
+      flexDirection: "row",
+      justifyContent: "space-around",
+    },
+    statItem: {
+      alignItems: "center",
+    },
+    statNumber: {
+      fontSize: fontSize.xl,
+      fontWeight: "bold",
+      marginBottom: spacing.xs / 2,
+    },
+    statLabel: {
+      fontSize: fontSize.sm,
+    },
+    signOutContainer: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.lg,
+    },
+    signOutButton: {
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      alignItems: "center",
+      borderWidth: 1,
+    },
+    signOutButtonText: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+  });
 
   const handleEditProfile = () => {
     navigation.navigate("EditProfile");
@@ -280,7 +506,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             disabled={deleteProfileMutation.isPending}
           >
             {deleteProfileMutation.isPending ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={Colors.background.primary} />
             ) : (
               <Text style={styles.actionBtnText}>🗑️ Delete</Text>
             )}
@@ -1219,245 +1445,4 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: 16,
-    marginTop: 16,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  settingsButton: {
-    padding: 8,
-  },
-  settingsText: {
-    fontSize: 16,
-  },
 
-  // Action Buttons Row
-  actionButtonsRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  actionBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  actionBtnText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-
-  // Sections
-  section: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 16,
-  },
-
-  // Image Gallery
-  imageGallery: {
-    marginHorizontal: 16,
-    marginBottom: 20,
-  },
-  imageContainer: {
-    width: width - 40,
-    marginHorizontal: 4,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
-  },
-  profileImage: {
-    width: width - 48,
-    height: (width - 48) * 1.2,
-    resizeMode: "cover",
-  },
-  mainBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  mainBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  imageIndicators: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 12,
-  },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-
-  // Info Grid
-  infoGrid: {
-    gap: 12,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    flex: 1,
-    fontWeight: "500",
-  },
-  infoValue: {
-    fontSize: 16,
-    flex: 2,
-    textAlign: "right",
-    fontWeight: "500",
-  },
-  premiumBadge: {
-    color: "#007AFF",
-    fontWeight: "bold",
-  },
-
-  // About Me
-  aboutText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-
-  // No Data
-  noDataText: {
-    fontSize: 16,
-    textAlign: "center",
-    fontStyle: "italic",
-  },
-
-  // Subscription Widget
-  subscriptionWidget: {
-    gap: 16,
-  },
-  subscriptionHeader: {
-    alignItems: "center",
-  },
-  subscriptionPlan: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  subscriptionExpiry: {
-    fontSize: 14,
-  },
-  subscriptionActions: {
-    gap: 12,
-  },
-  subscriptionButton: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  subscriptionButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  boostButton: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-
-  // Profile Viewers
-  viewersList: {
-    gap: 8,
-  },
-  viewerItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-  },
-  viewerText: {
-    fontSize: 14,
-  },
-  moreViewersText: {
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-    marginTop: 8,
-  },
-
-  // Stats Grid
-  statsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  statItem: {
-    alignItems: "center",
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-  },
-
-  // Sign Out
-  signOutContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-  },
-  signOutButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    borderWidth: 1,
-  },
-  signOutButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

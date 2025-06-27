@@ -1,4 +1,17 @@
-import * as InAppPurchases from "expo-in-app-purchases";
+import RNIap, {
+  Product,
+  Purchase,
+  PurchaseError,
+  SubscriptionPurchase,
+  initConnection,
+  endConnection,
+  getProducts,
+  requestPurchase,
+  requestSubscription,
+  finishTransaction,
+  purchaseErrorListener,
+  purchaseUpdatedListener,
+} from 'react-native-iap';
 import { Platform } from "react-native";
 import { SubscriptionPlan, PurchaseResult } from "../types/subscription";
 
@@ -6,7 +19,7 @@ export interface PurchaseManager {
   initialize: () => Promise<boolean>;
   getAvailableProducts: (
     productIds: string[]
-  ) => Promise<InAppPurchases.IAPItemDetails[]>;
+  ) => Promise<Product[]>;
   purchaseProduct: (productId: string) => Promise<PurchaseResult>;
   restorePurchases: () => Promise<PurchaseResult[]>;
   getReceiptData: () => Promise<string | null>;
@@ -15,16 +28,17 @@ export interface PurchaseManager {
 
 class InAppPurchaseManager implements PurchaseManager {
   private isInitialized = false;
-  private purchaseListener?: any;
+  private purchaseUpdateSubscription?: any;
+  private purchaseErrorSubscription?: any;
 
   /**
    * Initialize in-app purchases
    */
   async initialize(): Promise<boolean> {
     try {
-      await InAppPurchases.connectAsync();
+      await initConnection();
       this.isInitialized = true;
-      this.setupPurchaseListener();
+      this.setupPurchaseListeners();
       return true;
     } catch (error) {
       console.error("Error initializing in-app purchases:", error);
@@ -33,33 +47,24 @@ class InAppPurchaseManager implements PurchaseManager {
   }
 
   /**
-   * Set up purchase event listener
+   * Set up purchase event listeners
    */
-  private setupPurchaseListener(): void {
-    this.purchaseListener = InAppPurchases.setPurchaseListener(
-      ({ responseCode, results, errorCode }) => {
-        if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-          results?.forEach((purchase) => {
-            console.log("Purchase completed:", purchase);
-            // Handle successful purchase
-            this.handlePurchaseSuccess(purchase);
-          });
-        } else if (
-          responseCode === InAppPurchases.IAPResponseCode.USER_CANCELED
-        ) {
-          console.log("Purchase cancelled by user");
-        } else {
-          console.error("Purchase failed:", { responseCode, errorCode });
-        }
-      }
-    );
+  private setupPurchaseListeners(): void {
+    this.purchaseUpdateSubscription = purchaseUpdatedListener((purchase: Purchase | SubscriptionPurchase) => {
+      console.log("Purchase completed:", purchase);
+      this.handlePurchaseSuccess(purchase);
+    });
+
+    this.purchaseErrorSubscription = purchaseErrorListener((error: PurchaseError) => {
+      console.error("Purchase failed:", error);
+    });
   }
 
   /**
    * Handle successful purchase
    */
   private async handlePurchaseSuccess(
-    purchase: InAppPurchases.InAppPurchase
+    purchase: Purchase | SubscriptionPurchase
   ): Promise<void> {
     try {
       // Verify purchase with server
@@ -67,7 +72,7 @@ class InAppPurchaseManager implements PurchaseManager {
       console.log("Processing purchase:", purchase);
 
       // Finish the transaction
-      await InAppPurchases.finishTransactionAsync(purchase, true);
+      await finishTransaction({ purchase, isConsumable: false });
     } catch (error) {
       console.error("Error handling purchase success:", error);
     }
@@ -78,14 +83,14 @@ class InAppPurchaseManager implements PurchaseManager {
    */
   async getAvailableProducts(
     productIds: string[]
-  ): Promise<InAppPurchases.IAPItemDetails[]> {
+  ): Promise<Product[]> {
     if (!this.isInitialized) {
       throw new Error("InAppPurchases not initialized");
     }
 
     try {
-      const result = await InAppPurchases.getProductsAsync(productIds);
-      return (result as any)?.results || [];
+      const products = await getProducts({ skus: productIds });
+      return products;
     } catch (error) {
       console.error("Error getting products:", error);
       return [];
@@ -101,7 +106,15 @@ class InAppPurchaseManager implements PurchaseManager {
     }
 
     try {
-      await InAppPurchases.purchaseItemAsync(productId);
+      // Check if it's a subscription or regular product
+      const isSubscription = productId.includes('monthly') || productId.includes('yearly');
+      
+      if (isSubscription) {
+        await requestSubscription({ sku: productId });
+      } else {
+        await requestPurchase({ sku: productId });
+      }
+      
       return {
         success: true,
         transactionId: `transaction_${Date.now()}`,
@@ -130,11 +143,10 @@ class InAppPurchaseManager implements PurchaseManager {
     }
 
     try {
-      const result = await InAppPurchases.getPurchaseHistoryAsync();
-      const purchases = (result as any)?.results || [];
-      return purchases.map((purchase: any) => ({
+      const purchases = await RNIap.getAvailablePurchases();
+      return purchases.map((purchase) => ({
         success: true,
-        transactionId: purchase.orderId || purchase.transactionId || `restore_${Date.now()}`,
+        transactionId: purchase.transactionId || `restore_${Date.now()}`,
       }));
     } catch (error) {
       console.error("Error restoring purchases:", error);
@@ -148,9 +160,9 @@ class InAppPurchaseManager implements PurchaseManager {
   async getReceiptData(): Promise<string | null> {
     try {
       if (Platform.OS === "ios") {
-        // On iOS, get the app receipt
-        const result = await InAppPurchases.getProductsAsync([]);
-        return result.results?.[0]?.price || null;
+        // On iOS, receipt data is handled through purchase objects
+        // This would typically be obtained from a successful purchase
+        return null;
       } else {
         // On Android, purchase data is handled differently
         return null;
@@ -166,13 +178,18 @@ class InAppPurchaseManager implements PurchaseManager {
    */
   async cleanup(): Promise<void> {
     try {
-      if (this.purchaseListener) {
-        this.purchaseListener.remove();
-        this.purchaseListener = undefined;
+      if (this.purchaseUpdateSubscription) {
+        this.purchaseUpdateSubscription.remove();
+        this.purchaseUpdateSubscription = undefined;
+      }
+
+      if (this.purchaseErrorSubscription) {
+        this.purchaseErrorSubscription.remove();
+        this.purchaseErrorSubscription = undefined;
       }
 
       if (this.isInitialized) {
-        await InAppPurchases.disconnectAsync();
+        await endConnection();
         this.isInitialized = false;
       }
     } catch (error) {

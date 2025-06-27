@@ -1,5 +1,5 @@
-import { EventEmitter } from "events";
-import { Message, MessageStatus } from "../types/message";
+import { EventEmitter } from "eventemitter3";
+import { MessageStatus } from "../types/message";
 
 export interface RealtimeEvent {
   type:

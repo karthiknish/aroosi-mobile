@@ -15,6 +15,8 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import SocialAuthButtons from "../../../components/auth/SocialAuthButtons";
+import { Colors } from "../../../constants/Colors";
+import { useResponsiveSpacing, useResponsiveTypography } from "../../../hooks/useResponsive";
 
 type SignUpScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -24,6 +26,8 @@ type SignUpScreenNavigationProp = StackNavigationProp<
 export default function SignUpScreen() {
   const { isLoaded, signUp, setActive } = useSignUp();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -100,6 +104,125 @@ export default function SignUpScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.primary,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    header: {
+      marginBottom: spacing.xl * 2,
+    },
+    title: {
+      fontSize: fontSize["2xl"],
+      fontWeight: "bold",
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+    },
+    form: {
+      width: "100%",
+    },
+    inputContainer: {
+      marginBottom: spacing.lg,
+    },
+    label: {
+      fontSize: fontSize.sm,
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+      fontWeight: "500",
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: 8,
+      padding: spacing.md,
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+    },
+    button: {
+      backgroundColor: Colors.primary[500],
+      borderRadius: 8,
+      padding: spacing.md,
+      alignItems: "center",
+      marginTop: spacing.lg,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    buttonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    termsContainer: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginVertical: spacing.lg,
+      paddingHorizontal: spacing.xs,
+    },
+    checkbox: {
+      width: spacing.lg,
+      height: spacing.lg,
+      borderWidth: 2,
+      borderColor: Colors.border.primary,
+      borderRadius: 4,
+      marginRight: spacing.md,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 2,
+    },
+    checkboxChecked: {
+      backgroundColor: Colors.primary[500],
+      borderColor: Colors.primary[500],
+    },
+    checkmark: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.xs,
+      fontWeight: "bold",
+    },
+    termsText: {
+      flex: 1,
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      lineHeight: spacing.lg,
+    },
+    termsLink: {
+      color: Colors.primary[500],
+      fontWeight: "500",
+    },
+    divider: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginVertical: spacing.lg,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: Colors.border.primary,
+    },
+    dividerText: {
+      marginHorizontal: spacing.md,
+      color: Colors.text.secondary,
+      fontSize: fontSize.sm,
+    },
+    linkButton: {
+      marginTop: spacing.lg,
+      alignItems: "center",
+    },
+    linkText: {
+      color: Colors.primary[500],
+      fontSize: fontSize.sm,
+    },
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -124,7 +247,7 @@ export default function SignUpScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your email"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.text.secondary}
                   value={emailAddress}
                   onChangeText={setEmailAddress}
                   autoCapitalize="none"
@@ -138,7 +261,7 @@ export default function SignUpScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Create a password"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.text.secondary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
@@ -151,7 +274,7 @@ export default function SignUpScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm your password"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.text.secondary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
@@ -229,7 +352,7 @@ export default function SignUpScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter verification code"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.text.secondary}
                   value={code}
                   onChangeText={setCode}
                   keyboardType="number-pad"
@@ -253,122 +376,3 @@ export default function SignUpScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-  header: {
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-  },
-  form: {
-    width: "100%",
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 8,
-    fontWeight: "500",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  termsContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginVertical: 20,
-    paddingHorizontal: 4,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    borderRadius: 4,
-    marginRight: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
-  },
-  checkmark: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  termsText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: "#007AFF",
-    fontWeight: "500",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#ddd",
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: "#666",
-    fontSize: 14,
-  },
-  linkButton: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#007AFF",
-    fontSize: 14,
-  },
-});

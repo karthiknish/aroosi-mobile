@@ -20,6 +20,7 @@ import {
   createSequentialFadeIn,
   ANIMATION_DURATIONS,
 } from "../../utils/animations";
+import { Colors } from "../../../constants/Colors";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -226,8 +227,8 @@ export const HeartButton: React.FC<HeartButtonProps> = ({
   isLiked,
   onToggle,
   size = 24,
-  likedColor = "#FF4444",
-  unlikedColor = "#CCCCCC",
+  likedColor = Colors.error[500],
+  unlikedColor = Colors.neutral[400],
   style,
   ...props
 }) => {
@@ -361,8 +362,8 @@ interface AnimatedProgressBarProps extends ViewProps {
 export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
   progress,
   height = 4,
-  backgroundColor = "#E0E0E0",
-  progressColor = "#4CAF50",
+  backgroundColor = Colors.neutral[200],
+  progressColor = Colors.success[400],
   animated = true,
   duration = ANIMATION_DURATIONS.slow,
   style,
@@ -420,8 +421,8 @@ interface FloatingActionButtonProps extends TouchableOpacityProps {
 export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   icon,
   size = 56,
-  backgroundColor = "#FF4081",
-  shadowColor = "#000",
+  backgroundColor = Colors.primary[500],
+  shadowColor = Colors.neutral[900],
   style,
   ...props
 }) => {
@@ -485,7 +486,7 @@ interface PulseViewProps extends ViewProps {
 
 export const PulseView: React.FC<PulseViewProps> = ({
   isActive,
-  pulseColor = "#FF4081",
+  pulseColor = Colors.primary[500],
   children,
   style,
   ...props

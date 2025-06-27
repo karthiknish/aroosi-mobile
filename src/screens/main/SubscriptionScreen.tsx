@@ -230,7 +230,7 @@ export default function SubscriptionScreen({
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={Colors.primary[500]} />
           <Text style={styles.loadingText}>
             Loading subscription details...
           </Text>
@@ -314,7 +314,7 @@ export default function SubscriptionScreen({
               disabled={purchasing !== null}
             >
               {purchasing === selectedPlan.tier ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.background.primary} />
               ) : (
                 <Text style={styles.purchaseButtonText}>
                   Subscribe to {selectedPlan.name} - £
@@ -430,16 +430,17 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
   },
   backButton: {
-    padding: 8,
+    fontSize: 16,
+    color: Colors.primary[500],
   },
   backButtonText: {
     fontSize: 16,
-    color: "#007AFF",
+    color: Colors.primary[500],
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#333",
+    color: Colors.text.primary,
   },
   placeholder: {
     width: 50,
@@ -485,35 +486,35 @@ const styles = StyleSheet.create({
   statusTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    color: Colors.text.primary,
     marginBottom: 12,
   },
   statusActive: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#28a745",
+    color: Colors.success[500],
     marginBottom: 4,
   },
   statusTrial: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#ffc107",
+    color: Colors.warning[500],
     marginBottom: 4,
   },
   statusFree: {
     fontSize: 16,
-    color: "#666",
+    color: Colors.text.secondary,
   },
   statusExpiry: {
     fontSize: 14,
-    color: "#666",
+    color: Colors.text.secondary,
   },
   managementSection: {
     paddingHorizontal: 20,
     marginTop: 20,
   },
   usageHistoryButton: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -527,29 +528,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   cancelButton: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#dc3545",
+    borderColor: Colors.error[500],
   },
   cancelButtonText: {
-    color: "#dc3545",
+    color: Colors.error[500],
     fontSize: 16,
     fontWeight: "600",
   },
   restoreButton: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: Colors.primary[500],
   },
   restoreButtonText: {
-    color: "#007AFF",
+    color: Colors.primary[500],
     fontSize: 16,
     fontWeight: "600",
   },
@@ -559,7 +560,7 @@ const styles = StyleSheet.create({
   },
   termsText: {
     fontSize: 12,
-    color: "#666",
+    color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 18,
   },

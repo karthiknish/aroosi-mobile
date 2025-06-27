@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   TextInput,
   View,
@@ -7,8 +7,11 @@ import {
   TextInputProps,
   ViewStyle,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
+import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -22,6 +25,10 @@ interface InputProps extends TextInputProps {
   inputStyle?: ViewStyle;
   multiline?: boolean;
   numberOfLines?: number;
+  validationState?: 'default' | 'valid' | 'invalid';
+  showValidationIcon?: boolean;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export default function Input({
@@ -36,19 +43,79 @@ export default function Input({
   inputStyle,
   multiline = false,
   numberOfLines = 1,
+  validationState = 'default',
+  showValidationIcon = true,
+  accessibilityLabel,
+  accessibilityHint,
   ...textInputProps
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const { fontSize } = useResponsiveTypography();
+  const shakeAnimation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (error) {
+      Animated.sequence([
+        Animated.timing(shakeAnimation, {
+          toValue: 10,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+          toValue: -10,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+          toValue: 10,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shakeAnimation, {
+          toValue: 0,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [error, shakeAnimation]);
 
   const containerStyles = [
     styles.container,
     containerStyle,
   ];
 
+  const getValidationIcon = () => {
+    if (!showValidationIcon) return null;
+    
+    if (error || validationState === 'invalid') {
+      return (
+        <Ionicons 
+          name="close-circle" 
+          size={Layout.getResponsiveFontSize(20)} 
+          color={Colors.error[500]} 
+        />
+      );
+    }
+    
+    if (validationState === 'valid') {
+      return (
+        <Ionicons 
+          name="checkmark-circle" 
+          size={Layout.getResponsiveFontSize(20)} 
+          color={Colors.success[500]} 
+        />
+      );
+    }
+    
+    return null;
+  };
+
   const inputContainerStyles = [
     styles.inputContainer,
     isFocused && styles.inputContainerFocused,
     error && styles.inputContainerError,
+    validationState === 'valid' && styles.inputContainerValid,
     multiline && styles.inputContainerMultiline,
   ];
 
@@ -61,7 +128,7 @@ export default function Input({
   ];
 
   return (
-    <View style={containerStyles}>
+    <Animated.View style={[containerStyles, { transform: [{ translateX: shakeAnimation }] }]}>
       {label && (
         <View style={styles.labelContainer}>
           <Text style={styles.label}>
@@ -79,15 +146,24 @@ export default function Input({
         )}
         
         <TextInput
-          style={inputStyles}
+          style={[inputStyles, { fontSize: fontSize.base }]}
           placeholderTextColor={Colors.text.tertiary}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           multiline={multiline}
           numberOfLines={multiline ? numberOfLines : 1}
           textAlignVertical={multiline ? 'top' : 'center'}
+          accessibilityLabel={accessibilityLabel || label}
+          accessibilityHint={accessibilityHint || hint}
+          accessibilityValue={error ? { text: error } : undefined}
           {...textInputProps}
         />
+        
+        {getValidationIcon() && (
+          <View style={styles.validationIcon}>
+            {getValidationIcon()}
+          </View>
+        )}
         
         {rightIcon && (
           <TouchableOpacity
@@ -101,13 +177,13 @@ export default function Input({
       </View>
       
       {(error || hint) && (
-        <View style={styles.helpContainer}>
+        <Animated.View style={styles.helpContainer}>
           <Text style={[styles.help, error && styles.helpError]}>
             {error || hint}
           </Text>
-        </View>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -149,6 +225,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.error[500],
   },
   
+  inputContainerValid: {
+    borderColor: Colors.success[500],
+  },
+  
   inputContainerMultiline: {
     minHeight: 88,
     alignItems: 'flex-start',
@@ -184,6 +264,10 @@ const styles = StyleSheet.create({
   rightIcon: {
     paddingRight: Layout.spacing.md,
     paddingLeft: Layout.spacing.xs,
+  },
+  
+  validationIcon: {
+    paddingRight: Layout.spacing.sm,
   },
   
   helpContainer: {

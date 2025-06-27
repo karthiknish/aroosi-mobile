@@ -8,6 +8,8 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { Colors } from '../../../constants/Colors';
+import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
 
 interface WelcomeScreenProps {
   navigation: any;
@@ -16,6 +18,9 @@ interface WelcomeScreenProps {
 const { width, height } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
   const handleGetStarted = () => {
     navigation.navigate('ProfileSetup');
   };
@@ -23,6 +28,109 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const handleSkipForNow = () => {
     navigation.navigate('Main');
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.primary,
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: spacing.xl,
+      justifyContent: 'space-between',
+    },
+    header: {
+      alignItems: 'center',
+      paddingTop: spacing.xl * 2,
+    },
+    logoContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: Colors.primary[100],
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.xl,
+    },
+    logoText: {
+      fontSize: fontSize["3xl"],
+    },
+    welcomeTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      marginBottom: spacing.md,
+      textAlign: 'center',
+    },
+    welcomeSubtitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: 'center',
+      lineHeight: spacing.xl,
+    },
+    featuresContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingVertical: spacing.xl * 2,
+    },
+    feature: {
+      alignItems: 'center',
+      marginBottom: spacing.xl * 2,
+      paddingHorizontal: spacing.lg,
+    },
+    featureIcon: {
+      fontSize: fontSize["4xl"],
+      marginBottom: spacing.md,
+    },
+    featureTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    featureDescription: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: 'center',
+      lineHeight: spacing.lg + 2,
+    },
+    ctaContainer: {
+      paddingBottom: spacing.xl * 2,
+    },
+    primaryButton: {
+      backgroundColor: Colors.primary[500],
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    primaryButtonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.lg,
+      fontWeight: '600',
+    },
+    secondaryButton: {
+      backgroundColor: Colors.background.primary,
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      marginBottom: spacing.lg,
+    },
+    secondaryButtonText: {
+      color: Colors.text.secondary,
+      fontSize: fontSize.base,
+      fontWeight: '500',
+    },
+    disclaimerText: {
+      fontSize: fontSize.xs,
+      color: Colors.text.tertiary,
+      textAlign: 'center',
+      lineHeight: spacing.lg,
+    },
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -84,105 +192,3 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'space-between',
-  },
-  header: {
-    alignItems: 'center',
-    paddingTop: 40,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#FFE8E8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  logoText: {
-    fontSize: 36,
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  featuresContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  feature: {
-    alignItems: 'center',
-    marginBottom: 40,
-    paddingHorizontal: 20,
-  },
-  featureIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  featureTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  featureDescription: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  ctaContainer: {
-    paddingBottom: 40,
-  },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 20,
-  },
-  secondaryButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  disclaimerText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-});

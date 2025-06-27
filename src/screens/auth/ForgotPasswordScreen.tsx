@@ -15,6 +15,8 @@ import { useSignIn } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { Colors } from '../../../constants/Colors';
+import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
 
@@ -24,6 +26,8 @@ export default function ForgotPasswordScreen() {
   const [emailSent, setEmailSent] = useState(false);
   const { signIn, setActive } = useSignIn();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const onSendResetEmail = async () => {
     if (!email.trim()) {
@@ -72,6 +76,82 @@ export default function ForgotPasswordScreen() {
     }
     setLoading(false);
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.primary,
+    },
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: spacing.lg,
+    },
+    header: {
+      marginBottom: spacing.xl * 2,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: 'center',
+      lineHeight: spacing.lg + 2,
+    },
+    form: {
+      width: '100%',
+    },
+    inputContainer: {
+      marginBottom: spacing.lg,
+    },
+    label: {
+      fontSize: fontSize.base,
+      fontWeight: '600',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: 8,
+      padding: spacing.md,
+      fontSize: fontSize.base,
+      backgroundColor: Colors.background.secondary,
+      color: Colors.text.primary,
+    },
+    button: {
+      backgroundColor: Colors.primary[500],
+      borderRadius: 8,
+      padding: spacing.md,
+      alignItems: 'center',
+      marginTop: spacing.lg,
+    },
+    buttonDisabled: {
+      backgroundColor: Colors.neutral[300],
+    },
+    buttonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: '600',
+    },
+    backButton: {
+      alignItems: 'center',
+      marginTop: spacing.lg,
+    },
+    backButtonText: {
+      color: Colors.primary[500],
+      fontSize: fontSize.base,
+      fontWeight: '500',
+    },
+  });
 
   if (emailSent) {
     return <ResetPasswordForm onVerifyAndReset={onVerifyAndReset} loading={loading} />;
@@ -138,6 +218,8 @@ function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps
   const [code, setCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const handleSubmit = () => {
     if (newPassword !== confirmPassword) {
@@ -152,6 +234,73 @@ function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps
 
     onVerifyAndReset(code, newPassword);
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.primary,
+    },
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: spacing.lg,
+    },
+    header: {
+      marginBottom: spacing.xl * 2,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: 'center',
+      lineHeight: spacing.lg + 2,
+    },
+    form: {
+      width: '100%',
+    },
+    inputContainer: {
+      marginBottom: spacing.lg,
+    },
+    label: {
+      fontSize: fontSize.base,
+      fontWeight: '600',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: 8,
+      padding: spacing.md,
+      fontSize: fontSize.base,
+      backgroundColor: Colors.background.secondary,
+      color: Colors.text.primary,
+    },
+    button: {
+      backgroundColor: Colors.primary[500],
+      borderRadius: 8,
+      padding: spacing.md,
+      alignItems: 'center',
+      marginTop: spacing.lg,
+    },
+    buttonDisabled: {
+      backgroundColor: Colors.neutral[300],
+    },
+    buttonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: '600',
+    },
+  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -222,78 +371,3 @@ function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-  },
-  header: {
-    marginBottom: 40,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  form: {
-    width: '100%',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 15,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  buttonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-});

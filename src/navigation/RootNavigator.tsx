@@ -17,6 +17,7 @@ import { RootStackParamList } from "./types";
 
 // Loading screen
 import { View, ActivityIndicator } from "react-native";
+import { Colors } from "../../constants/Colors";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -39,7 +40,7 @@ export default function RootNavigator() {
   if (!isLoaded || (userId && profileLoading)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color={Colors.primary[500]} />
       </View>
     );
   }

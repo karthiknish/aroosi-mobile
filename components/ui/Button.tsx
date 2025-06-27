@@ -8,7 +8,46 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Colors, Layout } from '../../constants';
+import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+
+// Helper functions for responsive button styles
+const getResponsiveButtonStyle = (size: 'sm' | 'md' | 'lg', spacing: any) => {
+  const sizeMap = {
+    sm: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      minHeight: 36,
+    },
+    md: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      minHeight: 44,
+    },
+    lg: {
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.lg,
+      minHeight: 52,
+    },
+  };
+  return sizeMap[size];
+};
+
+const getResponsiveTextStyle = (size: 'sm' | 'md' | 'lg', fontSize: any) => {
+  const sizeMap = {
+    sm: {
+      fontSize: fontSize.sm,
+    },
+    md: {
+      fontSize: fontSize.base,
+    },
+    lg: {
+      fontSize: fontSize.lg,
+    },
+  };
+  return sizeMap[size];
+};
 
 interface ButtonProps {
   title: string;
@@ -22,6 +61,11 @@ interface ButtonProps {
   iconPosition?: 'left' | 'right';
   style?: ViewStyle;
   textStyle?: TextStyle;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  accessibilityRole?: 'button' | 'link';
+  enableHaptics?: boolean;
+  hapticType?: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error';
 }
 
 export default function Button({
@@ -36,11 +80,19 @@ export default function Button({
   iconPosition = 'left',
   style,
   textStyle,
+  accessibilityLabel,
+  accessibilityHint,
+  accessibilityRole = 'button',
+  enableHaptics = true,
+  hapticType = 'light',
 }: ButtonProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
   const buttonStyles = [
     styles.base,
     styles[variant],
-    styles[size],
+    getResponsiveButtonStyle(size, spacing),
     fullWidth && styles.fullWidth,
     (disabled || loading) && styles.disabled,
     style,
@@ -49,13 +101,41 @@ export default function Button({
   const textStyles = [
     styles.text,
     styles[`${variant}Text`] as TextStyle,
-    styles[`${size}Text`] as TextStyle,
+    getResponsiveTextStyle(size, fontSize),
     (disabled || loading) && styles.disabledText,
     textStyle,
   ];
 
+  const triggerHapticFeedback = () => {
+    if (!enableHaptics) return;
+    
+    switch (hapticType) {
+      case 'light':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        break;
+      case 'medium':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        break;
+      case 'heavy':
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        break;
+      case 'success':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        break;
+      case 'warning':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        break;
+      case 'error':
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        break;
+      default:
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
+
   const handlePress = () => {
     if (!disabled && !loading) {
+      triggerHapticFeedback();
       onPress();
     }
   };
@@ -66,6 +146,13 @@ export default function Button({
       onPress={handlePress}
       disabled={disabled || loading}
       activeOpacity={0.8}
+      accessibilityRole={accessibilityRole}
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{
+        disabled: disabled || loading,
+        busy: loading,
+      }}
     >
       <View style={styles.content}>
         {loading ? (

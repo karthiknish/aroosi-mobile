@@ -683,7 +683,7 @@ export default function ProfileDetailScreen({
             ]}
           >
             {interestLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={Colors.text.inverse} />
             ) : (
               <Text style={styles.buttonText}>
                 {hasInterest ? "💔 Remove Interest" : "💖 Send Interest"}
@@ -849,7 +849,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
   },

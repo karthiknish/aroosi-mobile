@@ -1,13 +1,15 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
+import { useResponsiveSpacing, useResponsiveTypography } from "../../hooks/useResponsive";
 
 export interface EmptyStateProps {
   icon?: string;
@@ -28,11 +30,90 @@ export default function EmptyState({
   style,
   illustration,
 }: EmptyStateProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, slideAnim]);
+
+  const dynamicStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xl,
+    },
+    content: {
+      alignItems: "center",
+      maxWidth: 300,
+    },
+    iconContainer: {
+      marginBottom: spacing.xl,
+      padding: spacing.lg,
+      borderRadius: 50,
+      backgroundColor: Colors.background.secondary,
+    },
+    title: {
+      fontSize: fontSize.xl,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      textAlign: "center",
+      marginBottom: spacing.md,
+    },
+    message: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: "center",
+      lineHeight: fontSize.base * 1.5,
+      marginBottom: spacing.xl,
+    },
+    actionButton: {
+      backgroundColor: Colors.primary[500],
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.md,
+      borderRadius: 8,
+      shadowColor: Colors.primary[500],
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    actionButtonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: '600',
+    },
+  });
+
   return (
-    <View style={[styles.container, style]}>
-      <View style={styles.content}>
+    <Animated.View 
+      style={[
+        dynamicStyles.container, 
+        style,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        }
+      ]}
+    >
+      <View style={dynamicStyles.content}>
         {illustration || (
-          <View style={styles.iconContainer}>
+          <View style={dynamicStyles.iconContainer}>
             <Ionicons
               name={icon as keyof typeof Ionicons.glyphMap}
               size={64}
@@ -41,63 +122,22 @@ export default function EmptyState({
           </View>
         )}
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={dynamicStyles.title}>{title}</Text>
 
-        {message && <Text style={styles.message}>{message}</Text>}
+        {message && <Text style={dynamicStyles.message}>{message}</Text>}
 
         {actionText && onAction && (
-          <TouchableOpacity style={styles.actionButton} onPress={onAction}>
-            <Text style={styles.actionButtonText}>{actionText}</Text>
+          <TouchableOpacity 
+            style={dynamicStyles.actionButton} 
+            onPress={onAction}
+            activeOpacity={0.8}
+          >
+            <Text style={dynamicStyles.actionButtonText}>{actionText}</Text>
           </TouchableOpacity>
         )}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: Layout.spacing.lg,
-  },
 
-  content: {
-    alignItems: "center",
-    maxWidth: 300,
-  },
-
-  iconContainer: {
-    marginBottom: Layout.spacing.lg,
-  },
-
-  title: {
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
-    textAlign: "center",
-    marginBottom: Layout.spacing.sm,
-  },
-
-  message: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: Layout.spacing.xl,
-  },
-
-  actionButton: {
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-  },
-
-  actionButtonText: {
-    color: Colors.background.primary,
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-  },
-});

@@ -35,7 +35,7 @@ jobs:
         run: npm run lint --if-present
 
       - name: 🔍 Run type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   # Build preview for pull requests
   build-preview:

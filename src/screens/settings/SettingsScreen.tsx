@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useState } from 'react';
+import { Colors } from '../../../constants/Colors';
+import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
 
 interface SettingsScreenProps {
   navigation: any;
@@ -30,6 +32,8 @@ interface SettingItem {
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { signOut } = useAuth();
   const { user } = useUser();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   
   // Local state for toggles
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -216,6 +220,126 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
   ];
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.secondary,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      backgroundColor: Colors.background.primary,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border.primary,
+    },
+    backButton: {
+      padding: spacing.xs,
+    },
+    backButtonText: {
+      fontSize: fontSize.base,
+      color: Colors.primary[500],
+    },
+    headerTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+    },
+    placeholder: {
+      width: 50,
+    },
+    userInfo: {
+      backgroundColor: Colors.background.primary,
+      paddingVertical: spacing.xl,
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    userAvatar: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: Colors.primary[500],
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    userInitial: {
+      fontSize: fontSize["2xl"],
+      fontWeight: 'bold',
+      color: Colors.text.inverse,
+    },
+    userName: {
+      fontSize: fontSize.lg,
+      fontWeight: 'bold',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs / 2,
+    },
+    userEmail: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+    },
+    section: {
+      marginBottom: spacing.lg,
+    },
+    sectionTitle: {
+      fontSize: fontSize.base,
+      fontWeight: '600',
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+      marginHorizontal: spacing.lg,
+    },
+    sectionContent: {
+      backgroundColor: Colors.background.primary,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: Colors.border.primary,
+    },
+    settingItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border.primary,
+    },
+    destructiveItem: {
+      // Additional styling for destructive items if needed
+    },
+    settingContent: {
+      flex: 1,
+    },
+    settingTitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+      marginBottom: 2,
+    },
+    destructiveText: {
+      color: Colors.error[500],
+    },
+    settingSubtitle: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+    },
+    chevron: {
+      fontSize: fontSize.lg,
+      color: Colors.neutral[400],
+      marginLeft: spacing.xs,
+    },
+    versionContainer: {
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+    },
+    versionText: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+    },
+  });
+
   const renderSettingItem = (item: SettingItem, index: number) => (
     <TouchableOpacity
       key={index}
@@ -299,122 +423,3 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 50,
-  },
-  userInfo: {
-    backgroundColor: '#fff',
-    paddingVertical: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  userAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  userInitial: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-    marginHorizontal: 20,
-  },
-  sectionContent: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  destructiveItem: {
-    // Additional styling for destructive items if needed
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 2,
-  },
-  destructiveText: {
-    color: '#dc3545',
-  },
-  settingSubtitle: {
-    fontSize: 14,
-    color: '#666',
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#c7c7cc',
-    marginLeft: 8,
-  },
-  versionContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  versionText: {
-    fontSize: 14,
-    color: '#666',
-  },
-});

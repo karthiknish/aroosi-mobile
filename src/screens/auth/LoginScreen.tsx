@@ -15,6 +15,8 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import SocialAuthButtons from "../../../components/auth/SocialAuthButtons";
+import { Colors, Layout } from "../../../constants";
+import { useResponsiveSpacing, useResponsiveTypography } from "../../../hooks/useResponsive";
 
 type LoginScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -24,6 +26,8 @@ type LoginScreenNavigationProp = StackNavigationProp<
 export default function LoginScreen() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -56,6 +60,98 @@ export default function LoginScreen() {
     }
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.primary,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    header: {
+      marginBottom: spacing.xl * 2,
+    },
+    title: {
+      fontSize: fontSize["2xl"],
+      fontWeight: "bold",
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    subtitle: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+    },
+    form: {
+      width: "100%",
+    },
+    inputContainer: {
+      marginBottom: spacing.lg,
+    },
+    label: {
+      fontSize: fontSize.sm,
+      color: Colors.text.primary,
+      marginBottom: spacing.xs,
+      fontWeight: "500",
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: 8,
+      padding: spacing.md,
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+    },
+    button: {
+      backgroundColor: Colors.primary[500],
+      borderRadius: 8,
+      padding: spacing.md,
+      alignItems: "center",
+      marginTop: spacing.lg,
+    },
+    buttonDisabled: {
+      opacity: 0.7,
+    },
+    buttonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    forgotPasswordButton: {
+      alignItems: "center",
+      marginTop: spacing.md,
+    },
+    forgotPasswordText: {
+      color: Colors.primary[500],
+      fontSize: fontSize.sm,
+      fontWeight: "500",
+    },
+    divider: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginVertical: spacing.xl,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: Colors.border.primary,
+    },
+    dividerText: {
+      marginHorizontal: spacing.md,
+      color: Colors.text.secondary,
+      fontSize: fontSize.sm,
+    },
+    linkButton: {
+      marginTop: spacing.lg,
+      alignItems: "center",
+    },
+    linkText: {
+      color: Colors.primary[500],
+      fontSize: fontSize.sm,
+    },
+  });
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -76,7 +172,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Enter your email"
-              placeholderTextColor="#999"
+              placeholderTextColor={Colors.text.secondary}
               value={emailAddress}
               onChangeText={setEmailAddress}
               autoCapitalize="none"
@@ -90,7 +186,7 @@ export default function LoginScreen() {
             <TextInput
               style={styles.input}
               placeholder="Enter your password"
-              placeholderTextColor="#999"
+              placeholderTextColor={Colors.text.secondary}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
@@ -142,95 +238,3 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: "center",
-    padding: 20,
-  },
-  header: {
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#666",
-  },
-  form: {
-    width: "100%",
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 8,
-    fontWeight: "500",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  forgotPasswordButton: {
-    alignItems: "center",
-    marginTop: 12,
-  },
-  forgotPasswordText: {
-    color: "#007AFF",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 30,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#ddd",
-  },
-  dividerText: {
-    marginHorizontal: 16,
-    color: "#666",
-    fontSize: 14,
-  },
-  linkButton: {
-    marginTop: 20,
-    alignItems: "center",
-  },
-  linkText: {
-    color: "#007AFF",
-    fontSize: 14,
-  },
-});

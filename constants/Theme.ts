@@ -102,14 +102,57 @@ const createComponentStyles = (colors: typeof Colors) => ({
       lineHeight: Layout.typography.lineHeight.heading,
       color: colors.text.primary,
     },
+    headingLarge: {
+      fontFamily: Layout.typography.fontFamily.serif, // Boldonse Regular
+      fontSize: Layout.typography.fontSize['3xl'],
+      lineHeight: Layout.typography.lineHeight.heading,
+      color: colors.text.primary,
+      fontWeight: Layout.typography.fontWeight.bold, // Use fontWeight for emphasis
+    },
+    headingMedium: {
+      fontFamily: Layout.typography.fontFamily.serif, // Boldonse Regular
+      fontSize: Layout.typography.fontSize['2xl'],
+      lineHeight: Layout.typography.lineHeight.heading,
+      color: colors.text.primary,
+    },
+    headingSmall: {
+      fontFamily: Layout.typography.fontFamily.serif, // Boldonse Regular
+      fontSize: Layout.typography.fontSize.xl,
+      lineHeight: Layout.typography.lineHeight.heading,
+      color: colors.text.primary,
+    },
     body: {
-      fontFamily: Layout.typography.fontFamily.sans, // Nunito Sans
+      fontFamily: Layout.typography.fontFamily.sans, // Nunito Sans Regular
+      fontSize: Layout.typography.fontSize.base,
+      lineHeight: Layout.typography.lineHeight.base,
+      color: colors.text.primary,
+    },
+    bodyMedium: {
+      fontFamily: Layout.typography.fontFamily.sansMedium, // Nunito Sans Medium
+      fontSize: Layout.typography.fontSize.base,
+      lineHeight: Layout.typography.lineHeight.base,
+      color: colors.text.primary,
+    },
+    bodySemiBold: {
+      fontFamily: Layout.typography.fontFamily.sansSemiBold, // Nunito Sans SemiBold
+      fontSize: Layout.typography.fontSize.base,
+      lineHeight: Layout.typography.lineHeight.base,
+      color: colors.text.primary,
+    },
+    bodyBold: {
+      fontFamily: Layout.typography.fontFamily.sansBold, // Nunito Sans Bold
       fontSize: Layout.typography.fontSize.base,
       lineHeight: Layout.typography.lineHeight.base,
       color: colors.text.primary,
     },
     caption: {
       fontFamily: Layout.typography.fontFamily.sans,
+      fontSize: Layout.typography.fontSize.sm,
+      lineHeight: Layout.typography.lineHeight.sm,
+      color: colors.text.secondary,
+    },
+    captionMedium: {
+      fontFamily: Layout.typography.fontFamily.sansMedium,
       fontSize: Layout.typography.fontSize.sm,
       lineHeight: Layout.typography.lineHeight.sm,
       color: colors.text.secondary,
