@@ -25,6 +25,7 @@ export type ProfileStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   Subscription: undefined;
+  Contact: undefined;
 };
 
 export type ChatStackParamList = {

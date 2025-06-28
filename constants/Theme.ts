@@ -69,7 +69,7 @@ const createComponentStyles = (colors: typeof Colors) => ({
       elevation: 2,
     },
   },
-  
+
   card: {
     backgroundColor: colors.background.primary,
     borderRadius: Layout.radius.lg,
@@ -82,7 +82,7 @@ const createComponentStyles = (colors: typeof Colors) => ({
     shadowRadius: 8,
     elevation: 3,
   },
-  
+
   input: {
     backgroundColor: colors.background.secondary,
     borderRadius: Layout.radius.sm,
@@ -94,24 +94,22 @@ const createComponentStyles = (colors: typeof Colors) => ({
     color: colors.text.primary,
     fontFamily: Layout.typography.fontFamily.sans,
   },
-  
+
   text: {
     heading: {
       fontFamily: Layout.typography.fontFamily.serif, // Boldonse
-      fontWeight: Layout.typography.fontWeight.bold,
       lineHeight: Layout.typography.lineHeight.heading,
       color: colors.text.primary,
     },
     headingLarge: {
       fontFamily: Layout.typography.fontFamily.serif, // Boldonse Regular
-      fontSize: Layout.typography.fontSize['3xl'],
+      fontSize: Layout.typography.fontSize["3xl"],
       lineHeight: Layout.typography.lineHeight.heading,
       color: colors.text.primary,
-      fontWeight: Layout.typography.fontWeight.bold, // Use fontWeight for emphasis
     },
     headingMedium: {
       fontFamily: Layout.typography.fontFamily.serif, // Boldonse Regular
-      fontSize: Layout.typography.fontSize['2xl'],
+      fontSize: Layout.typography.fontSize["2xl"],
       lineHeight: Layout.typography.lineHeight.heading,
       color: colors.text.primary,
     },

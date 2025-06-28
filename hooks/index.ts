@@ -12,6 +12,7 @@ export { useTheme, useThemedStyles } from '../contexts/ThemeContext';
 // Existing hooks
 export { default as useAppRating } from './useAppRating';
 export { useAudioPlayback } from './useAudioPlayback';
+export { useContact } from './useContact';
 export { useFeatureGate } from './useFeatureGate';
 export { useImageUpload } from './useImageUpload';
 export { useInterests } from './useInterests';

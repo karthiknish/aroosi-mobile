@@ -6,8 +6,9 @@
 // OneSignal Device Types
 export type DeviceType = 'ios' | 'android' | 'unknown';
 
-// Push Registration Data
+// Push Registration Data (aligned with main project Convex schema)
 export interface PushRegistration {
+  _id?: string;               // Convex document ID
   userId: string;
   playerId: string;           // OneSignal player ID
   deviceType: DeviceType;
@@ -115,11 +116,22 @@ export interface NotificationNavigationData {
   params?: Record<string, any>;
 }
 
-// API Response Types
+// API Response Types (aligned with main project API)
 export interface PushRegistrationResponse {
   success: boolean;
   message: string;
   registrationId?: string;
+  playerId?: string;
+  registeredAt?: number;
+  features?: string[];
+}
+
+export interface PushUnregistrationResponse {
+  success: boolean;
+  message: string;
+  playerId?: string;
+  unregistered?: boolean;
+  unregisteredAt?: number;
 }
 
 export interface NotificationStatusResponse {

@@ -2,12 +2,12 @@ import React, { ReactElement, cloneElement } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useFeatureAccess } from '../../hooks/useFeatureAccess';
 import { useSubscription } from '../../hooks/useSubscription';
-import { FeatureLimits } from '../../types/subscription';
+import { SubscriptionFeatures } from '../../types/subscription';
 import { Colors, Layout } from '../../constants';
 
 interface FeatureGateProps {
   children: ReactElement;
-  feature: keyof FeatureLimits;
+  feature: keyof SubscriptionFeatures;
   fallback?: ReactElement;
   showUpgradePrompt?: boolean;
   onUpgradeRequired?: () => void;
@@ -96,7 +96,7 @@ export default function FeatureGate({
 }
 
 interface UpgradePromptButtonProps {
-  feature: keyof FeatureLimits;
+  feature: keyof SubscriptionFeatures;
   onUpgrade?: () => void;
   originalChildren: ReactElement;
 }
@@ -104,7 +104,7 @@ interface UpgradePromptButtonProps {
 function UpgradePromptButton({ feature, onUpgrade, originalChildren }: UpgradePromptButtonProps) {
   const { hasActiveSubscription } = useSubscription();
 
-  const getFeatureDisplayName = (feature: keyof FeatureLimits): string => {
+  const getFeatureDisplayName = (feature: keyof SubscriptionFeatures): string => {
     const displayNames: Record<string, string> = {
       canInitiateChat: 'Start Conversations',
       canSendUnlimitedLikes: 'Unlimited Likes',
@@ -121,7 +121,7 @@ function UpgradePromptButton({ feature, onUpgrade, originalChildren }: UpgradePr
     return displayNames[feature as string] || 'Premium Feature';
   };
 
-  const getRequiredTier = (feature: keyof FeatureLimits): string => {
+  const getRequiredTier = (feature: keyof SubscriptionFeatures): string => {
     const premiumPlusFeatures = [
       'canBoostProfile',
       'canViewProfileViewers', 
@@ -171,7 +171,7 @@ export function useFeatureGate() {
   const { validateAndExecute, checkFeatureAccess } = useFeatureAccess();
 
   const withFeatureValidation = <T extends any[]>(
-    feature: keyof FeatureLimits,
+    feature: keyof SubscriptionFeatures,
     action: (...args: T) => Promise<any> | any,
     options?: {
       showErrorAlert?: boolean;

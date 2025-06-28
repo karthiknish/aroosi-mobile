@@ -27,6 +27,7 @@ export interface UseInterestsResult {
   // Computed values
   totalSentCount: number;
   pendingReceivedCount: number;
+  acceptedCount: number;
   matchedCount: number;
 }
 
@@ -48,9 +49,14 @@ export function useInterests(): UseInterestsResult {
       setLoading(true);
       const response = await apiClient.getSentInterests(user.id);
       if (response.success && response.data) {
-        setSentInterests(
-          (response.data as Interest[]) || (response.data as Interest[])
-        );
+        // Handle response data - main project returns enriched interests
+        const interests = Array.isArray(response.data) ? response.data : [];
+        // Add id field for backward compatibility with mobile components
+        const processedInterests = interests.map((interest: any) => ({
+          ...interest,
+          id: interest._id || interest.id, // Ensure id field exists
+        }));
+        setSentInterests(processedInterests);
       }
     } catch (error) {
       console.error("Error loading sent interests:", error);
@@ -67,9 +73,14 @@ export function useInterests(): UseInterestsResult {
       setLoading(true);
       const response = await apiClient.getReceivedInterests(user.id);
       if (response.success && response.data) {
-        setReceivedInterests(
-          (response.data as Interest[]) || (response.data as Interest[])
-        );
+        // Handle response data - main project returns enriched interests
+        const interests = Array.isArray(response.data) ? response.data : [];
+        // Add id field for backward compatibility with mobile components
+        const processedInterests = interests.map((interest: any) => ({
+          ...interest,
+          id: interest._id || interest.id, // Ensure id field exists
+        }));
+        setReceivedInterests(processedInterests);
       }
     } catch (error) {
       console.error("Error loading received interests:", error);
@@ -104,6 +115,7 @@ export function useInterests(): UseInterestsResult {
   );
 
   // Respond to interest (accept/reject)
+  // Note: Auto-matching system - interests automatically match when mutual
   const respondToInterest = useCallback(
     async (
       interestId: string,
@@ -113,37 +125,39 @@ export function useInterests(): UseInterestsResult {
 
       try {
         setResponding(true);
-        const result = await apiClient.respondToInterest(interestId, response);
+        
+        // In the main project, there's no manual response - it's auto-matching
+        // When both users send interests to each other, they automatically match
+        console.warn("Auto-matching system: Interests automatically match when both users express interest");
+        
+        // For UI consistency, we can simulate the response locally
+        // but the actual matching happens automatically on the backend
+        setReceivedInterests((prev) =>
+          prev.map((interest) => {
+            const id = (interest as any).id || interest._id;
+            return id === interestId
+              ? {
+                  ...interest,
+                  status: response === "accept" ? "accepted" : "rejected",
+                }
+              : interest;
+          })
+        );
 
-        if (result.success) {
-          // Update local state
-          setReceivedInterests((prev) =>
-            prev.map((interest) =>
-              interest.id === interestId
-                ? {
-                    ...interest,
-                    status: response === "accept" ? "matched" : "declined",
-                  }
-                : interest
-            )
-          );
-
-          // Also reload sent interests in case this created a match
-          await loadSentInterests();
-          return true;
-        }
-        return false;
+        // Reload interests to get updated state from server
+        await Promise.all([loadSentInterests(), loadReceivedInterests()]);
+        return true; // Return true for UI consistency
       } catch (error) {
-        console.error("Error responding to interest:", error);
+        console.error("Error in interest response simulation:", error);
         return false;
       } finally {
         setResponding(false);
       }
     },
-    [responding, apiClient, loadSentInterests]
+    [responding, loadSentInterests, loadReceivedInterests]
   );
 
-  // Remove interest
+  // Remove interest - matches main project behavior
   const removeInterest = useCallback(
     async (toUserId: string): Promise<boolean> => {
       if (!user) return false;
@@ -152,7 +166,7 @@ export function useInterests(): UseInterestsResult {
         const response = await apiClient.removeInterest(toUserId, user.id);
 
         if (response.success) {
-          // Remove from local state
+          // Remove from local state - handle both _id and id for compatibility
           setSentInterests((prev) =>
             prev.filter((interest) => interest.toUserId !== toUserId)
           );
@@ -167,14 +181,15 @@ export function useInterests(): UseInterestsResult {
     [user, apiClient]
   );
 
-  // Computed values
+  // Computed values - updated to match main project status values
   const totalSentCount = sentInterests.length;
   const pendingReceivedCount = receivedInterests.filter(
-    (interest) => interest.status === "sent" || interest.status === "received"
+    (interest) => interest.status === "pending"
   ).length;
-  const matchedCount = sentInterests.filter(
-    (interest) => interest.status === "matched"
+  const acceptedCount = sentInterests.filter(
+    (interest) => interest.status === "accepted"
   ).length;
+  const matchedCount = acceptedCount; // In auto-matching system, accepted = matched
 
   // Auto-load on mount and user change
   useEffect(() => {
@@ -204,6 +219,7 @@ export function useInterests(): UseInterestsResult {
     // Computed values
     totalSentCount,
     pendingReceivedCount,
+    acceptedCount,
     matchedCount,
   };
 }

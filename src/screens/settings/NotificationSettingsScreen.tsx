@@ -8,7 +8,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   Switch,
   TouchableOpacity,
   Alert,
@@ -26,6 +25,7 @@ import {
 } from "../../../types/notifications";
 import { Colors } from "../../../constants/Colors";
 import { Layout } from "../../../constants/Layout";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 const STORAGE_KEY = "notification_preferences";
 
@@ -267,9 +267,9 @@ export default function NotificationSettingsScreen() {
   const anyTypeEnabled = isAnyNotificationEnabled();
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentContainer}
     >
       {/* Permission Status Section */}
       <View style={styles.section}>
@@ -454,7 +454,7 @@ export default function NotificationSettingsScreen() {
           receive and when you receive them.
         </Text>
       </View>
-    </ScrollView>
+    </ScreenContainer>
   );
 }
 
@@ -464,7 +464,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   contentContainer: {
-    padding: Layout.spacing.md,
+    paddingHorizontal: Layout.spacing.lg,
+    paddingVertical: Layout.spacing.lg,
+    flexGrow: 1,
   },
   loadingText: {
     textAlign: "center",

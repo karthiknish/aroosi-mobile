@@ -4,11 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Dimensions,
-} from 'react-native';
+} from "react-native";
 import { Colors } from '../../../constants/Colors';
 import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface OnboardingCompleteScreenProps {
   navigation: any;
@@ -37,8 +37,11 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       paddingHorizontal: spacing.xl,
       paddingVertical: spacing.lg,
     },
+    contentStyle: {
+      flexGrow: 1,
+    },
     successContainer: {
-      alignItems: 'center',
+      alignItems: "center",
       paddingVertical: spacing.xl * 2,
     },
     successIcon: {
@@ -46,8 +49,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       height: 100,
       borderRadius: 50,
       backgroundColor: Colors.success[100],
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: spacing.xl,
     },
     successEmoji: {
@@ -55,15 +58,15 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     },
     successTitle: {
       fontSize: fontSize.xl,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.md,
-      textAlign: 'center',
+      textAlign: "center",
     },
     successSubtitle: {
       fontSize: fontSize.base,
       color: Colors.text.secondary,
-      textAlign: 'center',
+      textAlign: "center",
       lineHeight: spacing.xl,
     },
     nextStepsContainer: {
@@ -72,14 +75,14 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     },
     nextStepsTitle: {
       fontSize: fontSize.lg + 2,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xl,
-      textAlign: 'center',
+      textAlign: "center",
     },
     stepItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
+      flexDirection: "row",
+      alignItems: "flex-start",
       marginBottom: spacing.xl,
       paddingHorizontal: spacing.xs,
     },
@@ -88,8 +91,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       height: 48,
       borderRadius: 24,
       backgroundColor: Colors.background.secondary,
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       marginRight: spacing.md,
     },
     stepEmoji: {
@@ -100,7 +103,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     },
     stepTitle: {
       fontSize: fontSize.lg,
-      fontWeight: '600',
+      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.xs / 2,
     },
@@ -116,19 +119,19 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       backgroundColor: Colors.primary[500],
       paddingVertical: spacing.md,
       borderRadius: 12,
-      alignItems: 'center',
+      alignItems: "center",
       marginBottom: spacing.md,
     },
     primaryButtonText: {
       color: Colors.text.inverse,
       fontSize: fontSize.lg,
-      fontWeight: '600',
+      fontWeight: "600",
     },
     secondaryButton: {
       backgroundColor: Colors.background.primary,
       paddingVertical: spacing.md,
       borderRadius: 12,
-      alignItems: 'center',
+      alignItems: "center",
       borderWidth: 1,
       borderColor: Colors.border.primary,
       marginBottom: spacing.lg,
@@ -136,7 +139,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     secondaryButtonText: {
       color: Colors.text.secondary,
       fontSize: fontSize.base,
-      fontWeight: '500',
+      fontWeight: "500",
     },
     tipsContainer: {
       backgroundColor: Colors.background.secondary,
@@ -146,7 +149,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     },
     tipsTitle: {
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.md,
     },
@@ -159,7 +162,10 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       <View style={styles.content}>
         {/* Success Animation/Icon */}
         <View style={styles.successContainer}>
@@ -175,7 +181,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
         {/* Next Steps */}
         <View style={styles.nextStepsContainer}>
           <Text style={styles.nextStepsTitle}>What's Next?</Text>
-          
+
           <View style={styles.stepItem}>
             <View style={styles.stepIcon}>
               <Text style={styles.stepEmoji}>📸</Text>
@@ -183,7 +189,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Add Profile Photos</Text>
               <Text style={styles.stepDescription}>
-                Upload photos to make your profile more attractive and get better matches
+                Upload photos to make your profile more attractive and get
+                better matches
               </Text>
             </View>
           </View>
@@ -207,7 +214,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Send Interests</Text>
               <Text style={styles.stepDescription}>
-                Show interest in profiles you like and start meaningful conversations
+                Show interest in profiles you like and start meaningful
+                conversations
               </Text>
             </View>
           </View>
@@ -215,11 +223,17 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleAddPhotos}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleAddPhotos}
+          >
             <Text style={styles.primaryButtonText}>Add Photos Now</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleContinue}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleContinue}
+          >
             <Text style={styles.secondaryButtonText}>Continue to App</Text>
           </TouchableOpacity>
         </View>
@@ -241,6 +255,6 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
           </Text>
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }

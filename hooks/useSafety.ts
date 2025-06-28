@@ -87,7 +87,12 @@ export function useBlockedUsers() {
     queryKey: ["blockedUsers"],
     queryFn: async (): Promise<BlockedUser[]> => {
       const response = await apiClient.getBlockedUsers();
-      return response.success ? (response.data as BlockedUser[]) : [];
+      if (response.success && response.data) {
+        // Handle both direct array and nested object response formats
+        const blockedUsers = response.data.blockedUsers || response.data;
+        return Array.isArray(blockedUsers) ? blockedUsers : [];
+      }
+      return [];
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -104,9 +109,14 @@ export function useBlockStatus(userId: string | null) {
         return { isBlocked: false, isBlockedBy: false, canInteract: true };
       }
       const response = await apiClient.checkBlockStatus(userId);
-      return response.success
-        ? (response.data as BlockStatus)
-        : { isBlocked: false, isBlockedBy: false, canInteract: true };
+      if (response.success && response.data) {
+        return {
+          isBlocked: response.data.isBlocked || false,
+          isBlockedBy: response.data.isBlockedBy || false,
+          canInteract: response.data.canInteract !== false, // Default to true if not specified
+        };
+      }
+      return { isBlocked: false, isBlockedBy: false, canInteract: true };
     },
     enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes

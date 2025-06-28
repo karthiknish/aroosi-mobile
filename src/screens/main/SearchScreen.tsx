@@ -3,12 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   TextInput,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
@@ -317,7 +316,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
 
   if (isLoading) {
     return (
-      <SafeAreaView
+      <View
         style={[
           styles.container,
           { backgroundColor: theme.colors.background.primary },
@@ -339,13 +338,13 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </Text>
         </View>
         <ProfileCardSkeleton count={3} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
     <ErrorBoundary>
-      <SafeAreaView
+      <View
         style={[
           styles.container,
           { backgroundColor: theme.colors.background.secondary },
@@ -434,7 +433,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
             </View>
           )}
         </ScrollView>
-      </SafeAreaView>
+      </View>
     </ErrorBoundary>
   );
 }
@@ -460,6 +459,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.primary,
   },
   headerTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
@@ -575,6 +575,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileName: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,

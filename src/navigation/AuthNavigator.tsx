@@ -4,6 +4,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 // Import auth screens (to be created)
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignUpScreen from "../screens/auth/SignUpScreen";
+import withScreenContainer from "../../components/common/withScreenContainer";
 // import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
 export type AuthStackParamList = {
@@ -30,13 +31,13 @@ export default function AuthNavigator() {
     >
       <Stack.Screen
         name="Login"
-        component={LoginScreen}
-        options={{ title: "Sign In" }}
+        component={withScreenContainer(LoginScreen)}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="SignUp"
-        component={SignUpScreen}
-        options={{ title: "Create Account" }}
+        component={withScreenContainer(SignUpScreen)}
+        options={{ headerShown: false }}
       />
       {/* <Stack.Screen 
         name="ForgotPassword" 

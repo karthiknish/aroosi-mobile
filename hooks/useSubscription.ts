@@ -8,8 +8,9 @@ import {
   UserSubscription,
   FeatureUsage,
   SubscriptionInfo,
-  SubscriptionTier,
-  FeatureLimits,
+  SubscriptionPlan,
+  SubscriptionFeatures,
+  FeatureAvailabilityResult,
 } from "../types/subscription";
 import { FEATURE_LIMITS_BY_TIER } from "../utils/inAppPurchases";
 import { Platform } from "react-native";
@@ -23,12 +24,9 @@ export interface UseSubscriptionResult extends SubscriptionInfo {
 
   // Actions
   refreshSubscription: () => Promise<void>;
-  trackFeatureUsage: (
-    feature: keyof FeatureUsage,
-    increment?: number
-  ) => Promise<void>;
-  checkFeatureAccess: (feature: keyof FeatureLimits) => boolean;
-  getRemainingQuota: (feature: keyof FeatureUsage) => number;
+  trackFeatureUsage: (feature: string) => Promise<void>;
+  checkFeatureAccess: (feature: keyof SubscriptionFeatures) => boolean;
+  getRemainingQuota: (feature: string) => number;
 
   // Subscription management
   purchaseSubscription: (planId: string) => Promise<boolean>;
@@ -36,14 +34,8 @@ export interface UseSubscriptionResult extends SubscriptionInfo {
   restorePurchases: () => Promise<boolean>;
   updatePaymentMethod: () => Promise<boolean>;
 
-  // Real-time feature usage validation
-  canUseFeatureNow: (feature: string) => Promise<{
-    canUse: boolean;
-    reason?: string;
-    limit?: number;
-    used?: number;
-    resetDate?: number;
-  }>;
+  // Real-time feature usage validation - aligned with main project
+  canUseFeatureNow: (feature: string) => Promise<FeatureAvailabilityResult>;
 }
 
 export function useSubscription(): UseSubscriptionResult {
@@ -51,18 +43,17 @@ export function useSubscription(): UseSubscriptionResult {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 
-  // Get subscription status using React Query
+  // Get subscription status using React Query - aligned with main project
   const {
     data: subscriptionData,
     isLoading: subscriptionLoading,
     error: subscriptionError,
-  } = useQuery<SubscriptionInfo | null>({
+  } = useQuery<UserSubscription | null>({
     queryKey: ["subscription", userId],
-    queryFn: async (): Promise<SubscriptionInfo | null> => {
-      const result =
-        (await apiClient.getSubscriptionStatus()) as ApiResponse<any>;
+    queryFn: async (): Promise<UserSubscription | null> => {
+      const result = await apiClient.getSubscriptionStatus();
       if (result && result.success && result.data) {
-        return result.data as SubscriptionInfo;
+        return result.data as UserSubscription;
       }
       return null;
     },
@@ -86,14 +77,30 @@ export function useSubscription(): UseSubscriptionResult {
     enabled: !!userId,
   });
 
-  const loading = subscriptionLoading || usageLoading;
+  // Get subscription features using React Query
+  const {
+    data: featuresData,
+    isLoading: featuresLoading,
+  } = useQuery({
+    queryKey: ["subscriptionFeatures", userId],
+    queryFn: async (): Promise<{ plan: SubscriptionPlan; features: SubscriptionFeatures; isActive: boolean } | null> => {
+      const result = await apiClient.getSubscriptionFeatures();
+      if (result && result.success && result.data) {
+        return result.data as { plan: SubscriptionPlan; features: SubscriptionFeatures; isActive: boolean };
+      }
+      return null;
+    },
+    enabled: !!userId,
+  });
+
+  const loading = subscriptionLoading || usageLoading || featuresLoading;
   const error =
     subscriptionError || usageError
       ? "Failed to load subscription information"
       : null;
-  const subscription =
-    (subscriptionData as SubscriptionInfo | null)?.subscription || null;
-  const usage = (usageData as FeatureUsage | null) || null;
+  const subscription = subscriptionData || null;
+  const usage = usageData || null;
+  const features = featuresData?.features || null;
 
   // Refresh subscription data
   const refreshSubscription = useCallback(async () => {
@@ -103,154 +110,107 @@ export function useSubscription(): UseSubscriptionResult {
     ]);
   }, [queryClient, userId]);
 
-  // Check if subscription is active
+  // Check if subscription is active - aligned with main project
   const hasActiveSubscription = useCallback((): boolean => {
-    if (!subscription) return false;
-
-    const now = Date.now();
-    const isActive =
-      subscription.status === "active" && subscription.currentPeriodEnd > now;
-
-    return isActive;
+    return subscription?.isActive || false;
   }, [subscription]);
 
-  // Get current subscription tier
-  const getCurrentTier = useCallback((): SubscriptionTier => {
-    if (!subscription || !hasActiveSubscription()) {
-      return "free";
-    }
-    return subscription.tier;
-  }, [subscription, hasActiveSubscription]);
+  // Get current subscription plan
+  const getCurrentPlan = useCallback(() => {
+    return subscription?.plan || "free";
+  }, [subscription]);
 
-  // Check if trial is active
+  // Check if trial is active (not used in main project, but kept for compatibility)
   const isTrialActive = useCallback((): boolean => {
-    if (!subscription || !subscription.trialEnd) return false;
+    return false; // Main project doesn't use trials
+  }, []);
 
-    const now = Date.now();
-    return subscription.trialEnd > now;
-  }, [subscription]);
-
-  // Get days until expiry
+  // Get days until expiry - aligned with main project
   const daysUntilExpiry = useCallback((): number => {
-    if (!subscription) return 0;
-
-    const now = Date.now();
-    const expiryDate = subscription.trialEnd || subscription.currentPeriodEnd;
-    const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
-
-    return Math.max(0, daysLeft);
+    return subscription?.daysRemaining || 0;
   }, [subscription]);
 
-  // Get feature limits for current tier
-  const getFeatureLimits = useCallback((): FeatureLimits => {
-    const tier = getCurrentTier();
-    return FEATURE_LIMITS_BY_TIER[tier] || FEATURE_LIMITS_BY_TIER.free;
-  }, [getCurrentTier]);
+  // Get subscription features - aligned with main project
+  const getSubscriptionFeatures = useCallback((): SubscriptionFeatures => {
+    if (features) {
+      return features;
+    }
+    // Fallback to default free features
+    return {
+      canViewMatches: true,
+      canChatWithMatches: true,
+      canInitiateChat: false,
+      canSendUnlimitedLikes: false,
+      canViewFullProfiles: false,
+      canHideFromFreeUsers: false,
+      canBoostProfile: false,
+      canViewProfileViewers: false,
+      canUseAdvancedFilters: false,
+      hasSpotlightBadge: false,
+      canUseIncognitoMode: false,
+      canAccessPrioritySupport: false,
+      canSeeReadReceipts: false,
+      maxLikesPerDay: 5,
+      boostsPerMonth: 0,
+    };
+  }, [features]);
 
-  // Real-time feature access checking
-  const liveFeatureAccessQuery = useQuery<any>({
-    queryKey: ["subscriptionFeatures", userId],
-    queryFn: async (): Promise<{
-      features: Record<string, boolean>;
-    } | null> => {
-      const result = await apiClient.getSubscriptionFeatures();
-      if (
-        result &&
-        result.success &&
-        result.data &&
-        typeof (result.data as any).features === "object"
-      ) {
-        return result.data as { features: Record<string, boolean> };
-      }
-      return null;
-    },
-    enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
-  });
-  const liveFeatureAccess = liveFeatureAccessQuery.data;
+  // Remove old live feature access query - now handled by featuresData
 
-  // Check if user can access a feature (with real-time validation)
+  // Check if user can access a feature - aligned with main project
   const canAccessFeature = useCallback(
-    (feature: keyof FeatureLimits): boolean => {
-      // Use live feature access data if available, otherwise fall back to local calculation
-      const lfa: any = liveFeatureAccess;
-      if (lfa && typeof lfa.features === "object") {
-        const features = lfa.features as Record<string, boolean>;
-        const featureKey = feature as keyof typeof features;
-        if (features[featureKey] !== undefined) {
-          return Boolean(features[featureKey]);
-        }
-      }
-      // Fallback to local calculation
-      const limits = getFeatureLimits();
-      return limits[feature] === true;
+    (feature: keyof SubscriptionFeatures): boolean => {
+      const subscriptionFeatures = getSubscriptionFeatures();
+      return Boolean(subscriptionFeatures[feature]);
     },
-    [getFeatureLimits, liveFeatureAccess]
+    [getSubscriptionFeatures]
   );
 
   // Check feature access (public method)
   const checkFeatureAccess = useCallback(
-    (feature: keyof FeatureLimits): boolean => {
+    (feature: keyof SubscriptionFeatures): boolean => {
       return canAccessFeature(feature);
     },
     [canAccessFeature]
   );
 
-  // Get remaining usage for a feature
+  // Get remaining usage for a feature - aligned with main project
   const getRemainingUsage = useCallback(
-    (feature: keyof FeatureUsage): number => {
-      if (!usage) return 0;
+    (feature: string): number => {
+      if (!usage || !usage.features) return 0;
 
-      const limits = getFeatureLimits();
-      const usageKey = feature as keyof FeatureUsage;
-      const limitKey = `max${
-        feature.charAt(0).toUpperCase() + feature.slice(1)
-      }` as keyof FeatureLimits;
+      const featureUsage = usage.features.find(f => f.name === feature);
+      if (!featureUsage) return 0;
 
-      const currentUsage = (usage[usageKey] as number) || 0;
-      const maxUsage = limits[limitKey] as number;
-
-      if (maxUsage === null) return Infinity; // Unlimited
-
-      return Math.max(0, maxUsage - currentUsage);
+      return featureUsage.remaining;
     },
-    [usage, getFeatureLimits]
+    [usage]
   );
 
   // Get remaining quota (public method)
   const getRemainingQuota = useCallback(
-    (feature: keyof FeatureUsage): number => {
+    (feature: string): number => {
       return getRemainingUsage(feature);
     },
     [getRemainingUsage]
   );
 
-  // Get usage percentage
+  // Get usage percentage - aligned with main project
   const getUsagePercentage = useCallback(
-    (feature: keyof FeatureUsage): number => {
-      if (!usage) return 0;
+    (feature: string): number => {
+      if (!usage || !usage.features) return 0;
 
-      const limits = getFeatureLimits();
-      const usageKey = feature as keyof FeatureUsage;
-      const limitKey = `max${
-        feature.charAt(0).toUpperCase() + feature.slice(1)
-      }` as keyof FeatureLimits;
+      const featureUsage = usage.features.find(f => f.name === feature);
+      if (!featureUsage) return 0;
 
-      const currentUsage = (usage[usageKey] as number) || 0;
-      const maxUsage = limits[limitKey] as number;
-
-      if (maxUsage === null) return 0; // Unlimited
-      if (maxUsage === 0) return 100;
-
-      return Math.min(100, (currentUsage / maxUsage) * 100);
+      return featureUsage.percentageUsed;
     },
-    [usage, getFeatureLimits]
+    [usage]
   );
 
-  // Mutations using React Query
+  // Mutations using React Query - aligned with main project
   const trackFeatureUsageMutation = useMutation({
-    mutationFn: (feature: keyof FeatureUsage) =>
+    mutationFn: (feature: string) =>
       apiClient.trackFeatureUsage(feature),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usage", userId] });
@@ -266,7 +226,7 @@ export function useSubscription(): UseSubscriptionResult {
     }: {
       platform: "ios" | "android";
       productId: string;
-      purchaseToken?: string;
+      purchaseToken: string;
       receiptData?: string;
     }) => {
       const response = await apiClient.purchaseSubscription({
@@ -416,46 +376,31 @@ export function useSubscription(): UseSubscriptionResult {
       if (response.success) {
         await refreshSubscription();
         return true;
+      } else {
+        // Handle case where endpoint is not available
+        console.warn("Subscription upgrade endpoint not available");
+        return false;
       }
-      return false;
     } catch (error) {
       console.error("Error updating payment method:", error);
       return false;
     }
   }, [subscription, apiClient, refreshSubscription]);
 
-  // Real-time feature usage validation
+  // Real-time feature usage validation - aligned with main project
   const canUseFeatureNow = useCallback(
-    async (
-      feature: string
-    ): Promise<{
-      canUse: boolean;
-      reason?: string;
-      limit?: number;
-      used?: number;
-      resetDate?: number;
-    }> => {
+    async (feature: string): Promise<FeatureAvailabilityResult> => {
       if (!userId) {
         return { canUse: false, reason: "User not authenticated" };
       }
       try {
         const response = await apiClient.canUseFeature(feature);
-        if (
-          response &&
-          response.success &&
-          response.data &&
-          typeof (response.data as any).canUse === "boolean"
-        ) {
-          return response.data as any;
+        if (response && response.success && response.data) {
+          return response.data as FeatureAvailabilityResult;
         } else {
           return {
             canUse: false,
-            reason:
-              typeof response.error === "string"
-                ? response.error
-                : response.error && response.error.message
-                ? response.error.message
-                : "Feature check failed",
+            reason: typeof response.error === 'string' ? response.error : "Feature check failed",
           };
         }
       } catch (error) {
@@ -466,30 +411,13 @@ export function useSubscription(): UseSubscriptionResult {
     [userId, apiClient]
   );
 
-  // Create default usage object if none exists
-  const currentUsage = usage || {
-    userId: userId || "",
-    tier: getCurrentTier(),
-    period: new Date().toISOString().slice(0, 7), // YYYY-MM
-    messagesSent: 0,
-    interestsSent: 0,
-    profileViews: 0,
-    searchesPerformed: 0,
-    profileBoosts: 0,
-    limits: getFeatureLimits(),
-    lastUpdated: Date.now(),
-    periodStart: new Date().setDate(1),
-    periodEnd: new Date(
-      new Date().getFullYear(),
-      new Date().getMonth() + 1,
-      0
-    ).getTime(),
-  };
+  // Track feature usage method is defined earlier in the file
 
   return {
-    // Data
+    // Data - aligned with main project
     subscription,
-    usage: currentUsage,
+    usage,
+    features: getSubscriptionFeatures(),
     hasActiveSubscription: hasActiveSubscription(),
     isTrialActive: isTrialActive(),
     daysUntilExpiry: daysUntilExpiry(),

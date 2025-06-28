@@ -21,6 +21,8 @@ export interface UsePhotoManagementResult {
   deletePhoto: (imageId: string) => Promise<boolean>;
   reorderPhotos: (newOrder: ProfileImage[]) => Promise<boolean>;
   setMainPhoto: (imageId: string) => Promise<boolean>;
+  batchDeletePhotos: (imageIds: string[]) => Promise<boolean>;
+  validateImageBeforeUpload: (imageUri: string) => Promise<boolean>;
 
   // Computed values
   hasPhotos: boolean;
@@ -78,7 +80,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
     try {
       setUploading(true);
 
-      const result: PhotoUploadResult = await photoService.addPhoto();
+      const result: PhotoUploadResult = await photoService.addPhoto(user?.id);
 
       if (result.success && result.imageId) {
         // Reload images to get the updated list
@@ -118,7 +120,10 @@ export function usePhotoManagement(): UsePhotoManagementResult {
                 try {
                   setDeleting(imageId);
 
-                  const response = await apiClient.deleteProfileImage(imageId);
+                  const response = await apiClient.deleteProfileImage({
+                    userId: user?.id || "",
+                    imageId,
+                  });
 
                   if (response.success) {
                     // Remove from local state
@@ -231,6 +236,91 @@ export function usePhotoManagement(): UsePhotoManagementResult {
     [apiClient]
   );
 
+  // Batch operations
+  const batchDeletePhotos = useCallback(
+    async (imageIds: string[]): Promise<boolean> => {
+      if (deleting || imageIds.length === 0) return false;
+
+      return new Promise((resolve) => {
+        Alert.alert(
+          "Delete Photos",
+          `Are you sure you want to delete ${imageIds.length} photo(s)?`,
+          [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+            {
+              text: "Delete",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  setDeleting("batch");
+
+                  // Use batch operation if available, otherwise delete individually
+                  const operations = imageIds.map((imageId) => ({
+                    type: "delete",
+                    imageId,
+                    userId: user?.id || "",
+                  }));
+
+                  const response = await apiClient.batchProfileImageOperations(operations);
+
+                  if (response.success) {
+                    // Remove from local state
+                    setImages((prev) =>
+                      prev.filter((img) => !imageIds.includes(img.id))
+                    );
+                    resolve(true);
+                  } else {
+                    Alert.alert(
+                      "Error",
+                      typeof response.error === "string"
+                        ? response.error
+                        : "Failed to delete photos"
+                    );
+                    resolve(false);
+                  }
+                } catch (error) {
+                  console.error("Error batch deleting photos:", error);
+                  Alert.alert(
+                    "Error",
+                    "Failed to delete photos. Please try again."
+                  );
+                  resolve(false);
+                } finally {
+                  setDeleting(null);
+                }
+              },
+            },
+          ]
+        );
+      });
+    },
+    [deleting, apiClient, user?.id]
+  );
+
+  const validateImageBeforeUpload = useCallback(
+    async (imageUri: string): Promise<boolean> => {
+      try {
+        // Check file size and dimensions
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        
+        if (blob.size > 5 * 1024 * 1024) { // 5MB limit
+          Alert.alert(
+            "File Too Large",
+            "Please select an image smaller than 5MB."
+          );
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error validating image:", error);
+        return false;
+      }
+    },
+    []
+  );
+
   // Computed values
   const hasPhotos = images.length > 0;
   const mainPhoto = images.find((img) => img.isMain) || images[0] || null;
@@ -257,6 +347,8 @@ export function usePhotoManagement(): UsePhotoManagementResult {
     deletePhoto,
     reorderPhotos,
     setMainPhoto,
+    batchDeletePhotos,
+    validateImageBeforeUpload,
 
     // Computed values
     hasPhotos,

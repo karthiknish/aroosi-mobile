@@ -13,7 +13,9 @@ export type Diet =
 export type SmokingDrinking = "no" | "occasionally" | "yes" | "";
 export type PhysicalStatus = "normal" | "differently-abled" | "other" | "";
 export type ProfileFor = "self" | "friend" | "family";
-export type SubscriptionPlan = "free" | "premium" | "premiumPlus";
+// Import from subscription types for consistency
+import type { SubscriptionTier } from "./subscription";
+export type SubscriptionPlan = SubscriptionTier;
 
 export type Id<TableName extends string> = string;
 

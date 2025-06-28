@@ -8,15 +8,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
 } from "react-native";
 import { useSignUp } from "@clerk/clerk-expo";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "../../navigation/AuthNavigator";
 import SocialAuthButtons from "../../../components/auth/SocialAuthButtons";
-import { Colors } from "../../../constants/Colors";
-import { useResponsiveSpacing, useResponsiveTypography } from "../../../hooks/useResponsive";
+import { Colors, Layout } from "../../../constants";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
 type SignUpScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -110,16 +112,16 @@ export default function SignUpScreen() {
       backgroundColor: Colors.background.primary,
     },
     scrollContent: {
-      flexGrow: 1,
       justifyContent: "center",
       padding: spacing.lg,
+      paddingTop: spacing.xl * 2,
     },
     header: {
       marginBottom: spacing.xl * 2,
     },
     title: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize["2xl"],
-      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xs,
     },
@@ -228,10 +230,7 @@ export default function SignUpScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={styles.scrollContent}>
         {!pendingVerification ? (
           <>
             <View style={styles.header}>
@@ -372,7 +371,7 @@ export default function SignUpScreen() {
             </View>
           </>
         )}
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }

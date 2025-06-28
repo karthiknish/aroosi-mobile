@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Platform } from "react-native";
-import { OneSignal } from "react-native-onesignal";
+// import { OneSignal } from "react-native-onesignal"; // Temporarily disabled due to syntax error
 import { useAuth } from "@clerk/clerk-expo";
 import { useApiClient } from "../utils/api";
 import {
@@ -192,7 +192,7 @@ export const useOneSignal = (): UseOneSignalReturn => {
           return false;
         }
 
-        // Prepare registration data
+        // Prepare registration data (aligned with main project API)
         const deviceType: DeviceType =
           Platform.OS === "ios"
             ? "ios"
@@ -200,18 +200,15 @@ export const useOneSignal = (): UseOneSignalReturn => {
             ? "android"
             : "unknown";
 
-        const registrationData: PushRegistration = {
-          userId,
+        const registrationData = {
           playerId,
           deviceType,
-          registeredAt: Date.now(),
-          isActive: true,
+          deviceToken: undefined, // OneSignal handles tokens internally
         };
 
         // Register with backend API
         const response = await apiClient.registerForPushNotifications(
-          registrationData,
-          token
+          registrationData
         );
 
         if (response.success) {
@@ -229,26 +226,24 @@ export const useOneSignal = (): UseOneSignalReturn => {
         console.error("Error registering for push notifications:", error);
         return false;
       }
-    }, [userId, playerId, getToken, apiClient]);
+    }, [userId, playerId, apiClient]);
 
   // Unregister from push notifications
   const unregisterFromPushNotifications =
     useCallback(async (): Promise<boolean> => {
-      if (!userId) {
-        console.warn("Cannot unregister: missing userId");
+      if (!userId || !playerId) {
+        console.warn("Cannot unregister: missing userId or playerId");
         return false;
       }
 
       try {
-        // Get auth token
-        const token = await getToken();
-        if (!token) {
-          console.error("No auth token available for unregistration");
-          return false;
-        }
+        // Prepare unregistration data (aligned with main project API)
+        const unregistrationData = {
+          playerId,
+        };
 
         // Unregister from backend API
-        const response = await apiClient.unregisterFromPushNotifications(token);
+        const response = await apiClient.unregisterFromPushNotifications(unregistrationData);
 
         if (response.success) {
           setIsRegistered(false);
@@ -265,7 +260,7 @@ export const useOneSignal = (): UseOneSignalReturn => {
         console.error("Error unregistering from push notifications:", error);
         return false;
       }
-    }, [userId, getToken, apiClient]);
+    }, [userId, playerId, apiClient]);
 
   // Set external user ID (for targeting)
   const setExternalUserId = useCallback((externalUserId: string) => {

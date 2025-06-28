@@ -7,3 +7,4 @@ export * from "./image";
 export * from "./safety";
 export * from "./inAppPurchase";
 export * from "./notifications";
+export * from "./contact";

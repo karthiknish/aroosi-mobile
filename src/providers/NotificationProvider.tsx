@@ -5,8 +5,8 @@
 
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { NavigationContainerRef } from '@react-navigation/native';
-import { useAuth } from '@clerk/clerk-expo';
-import { useOneSignal } from '../../hooks/useOneSignal';
+import { useAuth } from '../../contexts/AuthContext';
+// import { useOneSignal } from '../../hooks/useOneSignal'; // Temporarily disabled
 import { NotificationHandler } from '../../utils/notificationHandler';
 import { NotificationPermissionsManager } from '../../utils/notificationPermissions';
 
@@ -32,7 +32,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   navigationRef,
 }) => {
   const { isSignedIn, userId } = useAuth();
-  const oneSignalData = useOneSignal();
+  
+  // Temporary mock for OneSignal until we fix the integration
+  const oneSignalData = {
+    isInitialized: false,
+    playerId: null,
+    permissionStatus: 'undetermined',
+    isRegistered: false,
+    requestPermission: async () => false,
+    registerForPushNotifications: async () => false,
+    unregisterFromPushNotifications: async () => false,
+    setExternalUserId: (id: string) => {},
+    clearExternalUserId: () => {},
+  };
+  
   const initializationRef = useRef(false);
 
   // Initialize notification system

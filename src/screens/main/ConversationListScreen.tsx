@@ -3,9 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from "react-native";
 import { useAuth } from "@clerk/clerk-expo";
@@ -20,6 +18,7 @@ import {
   ApiErrorDisplay,
 } from "../../components/ui/ErrorHandling";
 import { Conversation } from "../../../types/message";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface ConversationListScreenProps {
   navigation: any;
@@ -183,11 +182,9 @@ export default function ConversationListScreen({
 
   if (isLoading) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.background.secondary },
-        ]}
+      <ScreenContainer
+        containerStyle={{ backgroundColor: theme.colors.background.secondary }}
+        contentStyle={styles.contentStyle}
       >
         <View
           style={[
@@ -214,17 +211,23 @@ export default function ConversationListScreen({
           </TouchableOpacity>
         </View>
         <ChatListSkeleton />
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
     <ErrorBoundary>
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.background.secondary },
-        ]}
+      <ScreenContainer
+        containerStyle={{ backgroundColor: theme.colors.background.secondary }}
+        contentStyle={styles.contentStyle}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary[500]]}
+            tintColor={theme.colors.primary[500]}
+          />
+        }
       >
         {/* Header */}
         <View
@@ -253,30 +256,16 @@ export default function ConversationListScreen({
         </View>
 
         {/* Conversations List */}
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[theme.colors.primary[500]]}
-              tintColor={theme.colors.primary[500]}
-            />
-          }
-        >
-          {error ? (
-            <ApiErrorDisplay error={error} onRetry={refetch} />
-          ) : !conversations ||
-            (conversations as Conversation[]).length === 0 ? (
-            <NoMessages onActionPress={() => navigation.navigate("Search")} />
-          ) : (
-            <View style={styles.conversationsList}>
-              {(conversations as Conversation[]).map(renderConversation)}
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+        {error ? (
+          <ApiErrorDisplay error={error} onRetry={refetch} />
+        ) : !conversations || (conversations as Conversation[]).length === 0 ? (
+          <NoMessages onActionPress={() => navigation.navigate("Search")} />
+        ) : (
+          <View style={styles.conversationsList}>
+            {(conversations as Conversation[]).map(renderConversation)}
+          </View>
+        )}
+      </ScreenContainer>
     </ErrorBoundary>
   );
 }
@@ -297,6 +286,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.primary,
   },
   headerTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
@@ -308,9 +298,6 @@ const styles = StyleSheet.create({
   },
   newChatButtonText: {
     fontSize: Layout.typography.fontSize.lg,
-  },
-  scrollView: {
-    flex: 1,
   },
   conversationsList: {
     paddingTop: Layout.spacing.sm,
@@ -403,5 +390,8 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.xs,
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.inverse,
+  },
+  contentStyle: {
+    flexGrow: 1,
   },
 });

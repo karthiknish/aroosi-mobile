@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { Alert } from "react-native";
 import { useSubscription } from "./useSubscription";
 import { errorHandler } from "../utils/errorHandling";
-import { FeatureLimits, FeatureUsage } from "../types/subscription";
+import { FeatureLimits, FeatureUsage, SubscriptionFeatures } from "../types/subscription";
 
 export interface FeatureAccessResult {
   allowed: boolean;
@@ -14,10 +14,10 @@ export interface FeatureAccessResult {
 
 export interface UseFeatureAccessReturn {
   checkFeatureAccess: (
-    feature: keyof FeatureLimits
+    feature: keyof SubscriptionFeatures
   ) => Promise<FeatureAccessResult>;
   validateAndExecute: <T>(
-    feature: keyof FeatureLimits,
+    feature: keyof SubscriptionFeatures,
     action: () => Promise<T>,
     options?: {
       showErrorAlert?: boolean;
@@ -25,7 +25,7 @@ export interface UseFeatureAccessReturn {
       onUpgradeRequired?: () => void;
     }
   ) => Promise<T | null>;
-  canAccessFeature: (feature: keyof FeatureLimits) => boolean;
+  canAccessFeature: (feature: keyof SubscriptionFeatures) => boolean;
   getFeatureUsageStatus: (feature: string) => Promise<{
     canUse: boolean;
     reason?: string;
@@ -46,7 +46,7 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
   } = useSubscription();
 
   const checkFeatureAccess = useCallback(
-    async (feature: keyof FeatureLimits): Promise<FeatureAccessResult> => {
+    async (feature: keyof SubscriptionFeatures): Promise<FeatureAccessResult> => {
       try {
         // First check if the feature is available for the current tier
         const hasFeatureAccess = canAccessFeature(feature);
@@ -84,9 +84,7 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
                 reason: usageStatus.reason || "Usage limit reached",
                 showUpgradePrompt: !hasActiveSubscription,
                 upgradeRequired: !hasActiveSubscription,
-                remainingUsage: usageStatus.limit
-                  ? usageStatus.limit - (usageStatus.used || 0)
-                  : 0,
+                remainingUsage: 0,
               };
             }
           }
@@ -106,7 +104,7 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
 
   const validateAndExecute = useCallback(
     async <T>(
-      feature: keyof FeatureLimits,
+      feature: keyof SubscriptionFeatures,
       action: () => Promise<T>,
       options: {
         showErrorAlert?: boolean;
@@ -195,7 +193,7 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
 }
 
 // Helper functions
-function getFeatureUpgradeMessage(feature: keyof FeatureLimits): string {
+function getFeatureUpgradeMessage(feature: keyof SubscriptionFeatures): string {
   const messages: Record<string, string> = {
     canInitiateChat:
       "Upgrade to Premium to start conversations with your matches",
@@ -220,7 +218,7 @@ function getFeatureUpgradeMessage(feature: keyof FeatureLimits): string {
 }
 
 function mapFeatureToUsageName(
-  feature: keyof FeatureLimits
+  feature: keyof SubscriptionFeatures
 ): keyof FeatureUsage | null {
   const mapping: Record<string, keyof FeatureUsage> = {
     maxMessages: "messagesSent",

@@ -3,9 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   RefreshControl,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +27,7 @@ import {
   AnimatedButton,
   StaggeredList,
 } from "../../components/ui/AnimatedComponents";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 import { Profile } from "../../../types/profile";
 
 interface MatchesScreenProps {
@@ -238,11 +237,9 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
   if (matchesLoading || interestsLoading) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.background.secondary },
-        ]}
+      <ScreenContainer
+        containerStyle={{ backgroundColor: theme.colors.background.secondary }}
+        contentStyle={styles.contentStyle}
       >
         <View
           style={[
@@ -260,17 +257,23 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           </Text>
         </View>
         <ProfileCardSkeleton count={3} />
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
     <ErrorBoundary>
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: theme.colors.background.secondary },
-        ]}
+      <ScreenContainer
+        containerStyle={{ backgroundColor: theme.colors.background.secondary }}
+        contentStyle={styles.contentStyle}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[theme.colors.primary[500]]}
+            tintColor={theme.colors.primary[500]}
+          />
+        }
       >
         {/* Header */}
         <FadeInView>
@@ -296,104 +299,84 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           </View>
         </FadeInView>
 
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[theme.colors.primary[500]]}
-              tintColor={theme.colors.primary[500]}
+        {/* Pending Interests Section */}
+        {interestsError ? (
+          <View style={styles.section}>
+            <ApiErrorDisplay
+              error={interestsError}
+              onRetry={refetchInterests}
             />
-          }
-        >
-          {/* Pending Interests Section */}
-          {interestsError ? (
+          </View>
+        ) : (
+          receivedInterests &&
+          (receivedInterests as Interest[]).length > 0 && (
             <View style={styles.section}>
-              <ApiErrorDisplay
-                error={interestsError}
-                onRetry={refetchInterests}
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                New Interests
+              </Text>
+              <Text
+                style={[
+                  styles.sectionSubtitle,
+                  { color: theme.colors.text.secondary },
+                ]}
+              >
+                People who are interested in connecting with you
+              </Text>
+              {(receivedInterests as Interest[]).map(renderInterest)}
+            </View>
+          )
+        )}
+
+        {/* Matches Section */}
+        <View style={styles.section}>
+          <Text
+            style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+          >
+            Your Matches
+          </Text>
+          <Text
+            style={[
+              styles.sectionSubtitle,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            Start conversations with your mutual matches
+          </Text>
+
+          {matchesError ? (
+            <ApiErrorDisplay error={matchesError} onRetry={refetchMatches} />
+          ) : !matches || (matches as Match[]).length === 0 ? (
+            <NoMatches onActionPress={() => navigation.navigate("Search")} />
+          ) : (
+            <View style={styles.matchesList}>
+              {(matches as Match[]).map((match: Match, index: number) =>
+                renderMatch(match, index)
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Show no interests state if no interests and no error */}
+        {!interestsError &&
+          (!receivedInterests ||
+            (receivedInterests as Interest[]).length === 0) && (
+            <View style={styles.section}>
+              <NoInterests
+                onActionPress={() => navigation.navigate("Search")}
               />
             </View>
-          ) : (
-            receivedInterests &&
-            (receivedInterests as Interest[]).length > 0 && (
-              <View style={styles.section}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: theme.colors.text.primary },
-                  ]}
-                >
-                  New Interests
-                </Text>
-                <Text
-                  style={[
-                    styles.sectionSubtitle,
-                    { color: theme.colors.text.secondary },
-                  ]}
-                >
-                  People who are interested in connecting with you
-                </Text>
-                {(receivedInterests as Interest[]).map(renderInterest)}
-              </View>
-            )
           )}
-
-          {/* Matches Section */}
-          <View style={styles.section}>
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.colors.text.primary },
-              ]}
-            >
-              Your Matches
-            </Text>
-            <Text
-              style={[
-                styles.sectionSubtitle,
-                { color: theme.colors.text.secondary },
-              ]}
-            >
-              Start conversations with your mutual matches
-            </Text>
-
-            {matchesError ? (
-              <ApiErrorDisplay error={matchesError} onRetry={refetchMatches} />
-            ) : !matches || (matches as Match[]).length === 0 ? (
-              <NoMatches onActionPress={() => navigation.navigate("Search")} />
-            ) : (
-              <View style={styles.matchesList}>
-                {(matches as Match[]).map((match: Match, index: number) =>
-                  renderMatch(match, index)
-                )}
-              </View>
-            )}
-          </View>
-
-          {/* Show no interests state if no interests and no error */}
-          {!interestsError &&
-            (!receivedInterests ||
-              (receivedInterests as Interest[]).length === 0) && (
-              <View style={styles.section}>
-                <NoInterests
-                  onActionPress={() => navigation.navigate("Search")}
-                />
-              </View>
-            )}
-        </ScrollView>
-      </SafeAreaView>
+      </ScreenContainer>
     </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
   header: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
@@ -402,18 +385,20 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.primary,
   },
   headerTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
   },
-  scrollView: {
-    flex: 1,
+  contentStyle: {
+    flexGrow: 1,
   },
   section: {
     paddingHorizontal: Layout.spacing.lg,
     paddingTop: Layout.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.xl,
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,

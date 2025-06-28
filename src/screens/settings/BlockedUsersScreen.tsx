@@ -4,104 +4,112 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  SafeAreaView,
   TouchableOpacity,
   Image,
   Alert,
-} from 'react-native';
-import { Colors, Layout } from '../../../constants';
-import { useBlockedUsers, useUnblockUser } from '../../../hooks/useSafety';
-import { BlockedUser } from '../../../types/safety';
-import LoadingState from '../../../components/ui/LoadingState';
-import EmptyState from '../../../components/ui/EmptyState';
+} from "react-native";
+import { Colors, Layout } from "../../../constants";
+import { useBlockedUsers, useUnblockUser } from "../../../hooks/useSafety";
+import { BlockedUserWithProfile } from "../../../types/safety";
+import LoadingState from "../../../components/ui/LoadingState";
+import EmptyState from "../../../components/ui/EmptyState";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface BlockedUsersScreenProps {
   navigation: any;
 }
 
-export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenProps) {
-  const { data: blockedUsers = [], isLoading, error, refetch } = useBlockedUsers();
+export default function BlockedUsersScreen({
+  navigation,
+}: BlockedUsersScreenProps) {
+  const {
+    data: blockedUsers = [],
+    isLoading,
+    error,
+    refetch,
+  } = useBlockedUsers();
   const unblockUserMutation = useUnblockUser();
 
-  const handleUnblockUser = (user: BlockedUser) => {
+  const handleUnblockUser = (user: BlockedUserWithProfile) => {
     Alert.alert(
-      'Unblock User',
+      "Unblock User",
       `Are you sure you want to unblock ${user.blockedProfile.fullName}? They will be able to see your profile and contact you again.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Unblock',
-          style: 'default',
+          text: "Unblock",
+          style: "default",
           onPress: async () => {
             try {
-              await unblockUserMutation.mutateAsync({ 
-                blockedUserId: user.blockedUserId 
+              await unblockUserMutation.mutateAsync({
+                blockedUserId: user.blockedUserId,
               });
-              Alert.alert('Success', `${user.blockedProfile.fullName} has been unblocked.`);
+              Alert.alert(
+                "Success",
+                `${user.blockedProfile.fullName} has been unblocked.`
+              );
             } catch (error) {
-              console.error('Error unblocking user:', error);
-              Alert.alert('Error', 'Failed to unblock user. Please try again.');
+              console.error("Error unblocking user:", error);
+              Alert.alert("Error", "Failed to unblock user. Please try again.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
   const handleViewSafetyGuidelines = () => {
-    navigation.navigate('SafetyGuidelines');
+    navigation.navigate("SafetyGuidelines");
   };
 
-  const formatBlockDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatBlockDate = (timestamp: number | string) => {
+    const date = new Date(timestamp);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 1) {
-      return 'Blocked yesterday';
+      return "Blocked yesterday";
     } else if (diffDays < 7) {
       return `Blocked ${diffDays} days ago`;
     } else if (diffDays < 30) {
       const weeks = Math.floor(diffDays / 7);
-      return `Blocked ${weeks} week${weeks > 1 ? 's' : ''} ago`;
+      return `Blocked ${weeks} week${weeks > 1 ? "s" : ""} ago`;
     } else {
       const months = Math.floor(diffDays / 30);
-      return `Blocked ${months} month${months > 1 ? 's' : ''} ago`;
+      return `Blocked ${months} month${months > 1 ? "s" : ""} ago`;
     }
   };
 
-  const renderBlockedUser = ({ item }: { item: BlockedUser }) => (
+  const renderBlockedUser = ({ item }: { item: BlockedUserWithProfile }) => (
     <View style={styles.userCard}>
       <View style={styles.userInfo}>
         {item.blockedProfile.profileImageUrl ? (
-          <Image 
-            source={{ uri: item.blockedProfile.profileImageUrl }} 
-            style={styles.userImage} 
+          <Image
+            source={{ uri: item.blockedProfile.profileImageUrl }}
+            style={styles.userImage}
           />
         ) : (
           <View style={styles.placeholderImage}>
             <Text style={styles.placeholderText}>👤</Text>
           </View>
         )}
-        
+
         <View style={styles.userDetails}>
-          <Text style={styles.userName}>
-            {item.blockedProfile.fullName}
-          </Text>
+          <Text style={styles.userName}>{item.blockedProfile.fullName}</Text>
           <Text style={styles.blockDate}>
             {formatBlockDate(item.createdAt)}
           </Text>
         </View>
       </View>
 
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.unblockButton}
         onPress={() => handleUnblockUser(item)}
         disabled={unblockUserMutation.isPending}
       >
         <Text style={styles.unblockButtonText}>
-          {unblockUserMutation.isPending ? 'Unblocking...' : 'Unblock'}
+          {unblockUserMutation.isPending ? "Unblocking..." : "Unblock"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -114,9 +122,9 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
         title="No Blocked Users"
         message="You haven't blocked anyone yet. Blocking prevents users from seeing your profile or contacting you."
       />
-      
+
       <View style={styles.emptyActions}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.guidelinesButton}
           onPress={handleViewSafetyGuidelines}
         >
@@ -129,11 +137,21 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
       <View style={styles.infoSection}>
         <Text style={styles.infoTitle}>What does blocking do?</Text>
         <View style={styles.infoList}>
-          <Text style={styles.infoItem}>• They can't see your profile in search</Text>
-          <Text style={styles.infoItem}>• They can't send you messages or interests</Text>
-          <Text style={styles.infoItem}>• Existing conversations are hidden</Text>
-          <Text style={styles.infoItem}>• You won't see each other's profiles</Text>
-          <Text style={styles.infoItem}>• Blocking is completely reversible</Text>
+          <Text style={styles.infoItem}>
+            • They can't see your profile in search
+          </Text>
+          <Text style={styles.infoItem}>
+            • They can't send you messages or interests
+          </Text>
+          <Text style={styles.infoItem}>
+            • Existing conversations are hidden
+          </Text>
+          <Text style={styles.infoItem}>
+            • You won't see each other's profiles
+          </Text>
+          <Text style={styles.infoItem}>
+            • Blocking is completely reversible
+          </Text>
         </View>
       </View>
     </View>
@@ -141,30 +159,42 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenContainer
+        containerStyle={styles.container}
+        contentStyle={styles.contentStyle}
+      >
         <LoadingState message="Loading blocked users..." />
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenContainer
+        containerStyle={styles.container}
+        contentStyle={styles.contentStyle}
+      >
         <EmptyState
           title="Unable to load blocked users"
           message="Please check your connection and try again."
           actionText="Retry"
           onAction={refetch}
         />
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Blocked Users</Text>
@@ -178,8 +208,9 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
           {/* Info Banner */}
           <View style={styles.infoBanner}>
             <Text style={styles.infoBannerText}>
-              You have blocked {blockedUsers.length} user{blockedUsers.length !== 1 ? 's' : ''}. 
-              They cannot see your profile or contact you.
+              You have blocked {blockedUsers.length} user
+              {blockedUsers.length !== 1 ? "s" : ""}. They cannot see your
+              profile or contact you.
             </Text>
           </View>
 
@@ -187,7 +218,7 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
           <FlatList
             data={blockedUsers}
             renderItem={renderBlockedUser}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item._id}
             style={styles.list}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
@@ -195,7 +226,7 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
 
           {/* Footer Actions */}
           <View style={styles.footer}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.footerButton}
               onPress={handleViewSafetyGuidelines}
             >
@@ -204,7 +235,7 @@ export default function BlockedUsersScreen({ navigation }: BlockedUsersScreenPro
           </View>
         </>
       )}
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -213,9 +244,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
+  contentStyle: {
+    flexGrow: 1,
+  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
     borderBottomWidth: 1,
@@ -231,9 +265,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 40,
@@ -258,17 +292,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.spacing.lg,
   },
   userCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     backgroundColor: Colors.background.secondary,
     borderRadius: Layout.radius.lg,
     padding: Layout.spacing.lg,
     marginBottom: Layout.spacing.md,
   },
   userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   userImage: {
@@ -282,8 +316,8 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: Colors.neutral[200],
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: Layout.spacing.md,
   },
   placeholderText: {
@@ -295,7 +329,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
@@ -311,7 +345,7 @@ const styles = StyleSheet.create({
   },
   unblockButtonText: {
     fontSize: Layout.typography.fontSize.sm,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.background.primary,
   },
   emptyContainer: {
@@ -319,7 +353,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.spacing.lg,
   },
   emptyActions: {
-    alignItems: 'center',
+    alignItems: "center",
     marginVertical: Layout.spacing.xl,
   },
   guidelinesButton: {
@@ -330,7 +364,7 @@ const styles = StyleSheet.create({
   },
   guidelinesButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.background.primary,
   },
   infoSection: {
@@ -341,7 +375,7 @@ const styles = StyleSheet.create({
   },
   infoTitle: {
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },
@@ -363,11 +397,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.secondary,
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   footerButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '500',
+    fontWeight: "500",
     color: Colors.primary[500],
   },
 });

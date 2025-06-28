@@ -5,6 +5,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import WelcomeScreen from "../screens/onboarding/WelcomeScreen";
 import ProfileSetupScreen from "../screens/onboarding/ProfileSetupScreen";
 import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteScreen";
+import withScreenContainer from "../../components/common/withScreenContainer";
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
@@ -23,10 +24,13 @@ export default function OnboardingNavigator() {
       }}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+      <Stack.Screen
+        name="ProfileSetup"
+        component={withScreenContainer(ProfileSetupScreen)}
+      />
       <Stack.Screen
         name="OnboardingComplete"
-        component={OnboardingCompleteScreen}
+        component={withScreenContainer(OnboardingCompleteScreen)}
       />
     </Stack.Navigator>
   );

@@ -69,8 +69,9 @@ export default function EmptyState({
       backgroundColor: Colors.background.secondary,
     },
     title: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.xl,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
       textAlign: "center",
       marginBottom: spacing.md,
@@ -94,9 +95,10 @@ export default function EmptyState({
       elevation: 3,
     },
     actionButtonText: {
+      fontFamily: Layout.typography.fontFamily.sansSemiBold,
       color: Colors.text.inverse,
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
     },
   });
 

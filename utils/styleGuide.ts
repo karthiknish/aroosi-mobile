@@ -7,29 +7,25 @@ export const typography = StyleSheet.create({
   // Headings - Use Boldonse font
   h1: {
     fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize['3xl'],
-    fontWeight: Layout.typography.fontWeight.bold,
+    fontSize: Layout.typography.fontSize["3xl"],
     lineHeight: Layout.typography.lineHeight.heading,
     color: Colors.text.primary,
   },
   h2: {
     fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize['2xl'],
-    fontWeight: Layout.typography.fontWeight.bold,
+    fontSize: Layout.typography.fontSize["2xl"],
     lineHeight: Layout.typography.lineHeight.heading,
     color: Colors.text.primary,
   },
   h3: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.xl,
-    fontWeight: Layout.typography.fontWeight.bold,
     lineHeight: Layout.typography.lineHeight.heading,
     color: Colors.text.primary,
   },
   h4: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.bold,
     lineHeight: Layout.typography.lineHeight.heading,
     color: Colors.text.primary,
   },

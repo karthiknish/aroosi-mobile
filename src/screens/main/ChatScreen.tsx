@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
@@ -20,6 +19,11 @@ import EmptyState from "../../../components/ui/EmptyState";
 import { useRealtimeMessaging } from "../../../hooks/useRealtimeMessaging";
 import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
 import { normalizeMessage } from "../../../utils/messageUtils";
+import { VoiceMessage, VoiceRecorder } from "../../components/ui/VoiceMessage";
+import { GradientButton } from "../../components/ui/GradientComponents";
+import { AnimatedButton } from "../../components/ui/AnimatedComponents";
+import * as Haptics from "expo-haptics";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface ChatScreenProps {
   navigation: any;
@@ -43,6 +47,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState("");
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
 
   const {
     data: messages = [],
@@ -79,7 +84,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         throw new Error("Invalid conversation participants");
       }
 
-      return apiClient.sendMessage(conversationId, text, toUserId, fromUserId);
+      return apiClient.sendMessage({
+        conversationId,
+        text,
+        toUserId,
+        fromUserId,
+      });
     },
     onSuccess: () => {
       // Stop typing indicator when message is sent
@@ -249,14 +259,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 : styles.otherMessageBubble,
             ]}
           >
-            <Text
-              style={[
-                styles.messageText,
-                isOwnMessage ? styles.ownMessageText : styles.otherMessageText,
-              ]}
-            >
-              {message.content || message.text || "Message"}
-            </Text>
+            {message.type === "voice" ? (
+              <VoiceMessage
+                audioUri={message.audioUri}
+                duration={message.duration}
+                isOwnMessage={isOwnMessage}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.messageText,
+                  isOwnMessage
+                    ? styles.ownMessageText
+                    : styles.otherMessageText,
+                ]}
+              >
+                {message.content || message.text || "Message"}
+              </Text>
+            )}
 
             <View style={styles.messageFooter}>
               <Text
@@ -289,14 +309,20 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenContainer
+        containerStyle={styles.container}
+        contentStyle={styles.contentStyle}
+      >
         <LoadingState message="Loading conversation..." />
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -365,43 +391,69 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
         {/* Chat Input */}
         <View style={styles.chatInputContainer}>
-          <TextInput
-            style={styles.chatInput}
-            placeholder="Type a message..."
-            value={inputText}
-            onChangeText={handleInputChange}
-            multiline
-            maxLength={500}
-            onSubmitEditing={() => {
-              if (inputText.trim()) {
-                handleSendMessage(inputText);
-              }
-            }}
-            returnKeyType="send"
-            blurOnSubmit={false}
-          />
+          {showVoiceRecorder ? (
+            <VoiceRecorder
+              onRecordingComplete={(uri, duration) => {
+                // Handle voice message sending
+                setShowVoiceRecorder(false);
+                // You would send the voice message here
+                console.log("Voice message recorded:", uri, duration);
+              }}
+              onCancel={() => setShowVoiceRecorder(false)}
+              style={styles.voiceRecorderContainer}
+            />
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.voiceButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowVoiceRecorder(true);
+                }}
+              >
+                <Text style={styles.voiceButtonText}>🎤</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              inputText.trim()
-                ? styles.sendButtonActive
-                : styles.sendButtonInactive,
-            ]}
-            onPress={() => {
-              if (inputText.trim()) {
-                handleSendMessage(inputText);
-              }
-            }}
-            disabled={!inputText.trim() || sendMessageMutation.isPending}
-          >
-            <Text style={styles.sendButtonText}>
-              {sendMessageMutation.isPending ? "⏳" : "➤"}
-            </Text>
-          </TouchableOpacity>
+              <TextInput
+                style={styles.chatInput}
+                placeholder="Type a message..."
+                value={inputText}
+                onChangeText={handleInputChange}
+                multiline
+                maxLength={500}
+                onSubmitEditing={() => {
+                  if (inputText.trim()) {
+                    handleSendMessage(inputText);
+                  }
+                }}
+                returnKeyType="send"
+                blurOnSubmit={false}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  inputText.trim()
+                    ? styles.sendButtonActive
+                    : styles.sendButtonInactive,
+                ]}
+                onPress={() => {
+                  if (inputText.trim()) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleSendMessage(inputText);
+                  }
+                }}
+                disabled={!inputText.trim() || sendMessageMutation.isPending}
+              >
+                <Text style={styles.sendButtonText}>
+                  {sendMessageMutation.isPending ? "⏳" : "➤"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -409,6 +461,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background.secondary,
+  },
+  contentStyle: {
+    flexGrow: 1,
   },
   keyboardAvoidingView: {
     flex: 1,
@@ -434,6 +489,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerName: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
     fontWeight: "600" as any,
     color: Colors.text.primary,
@@ -565,5 +621,22 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.lg,
     color: Colors.text.inverse,
     fontWeight: "bold" as any,
+  },
+  voiceRecorderContainer: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: Layout.spacing.md,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: Layout.radius.full,
+    backgroundColor: Colors.primary[500],
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Layout.spacing.sm,
+  },
+  voiceButtonText: {
+    fontSize: Layout.typography.fontSize.lg,
   },
 });

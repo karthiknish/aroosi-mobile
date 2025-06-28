@@ -5,13 +5,17 @@ import { ClerkProvider } from '@clerk/clerk-expo';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as SecureStore from 'react-native-secure-store';
+import * as SecureStore from 'expo-secure-store';
 
 // Import navigation and providers
 import RootNavigator from './src/navigation/RootNavigator';
 import { NotificationProvider } from './src/providers/NotificationProvider';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { ToastProvider } from './contexts/ToastContext';
 import { FontLoader } from './components/FontLoader';
 import { Colors } from './constants/Colors';
+import { photoService } from './services/PhotoService';
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -47,7 +51,10 @@ export default function App() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
 
   React.useEffect(() => {
-    // Add any initialization logic here
+    // Initialize offline queue for image uploads
+    photoService.initializeOfflineQueue();
+    
+    // Add any other initialization logic here
     setIsReady(true);
   }, []);
 
@@ -66,14 +73,20 @@ export default function App() {
         tokenCache={tokenCache}
       >
         <QueryClientProvider client={queryClient}>
-          <SafeAreaProvider>
-            <NavigationContainer ref={navigationRef}>
-              <NotificationProvider navigationRef={navigationRef}>
-                <StatusBar style="auto" />
-                <RootNavigator />
-              </NotificationProvider>
-            </NavigationContainer>
-          </SafeAreaProvider>
+          <ThemeProvider>
+            <AuthProvider>
+              <ToastProvider>
+                <SafeAreaProvider>
+                  <NavigationContainer ref={navigationRef}>
+                    <NotificationProvider navigationRef={navigationRef}>
+                      <StatusBar style="auto" />
+                      <RootNavigator />
+                    </NotificationProvider>
+                  </NavigationContainer>
+                </SafeAreaProvider>
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
         </QueryClientProvider>
       </ClerkProvider>
     </FontLoader>

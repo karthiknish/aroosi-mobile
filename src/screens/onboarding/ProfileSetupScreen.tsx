@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -40,6 +39,7 @@ import {
 } from "../../../utils/profileValidation";
 import { Colors, Layout } from "../../../constants";
 import ImageUpload from "../../../components/profile/ImageUpload";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface ProfileSetupScreenProps {
   navigation: any;
@@ -719,7 +719,10 @@ export default function ProfileSetupScreen({
   const currentStepData = STEPS[currentStep - 1];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -778,7 +781,7 @@ export default function ProfileSetupScreen({
           />
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -787,6 +790,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background.primary,
   },
+  contentStyle: {
+    flexGrow: 1,
+  },
   header: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
@@ -794,6 +800,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.primary,
   },
   headerTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.xl,
     fontWeight: "600",
     color: Colors.text.primary,

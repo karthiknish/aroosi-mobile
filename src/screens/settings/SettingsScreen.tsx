@@ -3,16 +3,15 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   Switch,
-} from 'react-native';
+} from "react-native";
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useState } from 'react';
-import { Colors } from '../../../constants/Colors';
+import { Colors, Layout } from "../../../constants";
 import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface SettingsScreenProps {
   navigation: any;
@@ -96,123 +95,117 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
   const settingSections = [
     {
-      title: 'Account',
+      title: "Account",
       items: [
         {
-          title: 'Edit Profile',
-          subtitle: 'Update your personal information',
-          type: 'navigation' as const,
-          onPress: () => navigation.navigate('EditProfile'),
+          title: "Edit Profile",
+          subtitle: "Update your personal information",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("EditProfile"),
         },
         {
-          title: 'Subscription',
-          subtitle: 'Manage your premium features',
-          type: 'navigation' as const,
-          onPress: () => navigation.navigate('Subscription'),
+          title: "Subscription",
+          subtitle: "Manage your premium features",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("Subscription"),
         },
         {
-          title: 'Privacy Settings',
-          subtitle: 'Control who can see your profile',
-          type: 'navigation' as const,
-          onPress: () => navigation.navigate('Privacy'),
+          title: "Privacy Settings",
+          subtitle: "Control who can see your profile",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("Privacy"),
         },
       ],
     },
     {
-      title: 'Notifications',
+      title: "Notifications",
       items: [
         {
-          title: 'Push Notifications',
-          subtitle: 'Receive notifications on your device',
-          type: 'toggle' as const,
+          title: "Push Notifications",
+          subtitle: "Receive notifications on your device",
+          type: "toggle" as const,
           value: pushNotifications,
           onToggle: setPushNotifications,
         },
         {
-          title: 'Email Notifications',
-          subtitle: 'Receive notifications via email',
-          type: 'toggle' as const,
+          title: "Email Notifications",
+          subtitle: "Receive notifications via email",
+          type: "toggle" as const,
           value: emailNotifications,
           onToggle: setEmailNotifications,
         },
       ],
     },
     {
-      title: 'Privacy',
+      title: "Privacy",
       items: [
         {
-          title: 'Show Online Status',
-          subtitle: 'Let others see when you\'re online',
-          type: 'toggle' as const,
+          title: "Show Online Status",
+          subtitle: "Let others see when you're online",
+          type: "toggle" as const,
           value: showOnlineStatus,
           onToggle: setShowOnlineStatus,
         },
         {
-          title: 'Read Receipts',
-          subtitle: 'Let others see when you\'ve read their messages',
-          type: 'toggle' as const,
+          title: "Read Receipts",
+          subtitle: "Let others see when you've read their messages",
+          type: "toggle" as const,
           value: readReceipts,
           onToggle: setReadReceipts,
         },
         {
-          title: 'Blocked Users',
-          subtitle: 'Manage your blocked users list',
-          type: 'navigation' as const,
-          onPress: () => navigation.navigate('BlockedUsers'),
+          title: "Blocked Users",
+          subtitle: "Manage your blocked users list",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("BlockedUsers"),
         },
       ],
     },
     {
-      title: 'Safety & Support',
+      title: "Safety & Support",
       items: [
         {
-          title: 'Safety Center',
-          subtitle: 'Report issues and safety concerns',
-          type: 'navigation' as const,
-          onPress: () => navigation.navigate('Safety'),
+          title: "Safety Center",
+          subtitle: "Report issues and safety concerns",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("Safety"),
         },
         {
-          title: 'Contact Support',
-          subtitle: 'Get help from our support team',
-          type: 'action' as const,
+          title: "Contact Support",
+          subtitle: "Get help from our support team",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("Contact"),
+        },
+        {
+          title: "Terms of Service",
+          subtitle: "Read our terms and conditions",
+          type: "action" as const,
           onPress: () => {
-            Alert.alert(
-              'Contact Support',
-              'Please email us at support@aroosi.com or use the in-app chat feature.',
-              [{ text: 'OK' }]
-            );
+            Alert.alert("Info", "Terms of Service will open in browser.");
           },
         },
         {
-          title: 'Terms of Service',
-          subtitle: 'Read our terms and conditions',
-          type: 'action' as const,
+          title: "Privacy Policy",
+          subtitle: "Learn how we protect your data",
+          type: "action" as const,
           onPress: () => {
-            Alert.alert('Info', 'Terms of Service will open in browser.');
-          },
-        },
-        {
-          title: 'Privacy Policy',
-          subtitle: 'Learn how we protect your data',
-          type: 'action' as const,
-          onPress: () => {
-            Alert.alert('Info', 'Privacy Policy will open in browser.');
+            Alert.alert("Info", "Privacy Policy will open in browser.");
           },
         },
       ],
     },
     {
-      title: 'Account Actions',
+      title: "Account Actions",
       items: [
         {
-          title: 'Sign Out',
-          type: 'action' as const,
+          title: "Sign Out",
+          type: "action" as const,
           onPress: handleSignOut,
         },
         {
-          title: 'Delete Account',
-          subtitle: 'Permanently delete your account',
-          type: 'action' as const,
+          title: "Delete Account",
+          subtitle: "Permanently delete your account",
+          type: "action" as const,
           onPress: handleDeleteAccount,
           destructive: true,
         },
@@ -225,13 +218,13 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       flex: 1,
       backgroundColor: Colors.background.secondary,
     },
-    scrollView: {
-      flex: 1,
+    contentStyle: {
+      flexGrow: 1,
     },
     header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       backgroundColor: Colors.background.primary,
@@ -247,7 +240,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     headerTitle: {
       fontSize: fontSize.lg,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
     },
     placeholder: {
@@ -256,7 +249,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     userInfo: {
       backgroundColor: Colors.background.primary,
       paddingVertical: spacing.xl,
-      alignItems: 'center',
+      alignItems: "center",
       marginBottom: spacing.lg,
     },
     userAvatar: {
@@ -264,18 +257,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       height: 80,
       borderRadius: 40,
       backgroundColor: Colors.primary[500],
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: "center",
+      alignItems: "center",
       marginBottom: spacing.md,
     },
     userInitial: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize["2xl"],
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.inverse,
     },
     userName: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.lg,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xs / 2,
     },
@@ -287,8 +282,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       marginBottom: spacing.lg,
     },
     sectionTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.xs,
       marginHorizontal: spacing.lg,
@@ -300,8 +296,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       borderColor: Colors.border.primary,
     },
     settingItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      flexDirection: "row",
+      alignItems: "center",
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: 1,
@@ -332,7 +328,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     versionContainer: {
       paddingVertical: spacing.lg,
-      alignItems: 'center',
+      alignItems: "center",
     },
     versionText: {
       fontSize: fontSize.sm,
@@ -378,48 +374,54 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={styles.placeholder} />
-        </View>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* User Info */}
-        <View style={styles.userInfo}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.userInitial}>
-              {user?.firstName?.charAt(0) || 'U'}
-            </Text>
-          </View>
-          <Text style={styles.userName}>
-            {user?.firstName} {user?.lastName}
-          </Text>
-          <Text style={styles.userEmail}>
-            {user?.primaryEmailAddress?.emailAddress}
+      {/* User Info */}
+      <View style={styles.userInfo}>
+        <View style={styles.userAvatar}>
+          <Text style={styles.userInitial}>
+            {user?.firstName?.charAt(0) || "U"}
           </Text>
         </View>
+        <Text style={styles.userName}>
+          {user?.firstName} {user?.lastName}
+        </Text>
+        <Text style={styles.userEmail}>
+          {user?.primaryEmailAddress?.emailAddress}
+        </Text>
+      </View>
 
-        {/* Settings Sections */}
-        {settingSections.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <View style={styles.sectionContent}>
-              {section.items.map((item, itemIndex) => renderSettingItem(item, itemIndex))}
-            </View>
+      {/* Settings Sections */}
+      {settingSections.map((section, sectionIndex) => (
+        <View key={sectionIndex} style={styles.section}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <View style={styles.sectionContent}>
+            {section.items.map((item, itemIndex) =>
+              renderSettingItem(item, itemIndex)
+            )}
           </View>
-        ))}
-
-        {/* App Version */}
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Aroosi Mobile v1.0.0</Text>
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      ))}
+
+      {/* App Version */}
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>Aroosi Mobile v1.0.0</Text>
+      </View>
+    </ScreenContainer>
   );
 }
 

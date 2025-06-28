@@ -22,21 +22,25 @@ export interface UnblockUserRequest {
 }
 
 export interface BlockedUser {
-  id: string;
-  blockerId: string;
+  _id: string;
+  blockerUserId: string;
   blockedUserId: string;
-  blockedProfile: {
-    fullName: string;
-    profileImageUrl?: string;
-    userId: string;
-  };
-  createdAt: string;
+  createdAt: number;
 }
 
 export interface BlockStatus {
   isBlocked: boolean;
   isBlockedBy: boolean;
   canInteract: boolean;
+}
+
+// Enhanced blocked user with profile information (for UI display)
+export interface BlockedUserWithProfile extends BlockedUser {
+  blockedProfile?: {
+    fullName?: string;
+    profileImageUrl?: string;
+    userId: string;
+  };
 }
 
 export interface SafetyApiResponse<T = any> {

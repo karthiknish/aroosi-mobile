@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
-} from 'react-native';
+} from "react-native";
 import { Colors, Layout } from '../../../constants';
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 interface SafetyGuidelinesScreenProps {
   navigation: any;
@@ -158,23 +158,30 @@ export default function SafetyGuidelinesScreen({ navigation }: SafetyGuidelinesS
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Safety Guidelines</Text>
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Introduction */}
         <View style={styles.introduction}>
           <Text style={styles.introTitle}>Your Safety is Our Priority</Text>
           <Text style={styles.introText}>
-            Follow these guidelines to have a safe and positive experience on our platform. 
-            Remember, if something doesn't feel right, trust your instincts.
+            Follow these guidelines to have a safe and positive experience on
+            our platform. Remember, if something doesn't feel right, trust your
+            instincts.
           </Text>
         </View>
 
@@ -186,9 +193,12 @@ export default function SafetyGuidelinesScreen({ navigation }: SafetyGuidelinesS
 
         {/* Warning Signs */}
         <View style={styles.category}>
-          <Text style={styles.categoryTitle}>🚩 Warning Signs to Watch For</Text>
+          <Text style={styles.categoryTitle}>
+            🚩 Warning Signs to Watch For
+          </Text>
           <Text style={styles.categoryDescription}>
-            Be aware of these red flags that might indicate someone isn't who they claim to be or has bad intentions:
+            Be aware of these red flags that might indicate someone isn't who
+            they claim to be or has bad intentions:
           </Text>
           {warningSignsData.map(renderWarningSection)}
         </View>
@@ -209,12 +219,17 @@ export default function SafetyGuidelinesScreen({ navigation }: SafetyGuidelinesS
             <Text style={styles.emergencyTitle}>In Case of Emergency</Text>
           </View>
           <Text style={styles.emergencyText}>
-            If you feel unsafe or threatened, contact local emergency services immediately.
+            If you feel unsafe or threatened, contact local emergency services
+            immediately.
           </Text>
           <View style={styles.emergencyContacts}>
             <Text style={styles.emergencyContact}>🚨 Emergency: 999</Text>
-            <Text style={styles.emergencyContact}>🔍 Non-emergency police: 101</Text>
-            <Text style={styles.emergencyContact}>💬 Text emergency services: 999 (text "register" first)</Text>
+            <Text style={styles.emergencyContact}>
+              🔍 Non-emergency police: 101
+            </Text>
+            <Text style={styles.emergencyContact}>
+              💬 Text emergency services: 999 (text "register" first)
+            </Text>
           </View>
         </View>
 
@@ -222,15 +237,15 @@ export default function SafetyGuidelinesScreen({ navigation }: SafetyGuidelinesS
         <View style={styles.supportSection}>
           <Text style={styles.supportTitle}>Need Help?</Text>
           <Text style={styles.supportText}>
-            Our safety team is here 24/7. If you experience any issues or have safety concerns, 
-            don't hesitate to reach out to us.
+            Our safety team is here 24/7. If you experience any issues or have
+            safety concerns, don't hesitate to reach out to us.
           </Text>
           <TouchableOpacity style={styles.supportButton}>
             <Text style={styles.supportButtonText}>Contact Support</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -240,8 +255,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
     borderBottomWidth: 1,
@@ -257,15 +272,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   headerSpacer: {
     width: 40,
-  },
-  scrollView: {
-    flex: 1,
   },
   introduction: {
     padding: Layout.spacing.lg,
@@ -275,16 +287,16 @@ const styles = StyleSheet.create({
   },
   introTitle: {
     fontSize: Layout.typography.fontSize.xl,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.primary[700],
     marginBottom: Layout.spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   introText: {
     fontSize: Layout.typography.fontSize.base,
     color: Colors.primary[600],
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: "center",
   },
   category: {
     marginBottom: Layout.spacing.xl,
@@ -292,7 +304,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontSize: Layout.typography.fontSize.xl,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },
@@ -309,8 +321,8 @@ const styles = StyleSheet.create({
     padding: Layout.spacing.lg,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Layout.spacing.md,
   },
   sectionIcon: {
@@ -319,7 +331,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
   },
   sectionDescription: {
@@ -332,9 +344,9 @@ const styles = StyleSheet.create({
     marginLeft: Layout.spacing.sm,
   },
   tipItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Layout.spacing.sm,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   tipBullet: {
     fontSize: Layout.typography.fontSize.base,
@@ -349,9 +361,9 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   warningItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Layout.spacing.sm,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   warningBullet: {
     fontSize: 14,
@@ -371,7 +383,7 @@ const styles = StyleSheet.create({
   },
   examplesTitle: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.sm,
   },
@@ -390,8 +402,8 @@ const styles = StyleSheet.create({
     borderLeftColor: Colors.error[500],
   },
   emergencyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Layout.spacing.md,
   },
   emergencyIcon: {
@@ -400,7 +412,7 @@ const styles = StyleSheet.create({
   },
   emergencyTitle: {
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.error[700],
   },
   emergencyText: {
@@ -417,7 +429,7 @@ const styles = StyleSheet.create({
   emergencyContact: {
     fontSize: Layout.typography.fontSize.base,
     color: Colors.error[700],
-    fontWeight: '500',
+    fontWeight: "500",
     marginBottom: Layout.spacing.xs,
   },
   supportSection: {
@@ -425,11 +437,11 @@ const styles = StyleSheet.create({
     padding: Layout.spacing.lg,
     backgroundColor: Colors.background.secondary,
     borderRadius: Layout.radius.lg,
-    alignItems: 'center',
+    alignItems: "center",
   },
   supportTitle: {
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.sm,
   },
@@ -437,7 +449,7 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.base,
     color: Colors.text.secondary,
     lineHeight: 22,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Layout.spacing.lg,
   },
   supportButton: {
@@ -448,7 +460,10 @@ const styles = StyleSheet.create({
   },
   supportButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.background.primary,
+  },
+  contentStyle: {
+    flexGrow: 1,
   },
 });

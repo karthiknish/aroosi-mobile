@@ -1,8 +1,6 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
-import { useAuth } from "@clerk/clerk-expo";
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../utils/api";
+import { useAuth } from "../../contexts/AuthContext";
 
 // Import navigators
 import AuthNavigator from "./AuthNavigator";
@@ -11,6 +9,7 @@ import OnboardingNavigator from "./OnboardingNavigator";
 import { Profile } from "../../types";
 // Import screens that can be accessed globally
 import ProfileDetailScreen from "../screens/main/ProfileDetailScreen";
+import StartupScreen from "../screens/StartupScreen";
 
 // Import types
 import { RootStackParamList } from "./types";
@@ -22,22 +21,30 @@ import { Colors } from "../../constants/Colors";
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { userId, isLoaded } = useAuth();
-  const apiClient = useApiClient();
+  const {
+    userId,
+    isLoaded,
+    profile,
+    isProfileLoading,
+    hasProfile,
+    isOnboardingComplete,
+  } = useAuth();
 
-  // Check if user has a profile using API call
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["currentProfile"],
-    queryFn: async () => {
-      if (!userId) return null;
-      const response = await apiClient.getProfile();
-      return response.success ? response.data : null;
-    },
-    enabled: !!userId && isLoaded,
-    retry: 1,
+  // Show startup splash until user presses Get Started
+  const [showStartup, setShowStartup] = React.useState(true);
+
+  // Debug navigation state
+  console.log("🧭 Navigation state:", {
+    isLoaded,
+    userId: !!userId,
+    isProfileLoading,
+    hasProfile,
+    isOnboardingComplete,
+    // profileId omitted since not on type
   });
 
-  if (!isLoaded || (userId && profileLoading)) {
+  if (!isLoaded || (userId && isProfileLoading)) {
+    console.log("⏳ Showing loading screen");
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color={Colors.primary[500]} />
@@ -45,10 +52,24 @@ export default function RootNavigator() {
     );
   }
 
+  if (showStartup) {
+    return <StartupScreen onGetStarted={() => setShowStartup(false)} />;
+  }
+
   const isAuthenticated = !!userId;
-  const hasProfile = !!profile;
-  const isOnboardingComplete =
-    (profile as Profile)?.isOnboardingComplete ?? false;
+
+  if (!isAuthenticated) {
+    console.log("🔐 Showing Auth screens");
+  } else if (!hasProfile || !isOnboardingComplete) {
+    console.log(
+      "📝 Showing Onboarding screens - hasProfile:",
+      hasProfile,
+      "isOnboardingComplete:",
+      isOnboardingComplete
+    );
+  } else {
+    console.log("🏠 Showing Main screens (Search should be default)");
+  }
 
   return (
     <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>

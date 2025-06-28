@@ -1,11 +1,12 @@
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../contexts/AuthContext";
 import { ApiResponse } from "../types/profile";
 import { networkManager } from "./NetworkManager";
 import { AppError, errorHandler } from "./errorHandling";
 import { errorReporter } from "./ErrorReporter";
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+// Prefer env variable if defined; otherwise default to live API
+const DEFAULT_API_BASE_URL = "https://www.aroosi.app/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
 
 interface RequestOptions extends RequestInit {
   skipErrorHandling?: boolean;
@@ -30,6 +31,18 @@ class EnhancedApiClient {
 
   private async getAuthHeaders() {
     const token = await this.getToken?.();
+
+    if (__DEV__) {
+      if (token) {
+        console.log(
+          "🔑 Retrieved auth token prefix:",
+          token.substring(0, 10) + "..."
+        );
+      } else {
+        console.warn("🚫 No auth token available when building headers");
+      }
+    }
+
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
@@ -37,6 +50,9 @@ class EnhancedApiClient {
     endpoint: string,
     options: RequestOptions = {}
   ): Promise<ApiResponse<T>> {
+    if (__DEV__) {
+      console.log(`➡️  API request to ${endpoint}`);
+    }
     const {
       skipErrorHandling = false,
       priority = "medium",
@@ -59,6 +75,10 @@ class EnhancedApiClient {
           ...fetchOptions.headers,
         },
       };
+
+      if (__DEV__) {
+        console.log("📝 Request headers:", requestOptions.headers);
+      }
 
       // Use enhanced network manager for automatic retry and offline queueing
       const response = await networkManager.fetch(
@@ -158,7 +178,7 @@ class EnhancedApiClient {
     });
   }
 
-  // Interest APIs
+  // Interest APIs - Updated to match available endpoints
   async sendInterest(toUserId: string, fromUserId: string) {
     return this.request("/interests", {
       method: "POST",
@@ -175,20 +195,31 @@ class EnhancedApiClient {
     });
   }
 
+  // Get sent interests - returns interests with profile enrichment
   async getSentInterests(userId: string) {
-    return this.request(`/interests/sent?userId=${userId}`);
-  }
-
-  async getReceivedInterests(userId: string) {
-    return this.request(`/interests/received?userId=${userId}`);
-  }
-
-  async respondToInterest(interestId: string, response: "accept" | "reject") {
-    return this.request(`/interests/${interestId}/respond`, {
-      method: "POST",
-      body: JSON.stringify({ response }),
-      priority: "high",
+    return this.request(`/interests?userId=${userId}`, {
+      retryConfig: { maxRetries: 2 },
     });
+  }
+
+  // Get received interests - returns interests with profile enrichment
+  async getReceivedInterests(userId: string) {
+    return this.request(`/interests/received?userId=${userId}`, {
+      retryConfig: { maxRetries: 2 },
+    });
+  }
+
+  // Interest response not available via API - auto-matching system
+  // When both users send interests to each other, they automatically match
+  async respondToInterest(interestId: string, response: "accept" | "reject") {
+    console.warn(
+      "respondToInterest: Auto-matching system - interests automatically match when mutual"
+    );
+    return {
+      success: false,
+      error:
+        "Auto-matching system - interests automatically match when both users express interest",
+    };
   }
 
   async getInterestStatus(fromUserId: string, toUserId: string) {
@@ -267,16 +298,15 @@ class EnhancedApiClient {
     });
   }
 
-  // Image APIs
-  async getUploadUrl(fileName: string, fileType: string) {
+  // Image APIs - Updated to match basic API client
+  async getUploadUrl() {
     return this.request("/profile-images/upload-url", {
-      method: "POST",
-      body: JSON.stringify({ fileName, fileType }),
+      method: "GET",
       priority: "high",
     });
   }
 
-  async uploadImageToUrl(
+  async uploadImageToStorage(
     uploadUrl: string,
     imageData: any,
     contentType: string
@@ -290,7 +320,16 @@ class EnhancedApiClient {
         body: imageData,
       });
 
-      return { success: response.ok };
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`);
+      }
+
+      // Extract storageId from uploadUrl (matching basic API client)
+      const storageId = this.extractStorageId(uploadUrl);
+      return {
+        success: true,
+        data: { storageId },
+      };
     } catch (error) {
       const appError = errorHandler.handle(error as Error, {
         action: "image_upload",
@@ -304,42 +343,72 @@ class EnhancedApiClient {
     }
   }
 
-  async confirmImageUpload(fileName: string, uploadId: string) {
-    return this.request("/profile-images/confirm", {
+  // Helper to extract storageId from uploadUrl
+  private extractStorageId(uploadUrl: string): string {
+    const match = uploadUrl.match(/profile-images\/([\\w-]+)/);
+    return match ? match[1] : "";
+  }
+
+  async saveImageMetadata(data: {
+    userId: string;
+    storageId: string;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+  }) {
+    return this.request("/profile-images", {
       method: "POST",
-      body: JSON.stringify({ fileName, uploadId }),
+      body: JSON.stringify(data),
       priority: "high",
     });
   }
 
-  async deleteProfileImage(imageId: string) {
-    return this.request(`/profile-images/${imageId}`, {
+  async deleteProfileImage(data: { userId: string; imageId: string }) {
+    return this.request("/profile-images", {
       method: "DELETE",
+      body: JSON.stringify(data),
       priority: "high",
     });
   }
 
   async updateImageOrder(imageIds: string[]) {
     return this.request("/profile-images/order", {
-      method: "PUT",
+      method: "POST",
       body: JSON.stringify({ imageIds }),
       priority: "high",
     });
   }
 
-  async getProfileImages() {
-    return this.request("/profile-images");
+  async reorderProfileImages(data: { profileId: string; imageIds: string[] }) {
+    return this.request("/profile-images/order", {
+      method: "POST",
+      body: JSON.stringify(data),
+      priority: "high",
+    });
+  }
+
+  async getProfileImages(userId?: string) {
+    const params = userId ? `?userId=${userId}` : "";
+    return this.request(`/profile-images${params}`, {
+      retryConfig: { maxRetries: 2 },
+    });
+  }
+
+  async getBatchProfileImages(userIds: string[]) {
+    return this.request(`/profile-images/batch?userIds=${userIds.join(",")}`, {
+      retryConfig: { maxRetries: 2 },
+    });
   }
 
   async setMainProfileImage(imageId: string) {
     return this.request("/profile-images/main", {
-      method: "PUT",
+      method: "POST",
       body: JSON.stringify({ imageId }),
       priority: "high",
     });
   }
 
-  // Subscription APIs
+  // Subscription APIs - aligned with main project
   async createCheckoutSession(planId: "premium" | "premiumPlus") {
     return this.request("/stripe/checkout", {
       method: "POST",
@@ -383,54 +452,6 @@ class EnhancedApiClient {
     return this.request("/user/me", {
       retryConfig: { maxRetries: 2 },
     });
-  }
-
-  // Blog APIs
-  async getBlogPosts(
-    params: { page?: number; pageSize?: number; category?: string } = {}
-  ) {
-    const searchParams = new URLSearchParams();
-    if (params.page) searchParams.set("page", params.page.toString());
-    if (params.pageSize)
-      searchParams.set("pageSize", params.pageSize.toString());
-    if (params.category) searchParams.set("category", params.category);
-
-    return this.request(`/blog?${searchParams}`, {
-      retryConfig: { maxRetries: 1 },
-    });
-  }
-
-  async getBlogPost(slug: string) {
-    return this.request(`/blog/${slug}`, {
-      retryConfig: { maxRetries: 2 },
-    });
-  }
-
-  async createBlogPost(blogData: {
-    title: string;
-    slug: string;
-    excerpt: string;
-    content: string;
-    imageUrl?: string;
-    categories: string[];
-  }) {
-    return this.request("/blog", {
-      method: "POST",
-      body: JSON.stringify(blogData),
-      priority: "high",
-    });
-  }
-
-  async deleteBlogPost(id: string) {
-    return this.request("/blog", {
-      method: "DELETE",
-      body: JSON.stringify({ _id: id }),
-      priority: "high",
-    });
-  }
-
-  async getBlogImages() {
-    return this.request("/images/blog");
   }
 
   // Contact & Support
@@ -495,15 +516,19 @@ class EnhancedApiClient {
     });
   }
 
+  // Interest response by status not available via API - auto-matching system
   async respondToInterestByStatus(data: {
     interestId: string;
     status: "accepted" | "rejected";
   }) {
-    return this.request("/interests/respond", {
-      method: "POST",
-      body: JSON.stringify(data),
-      priority: "high",
-    });
+    console.warn(
+      "respondToInterestByStatus: Auto-matching system - interests automatically match when mutual"
+    );
+    return {
+      success: false,
+      error:
+        "Auto-matching system - interests automatically match when both users express interest",
+    };
   }
 
   // Messaging - Extended
@@ -539,7 +564,6 @@ class EnhancedApiClient {
   async getProfileImageUploadUrl(data: { fileName: string; fileType: string }) {
     return this.request("/profile-images/upload-url", {
       method: "GET",
-      // Note: Some endpoints might use GET with query params instead of POST
     });
   }
 
@@ -671,10 +695,25 @@ class EnhancedApiClient {
     });
   }
 
-  async purchaseSubscription(productId: string, purchaseToken: string) {
+  async purchaseSubscription({
+    platform,
+    productId,
+    purchaseToken,
+    receiptData,
+  }: {
+    platform: "ios" | "android";
+    productId: string;
+    purchaseToken: string;
+    receiptData?: string;
+  }) {
     return this.request("/subscription/purchase", {
       method: "POST",
-      body: JSON.stringify({ productId, purchaseToken }),
+      body: JSON.stringify({
+        platform,
+        productId,
+        purchaseToken: platform === "ios" ? receiptData : purchaseToken,
+        receiptData: platform === "ios" ? receiptData : undefined,
+      }),
       priority: "high",
     });
   }
@@ -693,12 +732,13 @@ class EnhancedApiClient {
     });
   }
 
+  // Note: /subscription/upgrade endpoint not available
   async updateSubscriptionTier(tier: string) {
-    return this.request("/subscription/upgrade", {
-      method: "POST",
-      body: JSON.stringify({ tier }),
-      priority: "high",
-    });
+    console.warn("updateSubscriptionTier: Endpoint not available");
+    return {
+      success: false,
+      error: "Subscription upgrade endpoint not available",
+    };
   }
 
   async trackFeatureUsage(feature: string) {
@@ -706,6 +746,41 @@ class EnhancedApiClient {
       method: "POST",
       body: JSON.stringify({ feature }),
       priority: "low",
+    });
+  }
+
+  async getUsageHistory() {
+    return this.request("/subscription/usage-history", {
+      retryConfig: { maxRetries: 2 },
+    });
+  }
+
+  async canUseFeature(feature: string) {
+    return this.request(`/subscription/can-use/${feature}`, {
+      retryConfig: { maxRetries: 1 },
+    });
+  }
+
+  async getSubscriptionFeatures() {
+    return this.request("/subscription/features", {
+      retryConfig: { maxRetries: 2 },
+    });
+  }
+
+  async validatePurchase(
+    validationRequest: {
+      platform: "ios" | "android";
+      productId: string;
+      purchaseToken?: string;
+      receiptData?: string;
+    },
+    authToken?: string
+  ) {
+    return this.request("/subscription/validate-purchase", {
+      method: "POST",
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      body: JSON.stringify(validationRequest),
+      priority: "high",
     });
   }
 
@@ -719,7 +794,7 @@ class EnhancedApiClient {
   }
 
   async getTypingIndicators(conversationId: string) {
-    return this.request(`/typing-indicators/${conversationId}`, {
+    return this.request(`/typing-indicators?conversationId=${conversationId}`, {
       retryConfig: { maxRetries: 1 },
     });
   }
@@ -733,7 +808,7 @@ class EnhancedApiClient {
   }
 
   async getDeliveryReceipts(conversationId: string) {
-    return this.request(`/delivery-receipts/${conversationId}`, {
+    return this.request(`/delivery-receipts?conversationId=${conversationId}`, {
       retryConfig: { maxRetries: 1 },
     });
   }

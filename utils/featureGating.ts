@@ -69,9 +69,9 @@ class FeatureGateManager {
     switch (action) {
       case "send_message":
         return this.checkUsageLimit(
-          usage.messagesSent,
-          limits.maxMessages,
-          "You've reached your monthly message limit",
+          typeof usage.profileViews === 'number' ? usage.profileViews : usage.profileViews.count,
+          limits.maxProfileViews,
+          "You've reached your daily profile view limit",
           currentTier === "free"
         );
 
@@ -85,7 +85,7 @@ class FeatureGateManager {
 
       case "view_profile":
         return this.checkUsageLimit(
-          usage.profileViews,
+          typeof usage.profileViews === 'number' ? usage.profileViews : usage.profileViews.count,
           limits.maxProfileViews,
           "You've reached your daily profile view limit",
           currentTier === "free"

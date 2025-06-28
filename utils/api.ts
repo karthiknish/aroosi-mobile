@@ -1,8 +1,15 @@
-import { useAuth } from "@clerk/clerk-expo";
-import { ApiResponse } from "../types/profile";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  ApiResponse,
+  Profile,
+  CreateProfileData,
+  UpdateProfileData,
+} from "../types/profile";
+import { validateProfileData, validateFormData } from "./typeValidation";
 
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+// Prefer env variable if defined; otherwise default to live API
+const DEFAULT_API_BASE_URL = "https://www.aroosi.app/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
 
 class ApiClient {
   private baseUrl: string;
@@ -60,26 +67,60 @@ class ApiClient {
   }
 
   // Profile APIs
-  async getProfile() {
-    return this.request("/profile");
+  async getProfile(): Promise<ApiResponse<Profile>> {
+    const response = await this.request("/profile");
+    if (response.success && response.data) {
+      response.data = validateProfileData(response.data) as Profile;
+    }
+    return response as ApiResponse<Profile>;
   }
 
-  async getProfileById(profileId: string) {
-    return this.request(`/profile-detail/${profileId}`);
+  async getProfileById(profileId: string): Promise<ApiResponse<Profile>> {
+    const response = await this.request(`/profile-detail/${profileId}`);
+    if (response.success && response.data) {
+      response.data = validateProfileData(response.data) as Profile;
+    }
+    return response as ApiResponse<Profile>;
   }
 
-  async createProfile(profileData: any) {
-    return this.request("/profile", {
+  async createProfile(
+    profileData: CreateProfileData
+  ): Promise<ApiResponse<Profile>> {
+    // Validate form data before sending
+    const validation = validateFormData(profileData);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: validation.errors.join(", "),
+      };
+    }
+
+    const response = await this.request("/profile", {
       method: "POST",
-      body: JSON.stringify(profileData),
+      body: JSON.stringify(validation.data),
     });
+
+    if (response.success && response.data) {
+      response.data = validateProfileData(response.data) as Profile;
+    }
+    return response as ApiResponse<Profile>;
   }
 
-  async updateProfile(updates: any) {
-    return this.request("/profile", {
+  async updateProfile(
+    updates: UpdateProfileData
+  ): Promise<ApiResponse<Profile>> {
+    // Validate updates before sending
+    const validatedUpdates = validateProfileData(updates);
+
+    const response = await this.request("/profile", {
       method: "PUT",
-      body: JSON.stringify(updates),
+      body: JSON.stringify(validatedUpdates),
     });
+
+    if (response.success && response.data) {
+      response.data = validateProfileData(response.data) as Profile;
+    }
+    return response as ApiResponse<Profile>;
   }
 
   // Search APIs
@@ -103,19 +144,27 @@ class ApiClient {
     });
   }
 
+  // Get sent interests - returns interests with profile enrichment
   async getSentInterests(userId: string) {
-    return this.request(`/interests/sent?userId=${userId}`);
+    return this.request(`/interests?userId=${userId}`);
   }
 
+  // Get received interests - returns interests with profile enrichment
   async getReceivedInterests(userId: string) {
     return this.request(`/interests/received?userId=${userId}`);
   }
 
+  // Interest response not available via API - auto-matching system
+  // When both users send interests to each other, they automatically match
   async respondToInterest(interestId: string, response: "accept" | "reject") {
-    return this.request(`/interests/${interestId}/respond`, {
-      method: "POST",
-      body: JSON.stringify({ response }),
-    });
+    console.warn(
+      "respondToInterest: Auto-matching system - interests automatically match when mutual"
+    );
+    return {
+      success: false,
+      error:
+        "Auto-matching system - interests automatically match when both users express interest",
+    };
   }
 
   async getInterestStatus(fromUserId: string, toUserId: string) {
@@ -158,6 +207,10 @@ class ApiClient {
     return this.request(`/safety/blocked/check?userId=${userId}`);
   }
 
+  async getBlockStatus(userId: string) {
+    return this.request(`/safety/blocked/check?userId=${userId}`);
+  }
+
   // Match APIs
   async getMatches() {
     return this.request("/matches");
@@ -172,28 +225,31 @@ class ApiClient {
     return this.request("/conversations");
   }
 
-  // Message APIs
-  async getMessages(conversationId: string, limit?: number, before?: number) {
+  // Message APIs - Updated to match main project structure
+  async getMessages(
+    conversationId: string,
+    options?: { limit?: number; before?: number }
+  ) {
     const params = new URLSearchParams({ conversationId });
-    if (limit) params.append("limit", limit.toString());
-    if (before) params.append("before", before.toString());
+    if (options?.limit) params.append("limit", options.limit.toString());
+    if (options?.before) params.append("before", options.before.toString());
     return this.request(`/match-messages?${params}`);
   }
 
-  async sendMessage(
-    conversationId: string,
-    text: string,
-    toUserId: string,
-    fromUserId: string
-  ) {
+  async sendMessage(data: {
+    conversationId: string;
+    text: string;
+    toUserId: string;
+    fromUserId?: string;
+    type?: "text" | "voice" | "image";
+    audioStorageId?: string;
+    duration?: number;
+    fileSize?: number;
+    mimeType?: string;
+  }) {
     return this.request("/match-messages", {
       method: "POST",
-      body: JSON.stringify({
-        conversationId,
-        text,
-        toUserId,
-        fromUserId,
-      }),
+      body: JSON.stringify(data),
     });
   }
 
@@ -201,6 +257,12 @@ class ApiClient {
     return this.request("/messages/mark-read", {
       method: "POST",
       body: JSON.stringify({ messageIds }),
+    });
+  }
+
+  async markConversationAsRead(conversationId: string) {
+    return this.request(`/conversations/${conversationId}/mark-read`, {
+      method: "POST",
     });
   }
 
@@ -310,7 +372,7 @@ class ApiClient {
     return this.request(`/profile-images/batch?userIds=${userIds.join(",")}`);
   }
 
-  // Subscription APIs
+  // Subscription APIs - aligned with main project
   async createCheckoutSession(planId: "premium" | "premiumPlus") {
     return this.request("/stripe/checkout", {
       method: "POST",
@@ -326,12 +388,16 @@ class ApiClient {
     return this.request("/subscription/usage");
   }
 
+  async getSubscriptionFeatures() {
+    return this.request("/subscription/features");
+  }
+
   /**
-   * Purchase a subscription (in-app purchase)
+   * Purchase a subscription (in-app purchase) - aligned with main project
    * @param {Object} params
    * @param {'ios'|'android'} params.platform - The platform (ios or android)
    * @param {string} params.productId - The product ID for the subscription
-   * @param {string} [params.purchaseToken] - The purchase token (Android)
+   * @param {string} params.purchaseToken - The purchase token (Android) or receipt data (iOS)
    * @param {string} [params.receiptData] - The base64 receipt data (iOS)
    */
   async purchaseSubscription({
@@ -342,12 +408,17 @@ class ApiClient {
   }: {
     platform: "ios" | "android";
     productId: string;
-    purchaseToken?: string;
+    purchaseToken: string;
     receiptData?: string;
   }) {
     return this.request("/subscription/purchase", {
       method: "POST",
-      body: JSON.stringify({ platform, productId, purchaseToken, receiptData }),
+      body: JSON.stringify({
+        platform,
+        productId,
+        purchaseToken: platform === "ios" ? receiptData : purchaseToken,
+        receiptData: platform === "ios" ? receiptData : undefined,
+      }),
     });
   }
 
@@ -363,11 +434,13 @@ class ApiClient {
     });
   }
 
+  // Note: /subscription/upgrade endpoint not available
   async updateSubscriptionTier(tier: string) {
-    return this.request("/subscription/upgrade", {
-      method: "POST",
-      body: JSON.stringify({ tier }),
-    });
+    console.warn("updateSubscriptionTier: Endpoint not available");
+    return {
+      success: false,
+      error: "Subscription upgrade endpoint not available",
+    };
   }
 
   async trackFeatureUsage(feature: string) {
@@ -385,10 +458,6 @@ class ApiClient {
     return this.request(`/subscription/can-use/${feature}`);
   }
 
-  async getSubscriptionFeatures() {
-    return this.request("/subscription/features");
-  }
-
   // Profile boost
   async boostProfile() {
     return this.request("/profile/boost", {
@@ -404,7 +473,13 @@ class ApiClient {
     });
   }
 
-  // Voice Messages
+  // Voice Messages - Updated to match main project
+  async generateVoiceUploadUrl() {
+    return this.request("/voice-messages/upload-url", {
+      method: "POST",
+    });
+  }
+
   async uploadVoiceMessage(
     audioBlob: Blob,
     conversationId: string,
@@ -422,6 +497,10 @@ class ApiClient {
       },
       body: formData,
     });
+  }
+
+  async getVoiceMessageUrl(storageId: string) {
+    return this.request(`/voice-messages/${storageId}/url`);
   }
 
   // Profile view tracking
@@ -445,48 +524,6 @@ class ApiClient {
 
   async getCurrentUser() {
     return this.request("/user/me");
-  }
-
-  // Blog APIs
-  async getBlogPosts(
-    params: { page?: number; pageSize?: number; category?: string } = {}
-  ) {
-    const searchParams = new URLSearchParams();
-    if (params.page) searchParams.set("page", params.page.toString());
-    if (params.pageSize)
-      searchParams.set("pageSize", params.pageSize.toString());
-    if (params.category) searchParams.set("category", params.category);
-
-    return this.request(`/blog?${searchParams}`);
-  }
-
-  async getBlogPost(slug: string) {
-    return this.request(`/blog/${slug}`);
-  }
-
-  async createBlogPost(blogData: {
-    title: string;
-    slug: string;
-    excerpt: string;
-    content: string;
-    imageUrl?: string;
-    categories: string[];
-  }) {
-    return this.request("/blog", {
-      method: "POST",
-      body: JSON.stringify(blogData),
-    });
-  }
-
-  async deleteBlogPost(id: string) {
-    return this.request("/blog", {
-      method: "DELETE",
-      body: JSON.stringify({ _id: id }),
-    });
-  }
-
-  async getBlogImages() {
-    return this.request("/images/blog");
   }
 
   // Contact & Support
@@ -528,24 +565,24 @@ class ApiClient {
     });
   }
 
-  // Push Notifications
-  async registerForPushNotifications(
-    registrationData: any,
-    authToken?: string
-  ) {
-    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  // Push Notifications (aligned with main project API)
+  async registerForPushNotifications(registrationData: {
+    playerId: string;
+    deviceType?: string;
+    deviceToken?: string;
+  }) {
     return this.request("/push/register", {
       method: "POST",
-      headers,
       body: JSON.stringify(registrationData),
     });
   }
 
-  async unregisterFromPushNotifications(authToken?: string) {
-    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+  async unregisterFromPushNotifications(unregistrationData: {
+    playerId: string;
+  }) {
     return this.request("/push/register", {
       method: "DELETE",
-      headers,
+      body: JSON.stringify(unregistrationData),
     });
   }
 
@@ -582,14 +619,19 @@ class ApiClient {
     return this.request(`/interests?${searchParams}`);
   }
 
+  // Interest response by status not available via API - auto-matching system
   async respondToInterestByStatus(data: {
     interestId: string;
     status: "accepted" | "rejected";
   }) {
-    return this.request("/interests/respond", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
+    console.warn(
+      "respondToInterestByStatus: Auto-matching system - interests automatically match when mutual"
+    );
+    return {
+      success: false,
+      error:
+        "Auto-matching system - interests automatically match when both users express interest",
+    };
   }
 
   // Messaging - Extended
@@ -610,12 +652,6 @@ class ApiClient {
   async searchImages(params: any) {
     const searchParams = new URLSearchParams(params);
     return this.request(`/search-images?${searchParams}`);
-  }
-
-  async markConversationAsRead(conversationId: string) {
-    return this.request(`/conversations/${conversationId}/read`, {
-      method: "POST",
-    });
   }
 }
 

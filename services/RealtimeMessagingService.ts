@@ -166,7 +166,7 @@ class RealtimeMessagingService extends EventEmitter {
     }
   }
 
-  // Send delivery receipt
+  // Send delivery receipt - Updated to match main project API
   async sendDeliveryReceipt(
     messageId: string,
     status: MessageStatus
@@ -186,6 +186,28 @@ class RealtimeMessagingService extends EventEmitter {
       }
     } catch (error) {
       console.error("Error sending delivery receipt:", error);
+      throw error;
+    }
+  }
+
+  // Get delivery receipts for a conversation
+  async getDeliveryReceipts(conversationId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/delivery-receipts?conversationId=${conversationId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to get delivery receipts: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error getting delivery receipts:", error);
       throw error;
     }
   }

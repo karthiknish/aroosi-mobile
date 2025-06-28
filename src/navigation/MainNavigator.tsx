@@ -26,14 +26,45 @@ import MatchesScreen from "../screens/main/MatchesScreen";
 import ConversationListScreen from "../screens/main/ConversationListScreen";
 import ChatScreen from "../screens/main/ChatScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
+import ContactScreen from "../screens/support/ContactScreen";
+import withScreenContainer from "../../components/common/withScreenContainer";
 
 // Placeholder screens for now
 import { View, Text } from "react-native";
 import { RouteProp } from "@react-navigation/native";
+import { useThemedStyles } from "../../contexts/ThemeContext";
+
+const SC = withScreenContainer;
 
 const PlaceholderScreen = ({ name }: { name: string }) => (
-  <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-    <Text>{name} Screen</Text>
+  <View
+    style={{
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    }}
+  >
+    <Text
+      style={{
+        fontFamily: "Boldonse-Regular",
+        fontSize: 24,
+        marginBottom: 16,
+        textAlign: "center",
+      }}
+    >
+      Welcome to {name}
+    </Text>
+    <Text
+      style={{
+        fontFamily: "NunitoSans-Regular",
+        fontSize: 16,
+        textAlign: "center",
+      }}
+    >
+      This should use Boldonse font for the heading and Nunito Sans for body
+      text.
+    </Text>
   </View>
 );
 
@@ -52,7 +83,7 @@ function ProfileStackNavigator() {
     >
       <ProfileStack.Screen
         name="Profile"
-        component={ProfileScreen}
+        component={SC(ProfileScreen)}
         options={getScreenTransition("Profile")}
       />
       <ProfileStack.Screen
@@ -62,18 +93,23 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="EditProfile"
-        component={EditProfileScreen}
+        component={SC(EditProfileScreen)}
         options={getScreenTransition("EditProfile")}
       />
       <ProfileStack.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SC(SettingsScreen)}
         options={getScreenTransition("Settings")}
       />
       <ProfileStack.Screen
         name="Subscription"
-        component={SubscriptionScreen}
+        component={SC(SubscriptionScreen)}
         options={getScreenTransition("Subscription")}
+      />
+      <ProfileStack.Screen
+        name="Contact"
+        component={SC(ContactScreen)}
+        options={getScreenTransition("Contact")}
       />
     </ProfileStack.Navigator>
   );
@@ -90,12 +126,12 @@ function ChatStackNavigator() {
     >
       <ChatStack.Screen
         name="ConversationList"
-        component={ConversationListScreen}
+        component={SC(ConversationListScreen)}
         options={getScreenTransition("ConversationList")}
       />
       <ChatStack.Screen
         name="Chat"
-        component={ChatScreen}
+        component={SC(ChatScreen)}
         options={getScreenTransition("Chat")}
       />
     </ChatStack.Navigator>
@@ -138,12 +174,12 @@ export default function MainNavigator() {
     >
       <Tab.Screen
         name="Search"
-        component={SearchScreen}
+        component={SC(SearchScreen)}
         options={{ title: "Browse" }}
       />
       <Tab.Screen
         name="Matches"
-        component={MatchesScreen}
+        component={SC(MatchesScreen)}
         options={{ title: "Matches" }}
       />
       <Tab.Screen
@@ -158,7 +194,7 @@ export default function MainNavigator() {
       />
       <Tab.Screen
         name="Premium"
-        component={SubscriptionScreen}
+        component={SC(SubscriptionScreen)}
         options={{ title: "Premium" }}
       />
     </Tab.Navigator>

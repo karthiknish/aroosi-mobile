@@ -23,6 +23,7 @@ import { useInterestStatus } from "../../../hooks/useInterests";
 import { useBlockStatus } from "../../../hooks/useSafety";
 import { Profile } from "../../../types/profile";
 import type { ReportReason } from "../../../types/index";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 
@@ -184,11 +185,12 @@ export default function ProfileDetailScreen({
 
   if (profileLoading) {
     return (
-      <SafeAreaView
-        style={[
+      <ScreenContainer
+        containerStyle={[
           styles.container,
           { backgroundColor: theme.colors.background.primary },
         ]}
+        contentStyle={styles.contentStyle}
       >
         <View style={styles.header}>
           <TouchableOpacity
@@ -210,17 +212,18 @@ export default function ProfileDetailScreen({
             Loading profile...
           </Text>
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   if (error || !profile) {
     return (
-      <SafeAreaView
-        style={[
+      <ScreenContainer
+        containerStyle={[
           styles.container,
           { backgroundColor: theme.colors.background.primary },
         ]}
+        contentStyle={styles.contentStyle}
       >
         <View style={styles.header}>
           <TouchableOpacity
@@ -248,17 +251,18 @@ export default function ProfileDetailScreen({
             <Text style={styles.buttonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   if (blockStatus?.isBlocked) {
     return (
-      <SafeAreaView
-        style={[
+      <ScreenContainer
+        containerStyle={[
           styles.container,
           { backgroundColor: theme.colors.background.primary },
         ]}
+        contentStyle={styles.contentStyle}
       >
         <View style={styles.header}>
           <TouchableOpacity
@@ -288,7 +292,7 @@ export default function ProfileDetailScreen({
             <Text style={styles.buttonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
@@ -297,11 +301,13 @@ export default function ProfileDetailScreen({
   const hasInterest = interestStatus === "sent" || interestStatus === "matched";
 
   return (
-    <SafeAreaView
-      style={[
+    <ScreenContainer
+      containerStyle={[
         styles.container,
         { backgroundColor: theme.colors.background.primary },
       ]}
+      contentStyle={styles.contentStyle}
+      showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View
@@ -336,10 +342,7 @@ export default function ProfileDetailScreen({
         )}
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
+      <View>
         {/* Image Gallery */}
         {profileImages.length > 0 ? (
           <View style={styles.imageGallery}>
@@ -660,7 +663,7 @@ export default function ProfileDetailScreen({
             </View>
           )}
         </View>
-      </ScrollView>
+      </View>
 
       {/* Action Buttons */}
       {!isOwnProfile && (
@@ -701,7 +704,7 @@ export default function ProfileDetailScreen({
         userName={profile?.fullName || ""}
         isBlocked={blockStatus?.isBlocked}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -852,5 +855,8 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
+  },
+  contentStyle: {
+    flexGrow: 1,
   },
 });

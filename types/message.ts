@@ -16,23 +16,23 @@ export interface Message {
   senderId?: string; // For backward compatibility
   text: string;
   content?: string; // For backward compatibility
-  type: 'text' | 'voice' | 'image';
-  _creationTime: number;
-  createdAt?: number; // For backward compatibility
+  type?: 'text' | 'voice' | 'image'; // Made optional to match main project
+  _creationTime?: number;
+  createdAt: number; // Main timestamp field to match main project
   timestamp?: number; // For backward compatibility
   readAt?: number;
   isRead?: boolean;
   status?: MessageStatus;
   deliveryReceipts?: MessageDeliveryReceipt[];
   
-  // Voice message specific
+  // Voice message specific - aligned with main project schema
   audioStorageId?: string;
   duration?: number;
   voiceUrl?: string; // For backward compatibility
   voiceDuration?: number; // For backward compatibility
   voiceWaveform?: number[];
   
-  // File/image specific
+  // File/image specific - aligned with main project schema
   fileSize?: number;
   mimeType?: string;
   fileUrl?: string;

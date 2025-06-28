@@ -9,14 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  SafeAreaView,
-} from 'react-native';
+} from "react-native";
 import { useSignIn } from '@clerk/clerk-expo';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
 import { Colors } from '../../../constants/Colors';
 import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
 
@@ -82,39 +82,42 @@ export default function ForgotPasswordScreen() {
       flex: 1,
       backgroundColor: Colors.background.primary,
     },
+    contentStyle: {
+      flexGrow: 1,
+    },
     keyboardAvoidingView: {
       flex: 1,
     },
     scrollContent: {
       flexGrow: 1,
-      justifyContent: 'center',
+      justifyContent: "center",
       padding: spacing.lg,
     },
     header: {
       marginBottom: spacing.xl * 2,
-      alignItems: 'center',
+      alignItems: "center",
     },
     title: {
       fontSize: fontSize.xl,
-      fontWeight: 'bold',
+      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xs,
     },
     subtitle: {
       fontSize: fontSize.base,
       color: Colors.text.secondary,
-      textAlign: 'center',
+      textAlign: "center",
       lineHeight: spacing.lg + 2,
     },
     form: {
-      width: '100%',
+      width: "100%",
     },
     inputContainer: {
       marginBottom: spacing.lg,
     },
     label: {
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.xs,
     },
@@ -131,7 +134,7 @@ export default function ForgotPasswordScreen() {
       backgroundColor: Colors.primary[500],
       borderRadius: 8,
       padding: spacing.md,
-      alignItems: 'center',
+      alignItems: "center",
       marginTop: spacing.lg,
     },
     buttonDisabled: {
@@ -140,16 +143,16 @@ export default function ForgotPasswordScreen() {
     buttonText: {
       color: Colors.text.inverse,
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
     },
     backButton: {
-      alignItems: 'center',
+      alignItems: "center",
       marginTop: spacing.lg,
     },
     backButtonText: {
       color: Colors.primary[500],
       fontSize: fontSize.base,
-      fontWeight: '500',
+      fontWeight: "500",
     },
   });
 
@@ -158,16 +161,20 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.contentStyle}
+    >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.title}>Reset Password</Text>
             <Text style={styles.subtitle}>
-              Enter your email address and we'll send you instructions to reset your password.
+              Enter your email address and we'll send you instructions to reset
+              your password.
             </Text>
           </View>
 
@@ -192,7 +199,7 @@ export default function ForgotPasswordScreen() {
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Sending...' : 'Send Reset Email'}
+                {loading ? "Sending..." : "Send Reset Email"}
               </Text>
             </TouchableOpacity>
 
@@ -205,7 +212,7 @@ export default function ForgotPasswordScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
@@ -303,9 +310,12 @@ function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenContainer
+      containerStyle={styles.container}
+      contentStyle={styles.scrollContent}
+    >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -362,12 +372,12 @@ function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Resetting...' : 'Reset Password'}
+                {loading ? "Resetting..." : "Reset Password"}
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }

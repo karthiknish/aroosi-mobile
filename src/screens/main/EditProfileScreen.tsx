@@ -3,11 +3,9 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
   Platform,
 } from "react-native";
@@ -281,17 +279,17 @@ export default function EditProfileScreen({
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary[500]} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -310,7 +308,7 @@ export default function EditProfileScreen({
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         {/* Basic Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic Information</Text>
@@ -906,7 +904,7 @@ export default function EditProfileScreen({
         )}
 
         <View style={styles.bottomSpacing} />
-      </ScrollView>
+      </View>
 
       {/* Date Picker Modal */}
       {showDatePicker && (
@@ -921,7 +919,7 @@ export default function EditProfileScreen({
           minimumDate={new Date(Date.now() - 120 * 365 * 24 * 60 * 60 * 1000)} // 120 years ago
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 

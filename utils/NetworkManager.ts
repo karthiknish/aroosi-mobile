@@ -158,11 +158,16 @@ class NetworkManager {
     currentRetry = 0
   ): Promise<Response> {
     try {
+      // Create timeout controller for React Native compatibility
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const response = await fetch(url, {
         ...options,
-        // Add timeout
-        signal: AbortSignal.timeout(30000),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       // If response is ok, return it
       if (response.ok) {

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  SafeAreaView,
   Dimensions,
   ActivityIndicator,
 } from "react-native";
@@ -15,10 +14,29 @@ import { useAuth } from "@clerk/clerk-expo";
 import { useSubscription } from "../../../hooks/useSubscription";
 import { useApiClient } from "../../../utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Colors } from "../../../constants";
+import { Colors, Layout } from "../../../constants";
 import { Profile, ProfileImage } from "../../../types";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { useResponsiveSpacing, useResponsiveTypography } from "../../../hooks/useResponsive";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
+import {
+  GradientButton,
+  GlassmorphismCard,
+  GradientBackground,
+} from "../../components/ui/GradientComponents";
+import {
+  CircularProgress,
+  LinearProgress,
+} from "../../components/ui/ProgressIndicators";
+import {
+  AnimatedButton,
+  FadeInView,
+  ScaleInView,
+} from "../../components/ui/AnimatedComponents";
+import * as Haptics from "expo-haptics";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 
@@ -121,6 +139,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       borderBottomWidth: 1,
     },
     headerTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.xl,
       fontWeight: "bold",
     },
@@ -161,8 +180,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       elevation: 3,
     },
     sectionTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.lg,
-      fontWeight: "600",
+      fontWeight: "400",
       marginBottom: spacing.md,
     },
     imageGallery: {
@@ -317,8 +337,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       fontSize: fontSize.base,
       fontWeight: "600",
     },
+    progressSection: {
+      marginTop: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: "rgba(255,255,255,0.1)",
+    },
+    contentStyle: {
+      flexGrow: 1,
+    },
   });
-
   const handleEditProfile = () => {
     navigation.navigate("EditProfile");
   };
@@ -421,11 +449,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   if (isLoading) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: Colors.background.primary },
-        ]}
+      <ScreenContainer
+        containerStyle={{ backgroundColor: Colors.background.primary }}
+        contentStyle={styles.contentStyle}
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary[500]} />
@@ -433,23 +459,18 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             Loading profile...
           </Text>
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   const age = profile?.dateOfBirth ? calculateAge(profile.dateOfBirth) : null;
 
   return (
-    <SafeAreaView
-      style={[
-        styles.container,
-        { backgroundColor: theme.colors.background.primary },
-      ]}
+    <ScreenContainer
+      containerStyle={{ backgroundColor: theme.colors.background.primary }}
+      contentStyle={styles.contentStyle}
     >
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View
           style={[
@@ -478,40 +499,51 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         </View>
 
         {/* Action Buttons Row */}
-        <View style={styles.actionButtonsRow}>
-          <TouchableOpacity
-            onPress={handleEditProfile}
-            style={[
-              styles.actionBtn,
-              { backgroundColor: theme.colors.primary[500] },
-            ]}
-          >
-            <Text style={styles.actionBtnText}>✏️ Edit Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleEditPhotos}
-            style={[
-              styles.actionBtn,
-              { backgroundColor: theme.colors.secondary[500] },
-            ]}
-          >
-            <Text style={styles.actionBtnText}>📷 Edit Photos</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDeleteProfile}
-            style={[
-              styles.actionBtn,
-              { backgroundColor: theme.colors.error[500] },
-            ]}
-            disabled={deleteProfileMutation.isPending}
-          >
-            {deleteProfileMutation.isPending ? (
-              <ActivityIndicator size="small" color={Colors.background.primary} />
-            ) : (
-              <Text style={styles.actionBtnText}>🗑️ Delete</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+        <FadeInView delay={200}>
+          <View style={styles.actionButtonsRow}>
+            <ScaleInView delay={300}>
+              <GradientButton
+                title="✏️ Edit Profile"
+                variant="primary"
+                size="medium"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleEditProfile();
+                }}
+                style={styles.actionBtn}
+              />
+            </ScaleInView>
+            <ScaleInView delay={400}>
+              <GradientButton
+                title="📷 Edit Photos"
+                variant="secondary"
+                size="medium"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleEditPhotos();
+                }}
+                style={styles.actionBtn}
+              />
+            </ScaleInView>
+            <ScaleInView delay={500}>
+              <GradientButton
+                title={
+                  deleteProfileMutation.isPending
+                    ? "⏳ Deleting..."
+                    : "🗑️ Delete"
+                }
+                variant="error"
+                size="medium"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  handleDeleteProfile();
+                }}
+                disabled={deleteProfileMutation.isPending}
+                style={styles.actionBtn}
+              />
+            </ScaleInView>
+          </View>
+        </FadeInView>
 
         {/* Profile Images Gallery */}
         {profileImages.length > 0 ? (
@@ -1347,79 +1379,117 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         )}
 
         {/* Profile Stats */}
-        <View
-          style={[
-            styles.section,
-            { backgroundColor: theme.colors.background.primary },
-          ]}
-        >
-          <Text
-            style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+        <FadeInView delay={600}>
+          <GlassmorphismCard
+            style={[styles.section, { backgroundColor: "transparent" }]}
+            intensity={60}
+            borderColor="rgba(255,255,255,0.1)"
           >
-            Profile Statistics
-          </Text>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.colors.text.primary },
+              ]}
+            >
+              Profile Statistics
+            </Text>
 
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text
-                style={[
-                  styles.statNumber,
-                  { color: theme.colors.primary[500] },
-                ]}
-              >
-                {profileImages?.length || 0}
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                Photos
-              </Text>
+            <View style={styles.statsGrid}>
+              <ScaleInView delay={700}>
+                <View style={styles.statItem}>
+                  <CircularProgress
+                    progress={(profileImages?.length || 0) / 6}
+                    size={80}
+                    strokeWidth={6}
+                    color={theme.colors.primary[500]}
+                    showPercentage={false}
+                  >
+                    <Text
+                      style={[
+                        styles.statNumber,
+                        { color: theme.colors.primary[500], fontSize: 18 },
+                      ]}
+                    >
+                      {profileImages?.length || 0}
+                    </Text>
+                  </CircularProgress>
+                  <Text
+                    style={[
+                      styles.statLabel,
+                      { color: theme.colors.text.secondary },
+                    ]}
+                  >
+                    Photos
+                  </Text>
+                </View>
+              </ScaleInView>
+
+              <ScaleInView delay={800}>
+                <View style={styles.statItem}>
+                  <CircularProgress
+                    progress={(profile?.isProfileComplete ? 100 : 75) / 100}
+                    size={80}
+                    strokeWidth={6}
+                    color={theme.colors.success[500]}
+                    showPercentage={true}
+                  />
+                  <Text
+                    style={[
+                      styles.statLabel,
+                      { color: theme.colors.text.secondary },
+                    ]}
+                  >
+                    Complete
+                  </Text>
+                </View>
+              </ScaleInView>
+
+              {hasActiveSubscription && (
+                <ScaleInView delay={900}>
+                  <View style={styles.statItem}>
+                    <CircularProgress
+                      progress={Math.min((profileViewers?.length || 0) / 50, 1)}
+                      size={80}
+                      strokeWidth={6}
+                      color={theme.colors.warning[500]}
+                      showPercentage={false}
+                    >
+                      <Text
+                        style={[
+                          styles.statNumber,
+                          { color: theme.colors.warning[500], fontSize: 18 },
+                        ]}
+                      >
+                        {profileViewers?.length || 0}
+                      </Text>
+                    </CircularProgress>
+                    <Text
+                      style={[
+                        styles.statLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Views
+                    </Text>
+                  </View>
+                </ScaleInView>
+              )}
             </View>
 
-            <View style={styles.statItem}>
-              <Text
-                style={[
-                  styles.statNumber,
-                  { color: theme.colors.primary[500] },
-                ]}
-              >
-                {profile?.isProfileComplete ? 100 : 75}%
-              </Text>
-              <Text
-                style={[
-                  styles.statLabel,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                Complete
-              </Text>
+            {/* Profile Completion Progress */}
+            <View style={styles.progressSection}>
+              <LinearProgress
+                progress={(profile?.isProfileComplete ? 100 : 75) / 100}
+                height={8}
+                colors={[theme.colors.success[400], theme.colors.success[600]]}
+                showLabel={true}
+                label="Profile Completion"
+                animated={true}
+                duration={1500}
+              />
             </View>
-
-            {hasActiveSubscription && (
-              <View style={styles.statItem}>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: theme.colors.primary[500] },
-                  ]}
-                >
-                  {profileViewers?.length || 0}
-                </Text>
-                <Text
-                  style={[
-                    styles.statLabel,
-                    { color: theme.colors.text.secondary },
-                  ]}
-                >
-                  Views
-                </Text>
-              </View>
-            )}
-          </View>
-        </View>
+          </GlassmorphismCard>
+        </FadeInView>
 
         {/* Sign Out */}
         <View style={styles.signOutContainer}>
@@ -1441,7 +1511,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 

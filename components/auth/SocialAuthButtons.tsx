@@ -1,14 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSignIn, useSignUp, useOAuth } from '@clerk/clerk-expo';
-import { router } from 'expo-router';
-import { Colors, Layout } from '../../constants';
-import PlatformButton from '../ui/PlatformButton';
-import PlatformHaptics from '../../utils/PlatformHaptics';
+import { useSignIn, useSignUp, useOAuth } from "@clerk/clerk-expo";
+import { Colors, Layout } from "../../constants";
+import PlatformButton from "../ui/PlatformButton";
+import PlatformHaptics from "../../utils/PlatformHaptics";
 
 interface SocialAuthButtonsProps {
-  mode: 'sign-in' | 'sign-up';
+  mode: "sign-in" | "sign-up";
   onSuccess?: () => void;
   loading?: boolean;
   setLoading?: (loading: boolean) => void;
@@ -22,50 +21,49 @@ export default function SocialAuthButtons({
 }: SocialAuthButtonsProps) {
   const { signIn, setActive: setActiveSignIn } = useSignIn();
   const { signUp, setActive: setActiveSignUp } = useSignUp();
-  const { startOAuthFlow: googleAuth } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: googleAuth } = useOAuth({ strategy: "oauth_google" });
 
   const handleGoogleAuth = async () => {
     if (loading) return;
-    
+
     setLoading?.(true);
     await PlatformHaptics.light();
 
     try {
-      const { createdSessionId, signIn: oauthSignIn, signUp: oauthSignUp, setActive } = await googleAuth();
+      const {
+        createdSessionId,
+        signIn: oauthSignIn,
+        signUp: oauthSignUp,
+        setActive,
+      } = await googleAuth();
 
       if (createdSessionId) {
         // User completed OAuth flow
         await setActive({ session: createdSessionId });
         await PlatformHaptics.success();
-        
-        if (mode === 'sign-up') {
-          // New user, redirect to profile setup
-          router.replace('/profile-setup');
-        } else {
-          // Existing user, redirect to main app
-          router.replace('/(tabs)/search');
-        }
-        
+
+        // Navigation will be handled by the AuthContext/RootNavigator
+        // based on the user's authentication state and profile completion
         onSuccess?.();
       } else if (oauthSignIn) {
         // Additional verification steps needed for sign in
         await setActiveSignIn({ session: oauthSignIn.createdSessionId });
-        router.replace('/(tabs)/search');
+        onSuccess?.();
       } else if (oauthSignUp) {
         // Additional verification steps needed for sign up
         await setActiveSignUp({ session: oauthSignUp.createdSessionId });
-        router.replace('/profile-setup');
+        onSuccess?.();
       }
     } catch (err: any) {
-      console.error('Google auth error:', err);
+      console.error("Google auth error:", err);
       await PlatformHaptics.error();
-      
-      let errorMessage = 'Google authentication failed. Please try again.';
+
+      let errorMessage = "Google authentication failed. Please try again.";
       if (err.errors?.[0]?.message) {
         errorMessage = err.errors[0].message;
       }
-      
-      Alert.alert('Authentication Failed', errorMessage);
+
+      Alert.alert("Authentication Failed", errorMessage);
     } finally {
       setLoading?.(false);
     }
@@ -76,7 +74,7 @@ export default function SocialAuthButtons({
       <View style={styles.divider}>
         <View style={styles.dividerLine} />
         <Text style={styles.dividerText}>
-          or {mode === 'sign-in' ? 'sign in' : 'sign up'} with
+          or {mode === "sign-in" ? "sign in" : "sign up"} with
         </Text>
         <View style={styles.dividerLine} />
       </View>
@@ -104,8 +102,8 @@ const styles = StyleSheet.create({
   },
 
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: Layout.spacing.lg,
   },
 
@@ -129,10 +127,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderColor: Colors.border.primary,
     borderWidth: 1,
+    alignSelf: "stretch",
+    height: "auto",
+    paddingVertical: Layout.spacing.md,
   },
 
   googleButtonText: {
     color: Colors.text.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });

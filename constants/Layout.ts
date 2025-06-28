@@ -1,29 +1,29 @@
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from "react-native";
 
-const { width, height } = Dimensions.get('window');
+const { width, height } = Dimensions.get("window");
 
 export const Layout = {
   window: {
     width,
     height,
   },
-  
+
   // Device size breakpoints
   breakpoints: {
-    xs: 320,  // iPhone SE
-    sm: 375,  // iPhone 12 mini
-    md: 390,  // iPhone 12/13/14
-    lg: 414,  // iPhone 12/13/14 Plus
-    xl: 428,  // iPhone 12/13/14 Pro Max
+    xs: 320, // iPhone SE
+    sm: 375, // iPhone 12 mini
+    md: 390, // iPhone 12/13/14
+    lg: 414, // iPhone 12/13/14 Plus
+    xl: 428, // iPhone 12/13/14 Pro Max
     tablet: 768, // iPad
   },
-  
+
   // Device type detection
   isSmallDevice: width < 375,
   isMediumDevice: width >= 375 && width < 414,
   isLargeDevice: width >= 414 && width < 768,
   isTablet: width >= 768,
-  
+
   // Dynamic spacing based on device size
   getResponsiveSpacing: (base: number) => {
     if (width < 375) return base * 0.8;
@@ -33,7 +33,7 @@ export const Layout = {
 
   // Responsive font size utility
   getResponsiveFontSize: (base: number) => {
-    if (width < 375) return base * 0.9;  // iPhone SE
+    if (width < 375) return base * 0.9; // iPhone SE
     if (width >= 428) return base * 1.05; // iPhone Pro Max
     return base;
   },
@@ -46,14 +46,17 @@ export const Layout = {
   },
 
   // Get responsive value based on screen size
-  getResponsiveValue: <T>(values: {
-    xs?: T;
-    sm?: T;
-    md?: T;
-    lg?: T;
-    xl?: T;
-    tablet?: T;
-  }, defaultValue: T): T => {
+  getResponsiveValue: <T>(
+    values: {
+      xs?: T;
+      sm?: T;
+      md?: T;
+      lg?: T;
+      xl?: T;
+      tablet?: T;
+    },
+    defaultValue: T
+  ): T => {
     if (width >= 768 && values.tablet) return values.tablet;
     if (width >= 428 && values.xl) return values.xl;
     if (width >= 414 && values.lg) return values.lg;
@@ -62,7 +65,7 @@ export const Layout = {
     if (width >= 320 && values.xs) return values.xs;
     return defaultValue;
   },
-  
+
   // Responsive spacing
   spacing: {
     xs: (() => {
@@ -96,7 +99,7 @@ export const Layout = {
       return 48;
     })(),
   },
-  
+
   // Border radius
   radius: {
     xs: 4,
@@ -106,20 +109,20 @@ export const Layout = {
     xl: 24,
     full: 9999,
   },
-  
+
   // Typography - Responsive system matching web app
   typography: {
     // Font families (matching web app)
     fontFamily: {
-      sans: 'NunitoSans-Regular', // Nunito Sans for body text
-      sansMedium: 'NunitoSans-Medium',
-      sansSemiBold: 'NunitoSans-SemiBold',
-      sansBold: 'NunitoSans-Bold',
-      serif: 'Boldonse-Regular', // Boldonse for headings
-      serifBold: 'Boldonse-Regular', // Use same font since only Regular is available
-      mono: 'Courier New',
+      sans: "NunitoSans-Regular", // Nunito Sans for body text
+      sansMedium: "NunitoSans-Medium",
+      sansSemiBold: "NunitoSans-SemiBold",
+      sansBold: "NunitoSans-Bold",
+      serif: "Boldonse-Regular", // Always use Boldonse-Regular for headings
+      serifBold: "Boldonse-Regular", // Always use Boldonse-Regular for bold headings
+      mono: "Courier New",
     },
-    
+
     // Responsive font sizes with better scaling
     fontSize: {
       xs: (() => {
@@ -147,28 +150,28 @@ export const Layout = {
         if (width >= 428) return 21;
         return 20;
       })(),
-      '2xl': (() => {
+      "2xl": (() => {
         if (width < 375) return 22;
         if (width >= 428) return 26;
         return 24;
       })(),
-      '3xl': (() => {
+      "3xl": (() => {
         if (width < 375) return 28;
         if (width >= 428) return 32;
         return 30;
       })(),
-      '4xl': (() => {
+      "4xl": (() => {
         if (width < 375) return 34;
         if (width >= 428) return 38;
         return 36;
       })(),
-      '5xl': (() => {
+      "5xl": (() => {
         if (width < 375) return 44;
         if (width >= 428) return 52;
         return 48;
       })(),
     },
-    
+
     // Responsive line heights
     lineHeight: {
       xs: (() => {
@@ -196,67 +199,67 @@ export const Layout = {
         if (width >= 428) return 31;
         return 29;
       })(),
-      '2xl': (() => {
+      "2xl": (() => {
         if (width < 375) return 30;
         if (width >= 428) return 34;
         return 32;
       })(),
-      '3xl': (() => {
+      "3xl": (() => {
         if (width < 375) return 34;
         if (width >= 428) return 38;
         return 36;
       })(),
-      '4xl': (() => {
+      "4xl": (() => {
         if (width < 375) return 38;
         if (width >= 428) return 42;
         return 40;
       })(),
-      '5xl': (() => {
+      "5xl": (() => {
         if (width < 375) return 48;
         if (width >= 428) return 56;
         return 52;
       })(),
       heading: 1.3, // Heading line height from web
     },
-    
+
     fontWeight: {
-      normal: '400' as const,
-      medium: '500' as const,
-      semibold: '600' as const,
-      bold: '700' as const,
+      normal: "400" as const,
+      medium: "500" as const,
+      semibold: "600" as const,
+      bold: "700" as const,
     },
   },
-  
+
   // Header heights
   header: {
     height: 64,
     heightWithSafeArea: 104, // Approximate with status bar
   },
-  
+
   // Tab bar
   tabBar: {
     height: 80,
   },
-  
+
   // Safe areas (approximate)
   safeArea: {
     top: 44,
     bottom: 34,
   },
-  
+
   // Card dimensions
   card: {
     minHeight: 400,
     aspectRatio: 3 / 4,
   },
-  
+
   // Animation durations
   animation: {
     fast: 150,
     normal: 300,
     slow: 500,
   },
-  
+
   // Z-index values
   zIndex: {
     modal: 1000,

@@ -1,8 +1,11 @@
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Alert, Image } from "react-native";
-import { useApiClient } from "../utils/api";
+import { enhancedApiClient } from "../utils/enhancedApiClient";
 import { ProfileImage } from "../types/image";
+import { errorHandler, AppError } from "../utils/errorHandling";
+import { networkManager } from "../utils/NetworkManager";
+import { offlineImageQueue } from "../utils/OfflineImageQueue";
 
 export interface PhotoUploadResult {
   success: boolean;
@@ -24,7 +27,7 @@ export interface ProcessedPhoto {
 }
 
 export class PhotoService {
-  private apiClient = useApiClient();
+  private apiClient = enhancedApiClient;
 
   // Maximum file size in bytes (5MB)
   private readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -227,26 +230,48 @@ export class PhotoService {
   }
 
   /**
-   * Upload a processed photo to the server
+   * Upload a processed photo to the server with enhanced error handling
    */
   async uploadPhoto(
-    processedPhoto: ProcessedPhoto
+    processedPhoto: ProcessedPhoto,
+    userId?: string
   ): Promise<PhotoUploadResult & { profileImage?: ProfileImage }> {
     try {
       // Generate a unique filename
       const fileName = `profile_${Date.now()}.jpg`;
+
+      // Check network connectivity
+      if (!networkManager.isOnline()) {
+        // Queue for offline upload
+        await offlineImageQueue.addToQueue({
+          uri: processedPhoto.uri,
+          fileName,
+          userId: userId || "",
+          timestamp: Date.now(),
+        });
+        return {
+          success: false,
+          error: "No internet connection. Upload queued for when online.",
+        };
+      }
 
       // Get upload URL from server
       const urlResponse = await this.apiClient.getUploadUrl();
       const uploadData = urlResponse.data as { uploadUrl?: string };
       const uploadUrl = urlResponse.success && uploadData.uploadUrl;
       if (!uploadUrl) {
+        const error = new AppError(
+          typeof urlResponse.error === "string"
+            ? urlResponse.error
+            : "Failed to get upload URL",
+          "network",
+          { action: "getUploadUrl" },
+          true
+        );
+        errorHandler.handle(error);
         return {
           success: false,
-          error:
-            typeof urlResponse.error === "string"
-              ? urlResponse.error
-              : "Failed to get upload URL",
+          error: error.userMessage,
         };
       }
 
@@ -261,30 +286,42 @@ export class PhotoService {
         "image/jpeg"
       );
       if (!uploadResult.success) {
+        const error = new AppError(
+          typeof uploadResult.error === "string"
+            ? uploadResult.error
+            : "Failed to upload image",
+          "network",
+          { action: "uploadImageToStorage" },
+          true
+        );
+        errorHandler.handle(error);
         return {
           success: false,
-          error:
-            typeof uploadResult.error === "string"
-              ? uploadResult.error
-              : "Failed to upload image",
+          error: error.userMessage,
         };
       }
 
       // Save image metadata
       const metadataResult = await this.apiClient.saveImageMetadata({
-        userId: "", // Fill with actual userId if available
+        userId: userId || "",
         storageId: uploadResult.data?.storageId || "",
         fileName,
         contentType: "image/jpeg",
         fileSize: imageBlob.size,
       });
       if (!metadataResult.success) {
+        const error = new AppError(
+          typeof metadataResult.error === "string"
+            ? metadataResult.error
+            : "Failed to save image metadata",
+          "server",
+          { action: "saveImageMetadata" },
+          true
+        );
+        errorHandler.handle(error);
         return {
           success: false,
-          error:
-            typeof metadataResult.error === "string"
-              ? metadataResult.error
-              : "Failed to save image metadata",
+          error: error.userMessage,
         };
       }
       const metaData = metadataResult.data as { id?: string };
@@ -294,11 +331,13 @@ export class PhotoService {
         profileImage: metadataResult.data as ProfileImage,
       };
     } catch (error) {
-      console.error("Error uploading photo:", error);
+      const appError = errorHandler.handle(error as Error, {
+        action: "uploadPhoto",
+        metadata: { fileName: processedPhoto.uri },
+      });
       return {
         success: false,
-        error:
-          "Upload failed. Please check your internet connection and try again.",
+        error: appError.userMessage,
       };
     }
   }
@@ -306,7 +345,7 @@ export class PhotoService {
   /**
    * Complete photo upload process from selection to server
    */
-  async addPhoto(): Promise<
+  async addPhoto(userId?: string): Promise<
     PhotoUploadResult & { profileImage?: ProfileImage }
   > {
     try {
@@ -319,6 +358,12 @@ export class PhotoService {
 
       const asset = pickerResult.assets[0];
 
+      // Validate image before processing
+      const isValid = await this.validateImage(asset.uri);
+      if (!isValid) {
+        return { success: false, error: "Invalid image selected" };
+      }
+
       // Process the image
       const processedPhoto = await this.processImage(asset.uri);
 
@@ -327,14 +372,16 @@ export class PhotoService {
       }
 
       // Upload the processed image
-      const uploadResult = await this.uploadPhoto(processedPhoto);
+      const uploadResult = await this.uploadPhoto(processedPhoto, userId);
 
       return uploadResult;
     } catch (error) {
-      console.error("Error in addPhoto:", error);
+      const appError = errorHandler.handle(error as Error, {
+        action: "addPhoto",
+      });
       return {
         success: false,
-        error: "Failed to add photo. Please try again.",
+        error: appError.userMessage,
       };
     }
   }
@@ -369,6 +416,13 @@ export class PhotoService {
         }
       );
     });
+  }
+
+  /**
+   * Initialize offline queue processing
+   */
+  initializeOfflineQueue(): void {
+    offlineImageQueue.initializeNetworkListener();
   }
 }
 

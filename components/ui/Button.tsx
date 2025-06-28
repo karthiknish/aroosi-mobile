@@ -242,6 +242,7 @@ const styles = StyleSheet.create({
   
   // Text styles
   text: {
+    fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontWeight: Layout.typography.fontWeight.semibold,
     textAlign: 'center',
   },

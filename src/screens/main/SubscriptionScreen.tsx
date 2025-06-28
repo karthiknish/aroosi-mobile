@@ -3,10 +3,8 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   ActivityIndicator,
 } from "react-native";
 import { useSubscription } from "../../../hooks/useSubscription";
@@ -228,139 +226,128 @@ export default function SubscriptionScreen({
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary[500]} />
-          <Text style={styles.loadingText}>
-            Loading subscription details...
-          </Text>
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.primary[500]} />
+        <Text style={styles.loadingText}>Loading subscription details...</Text>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Subscription</Text>
-          <View style={styles.placeholder} />
-        </View>
+    <>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Subscription</Text>
+        <View style={styles.placeholder} />
+      </View>
 
-        {/* Current Status */}
-        <View style={styles.statusCard}>
-          <Text style={styles.statusTitle}>Current Plan</Text>
-          {hasActiveSubscription ? (
-            <View>
-              <Text style={styles.statusActive}>
-                {subscription?.tier?.toUpperCase()} Active
-              </Text>
-              {daysUntilExpiry > 0 && (
-                <Text style={styles.statusExpiry}>
-                  Renews in {daysUntilExpiry} days
-                </Text>
-              )}
-            </View>
-          ) : isTrialActive ? (
-            <View>
-              <Text style={styles.statusTrial}>Trial Active</Text>
-              <Text style={styles.statusExpiry}>
-                {daysUntilExpiry} days remaining
-              </Text>
-            </View>
-          ) : (
-            <Text style={styles.statusFree}>Free Plan</Text>
-          )}
-        </View>
-
-        {/* Usage Dashboard */}
-        {usage && (
-          <View style={styles.usageSection}>
-            <UsageDashboard onUpgradePress={() => {}} />
-          </View>
-        )}
-
-        {/* Subscription Plans */}
-        <View style={styles.plansSection}>
-          <Text style={styles.plansTitle}>Choose Your Plan</Text>
-          {SUBSCRIPTION_PLANS.map((plan) => (
-            <SubscriptionCard
-              key={plan.id}
-              plan={plan}
-              isSelected={selectedPlan?.id === plan.id}
-              isCurrentPlan={currentTier === plan.tier}
-              onSelect={setSelectedPlan}
-              disabled={purchasing !== null}
-            />
-          ))}
-        </View>
-
-        {/* Purchase Button */}
-        {selectedPlan && selectedPlan.tier !== currentTier && (
-          <View style={styles.purchaseSection}>
-            <TouchableOpacity
-              style={styles.purchaseButton}
-              onPress={() => handlePurchase(selectedPlan.tier)}
-              disabled={purchasing !== null}
-            >
-              {purchasing === selectedPlan.tier ? (
-                <ActivityIndicator color={Colors.background.primary} />
-              ) : (
-                <Text style={styles.purchaseButtonText}>
-                  Subscribe to {selectedPlan.name} - £
-                  {selectedPlan.price.toFixed(2)}/month
-                </Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Management Section */}
-        <View style={styles.managementSection}>
-          <TouchableOpacity
-            style={styles.usageHistoryButton}
-            onPress={() => navigation.navigate("UsageHistory")}
-          >
-            <Text style={styles.usageHistoryButtonText}>
-              View Usage History
+      {/* Current Status */}
+      <View style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Current Plan</Text>
+        {hasActiveSubscription ? (
+          <View>
+            <Text style={styles.statusActive}>
+              {subscription?.tier?.toUpperCase()} Active
             </Text>
-          </TouchableOpacity>
+            {daysUntilExpiry > 0 && (
+              <Text style={styles.statusExpiry}>
+                Renews in {daysUntilExpiry} days
+              </Text>
+            )}
+          </View>
+        ) : isTrialActive ? (
+          <View>
+            <Text style={styles.statusTrial}>Trial Active</Text>
+            <Text style={styles.statusExpiry}>
+              {daysUntilExpiry} days remaining
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.statusFree}>Free Plan</Text>
+        )}
+      </View>
 
-          {hasActiveSubscription && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancelSubscription}
-            >
-              <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
-            </TouchableOpacity>
-          )}
+      {/* Usage Dashboard */}
+      {usage && (
+        <View style={styles.usageSection}>
+          <UsageDashboard onUpgradePress={() => {}} />
+        </View>
+      )}
 
+      {/* Subscription Plans */}
+      <View style={styles.plansSection}>
+        <Text style={styles.plansTitle}>Choose Your Plan</Text>
+        {SUBSCRIPTION_PLANS.map((plan) => (
+          <SubscriptionCard
+            key={plan.id}
+            plan={plan}
+            isSelected={selectedPlan?.id === plan.id}
+            isCurrentPlan={currentTier === plan.tier}
+            onSelect={setSelectedPlan}
+            disabled={purchasing !== null}
+          />
+        ))}
+      </View>
+
+      {/* Purchase Button */}
+      {selectedPlan && selectedPlan.tier !== currentTier && (
+        <View style={styles.purchaseSection}>
           <TouchableOpacity
-            style={styles.restoreButton}
-            onPress={handleRestorePurchases}
+            style={styles.purchaseButton}
+            onPress={() => handlePurchase(selectedPlan.tier)}
+            disabled={purchasing !== null}
           >
-            <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+            {purchasing === selectedPlan.tier ? (
+              <ActivityIndicator color={Colors.background.primary} />
+            ) : (
+              <Text style={styles.purchaseButtonText}>
+                Subscribe to {selectedPlan.name} - £
+                {selectedPlan.price.toFixed(2)}/month
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
+      )}
 
-        {/* Terms */}
-        <View style={styles.termsSection}>
-          <Text style={styles.termsText}>
-            Subscriptions auto-renew until cancelled. You can cancel anytime in
-            your account settings.
-          </Text>
-        </View>
-      </ScrollView>
+      {/* Management Section */}
+      <View style={styles.managementSection}>
+        <TouchableOpacity
+          style={styles.usageHistoryButton}
+          onPress={() => navigation.navigate("UsageHistory")}
+        >
+          <Text style={styles.usageHistoryButtonText}>View Usage History</Text>
+        </TouchableOpacity>
+
+        {hasActiveSubscription && (
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={handleCancelSubscription}
+          >
+            <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.restoreButton}
+          onPress={handleRestorePurchases}
+        >
+          <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Terms */}
+      <View style={styles.termsSection}>
+        <Text style={styles.termsText}>
+          Subscriptions auto-renew until cancelled. You can cancel anytime in
+          your account settings.
+        </Text>
+      </View>
 
       {/* Upgrade Confirmation Modal */}
       {upgradeTarget && (
@@ -398,28 +385,11 @@ export default function SubscriptionScreen({
           onConfirm={handleUpgradeConfirm}
         />
       )}
-    </SafeAreaView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: Layout.spacing.md,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -430,8 +400,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#f0f0f0",
   },
   backButton: {
-    fontSize: 16,
-    color: Colors.primary[500],
+    padding: 8,
   },
   backButtonText: {
     fontSize: 16,
@@ -462,6 +431,7 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.lg,
   },
   plansTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
@@ -484,18 +454,21 @@ const styles = StyleSheet.create({
     fontWeight: Layout.typography.fontWeight.bold,
   },
   statusTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: 18,
     fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: 12,
   },
   statusActive: {
+    fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 16,
     fontWeight: "600",
     color: Colors.success[500],
     marginBottom: 4,
   },
   statusTrial: {
+    fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 16,
     fontWeight: "600",
     color: Colors.warning[500],
@@ -591,4 +564,15 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.lg,
     color: Colors.primary[500],
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: Layout.spacing.md,
+    fontSize: Layout.typography.fontSize.base,
+    color: Colors.text.secondary,
+  },
+  // loading styles defined later after removing duplicates
 });

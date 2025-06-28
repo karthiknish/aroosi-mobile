@@ -1,3 +1,4 @@
+// Core types - aligned with main project (aroosi/src/types/profile.ts)
 export type SubscriptionTier = "free" | "premium" | "premiumPlus";
 
 export type SubscriptionStatus =
@@ -8,6 +9,7 @@ export type SubscriptionStatus =
   | "grace_period"
   | "on_hold";
 
+// Subscription plan object - what mobile components expect
 export interface SubscriptionPlan {
   id: string;
   tier: SubscriptionTier;
@@ -15,60 +17,123 @@ export interface SubscriptionPlan {
   description: string;
   price: number;
   currency: string;
-  duration: "monthly" | "yearly";
+  duration: string;
   features: string[];
   popularBadge?: boolean;
 
-  // Store-specific IDs
+  // Store-specific IDs for mobile
   appleProductId?: string;
   googleProductId?: string;
   stripeProductId?: string;
 }
 
-export interface UserSubscription {
-  id: string;
-  userId: string;
-  planId: string;
-  tier: SubscriptionTier;
-  status: SubscriptionStatus;
-  currentPeriodStart: number;
-  currentPeriodEnd: number;
-  cancelAtPeriodEnd: boolean;
-  trialEnd?: number;
+// Main project compatible plan details - aligned with aroosi/src/types/profile.ts
+export interface SubscriptionPlanDetails {
+  id: SubscriptionTier;
+  name: string;
+  price: number;
+  displayPrice: string;
+  duration: string;
+  features: string[];
+  popular?: boolean;
+  badge?: string;
+}
 
-  // Payment info
+// User subscription status - aligned with main project API response (aroosi/src/lib/api/subscription.ts)
+export interface UserSubscription {
+  plan: SubscriptionTier;
+  tier: SubscriptionTier; // Components expect this field
+  isActive: boolean;
+  expiresAt?: number;
+  currentPeriodEnd?: number; // Components expect this field
+  daysRemaining: number;
+  boostsRemaining: number;
+  hasSpotlightBadge: boolean;
+  spotlightBadgeExpiresAt?: number | null;
+
+  // Mobile-specific fields
+  status?: SubscriptionStatus;
   paymentMethod?: "apple" | "google" | "stripe";
   originalTransactionId?: string;
   latestReceiptData?: string;
-
-  // Metadata
-  createdAt: number;
-  updatedAt: number;
+  createdAt?: number;
+  updatedAt?: number;
 }
 
+// Feature usage tracking - aligned with main project API response
 export interface FeatureUsage {
-  userId: string;
-  tier: SubscriptionTier;
-  period: string; // YYYY-MM format
-
-  // Usage counters
-  messagesSent: number;
-  interestsSent: number;
-  profileViews: number;
-  searchesPerformed: number;
-  profileBoosts: number;
-
-  // Limits based on tier
-  limits: FeatureLimits;
-
-  // Timestamps
-  lastUpdated: number;
+  plan: SubscriptionTier;
+  currentMonth: string;
+  resetDate: number;
+  features: FeatureUsageItem[];
+  
+  // Period tracking
   periodStart: number;
   periodEnd: number;
+  
+  // Usage tracking - what components expect
+  messagesSent: number;
+  interestsSent: number;
+  searchesPerformed: number;
+  profileBoosts: number;
+  
+  // Limits object - what components expect
+  limits: FeatureLimits;
+
+  // Legacy format for backward compatibility
+  messaging: {
+    sent: number;
+    limit: number;
+  };
+  profileViews: {
+    count: number;
+    limit: number;
+  };
+  searches: {
+    count: number;
+    limit: number;
+  };
+  boosts: {
+    used: number;
+    monthlyLimit: number;
+  };
 }
 
+// Feature limits interface
 export interface FeatureLimits {
-  // Aligned with API SubscriptionFeatures
+  messagesSent: number;
+  interestsSent: number;
+  searchesPerformed: number;
+  profileBoosts: number;
+  profileViews: number;
+  dailyLikes: number;
+  // Legacy names for backward compatibility
+  maxMessages: number;
+  maxInterests: number;
+  maxProfileViews: number;
+  maxSearches: number;
+  maxProfileBoosts: number;
+  // Feature access limits (boolean features don't have numeric limits, but components may check)
+  canBoostProfile?: number;
+  canUseAdvancedFilters?: number;
+  canSeeWhoViewedProfile?: number;
+  canSeeReadReceipts?: number;
+  canViewWhoLikedMe?: number;
+  canUseIncognitoMode?: number;
+  canAccessPrioritySupport?: number;
+}
+
+export interface FeatureUsageItem {
+  name: string;
+  used: number;
+  limit: number;
+  unlimited: boolean;
+  remaining: number;
+  percentageUsed: number;
+}
+
+// Subscription features - exactly matching main project (aroosi/src/lib/utils/subscriptionUtils.ts)
+export interface SubscriptionFeatures {
   canViewMatches: boolean;
   canChatWithMatches: boolean;
   canInitiateChat: boolean;
@@ -84,17 +149,6 @@ export interface FeatureLimits {
   canSeeReadReceipts: boolean;
   maxLikesPerDay: number; // -1 = unlimited
   boostsPerMonth: number;
-
-  // Additional mobile-specific limits
-  maxMessages: number | null; // null = unlimited
-  maxInterests: number | null;
-  maxProfileViews: number | null;
-  maxSearches: number | null;
-
-  // Add missing fields for feature gating
-  maxProfileBoosts: number | null;
-  canViewWhoLikedMe: boolean;
-  canSeeWhoViewedProfile: boolean;
 }
 
 export interface PurchaseResult {
@@ -106,15 +160,25 @@ export interface PurchaseResult {
   receiptData?: string;
 }
 
+// Combined subscription info for mobile hooks
 export interface SubscriptionInfo {
   subscription: UserSubscription | null;
-  usage: FeatureUsage;
+  usage: FeatureUsage | null;
+  features: SubscriptionFeatures;
   hasActiveSubscription: boolean;
   isTrialActive: boolean;
   daysUntilExpiry: number;
-  canAccessFeature: (feature: keyof FeatureLimits) => boolean;
-  getRemainingUsage: (feature: keyof FeatureUsage) => number;
-  getUsagePercentage: (feature: keyof FeatureUsage) => number;
+  canAccessFeature: (feature: keyof SubscriptionFeatures) => boolean;
+  getRemainingUsage: (feature: string) => number;
+  getUsagePercentage: (feature: string) => number;
+}
+
+// Feature availability check result - aligned with main project
+export interface FeatureAvailabilityResult {
+  canUse: boolean;
+  reason?: string;
+  requiredPlan?: SubscriptionTier;
+  message?: string;
 }
 
 // Add PlanFeature type for SubscriptionScreen
