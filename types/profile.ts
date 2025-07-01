@@ -60,19 +60,22 @@ export interface Profile {
   subscriptionPlan?: SubscriptionPlan;
   subscriptionExpiresAt?: number;
   boostsRemaining?: number;
-  boostsMonth?: string;
+  boostsMonth?: number;
   hasSpotlightBadge?: boolean;
   spotlightBadgeExpiresAt?: number;
   boostedUntil?: number;
   motherTongue?: string;
   religion?: string;
   ethnicity?: string;
+  images?: string[];
+  interests?: string[] | string;
 }
 
 // Form-specific fields that aren't persisted
 export interface ProfileFormValues extends Partial<Profile> {
   language?: string;
   familyValues?: string;
+  interests?: string[] | string;
 }
 
 // Create profile data for onboarding
@@ -228,4 +231,35 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string | { code?: string; message?: string; [key: string]: any };
+}
+
+// Duplicate ProfileEditFormState removed to avoid conflict
+
+export interface ProfileEditFormState {
+  fullName?: string;
+  city?: string;
+  country?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  height?: string;
+  maritalStatus?: string;
+  education?: string;
+  occupation?: string;
+  annualIncome?: string | number;
+  aboutMe?: string;
+  phoneNumber?: string;
+  diet?: string;
+  smoking?: string;
+  drinking?: string;
+  physicalStatus?: string;
+  partnerPreferenceAgeMin?: number | string;
+  partnerPreferenceAgeMax?: number | string;
+  partnerPreferenceCity?: string[];
+  profileImageIds?: string[];
+  banned?: boolean;
+  preferredGender?: string;
+  motherTongue?: string;
+  religion?: string;
+  ethnicity?: string;
+  interests?: string[] | string;
 }
