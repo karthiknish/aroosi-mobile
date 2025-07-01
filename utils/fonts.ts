@@ -12,18 +12,17 @@ export const loadFonts = async () => {
   try {
     await Font.loadAsync({
       // Nunito Sans fonts from Google Fonts (for body text)
-      'NunitoSans-Regular': NunitoSans_400Regular,
-      'NunitoSans-Medium': NunitoSans_500Medium,
-      'NunitoSans-SemiBold': NunitoSans_600SemiBold,
-      'NunitoSans-Bold': NunitoSans_700Bold,
-      
+      "NunitoSans-Regular": NunitoSans_400Regular,
+      "NunitoSans-Medium": NunitoSans_500Medium,
+      "NunitoSans-SemiBold": NunitoSans_600SemiBold,
+      "NunitoSans-Bold": NunitoSans_700Bold,
+
       // Boldonse font from local file (for headings)
-      'Boldonse-Regular': require('../assets/fonts/Boldonse-Regular.ttf'),
+      "Boldonse-Regular": require("../assets/fonts/Boldonse-Regular.ttf"),
     });
-    console.log('Fonts loaded successfully');
+    // Fonts loaded successfully
   } catch (error) {
-    console.warn('Error loading fonts:', error);
-    // Fallback to system fonts if custom fonts fail to load
+    // console.warn('Error loading fonts:', error);
   }
 };
 
@@ -38,24 +37,11 @@ export const useAppFonts = () => {
   });
 
   if (error) {
-    console.error("Font loading error:", error);
+    // Optionally handle font loading error
   }
 
   if (fontsLoaded) {
-    console.log("✅ All fonts loaded successfully, including Boldonse");
-    console.log("🔍 Testing font availability...");
-
-    // Test if fonts are actually loaded
-    setTimeout(() => {
-      try {
-        const isBoldonseLoaded = Font.isLoaded("Boldonse");
-        const isBoldonseRegularLoaded = Font.isLoaded("Boldonse-Regular");
-        console.log("Boldonse loaded:", isBoldonseLoaded);
-        console.log("Boldonse-Regular loaded:", isBoldonseRegularLoaded);
-      } catch (e) {
-        console.log("Error checking font status:", e);
-      }
-    }, 1000);
+    // Fonts ready for use
   }
 
   return fontsLoaded;

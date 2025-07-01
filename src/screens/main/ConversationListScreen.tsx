@@ -11,14 +11,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
 import { Colors, Layout } from "../../../constants";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { ChatListSkeleton } from "../../components/ui/LoadingStates";
-import { NoMessages } from "../../components/ui/EmptyStates";
-import {
-  ErrorBoundary,
-  ApiErrorDisplay,
-} from "../../components/ui/ErrorHandling";
+import { ChatListSkeleton } from "@/components/ui/LoadingStates";
+import { NoMessages } from "@/components/ui/EmptyStates";
+import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 import { Conversation } from "../../../types/message";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ConversationListScreenProps {
   navigation: any;

@@ -7,7 +7,8 @@ import {
   StyleSheet,
   ViewStyle,
 } from "react-native";
-import { Colors } from "../../constants";
+import { Colors } from "@constants";
+import { GradientBackground } from "@/components/ui/GradientComponents";
 
 const { height } = Dimensions.get("window");
 
@@ -35,24 +36,32 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   ...scrollViewProps
 }) => {
   return (
-    <SafeAreaView style={[styles.container, containerStyle] as any}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.content, contentStyle] as any}
-        showsVerticalScrollIndicator={showsVerticalScrollIndicator}
-        keyboardShouldPersistTaps="handled"
-        {...scrollViewProps}
+    <SafeAreaView style={[styles.safeArea, containerStyle] as any}>
+      <GradientBackground
+        colors={Colors.gradient.secondary as any}
+        style={styles.gradient}
       >
-        {children}
-      </ScrollView>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.content, contentStyle] as any}
+          showsVerticalScrollIndicator={showsVerticalScrollIndicator}
+          keyboardShouldPersistTaps="handled"
+          {...scrollViewProps}
+        >
+          {children}
+        </ScrollView>
+      </GradientBackground>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
+    backgroundColor: "transparent",
+  },
+  gradient: {
+    flex: 1,
   },
   scroll: {
     flex: 1,

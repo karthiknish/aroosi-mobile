@@ -8,9 +8,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSubscription } from "../../../hooks/useSubscription";
-import SubscriptionCard from "../../../components/subscription/SubscriptionCard";
-import UsageDashboard from "../../../components/subscription/UsageDashboard";
-import UpgradeConfirmationModal from "../../../components/subscription/UpgradeConfirmationModal";
+import SubscriptionCard from "@components/subscription/SubscriptionCard";
+import UsageDashboard from "@components/subscription/UsageDashboard";
+import UpgradeConfirmationModal from "@components/subscription/UpgradeConfirmationModal";
 import { Colors, Layout } from "../../../constants";
 import { SubscriptionPlan, PlanFeature } from "../../../types/subscription";
 

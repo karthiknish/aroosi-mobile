@@ -11,7 +11,7 @@ import { useAuth, useUser } from '@clerk/clerk-expo';
 import { useState } from 'react';
 import { Colors, Layout } from "../../../constants";
 import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface SettingsScreenProps {
   navigation: any;

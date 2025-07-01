@@ -14,20 +14,17 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
-} from "../../components/ui/LoadingStates";
-import { NoMatches, NoInterests } from "../../components/ui/EmptyStates";
-import {
-  ErrorBoundary,
-  ApiErrorDisplay,
-} from "../../components/ui/ErrorHandling";
+} from "@/components/ui/LoadingStates";
+import { NoMatches, NoInterests } from "@/components/ui/EmptyStates";
+import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
   SlideInView,
   AnimatedButton,
   StaggeredList,
-} from "../../components/ui/AnimatedComponents";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+} from "@/components/ui/AnimatedComponents";
+import ScreenContainer from "@components/common/ScreenContainer";
 import { Profile } from "../../../types/profile";
 
 interface MatchesScreenProps {

@@ -25,7 +25,7 @@ import {
 } from "../../../types/notifications";
 import { Colors } from "../../../constants/Colors";
 import { Layout } from "../../../constants/Layout";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 const STORAGE_KEY = "notification_preferences";
 

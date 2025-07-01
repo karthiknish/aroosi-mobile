@@ -38,8 +38,8 @@ import {
   cleanPhoneNumber,
 } from "../../../utils/profileValidation";
 import { Colors, Layout } from "../../../constants";
-import ImageUpload from "../../../components/profile/ImageUpload";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ImageUpload from "@components/profile/ImageUpload";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ProfileSetupScreenProps {
   navigation: any;

@@ -11,9 +11,9 @@ import {
 import { Colors, Layout } from "../../../constants";
 import { useBlockedUsers, useUnblockUser } from "../../../hooks/useSafety";
 import { BlockedUserWithProfile } from "../../../types/safety";
-import LoadingState from "../../../components/ui/LoadingState";
-import EmptyState from "../../../components/ui/EmptyState";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import LoadingState from "@components/ui/LoadingState";
+import EmptyState from "@components/ui/EmptyState";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface BlockedUsersScreenProps {
   navigation: any;

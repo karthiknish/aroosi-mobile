@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Audio } from "expo-av";
+import { Audio } from "expo-audio";
 import { Alert } from "react-native";
 import PlatformHaptics from "../utils/PlatformHaptics";
 import React from "react";

@@ -34,7 +34,7 @@ import {
   cleanPhoneNumber,
 } from "../../../utils/profileValidation";
 import { Colors, Layout } from "../../../constants";
-import ImageUpload from "../../../components/profile/ImageUpload";
+import ImageUpload from "@components/profile/ImageUpload";
 
 interface EditProfileScreenProps {
   navigation: any;

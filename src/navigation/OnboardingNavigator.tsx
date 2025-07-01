@@ -5,7 +5,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import WelcomeScreen from "../screens/onboarding/WelcomeScreen";
 import ProfileSetupScreen from "../screens/onboarding/ProfileSetupScreen";
 import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteScreen";
-import withScreenContainer from "../../components/common/withScreenContainer";
+import withScreenContainer from "@components/common/withScreenContainer";
 
 export type OnboardingStackParamList = {
   Welcome: undefined;

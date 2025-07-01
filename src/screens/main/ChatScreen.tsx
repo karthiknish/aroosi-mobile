@@ -14,16 +14,16 @@ import { useAuth } from "@clerk/clerk-expo";
 import { Colors, Layout } from "../../../constants";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
-import LoadingState from "../../../components/ui/LoadingState";
-import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "@components/ui/LoadingState";
+import EmptyState from "@components/ui/EmptyState";
 import { useRealtimeMessaging } from "../../../hooks/useRealtimeMessaging";
 import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
 import { normalizeMessage } from "../../../utils/messageUtils";
-import { VoiceMessage, VoiceRecorder } from "../../components/ui/VoiceMessage";
-import { GradientButton } from "../../components/ui/GradientComponents";
-import { AnimatedButton } from "../../components/ui/AnimatedComponents";
+import { VoiceMessage, VoiceRecorder } from "@/components/ui/VoiceMessage";
+import { GradientButton } from "@/components/ui/GradientComponents";
+import { AnimatedButton } from "@/components/ui/AnimatedComponents";
 import * as Haptics from "expo-haptics";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ChatScreenProps {
   navigation: any;

@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Colors, Layout } from '../../../constants';
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface SafetyGuidelinesScreenProps {
   navigation: any;

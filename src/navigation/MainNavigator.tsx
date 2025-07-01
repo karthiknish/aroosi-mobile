@@ -27,7 +27,7 @@ import ConversationListScreen from "../screens/main/ConversationListScreen";
 import ChatScreen from "../screens/main/ChatScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import ContactScreen from "../screens/support/ContactScreen";
-import withScreenContainer from "../../components/common/withScreenContainer";
+import withScreenContainer from "@components/common/withScreenContainer";
 
 // Placeholder screens for now
 import { View, Text } from "react-native";

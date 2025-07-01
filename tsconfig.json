@@ -8,6 +8,10 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@components/*": ["./components/*"],
+      "@hooks/*": ["./hooks/*"],
+      "@constants/*": ["./constants/*"],
+      "@constants": ["./constants/index.ts"],
       "@convex/*": ["./convex/*"]
     },
     "skipLibCheck": true

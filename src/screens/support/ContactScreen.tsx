@@ -13,8 +13,8 @@ import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "../../../hooks/useResponsive";
-import ContactForm from "../../../components/contact/ContactForm";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ContactForm from "@components/contact/ContactForm";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ContactScreenProps {
   navigation: any;

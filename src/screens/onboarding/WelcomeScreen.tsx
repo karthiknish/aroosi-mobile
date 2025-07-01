@@ -13,7 +13,7 @@ import {
   useResponsiveTypography,
 } from "../../../hooks/useResponsive";
 import { useAuth } from "../../../contexts/AuthContext";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 interface WelcomeScreenProps {
   navigation: any;

@@ -25,18 +25,18 @@ import {
   GradientButton,
   GlassmorphismCard,
   GradientBackground,
-} from "../../components/ui/GradientComponents";
+} from "@/components/ui/GradientComponents";
 import {
   CircularProgress,
   LinearProgress,
-} from "../../components/ui/ProgressIndicators";
+} from "@/components/ui/ProgressIndicators";
 import {
   AnimatedButton,
   FadeInView,
   ScaleInView,
-} from "../../components/ui/AnimatedComponents";
+} from "@/components/ui/AnimatedComponents";
 import * as Haptics from "expo-haptics";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 

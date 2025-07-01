@@ -12,13 +12,14 @@ import {
 import { useSignIn } from "@clerk/clerk-expo";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { AuthStackParamList } from "../../navigation/AuthNavigator";
-import SocialAuthButtons from "../../../components/auth/SocialAuthButtons";
-import { Colors, Layout } from "../../../constants";
+import { AuthStackParamList } from "@/navigation/AuthNavigator";
+import SocialAuthButtons from "@components/auth/SocialAuthButtons";
+import { Colors, Layout } from "@constants";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
+import { GradientBackground } from "@/components/ui/GradientComponents";
 
 type LoginScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -65,7 +66,6 @@ export default function LoginScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.primary,
     },
     scrollContent: {
       justifyContent: "center",
@@ -104,6 +104,7 @@ export default function LoginScreen() {
       padding: spacing.md,
       fontSize: fontSize.base,
       color: Colors.text.primary,
+      backgroundColor: "white",
     },
     button: {
       backgroundColor: Colors.primary[500],
@@ -155,85 +156,92 @@ export default function LoginScreen() {
   });
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <GradientBackground
+      colors={Colors.gradient.secondary as any}
+      style={{ flex: 1 }}
     >
-      <View style={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
-        </View>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.scrollContent}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Welcome Back</Text>
+            <Text style={styles.subtitle}>Sign in to continue</Text>
+          </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              placeholderTextColor={Colors.text.secondary}
-              value={emailAddress}
-              onChangeText={setEmailAddress}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              editable={!loading}
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={Colors.text.secondary}
+                value={emailAddress}
+                onChangeText={setEmailAddress}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your password"
+                placeholderTextColor={Colors.text.secondary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                editable={!loading}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={onSignInPress}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>
+                {loading ? "Signing in..." : "Sign In"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.forgotPasswordButton}
+              onPress={() => navigation.navigate("ForgotPassword")}
+              disabled={loading}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>OR</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <SocialAuthButtons
+              mode="sign-in"
+              loading={loading}
+              onSuccess={() => {
+                // Navigation handled by auth context
+              }}
             />
+
+            <TouchableOpacity
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("SignUp")}
+              disabled={loading}
+            >
+              <Text style={styles.linkText}>
+                Don't have an account? Sign Up
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your password"
-              placeholderTextColor={Colors.text.secondary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!loading}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={onSignInPress}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.forgotPasswordButton}
-            onPress={() => navigation.navigate("ForgotPassword")}
-            disabled={loading}
-          >
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <SocialAuthButtons
-            mode="sign-in"
-            loading={loading}
-            onSuccess={() => {
-              // Navigation handled by auth context
-            }}
-          />
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => navigation.navigate("SignUp")}
-            disabled={loading}
-          >
-            <Text style={styles.linkText}>Don't have an account? Sign Up</Text>
-          </TouchableOpacity>
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </GradientBackground>
   );
 }

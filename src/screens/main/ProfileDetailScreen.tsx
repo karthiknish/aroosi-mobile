@@ -17,13 +17,13 @@ import { useApiClient } from "../../../utils/api";
 import { useInterests } from "../../../hooks/useInterests";
 import { useSafety } from "../../../hooks/useSafety";
 import { useTheme } from "../../../contexts/ThemeContext";
-import SafetyActionSheet from "../../../components/safety/SafetyActionSheet";
+import SafetyActionSheet from "@components/safety/SafetyActionSheet";
 import { Colors } from "../../../constants";
 import { useInterestStatus } from "../../../hooks/useInterests";
 import { useBlockStatus } from "../../../hooks/useSafety";
 import { Profile } from "../../../types/profile";
 import type { ReportReason } from "../../../types/index";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 

@@ -7,7 +7,14 @@ import {
   Dimensions,
   Alert,
 } from "react-native";
-import { Audio } from "expo-av";
+import {
+  createAudioPlayer,
+  useAudioPlayerStatus,
+  AudioPlayer,
+  useAudioRecorder,
+  AudioModule,
+  RecordingPresets,
+} from "expo-audio";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
@@ -49,7 +56,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   onPause,
   style,
 }) => {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [player, setPlayer] = useState<AudioPlayer | null>(null);
+  const status = useAudioPlayerStatus(player);
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,47 +66,27 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   const waveformScale = useSharedValue(1);
 
   useEffect(() => {
-    return sound
-      ? () => {
-          sound.unloadAsync();
-        }
-      : undefined;
-  }, [sound]);
+    return () => {
+      player?.remove();
+    };
+  }, [player]);
 
   const loadAudio = async () => {
     // Support both direct URI and storage ID from main project
     let finalAudioUri = audioUri;
-    
+
     if (!finalAudioUri && audioStorageId) {
       // Construct URL for storage ID - this would need to be implemented
       finalAudioUri = `${process.env.EXPO_PUBLIC_API_URL}/voice-messages/${audioStorageId}/url`;
     }
-    
+
     if (!finalAudioUri) return;
 
     try {
       setIsLoading(true);
-      const { sound: audioSound } = await Audio.Sound.createAsync(
-        { uri: finalAudioUri },
-        { shouldPlay: false }
-      );
-      setSound(audioSound);
 
-      audioSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setPosition(status.positionMillis || 0);
-          const progress = duration > 0 ? (status.positionMillis || 0) / duration : 0;
-          playbackProgress.value = progress;
-
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-            setPosition(0);
-            playbackProgress.value = 0;
-            cancelAnimation(waveformScale);
-            waveformScale.value = withTiming(1);
-          }
-        }
-      });
+      const newPlayer = createAudioPlayer({ uri: finalAudioUri });
+      setPlayer(newPlayer);
     } catch (error) {
       console.error("Error loading audio:", error);
       Alert.alert("Error", "Failed to load audio message");
@@ -110,20 +98,20 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   const togglePlayback = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (!sound) {
+    if (!player) {
       await loadAudio();
       return;
     }
 
     try {
       if (isPlaying) {
-        await sound.pauseAsync();
+        player.pause();
         setIsPlaying(false);
         onPause?.();
         cancelAnimation(waveformScale);
         waveformScale.value = withTiming(1);
       } else {
-        await sound.playAsync();
+        player.play();
         setIsPlaying(true);
         onPlay?.();
         waveformScale.value = withRepeat(
@@ -139,6 +127,24 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       console.error("Error controlling playback:", error);
     }
   };
+
+  // Sync local state with player status
+  useEffect(() => {
+    if (!status) return;
+
+    setPosition(Math.floor((status.currentTime ?? 0) * 1000));
+
+    const prog =
+      duration > 0 ? ((status.currentTime ?? 0) * 1000) / duration : 0;
+    playbackProgress.value = prog;
+
+    if (status.didJustFinish) {
+      setIsPlaying(false);
+      playbackProgress.value = 0;
+      cancelAnimation(waveformScale);
+      waveformScale.value = withTiming(1);
+    }
+  }, [status, duration]);
 
   const formatDuration = (milliseconds: number) => {
     const seconds = Math.floor(milliseconds / 1000);
@@ -191,7 +197,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
           <View style={styles.waveformBackground}>
             <Animated.View style={[styles.waveformProgress, progressStyle]} />
           </View>
-          
+
           <Animated.View style={[styles.waveform, waveformStyle]}>
             {Array.from({ length: 20 }).map((_, index) => (
               <View
@@ -234,10 +240,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   maxDuration = 60000, // 60 seconds
   style,
 }) => {
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const [permissionResponse, requestPermission] = Audio.usePermissions();
+  const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
 
   const recordingScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0);
@@ -252,26 +258,28 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     };
   }, []);
 
+  const requestPerms = async () => {
+    if (permissionGranted) return true;
+    const status = await AudioModule.requestRecordingPermissionsAsync();
+    if (!status.granted) {
+      Alert.alert(
+        "Permission required",
+        "Please grant microphone permission to record voice messages."
+      );
+      return false;
+    }
+    setPermissionGranted(true);
+    return true;
+  };
+
   const startRecording = async () => {
     try {
-      if (permissionResponse?.status !== "granted") {
-        const permission = await requestPermission();
-        if (permission.status !== "granted") {
-          Alert.alert("Permission required", "Please grant microphone permission to record voice messages.");
-          return;
-        }
-      }
+      const ok = await requestPerms();
+      if (!ok) return;
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
 
-      const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      setRecording(newRecording);
       setIsRecording(true);
       setRecordingDuration(0);
 
@@ -314,16 +322,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
+    if (!audioRecorder.isRecording) return;
 
     try {
       setIsRecording(false);
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
+      await audioRecorder.stop();
 
-      const uri = recording.getURI();
+      const uri = audioRecorder.uri;
       if (uri) {
         onRecordingComplete(uri, recordingDuration);
       }
@@ -344,14 +349,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       console.error("Error stopping recording:", error);
     }
 
-    setRecording(null);
     setRecordingDuration(0);
   };
 
   const cancelRecording = async () => {
-    if (recording) {
-      await recording.stopAndUnloadAsync();
-      setRecording(null);
+    if (audioRecorder.isRecording) {
+      await audioRecorder.stop();
     }
 
     setIsRecording(false);
@@ -404,15 +407,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
           <View style={styles.recordingIndicator}>
             <Animated.View style={[styles.pulseCircle, pulseAnimatedStyle]} />
-            <Animated.View style={[styles.recordButton, recordingAnimatedStyle]}>
+            <Animated.View
+              style={[styles.recordButton, recordingAnimatedStyle]}
+            >
               <View style={styles.recordingDot} />
             </Animated.View>
           </View>
 
-          <TouchableOpacity
-            style={styles.stopButton}
-            onPress={stopRecording}
-          >
+          <TouchableOpacity style={styles.stopButton} onPress={stopRecording}>
             <Text style={styles.stopButtonText}>⏹️</Text>
           </TouchableOpacity>
         </View>

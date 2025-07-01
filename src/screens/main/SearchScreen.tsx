@@ -17,12 +17,9 @@ import { useTheme } from "../../../contexts/ThemeContext";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
-} from "src/components/ui/LoadingStates";
-import { NoSearchResults, NetworkError } from "src/components/ui/EmptyStates";
-import {
-  ErrorBoundary,
-  ApiErrorDisplay,
-} from "src/components/ui/ErrorHandling";
+} from "@/components/ui/LoadingStates";
+import { NoSearchResults, NetworkError } from "@/components/ui/EmptyStates";
+import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
@@ -30,7 +27,7 @@ import {
   AnimatedButton,
   HeartButton,
   StaggeredList,
-} from "src/components/ui/AnimatedComponents";
+} from "@/components/ui/AnimatedComponents";
 import { Profile } from "../../../types/profile";
 
 interface SearchScreenProps {

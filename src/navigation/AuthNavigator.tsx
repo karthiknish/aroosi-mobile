@@ -4,8 +4,8 @@ import { createStackNavigator } from "@react-navigation/stack";
 // Import auth screens (to be created)
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignUpScreen from "../screens/auth/SignUpScreen";
-import withScreenContainer from "../../components/common/withScreenContainer";
 // import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import withScreenContainer from "@components/common/withScreenContainer";
 
 export type AuthStackParamList = {
   Login: undefined;
