@@ -35,6 +35,9 @@ import {
 } from "../../../utils/profileValidation";
 import { Colors, Layout } from "../../../constants";
 import ImageUpload from "@components/profile/ImageUpload";
+import { COUNTRIES } from "../../../constants/countries";
+import SearchableSelect from "../../../components/SearchableSelect";
+import { MOTHER_TONGUES, ETHNICITIES } from "../../../constants/options";
 
 interface EditProfileScreenProps {
   navigation: any;
@@ -122,35 +125,6 @@ const GLOBAL_CITIES = [
   "Al Wakrah",
   "Al Khor",
   "Umm Salal", // Qatar cities
-  "Other",
-];
-const COUNTRIES = [
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Australia",
-  "New Zealand",
-  "Afghanistan",
-  "United Arab Emirates",
-  "Qatar",
-  "Saudi Arabia",
-  "Kuwait",
-  "Bahrain",
-  "Oman",
-  "Germany",
-  "France",
-  "Netherlands",
-  "Belgium",
-  "Switzerland",
-  "Austria",
-  "Sweden",
-  "Norway",
-  "Denmark",
-  "Finland",
-  "Italy",
-  "Spain",
-  "Portugal",
-  "Ireland",
   "Other",
 ];
 
@@ -341,29 +315,23 @@ export default function EditProfileScreen({
           )}
 
           {formData.motherTongue !== undefined && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Mother Tongue</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.motherTongue || ""}
-                onChangeText={(text) => handleInputChange("motherTongue", text)}
-                placeholder="e.g., English, Hindi, Urdu, etc."
-                maxLength={50}
-              />
-            </View>
+            <SearchableSelect
+              label="Mother Tongue"
+              options={MOTHER_TONGUES}
+              selectedValue={formData.motherTongue || ""}
+              placeholder="Select mother tongue"
+              onValueChange={(v) => handleInputChange("motherTongue", v)}
+            />
           )}
 
           {formData.ethnicity !== undefined && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Ethnicity</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.ethnicity || ""}
-                onChangeText={(text) => handleInputChange("ethnicity", text)}
-                placeholder="e.g., British Asian, Indian, Pakistani, etc."
-                maxLength={50}
-              />
-            </View>
+            <SearchableSelect
+              label="Ethnicity"
+              options={ETHNICITIES}
+              selectedValue={formData.ethnicity || ""}
+              placeholder="Select ethnicity"
+              onValueChange={(v) => handleInputChange("ethnicity", v)}
+            />
           )}
 
           <View style={styles.formGroup}>
@@ -438,39 +406,23 @@ export default function EditProfileScreen({
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>City *</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.city}
-                onValueChange={(value) => handleInputChange("city", value)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select city" value="" />
-                {GLOBAL_CITIES.map((city) => (
-                  <Picker.Item label={city} value={city} />
-                ))}
-              </Picker>
-            </View>
+            <TextInput
+              style={[styles.input, errors.city && styles.inputError]}
+              value={formData.city || ""}
+              onChangeText={(text) => handleInputChange("city", text)}
+              placeholder="Enter city"
+            />
             {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Country *</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={formData.country}
-                onValueChange={(value) => handleInputChange("country", value)}
-                style={styles.picker}
-              >
-                <Picker.Item label="Select country" value="" />
-                {COUNTRIES.map((country) => (
-                  <Picker.Item label={country} value={country} />
-                ))}
-              </Picker>
-            </View>
-            {errors.country && (
-              <Text style={styles.errorText}>{errors.country}</Text>
-            )}
-          </View>
+          <SearchableSelect
+            label="Country *"
+            options={COUNTRIES}
+            selectedValue={formData.country || ""}
+            placeholder="Select country"
+            onValueChange={(value) => handleInputChange("country", value)}
+            containerStyle={{ marginBottom: 16 }}
+          />
         </View>
 
         {/* Physical Details */}

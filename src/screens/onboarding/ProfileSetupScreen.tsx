@@ -40,6 +40,8 @@ import {
 import { Colors, Layout } from "../../../constants";
 import ImageUpload from "@components/profile/ImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
+import SearchableSelect from "../../../components/SearchableSelect";
+import { MOTHER_TONGUES, ETHNICITIES } from "../../../constants/options";
 
 interface ProfileSetupScreenProps {
   navigation: any;
@@ -327,36 +329,25 @@ export default function ProfileSetupScreen({
       <Text style={styles.stepSubtitle}>Where are you based?</Text>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>City *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.city}
-            onValueChange={(value) => handleInputChange("city", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select city" value="" />
-            {GLOBAL_CITIES.map((city) => (
-              <Picker.Item key={city} label={city} value={city} />
-            ))}
-          </Picker>
-        </View>
-        {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
+        <Text style={styles.label}>Country - searchable select</Text>
+        <SearchableSelect
+          label="Country *"
+          options={COUNTRIES}
+          selectedValue={formData.country || ""}
+          placeholder="Select country"
+          onValueChange={(value) => handleInputChange("country", value)}
+        />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Country</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.country || "UK"}
-            onValueChange={(value) => handleInputChange("country", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select country" value="" />
-            {COUNTRIES.map((country) => (
-              <Picker.Item key={country} label={country} value={country} />
-            ))}
-          </Picker>
-        </View>
+        <Text style={styles.label}>City *</Text>
+        <TextInput
+          style={[styles.input, errors.city && styles.inputError]}
+          value={formData.city || ""}
+          onChangeText={(text) => handleInputChange("city", text)}
+          placeholder="Enter city"
+        />
+        {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
       </View>
     </View>
   );
@@ -489,6 +480,28 @@ export default function ProfileSetupScreen({
       <Text style={styles.stepSubtitle}>
         Share your cultural identity (optional)
       </Text>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Cultural Background</Text>
+
+        <SearchableSelect
+          label="Mother Tongue"
+          options={MOTHER_TONGUES}
+          selectedValue={formData.motherTongue || ""}
+          placeholder="Select mother tongue"
+          onValueChange={(v) => handleInputChange("motherTongue", v)}
+        />
+
+        <SearchableSelect
+          label="Ethnicity"
+          options={ETHNICITIES}
+          selectedValue={formData.ethnicity || ""}
+          placeholder="Select ethnicity"
+          onValueChange={(v) => handleInputChange("ethnicity", v)}
+        />
+
+        {/* Additional language field removed to align with CreateProfileData */}
+      </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Religion</Text>
@@ -977,5 +990,8 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.sm,
     color: Colors.text.secondary,
     lineHeight: 20,
+  },
+  section: {
+    marginBottom: Layout.spacing.lg,
   },
 });

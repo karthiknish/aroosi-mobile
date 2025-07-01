@@ -85,8 +85,8 @@ export const ValidationMessages = {
 // Validation regex patterns
 const PATTERNS = {
   fullName: /^[a-zA-Z\s\-']+$/,
-  ukPhone: /^(\+44|0)[0-9]{10,11}$/,
-  ukPhoneWithSpaces: /^[+]?[\d\s-]{7,20}$/,
+  internationalPhone: /^[+]?\d{7,15}$/,
+  internationalPhoneWithSpaces: /^[+]?[\d\s-]{7,20}$/,
   ukPostcode: /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i,
 };
 
@@ -193,11 +193,10 @@ export const validators = {
 
   phoneNumber: (value: string | undefined): string | null => {
     if (!value?.trim()) return ValidationMessages.phoneNumber.required;
-    // Remove spaces and hyphens for validation
     const cleanPhone = value.replace(/[\s-]/g, "");
     if (
-      !PATTERNS.ukPhone.test(cleanPhone) &&
-      !PATTERNS.ukPhoneWithSpaces.test(value)
+      !PATTERNS.internationalPhone.test(cleanPhone) &&
+      !PATTERNS.internationalPhoneWithSpaces.test(value)
     ) {
       return ValidationMessages.phoneNumber.invalid;
     }
@@ -354,20 +353,11 @@ export function isProfileComplete(
 
 // Format phone number for display
 export function formatPhoneNumber(phone: string): string {
-  // Remove all non-digits
   const cleaned = phone.replace(/\D/g, "");
-
-  // Format as UK number
-  if (cleaned.startsWith("44")) {
-    // +44 format
-    const number = cleaned.slice(2);
-    return `+44 ${number.slice(0, 4)} ${number.slice(4, 7)} ${number.slice(7)}`;
-  } else if (cleaned.startsWith("0")) {
-    // 0 format
-    return `${cleaned.slice(0, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`;
+  if (phone.startsWith("+")) {
+    return `+${cleaned}`;
   }
-
-  return phone;
+  return cleaned;
 }
 
 // Clean phone number for storage
