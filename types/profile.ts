@@ -22,7 +22,6 @@ export type Id<TableName extends string> = string;
 export interface Profile {
   _id: Id<"profiles">;
   userId: Id<"users">;
-  clerkId: string;
   email: string;
   role?: string;
   profileFor: ProfileFor;
@@ -52,11 +51,13 @@ export interface Profile {
   isProfileComplete: boolean;
   isOnboardingComplete: boolean;
   isApproved?: boolean;
+
   hideFromFreeUsers?: boolean;
   banned: boolean;
   createdAt: number;
   updatedAt: number;
   _creationTime?: number | string | Date;
+
   subscriptionPlan?: SubscriptionPlan;
   subscriptionExpiresAt?: number;
   boostsRemaining?: number;
@@ -67,15 +68,266 @@ export interface Profile {
   motherTongue?: string;
   religion?: string;
   ethnicity?: string;
+
+  /**
+   * Array of raw image URLs belonging to the user profile (legacy support).
+   * Prefer using `profileImageUrls` but `images` is retained for backward-compat.
+   */
   images?: string[];
+
+  /**
+   * Comma-separated string or array of user interests/hobbies.
+   */
   interests?: string[] | string;
 }
 
-// Form-specific fields that aren't persisted
-export interface ProfileFormValues extends Partial<Profile> {
+export interface ProfileFormValues {
+  _id?: Id<"profiles">;
+  userId?: Id<"users">;
+  email?: string;
+  role?: string;
+  fullName: string;
+  dateOfBirth: string;
+  gender: string;
+  city: string;
+  country: string;
+  phoneNumber: string;
+  aboutMe: string;
+  height: string;
+  maritalStatus: string;
+  education: string;
+  occupation: string;
+  annualIncome: string | number;
+  diet: string;
+  smoking: string;
+  drinking: string;
+  physicalStatus: string;
+  partnerPreferenceAgeMin: number | string;
+  partnerPreferenceAgeMax: number | string;
+  partnerPreferenceCity: string[] | string;
+  preferredGender: string;
+  profileImageIds?: string[];
+  isProfileComplete?: boolean;
+  isOnboardingComplete?: boolean;
+
+  banned?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+  profileFor: "self" | "friend" | "family";
+  subscriptionPlan?: SubscriptionPlan;
+  boostsRemaining?: number;
+  motherTongue: string;
+  religion: string;
+  ethnicity: string;
+}
+
+// Search-related types
+export interface SearchFilters {
+  // Basic filters
+  city?: string;
+  country?: string;
+  ageMin?: number;
+  ageMax?: number;
+  gender?: "male" | "female" | "other" | "any";
+
+  // Additional filters
+  maritalStatus?: string[];
+  education?: string[];
+  occupation?: string[];
+  diet?: string[];
+  smoking?: string[];
+  drinking?: string[];
+
+  // Premium filters (Premium Plus only)
+  ethnicity?: string;
+  motherTongue?: string;
   language?: string;
-  familyValues?: string;
-  interests?: string[] | string;
+  annualIncomeMin?: number;
+  heightMin?: string;
+  heightMax?: string;
+
+  // Pagination
+  pageSize?: number;
+}
+
+export interface ProfileSearchResult {
+  userId: string;
+  email?: string;
+  profile: {
+    fullName: string;
+    city?: string;
+    dateOfBirth?: string;
+    isProfileComplete?: boolean;
+    hiddenFromSearch?: boolean;
+    boostedUntil?: number;
+    subscriptionPlan?: string;
+    hideFromFreeUsers?: boolean;
+    profileImageUrls?: string[];
+    [key: string]: unknown;
+  };
+}
+
+export interface SearchResponse {
+  profiles: ProfileSearchResult[];
+  total: number;
+  hasMore: boolean;
+  nextPage?: number | null;
+}
+
+// Interest system types (aligned with auto-matching)
+export interface Interest {
+  _id: string;
+  fromUserId: string;
+  toUserId: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: number;
+  updatedAt?: number;
+
+  // Profile enrichment (from main project)
+  fromProfile?: ProfileSummary;
+  toProfile?: ProfileSummary;
+}
+
+export interface ProfileSummary {
+  fullName: string;
+  city: string;
+  profileImageIds: string[];
+  profileImageUrls: string[];
+}
+
+export interface Match {
+  _id: string;
+  participants: string[];
+  createdAt: number;
+  lastMessageAt?: number;
+  conversationId: string;
+  profiles: ProfileSummary[];
+}
+
+// Message system types (aligned with main project)
+export interface Message {
+  _id: string;
+  conversationId: string;
+  fromUserId: string;
+  toUserId: string;
+  text: string;
+  type?: "text" | "voice" | "image";
+  createdAt: number;
+  readAt?: number;
+
+  // Voice message fields
+  audioStorageId?: string;
+  duration?: number;
+  fileSize?: number;
+  mimeType?: string;
+
+  // Image message fields
+  imageStorageId?: string;
+  imageUrl?: string;
+
+  // Delivery tracking
+  deliveredAt?: number;
+  status?: "sent" | "delivered" | "read";
+}
+
+export interface Conversation {
+  _id: string;
+  participants: string[];
+  lastMessage?: Message;
+  lastMessageAt?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Subscription system types (aligned with main project)
+export interface SubscriptionStatus {
+  plan: "free" | "premium" | "premiumPlus";
+  isActive: boolean;
+  expiresAt?: number;
+  daysRemaining: number;
+  boostsRemaining: number;
+  hasSpotlightBadge: boolean;
+  spotlightBadgeExpiresAt?: number;
+}
+
+export interface UsageStats {
+  plan: "free" | "premium" | "premiumPlus";
+  messaging: {
+    sent: number;
+    received: number;
+    limit: number; // -1 means unlimited
+  };
+  profileViews: {
+    count: number;
+    limit: number;
+  };
+  searches: {
+    count: number;
+    limit: number;
+  };
+  boosts: {
+    used: number;
+    remaining: number;
+    monthlyLimit: number;
+  };
+}
+
+export interface FeatureUsageResponse {
+  feature: string;
+  plan: string;
+  tracked: boolean;
+  currentUsage: number;
+  limit: number;
+  remainingQuota: number;
+  isUnlimited: boolean;
+  resetDate: number;
+}
+
+// Safety and Security types (aligned with main project)
+export interface BlockedUser {
+  id: string;
+  blockerId: string;
+  blockedUserId: string;
+  blockedProfile: {
+    fullName: string;
+    profileImageUrl?: string;
+  };
+  createdAt: number;
+}
+
+export interface BlockStatus {
+  isBlocked: boolean;
+  isBlockedBy?: boolean;
+  canInteract?: boolean;
+}
+
+export type ReportReason =
+  | "inappropriate_content"
+  | "harassment"
+  | "fake_profile"
+  | "spam"
+  | "safety_concern"
+  | "inappropriate_behavior"
+  | "other";
+
+export interface ReportData {
+  reportedUserId: string;
+  reason: ReportReason;
+  description?: string;
+}
+
+export interface UserReport {
+  id: string;
+  reporterId: string;
+  reportedUserId: string;
+  reason: ReportReason;
+  description?: string;
+  status: "pending" | "reviewed" | "resolved";
+  createdAt: number;
+}
+
+export interface ReportResponse {
+  message: string;
 }
 
 // Create profile data for onboarding
@@ -227,10 +479,16 @@ export function calculateAge(dateOfBirth: string): number {
 }
 
 // Generic API response type
+export interface ApiError {
+  code: string;
+  message: string;
+  details?: any;
+}
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
-  error?: string | { code?: string; message?: string; [key: string]: any };
+  error?: ApiError;
 }
 
 // Duplicate ProfileEditFormState removed to avoid conflict

@@ -4,6 +4,16 @@ import {
   Profile,
   CreateProfileData,
   UpdateProfileData,
+  SearchFilters,
+  SearchResponse,
+  Interest,
+  Message,
+  SubscriptionStatus,
+  UsageStats,
+  BlockedUser,
+  BlockStatus,
+  ReportData,
+  ReportResponse,
 } from "../types/profile";
 import { validateProfileData, validateFormData } from "./typeValidation";
 
@@ -30,8 +40,12 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryCount: number = 0
   ): Promise<ApiResponse<T>> {
+    const maxRetries = 3;
+    const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
+
     try {
       const url = `${this.baseUrl}${endpoint}`;
       const authHeaders = await this.getAuthHeaders();
@@ -45,12 +59,27 @@ class ApiClient {
         },
       });
 
+      // Handle token expiration
+      if (response.status === 401) {
+        // Try to refresh token if available
+        const newToken = await this.refreshTokenIfNeeded();
+        if (newToken && retryCount < maxRetries) {
+          // Retry with new token
+          return this.request(endpoint, options, retryCount + 1);
+        }
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
+        // Standardized error response format matching web application
         return {
           success: false,
-          error: data.error || `HTTP ${response.status}`,
+          error: {
+            code: this.getErrorCode(response.status, data),
+            message: data.error || data.message || `HTTP ${response.status}`,
+            details: data.details || null,
+          },
         };
       }
 
@@ -59,11 +88,62 @@ class ApiClient {
         data,
       };
     } catch (error) {
+      // Retry on network errors
+      if (retryCount < maxRetries && this.isRetryableError(error)) {
+        await this.delay(retryDelay);
+        return this.request(endpoint, options, retryCount + 1);
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Network error",
+        error: {
+          code: "NETWORK_ERROR",
+          message: error instanceof Error ? error.message : "Network error",
+          details: null,
+        },
       };
     }
+  }
+
+  private getErrorCode(status: number, data: any): string {
+    if (data.code) return data.code;
+
+    switch (status) {
+      case 401:
+        return "UNAUTHORIZED";
+      case 403:
+        return "FORBIDDEN";
+      case 400:
+        return "VALIDATION_ERROR";
+      case 429:
+        return "RATE_LIMITED";
+      case 402:
+        return "SUBSCRIPTION_REQUIRED";
+      case 422:
+        return "PROFILE_INCOMPLETE";
+      default:
+        return `HTTP_${status}`;
+    }
+  }
+
+  private isRetryableError(error: any): boolean {
+    // Retry on network errors, timeouts, and 5xx server errors
+    return (
+      error instanceof TypeError ||
+      error.message?.includes("fetch") ||
+      error.message?.includes("network") ||
+      error.message?.includes("timeout")
+    );
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async refreshTokenIfNeeded(): Promise<string | null> {
+    // This would integrate with the auth system's token refresh mechanism
+    // For now, return null - this will be implemented when token refresh is added
+    return null;
   }
 
   // Profile APIs
@@ -91,7 +171,11 @@ class ApiClient {
     if (!validation.isValid) {
       return {
         success: false,
-        error: validation.errors.join(", "),
+        error: {
+          code: "VALIDATION_ERROR",
+          message: validation.errors.join(", "),
+          details: validation.errors,
+        },
       };
     }
 
@@ -124,90 +208,175 @@ class ApiClient {
   }
 
   // Search APIs
-  async searchProfiles(filters: any) {
-    const params = new URLSearchParams(filters);
-    return this.request(`/search?${params}`);
+  async searchProfiles(
+    filters: SearchFilters,
+    page: number = 0
+  ): Promise<ApiResponse<SearchResponse>> {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      pageSize: filters.pageSize?.toString() || "12",
+    });
+
+    // Basic filters
+    if (filters.city && filters.city !== "any")
+      params.append("city", filters.city);
+    if (filters.country && filters.country !== "any")
+      params.append("country", filters.country);
+    if (filters.ageMin) params.append("ageMin", filters.ageMin.toString());
+    if (filters.ageMax) params.append("ageMax", filters.ageMax.toString());
+
+    // Premium filters (Premium Plus only)
+    if (filters.ethnicity && filters.ethnicity !== "any")
+      params.append("ethnicity", filters.ethnicity);
+    if (filters.motherTongue && filters.motherTongue !== "any")
+      params.append("motherTongue", filters.motherTongue);
+    if (filters.language && filters.language !== "any")
+      params.append("language", filters.language);
+
+    // Additional filters
+    if (filters.gender && filters.gender !== "any")
+      params.append("gender", filters.gender);
+    if (filters.maritalStatus && filters.maritalStatus.length > 0) {
+      filters.maritalStatus.forEach((status) =>
+        params.append("maritalStatus", status)
+      );
+    }
+    if (filters.education && filters.education.length > 0) {
+      filters.education.forEach((edu) => params.append("education", edu));
+    }
+    if (filters.occupation && filters.occupation.length > 0) {
+      filters.occupation.forEach((occ) => params.append("occupation", occ));
+    }
+    if (filters.diet && filters.diet.length > 0) {
+      filters.diet.forEach((d) => params.append("diet", d));
+    }
+    if (filters.smoking && filters.smoking.length > 0) {
+      filters.smoking.forEach((s) => params.append("smoking", s));
+    }
+    if (filters.drinking && filters.drinking.length > 0) {
+      filters.drinking.forEach((d) => params.append("drinking", d));
+    }
+
+    // Premium filters (Premium Plus only)
+    if (filters.annualIncomeMin)
+      params.append("annualIncomeMin", filters.annualIncomeMin.toString());
+    if (filters.heightMin) params.append("heightMin", filters.heightMin);
+    if (filters.heightMax) params.append("heightMax", filters.heightMax);
+
+    const response = await this.request(`/search?${params}`);
+
+    if (response.success && response.data) {
+      const envelope = response.data?.data ?? response.data;
+      return {
+        success: true,
+        data: {
+          profiles: Array.isArray(envelope.profiles) ? envelope.profiles : [],
+          total: typeof envelope.total === "number" ? envelope.total : 0,
+          hasMore: envelope.hasMore || false,
+          nextPage: envelope.nextPage || null,
+        },
+      };
+    }
+
+    return response as ApiResponse<SearchResponse>;
   }
 
-  // Interest APIs
-  async sendInterest(toUserId: string, fromUserId: string) {
+  // Interest APIs (Auto-matching system)
+  async sendInterest(toUserId: string): Promise<ApiResponse<Interest>> {
     return this.request("/interests", {
       method: "POST",
-      body: JSON.stringify({ toUserId, fromUserId }),
+      body: JSON.stringify({ toUserId }),
     });
   }
 
-  async removeInterest(toUserId: string, fromUserId: string) {
+  async removeInterest(toUserId: string): Promise<ApiResponse<void>> {
     return this.request("/interests", {
       method: "DELETE",
-      body: JSON.stringify({ toUserId, fromUserId }),
+      body: JSON.stringify({ toUserId }),
     });
   }
 
   // Get sent interests - returns interests with profile enrichment
-  async getSentInterests(userId: string) {
-    return this.request(`/interests?userId=${userId}`);
+  async getSentInterests(userId?: string): Promise<ApiResponse<Interest[]>> {
+    const params = userId ? `?userId=${userId}` : "";
+    return this.request(`/interests${params}`);
   }
 
   // Get received interests - returns interests with profile enrichment
-  async getReceivedInterests(userId: string) {
-    return this.request(`/interests/received?userId=${userId}`);
+  async getReceivedInterests(
+    userId?: string
+  ): Promise<ApiResponse<Interest[]>> {
+    const params = userId ? `?userId=${userId}` : "";
+    return this.request(`/interests/received${params}`);
   }
 
   // Interest response not available via API - auto-matching system
   // When both users send interests to each other, they automatically match
-  async respondToInterest(interestId: string, response: "accept" | "reject") {
+  async respondToInterest(
+    interestId: string,
+    response: "accept" | "reject"
+  ): Promise<ApiResponse<never>> {
     console.warn(
       "respondToInterest: Auto-matching system - interests automatically match when mutual"
     );
     return {
       success: false,
-      error:
-        "Auto-matching system - interests automatically match when both users express interest",
+      error: {
+        code: "AUTO_MATCHING_SYSTEM",
+        message:
+          "Auto-matching system - interests automatically match when both users express interest",
+        details:
+          "Manual interest responses are not supported. Matches are created automatically when mutual interest is detected.",
+      },
     };
   }
 
-  async getInterestStatus(fromUserId: string, toUserId: string) {
+  async getInterestStatus(
+    fromUserId: string,
+    toUserId: string
+  ): Promise<ApiResponse<{ status: string; hasInterest: boolean }>> {
     return this.request(
       `/interests/status?fromUserId=${fromUserId}&toUserId=${toUserId}`
     );
   }
 
   // Safety APIs
-  async reportUser(request: {
-    reportedUserId: string;
-    reason: string;
-    description?: string;
-  }) {
+  async reportUser(request: ReportData): Promise<ApiResponse<ReportResponse>> {
     return this.request("/safety/report", {
       method: "POST",
       body: JSON.stringify(request),
     });
   }
 
-  async blockUser(request: { blockedUserId: string }) {
+  async blockUser(request: {
+    blockedUserId: string;
+  }): Promise<ApiResponse<{ message: string }>> {
     return this.request("/safety/block", {
       method: "POST",
       body: JSON.stringify(request),
     });
   }
 
-  async unblockUser(request: { blockedUserId: string }) {
+  async unblockUser(request: {
+    blockedUserId: string;
+  }): Promise<ApiResponse<{ message: string }>> {
     return this.request("/safety/unblock", {
       method: "POST",
       body: JSON.stringify(request),
     });
   }
 
-  async getBlockedUsers() {
+  async getBlockedUsers(): Promise<
+    ApiResponse<{ blockedUsers: BlockedUser[] }>
+  > {
     return this.request("/safety/blocked");
   }
 
-  async checkBlockStatus(userId: string) {
+  async checkBlockStatus(userId: string): Promise<ApiResponse<BlockStatus>> {
     return this.request(`/safety/blocked/check?userId=${userId}`);
   }
 
-  async getBlockStatus(userId: string) {
+  async getBlockStatus(userId: string): Promise<ApiResponse<BlockStatus>> {
     return this.request(`/safety/blocked/check?userId=${userId}`);
   }
 
@@ -229,7 +398,7 @@ class ApiClient {
   async getMessages(
     conversationId: string,
     options?: { limit?: number; before?: number }
-  ) {
+  ): Promise<ApiResponse<Message[]>> {
     const params = new URLSearchParams({ conversationId });
     if (options?.limit) params.append("limit", options.limit.toString());
     if (options?.before) params.append("before", options.before.toString());
@@ -246,7 +415,7 @@ class ApiClient {
     duration?: number;
     fileSize?: number;
     mimeType?: string;
-  }) {
+  }): Promise<ApiResponse<Message>> {
     return this.request("/match-messages", {
       method: "POST",
       body: JSON.stringify(data),
@@ -373,22 +542,24 @@ class ApiClient {
   }
 
   // Subscription APIs - aligned with main project
-  async createCheckoutSession(planId: "premium" | "premiumPlus") {
+  async createCheckoutSession(
+    planId: "premium" | "premiumPlus"
+  ): Promise<ApiResponse<any>> {
     return this.request("/stripe/checkout", {
       method: "POST",
       body: JSON.stringify({ planId }),
     });
   }
 
-  async getSubscriptionStatus() {
+  async getSubscriptionStatus(): Promise<ApiResponse<SubscriptionStatus>> {
     return this.request("/subscription/status");
   }
 
-  async getUsageStats() {
+  async getUsageStats(): Promise<ApiResponse<UsageStats>> {
     return this.request("/subscription/usage");
   }
 
-  async getSubscriptionFeatures() {
+  async getSubscriptionFeatures(): Promise<ApiResponse<any>> {
     return this.request("/subscription/features");
   }
 
@@ -623,14 +794,19 @@ class ApiClient {
   async respondToInterestByStatus(data: {
     interestId: string;
     status: "accepted" | "rejected";
-  }) {
+  }): Promise<ApiResponse<never>> {
     console.warn(
       "respondToInterestByStatus: Auto-matching system - interests automatically match when mutual"
     );
     return {
       success: false,
-      error:
-        "Auto-matching system - interests automatically match when both users express interest",
+      error: {
+        code: "AUTO_MATCHING_SYSTEM",
+        message:
+          "Auto-matching system - interests automatically match when both users express interest",
+        details:
+          "Manual interest responses are not supported. Matches are created automatically when mutual interest is detected.",
+      },
     };
   }
 

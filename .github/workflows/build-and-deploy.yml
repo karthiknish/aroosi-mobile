@@ -1,183 +1,301 @@
-name: Build and Deploy to App Stores
+name: Build and Deploy Aroosi Mobile
 
 on:
   push:
-    branches: [main, release/*]
-    tags: ['v*']
+    branches: [main, develop, staging]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 env:
   NODE_VERSION: '18'
   EXPO_CLI_VERSION: 'latest'
 
 jobs:
-  # Run tests and linting
   test:
+    name: Run Tests
     runs-on: ubuntu-latest
+    
     steps:
-      - name: 🏗 Setup repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: 'npm'
 
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: 🧪 Run tests
-        run: npm run test --if-present
+      - name: Run linting
+        run: npm run lint
 
-      - name: 🔍 Run linter
-        run: npm run lint --if-present
+      - name: Run type checking
+        run: npm run type-check
 
-      - name: 🔍 Run type check
-        run: npm run typecheck
+      - name: Run unit tests
+        run: npm run test:unit
 
-  # Build preview for pull requests
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Generate test coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: aroosi-mobile-coverage
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Run dependency vulnerability scan
+        run: npx audit-ci --moderate
+
   build-preview:
+    name: Build Preview
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, security-scan]
     if: github.event_name == 'pull_request'
+    
     steps:
-      - name: 🏗 Setup repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: 'npm'
 
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: ${{ env.EXPO_CLI_VERSION }}
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
 
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: 🚀 Build preview (iOS)
-        run: eas build --platform ios --profile preview --non-interactive --wait
+      - name: Configure Expo
+        run: |
+          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
 
-      - name: 🚀 Build preview (Android)
-        run: eas build --platform android --profile preview --non-interactive --wait
+      - name: Build preview
+        run: |
+          expo build:web --no-pwa
+          expo publish --release-channel=pr-${{ github.event.number }}
 
-      - name: 📝 Comment PR with build links
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
+      - name: Comment PR with preview link
+        uses: actions/github-script@v6
         with:
           script: |
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '🚀 Preview builds completed! Check your Expo dashboard for download links.'
+              body: '🚀 Preview build available at: https://expo.dev/@aroosi/aroosi-mobile?release-channel=pr-${{ github.event.number }}'
             })
 
-  # Build and deploy to internal testing
   build-staging:
+    name: Build Staging
     runs-on: ubuntu-latest
-    needs: test
-    if: github.ref == 'refs/heads/main'
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/staging'
+    
     steps:
-      - name: 🏗 Setup repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: 'npm'
 
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Configure Expo
+        run: |
+          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
+
+      - name: Build for staging
+        env:
+          ENVIRONMENT: staging
+          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+          ONESIGNAL_APP_ID: ${{ secrets.STAGING_ONESIGNAL_APP_ID }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_OAUTH_CLIENT_ID }}
+          SENTRY_DSN: ${{ secrets.STAGING_SENTRY_DSN }}
+        run: |
+          expo build:android --release-channel=staging --no-wait
+          expo build:ios --release-channel=staging --no-wait
+
+      - name: Notify staging deployment
+        uses: 8398a7/action-slack@v3
         with:
-          expo-version: ${{ env.EXPO_CLI_VERSION }}
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: 'Staging build initiated for Aroosi Mobile'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
-
-      - name: 🚀 Build staging (iOS)
-        run: eas build --platform ios --profile staging --non-interactive --wait
-
-      - name: 🚀 Build staging (Android)
-        run: eas build --platform android --profile staging --non-interactive --wait
-
-      - name: 📱 Submit to internal testing (Android)
-        run: eas submit --platform android --profile preview --latest --non-interactive
-        continue-on-error: true
-
-      - name: 📱 Submit to TestFlight (iOS)
-        run: eas submit --platform ios --profile preview --latest --non-interactive
-        continue-on-error: true
-
-  # Build and deploy to production
   build-production:
+    name: Build Production
     runs-on: ubuntu-latest
-    needs: test
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/main'
+    
     steps:
-      - name: 🏗 Setup repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🏗 Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+          cache: 'npm'
 
-      - name: 🏗 Setup EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: ${{ env.EXPO_CLI_VERSION }}
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
 
-      - name: 📦 Install dependencies
-        run: npm ci --legacy-peer-deps
+      - name: Install dependencies
+        run: npm ci
 
-      - name: 🚀 Build production (iOS)
-        run: eas build --platform ios --profile production --non-interactive --wait
+      - name: Configure Expo
+        run: |
+          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
 
-      - name: 🚀 Build production (Android)
-        run: eas build --platform android --profile production --non-interactive --wait
+      - name: Build for production
+        env:
+          ENVIRONMENT: production
+          API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
+          ONESIGNAL_APP_ID: ${{ secrets.PRODUCTION_ONESIGNAL_APP_ID }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.PRODUCTION_GOOGLE_OAUTH_CLIENT_ID }}
+          SENTRY_DSN: ${{ secrets.PRODUCTION_SENTRY_DSN }}
+        run: |
+          expo build:android --release-channel=production --no-wait
+          expo build:ios --release-channel=production --no-wait
 
-      - name: 🍎 Submit to App Store
-        run: eas submit --platform ios --profile production --latest --non-interactive
-        continue-on-error: true
+      - name: Submit to app stores
+        env:
+          EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
+          EXPO_APPLE_ID_PASSWORD: ${{ secrets.EXPO_APPLE_ID_PASSWORD }}
+          EXPO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.EXPO_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          # Submit to Google Play Store
+          expo upload:android --latest --key ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+          
+          # Submit to Apple App Store
+          expo upload:ios --latest --apple-id ${{ secrets.EXPO_APPLE_ID }}
 
-      - name: 🤖 Submit to Google Play
-        run: eas submit --platform android --profile production --latest --non-interactive
-        continue-on-error: true
-
-      - name: 📝 Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub release
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
           body: |
-            ## 🚀 Production Release ${{ github.ref_name }}
+            ## Changes in this Release
+            - Automated production build
+            - Submitted to app stores
             
-            ### What's New
-            - iOS and Android builds submitted to app stores
-            - Version: ${{ github.ref_name }}
-            
-            ### Download Links
-            Check your respective app stores for the latest version.
-            
-            ### Build Information
-            - Built with Node.js ${{ env.NODE_VERSION }}
-            - Expo SDK 53
-            - React Native 0.79.4
+            ## Build Information
+            - Build Number: ${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+            - Branch: ${{ github.ref }}
           draft: false
           prerelease: false
+
+      - name: Notify production deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          text: 'Production build completed and submitted to app stores! 🚀'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    needs: [build-staging]
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run performance tests
+        run: npm run test:performance
+
+      - name: Generate performance report
+        run: npm run performance:report
+
+      - name: Upload performance artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: ./performance-report/
+
+  accessibility-test:
+    name: Accessibility Testing
+    runs-on: ubuntu-latest
+    needs: [build-staging]
+    if: github.ref == 'refs/heads/staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run accessibility tests
+        run: npm run test:accessibility
+
+      - name: Generate accessibility report
+        run: npm run accessibility:report
+
+      - name: Upload accessibility artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: accessibility-report
+          path: ./accessibility-report/

@@ -1,117 +1,177 @@
-/**
- * Notification Permissions Utility
- * Handles notification permission requests and status checking
- */
-
 import { Platform, Alert, Linking } from "react-native";
 import * as Notifications from "expo-notifications";
-import { NotificationPermissionStatus } from "../types/notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export class NotificationPermissionsManager {
-  /**
-   * Check current notification permission status
-   */
-  static async getPermissionStatus(): Promise<NotificationPermissionStatus> {
+export type PermissionStatus = "granted" | "denied" | "undetermined";
+
+export interface NotificationPermissionState {
+  status: PermissionStatus;
+  canAskAgain: boolean;
+  lastAsked: number | null;
+  askCount: number;
+}
+
+const PERMISSION_STORAGE_KEY = "notification_permission_state";
+const MAX_ASK_COUNT = 3;
+const ASK_COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
+
+export class NotificationPermissionManager {
+  private static instance: NotificationPermissionManager;
+  private permissionState: NotificationPermissionState = {
+    status: "undetermined",
+    canAskAgain: true,
+    lastAsked: null,
+    askCount: 0,
+  };
+
+  private constructor() {
+    this.loadPermissionState();
+  }
+
+  public static getInstance(): NotificationPermissionManager {
+    if (!NotificationPermissionManager.instance) {
+      NotificationPermissionManager.instance =
+        new NotificationPermissionManager();
+    }
+    return NotificationPermissionManager.instance;
+  }
+
+  public async checkPermissionStatus(): Promise<PermissionStatus> {
     try {
       const { status } = await Notifications.getPermissionsAsync();
 
+      let mappedStatus: PermissionStatus;
       switch (status) {
         case "granted":
-          return "granted";
+          mappedStatus = "granted";
+          break;
         case "denied":
-          return "denied";
-        case "undetermined":
-          return "undetermined";
+          mappedStatus = "denied";
+          break;
         default:
-          return "undetermined";
+          mappedStatus = "undetermined";
       }
+
+      this.permissionState.status = mappedStatus;
+      await this.savePermissionState();
+
+      return mappedStatus;
     } catch (error) {
-      console.error("Error getting notification permission status:", error);
+      console.error("Failed to check notification permission:", error);
       return "undetermined";
     }
   }
 
-  /**
-   * Request notification permissions with user-friendly flow
-   */
-  static async requestPermissions(): Promise<{
-    granted: boolean;
-    status: NotificationPermissionStatus;
-  }> {
+  public async requestPermission(
+    showRationale = true
+  ): Promise<PermissionStatus> {
+    const currentStatus = await this.checkPermissionStatus();
+
+    if (currentStatus === "granted") {
+      return "granted";
+    }
+
+    // Check if we can ask again
+    if (!this.canAskForPermission()) {
+      if (showRationale) {
+        this.showPermissionRationale();
+      }
+      return currentStatus;
+    }
+
     try {
-      // First check current status
-      const currentStatus = await this.getPermissionStatus();
-
-      if (currentStatus === "granted") {
-        return { granted: true, status: "granted" };
+      // Show rationale before asking (iOS best practice)
+      if (
+        showRationale &&
+        Platform.OS === "ios" &&
+        this.permissionState.askCount === 0
+      ) {
+        const shouldProceed = await this.showPrePermissionDialog();
+        if (!shouldProceed) {
+          return currentStatus;
+        }
       }
 
-      if (currentStatus === "denied") {
-        // Show alert directing user to settings
-        this.showSettingsAlert();
-        return { granted: false, status: "denied" };
-      }
-
-      // Request permissions
       const { status } = await Notifications.requestPermissionsAsync({
         ios: {
           allowAlert: true,
           allowBadge: true,
           allowSound: true,
-        },
-        android: {
-          allowAlert: true,
-          allowBadge: true,
-          allowSound: true,
+          allowDisplayInCarPlay: true,
+          allowCriticalAlerts: false,
+          provideAppNotificationSettings: true,
+          allowProvisional: false,
+          allowAnnouncements: false,
         },
       });
 
-      const granted = status === "granted";
-      const finalStatus: NotificationPermissionStatus = granted
-        ? "granted"
-        : "denied";
+      let mappedStatus: PermissionStatus;
+      switch (status) {
+        case "granted":
+          mappedStatus = "granted";
+          break;
+        case "denied":
+          mappedStatus = "denied";
+          break;
+        default:
+          mappedStatus = "undetermined";
+      }
 
-      return { granted, status: finalStatus };
+      // Update permission state
+      this.permissionState = {
+        status: mappedStatus,
+        canAskAgain:
+          mappedStatus !== "denied" &&
+          this.permissionState.askCount < MAX_ASK_COUNT,
+        lastAsked: Date.now(),
+        askCount: this.permissionState.askCount + 1,
+      };
+
+      await this.savePermissionState();
+
+      return mappedStatus;
     } catch (error) {
-      console.error("Error requesting notification permissions:", error);
-      return { granted: false, status: "denied" };
+      console.error("Failed to request notification permission:", error);
+      return currentStatus;
     }
   }
 
-  /**
-   * Show alert directing user to app settings to enable notifications
-   */
-  static showSettingsAlert(): void {
-    Alert.alert(
-      "Enable Notifications",
-      "To receive notifications about new matches, messages, and interests, please enable notifications in your device settings.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Open Settings",
-          onPress: () => {
-            if (Platform.OS === "ios") {
-              Linking.openURL("app-settings:");
-            } else {
-              Linking.openSettings();
-            }
-          },
-        },
-      ]
-    );
+  public canAskForPermission(): boolean {
+    if (this.permissionState.status === "granted") {
+      return false;
+    }
+
+    if (this.permissionState.askCount >= MAX_ASK_COUNT) {
+      return false;
+    }
+
+    if (this.permissionState.lastAsked) {
+      const timeSinceLastAsk = Date.now() - this.permissionState.lastAsked;
+      if (timeSinceLastAsk < ASK_COOLDOWN) {
+        return false;
+      }
+    }
+
+    return this.permissionState.canAskAgain;
   }
 
-  /**
-   * Show permission rationale before requesting
-   */
-  static showPermissionRationale(): Promise<boolean> {
+  public getPermissionState(): NotificationPermissionState {
+    return { ...this.permissionState };
+  }
+
+  public async openAppSettings(): Promise<void> {
+    try {
+      await Linking.openSettings();
+    } catch (error) {
+      console.error("Failed to open app settings:", error);
+    }
+  }
+
+  private async showPrePermissionDialog(): Promise<boolean> {
     return new Promise((resolve) => {
       Alert.alert(
         "Stay Connected",
-        "Aroosi would like to send you notifications about:\n\n• New matches and interests\n• New messages from your matches\n• Important account updates\n\nYou can change this anytime in Settings.",
+        "Get notified about new messages, matches, and important updates. You can change this anytime in settings.",
         [
           {
             text: "Not Now",
@@ -119,7 +179,7 @@ export class NotificationPermissionsManager {
             onPress: () => resolve(false),
           },
           {
-            text: "Allow Notifications",
+            text: "Enable Notifications",
             onPress: () => resolve(true),
           },
         ]
@@ -127,143 +187,257 @@ export class NotificationPermissionsManager {
     });
   }
 
-  /**
-   * Check if notifications are enabled at system level
-   */
-  static async areNotificationsEnabled(): Promise<boolean> {
+  private showPermissionRationale(): void {
+    const title = "Notifications Disabled";
+    let message =
+      "Enable notifications to stay updated with messages and matches.";
+
+    if (this.permissionState.status === "denied") {
+      message += " You can enable them in your device settings.";
+    }
+
+    Alert.alert(title, message, [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Open Settings",
+        onPress: () => this.openAppSettings(),
+      },
+    ]);
+  }
+
+  private async loadPermissionState(): Promise<void> {
     try {
-      const status = await this.getPermissionStatus();
-      return status === "granted";
+      const stored = await AsyncStorage.getItem(PERMISSION_STORAGE_KEY);
+      if (stored) {
+        this.permissionState = {
+          ...this.permissionState,
+          ...JSON.parse(stored),
+        };
+      }
     } catch (error) {
-      console.error("Error checking if notifications are enabled:", error);
-      return false;
+      console.error("Failed to load permission state:", error);
     }
   }
 
-  /**
-   * Configure notification behavior
-   */
-  static configureNotificationBehavior(): void {
-    // Configure how notifications are displayed when app is in foreground
-    Notifications.setNotificationHandler({
-      handleNotification: async (notification) => {
-        // Check notification type and decide whether to show
-        const notificationType = notification.request.content.data?.type;
+  private async savePermissionState(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        PERMISSION_STORAGE_KEY,
+        JSON.stringify(this.permissionState)
+      );
+    } catch (error) {
+      console.error("Failed to save permission state:", error);
+    }
+  }
 
-        return {
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-        };
-      },
+  public async resetPermissionState(): Promise<void> {
+    this.permissionState = {
+      status: "undetermined",
+      canAskAgain: true,
+      lastAsked: null,
+      askCount: 0,
+    };
+    await this.savePermissionState();
+  }
+}
+
+// Notification permission strategies
+export class NotificationPermissionStrategy {
+  private permissionManager: NotificationPermissionManager;
+
+  constructor() {
+    this.permissionManager = NotificationPermissionManager.getInstance();
+  }
+
+  // Strategy 1: Ask immediately on app launch
+  public async requestOnLaunch(): Promise<PermissionStatus> {
+    return this.permissionManager.requestPermission(true);
+  }
+
+  // Strategy 2: Ask after user engagement (e.g., after first match)
+  public async requestAfterEngagement(
+    context: string
+  ): Promise<PermissionStatus> {
+    const canAsk = this.permissionManager.canAskForPermission();
+    if (!canAsk) {
+      return this.permissionManager.getPermissionState().status;
+    }
+
+    return new Promise((resolve) => {
+      const contextMessages = {
+        first_match:
+          "You got your first match! Enable notifications so you never miss a message.",
+        first_message:
+          "Stay connected! Enable notifications to get instant message alerts.",
+        profile_complete:
+          "Your profile is complete! Enable notifications to know when someone is interested.",
+        subscription:
+          "Get the most out of your premium subscription with instant notifications.",
+      };
+
+      const message =
+        contextMessages[context as keyof typeof contextMessages] ||
+        "Enable notifications to stay updated with your Aroosi activity.";
+
+      Alert.alert("Stay Updated", message, [
+        {
+          text: "Maybe Later",
+          style: "cancel",
+          onPress: () =>
+            resolve(this.permissionManager.getPermissionState().status),
+        },
+        {
+          text: "Enable",
+          onPress: async () => {
+            const status = await this.permissionManager.requestPermission(
+              false
+            );
+            resolve(status);
+          },
+        },
+      ]);
     });
   }
 
-  /**
-   * Handle notification channels for Android
-   */
-  static async setupAndroidNotificationChannels(): Promise<void> {
-    if (Platform.OS !== "android") return;
-
-    try {
-      // Default channel
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "General Notifications",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#EC4899",
-        sound: "default",
-      });
-
-      // Messages channel
-      await Notifications.setNotificationChannelAsync("messages", {
-        name: "New Messages",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#EC4899",
-        sound: "default",
-      });
-
-      // Matches channel
-      await Notifications.setNotificationChannelAsync("matches", {
-        name: "Matches & Interests",
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 500, 250, 500],
-        lightColor: "#D6B27C",
-        sound: "default",
-      });
-
-      // System channel
-      await Notifications.setNotificationChannelAsync("system", {
-        name: "System Updates",
-        importance: Notifications.AndroidImportance.DEFAULT,
-        vibrationPattern: [0, 250],
-        lightColor: "#5F92AC",
-        sound: "default",
-      });
-
-      console.log("Android notification channels configured");
-    } catch (error) {
-      console.error("Error setting up Android notification channels:", error);
+  // Strategy 3: Soft ask with explanation
+  public async softAsk(feature: string): Promise<PermissionStatus> {
+    const canAsk = this.permissionManager.canAskForPermission();
+    if (!canAsk) {
+      return this.permissionManager.getPermissionState().status;
     }
+
+    const featureMessages = {
+      messages: "Get notified instantly when someone sends you a message.",
+      matches: "Be the first to know when you have a new match.",
+      interests: "Know when someone is interested in your profile.",
+      premium: "Get exclusive notifications about premium features and offers.",
+    };
+
+    const message =
+      featureMessages[feature as keyof typeof featureMessages] ||
+      "Enable notifications for a better experience.";
+
+    return new Promise((resolve) => {
+      Alert.alert("Enable Notifications?", message, [
+        {
+          text: "Not Now",
+          style: "cancel",
+          onPress: () =>
+            resolve(this.permissionManager.getPermissionState().status),
+        },
+        {
+          text: "Enable",
+          onPress: async () => {
+            const status = await this.permissionManager.requestPermission(
+              false
+            );
+            resolve(status);
+          },
+        },
+      ]);
+    });
   }
 
-  /**
-   * Clear notification badge
-   */
-  static async clearBadge(): Promise<void> {
-    try {
-      await Notifications.setBadgeCountAsync(0);
-    } catch (error) {
-      console.error("Error clearing notification badge:", error);
-    }
-  }
+  // Strategy 4: Progressive permission (ask for specific types)
+  public async requestProgressive(types: string[]): Promise<PermissionStatus> {
+    const typeDescriptions = {
+      messages: "new messages",
+      matches: "new matches",
+      interests: "profile interests",
+      system: "important updates",
+    };
 
-  /**
-   * Set notification badge count
-   */
-  static async setBadgeCount(count: number): Promise<void> {
-    try {
-      await Notifications.setBadgeCountAsync(count);
-    } catch (error) {
-      console.error("Error setting notification badge:", error);
-    }
-  }
+    const descriptions = types
+      .map((type) => typeDescriptions[type as keyof typeof typeDescriptions])
+      .filter(Boolean);
+    const message = `Get notified about ${descriptions.join(
+      ", "
+    )} to stay connected.`;
 
-  /**
-   * Get notification badge count
-   */
-  static async getBadgeCount(): Promise<number> {
-    try {
-      return await Notifications.getBadgeCountAsync();
-    } catch (error) {
-      console.error("Error getting notification badge:", error);
-      return 0;
-    }
+    return new Promise((resolve) => {
+      Alert.alert("Notification Preferences", message, [
+        {
+          text: "Skip",
+          style: "cancel",
+          onPress: () =>
+            resolve(this.permissionManager.getPermissionState().status),
+        },
+        {
+          text: "Allow",
+          onPress: async () => {
+            const status = await this.permissionManager.requestPermission(
+              false
+            );
+            resolve(status);
+          },
+        },
+      ]);
+    });
   }
+}
 
-  /**
-   * Dismiss all notifications
-   */
-  static async dismissAllNotifications(): Promise<void> {
-    try {
-      await Notifications.dismissAllNotificationsAsync();
-    } catch (error) {
-      console.error("Error dismissing notifications:", error);
-    }
-  }
+// React hooks for permission management
+export function useNotificationPermissions() {
+  const [permissionState, setPermissionState] =
+    React.useState<NotificationPermissionState>({
+      status: "undetermined",
+      canAskAgain: true,
+      lastAsked: null,
+      askCount: 0,
+    });
 
-  /**
-   * Dismiss specific notification
-   */
-  static async dismissNotification(notificationId: string): Promise<void> {
-    try {
-      await Notifications.dismissNotificationAsync(notificationId);
-    } catch (error) {
-      console.error("Error dismissing notification:", error);
-    }
-  }
+  const permissionManager = NotificationPermissionManager.getInstance();
+  const strategy = new NotificationPermissionStrategy();
+
+  React.useEffect(() => {
+    const checkStatus = async () => {
+      await permissionManager.checkPermissionStatus();
+      setPermissionState(permissionManager.getPermissionState());
+    };
+
+    checkStatus();
+  }, []);
+
+  const requestPermission = React.useCallback(
+    async (showRationale = true) => {
+      const status = await permissionManager.requestPermission(showRationale);
+      setPermissionState(permissionManager.getPermissionState());
+      return status;
+    },
+    [permissionManager]
+  );
+
+  const requestAfterEngagement = React.useCallback(
+    async (context: string) => {
+      const status = await strategy.requestAfterEngagement(context);
+      setPermissionState(permissionManager.getPermissionState());
+      return status;
+    },
+    [strategy, permissionManager]
+  );
+
+  const softAsk = React.useCallback(
+    async (feature: string) => {
+      const status = await strategy.softAsk(feature);
+      setPermissionState(permissionManager.getPermissionState());
+      return status;
+    },
+    [strategy, permissionManager]
+  );
+
+  const openSettings = React.useCallback(() => {
+    return permissionManager.openAppSettings();
+  }, [permissionManager]);
+
+  return {
+    permissionState,
+    requestPermission,
+    requestAfterEngagement,
+    softAsk,
+    openSettings,
+    canAskAgain: permissionManager.canAskForPermission(),
+  };
 }

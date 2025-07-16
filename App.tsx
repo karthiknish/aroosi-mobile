@@ -1,11 +1,12 @@
 import React, { useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
-import { ClerkProvider } from '@clerk/clerk-expo';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
+import { StyleSheet, View, ActivityIndicator } from "react-native";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  NavigationContainer,
+  NavigationContainerRef,
+} from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Import navigation and providers
@@ -27,25 +28,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Token cache for Clerk
-const tokenCache = {
-  async getToken(key: string) {
-    try {
-      return await SecureStore.getItemAsync(key);
-    } catch (err) {
-      console.error("Error getting token:", err);
-      return null;
-    }
-  },
-  async saveToken(key: string, value: string) {
-    try {
-      await SecureStore.setItemAsync(key, value);
-    } catch (err) {
-      console.error("Error saving token:", err);
-    }
-  },
-};
 
 export default function App() {
   const [isReady, setIsReady] = React.useState(false);
@@ -69,34 +51,29 @@ export default function App() {
 
   return (
     <FontLoader>
-      <ClerkProvider
-        publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
-        tokenCache={tokenCache}
-      >
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <AuthProvider>
-              <ToastProvider>
-                <SafeAreaProvider>
-                  <LinearGradient
-                    colors={Colors.gradient.secondary as any}
-                    style={{ flex: 1 }}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <NavigationContainer ref={navigationRef}>
-                      <NotificationProvider navigationRef={navigationRef}>
-                        <StatusBar style="auto" />
-                        <RootNavigator />
-                      </NotificationProvider>
-                    </NavigationContainer>
-                  </LinearGradient>
-                </SafeAreaProvider>
-              </ToastProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <SafeAreaProvider>
+                <LinearGradient
+                  colors={Colors.gradient.secondary as any}
+                  style={{ flex: 1 }}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <NavigationContainer ref={navigationRef}>
+                    <NotificationProvider navigationRef={navigationRef}>
+                      <StatusBar style="auto" />
+                      <RootNavigator />
+                    </NotificationProvider>
+                  </NavigationContainer>
+                </LinearGradient>
+              </SafeAreaProvider>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </FontLoader>
   );
 }

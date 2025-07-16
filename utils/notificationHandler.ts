@@ -1,360 +1,541 @@
-/**
- * Notification Handler Utility
- * Handles notification processing, deep linking, and user interactions
- */
+import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { Linking } from 'react-native';
-import * as Notifications from 'expo-notifications';
-import {
-  NotificationType,
-  NotificationPayload,
-  NotificationNavigationData,
-  NotificationReceivedEvent,
-  NotificationOpenedEvent,
-} from '../types/notifications';
-import { NotificationPermissionsManager } from './notificationPermissions';
+export interface NotificationData {
+  type: "message" | "match" | "interest" | "system" | "subscription";
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  userId?: string;
+  profileId?: string;
+  conversationId?: string;
+  matchId?: string;
+}
 
-export class NotificationHandler {
-  private static navigationRef: any = null;
+export interface NotificationPreferences {
+  messages: boolean;
+  matches: boolean;
+  interests: boolean;
+  system: boolean;
+  marketing: boolean;
+  sound: boolean;
+  vibration: boolean;
+  quietHours: {
+    enabled: boolean;
+    start: string; // HH:MM format
+    end: string; // HH:MM format
+  };
+}
 
-  /**
-   * Set navigation reference for deep linking
-   */
-  static setNavigationRef(ref: any): void {
-    this.navigationRef = ref;
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  messages: true,
+  matches: true,
+  interests: true,
+  system: true,
+  marketing: false,
+  sound: true,
+  vibration: true,
+  quietHours: {
+    enabled: false,
+    start: "22:00",
+    end: "08:00",
+  },
+};
+
+export class NotificationManager {
+  private static instance: NotificationManager;
+  private token: string | null = null;
+  private preferences: NotificationPreferences = DEFAULT_PREFERENCES;
+  private isInitialized = false;
+
+  private constructor() {}
+
+  public static getInstance(): NotificationManager {
+    if (!NotificationManager.instance) {
+      NotificationManager.instance = new NotificationManager();
+    }
+    return NotificationManager.instance;
   }
 
-  /**
-   * Initialize notification handling
-   */
-  static initialize(): void {
-    // Configure notification behavior
-    NotificationPermissionsManager.configureNotificationBehavior();
-    
-    // Setup Android channels
-    NotificationPermissionsManager.setupAndroidNotificationChannels();
-    
-    // Add notification event listeners
-    this.setupNotificationListeners();
-    
-    console.log('Notification handler initialized');
+  public async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    try {
+      // Configure notification behavior
+      Notifications.setNotificationHandler({
+        handleNotification: async (notification) => {
+          const shouldShow = await this.shouldShowNotification(notification);
+          return {
+            shouldShowAlert: shouldShow,
+            shouldPlaySound: shouldShow && this.preferences.sound,
+            shouldSetBadge: true,
+          };
+        },
+      });
+
+      // Load preferences
+      await this.loadPreferences();
+
+      // Register for push notifications
+      await this.registerForPushNotifications();
+
+      // Set up notification listeners
+      this.setupNotificationListeners();
+
+      this.isInitialized = true;
+    } catch (error) {
+      console.error("Failed to initialize notifications:", error);
+    }
   }
 
-  /**
-   * Setup notification event listeners for Expo Notifications
-   */
-  private static setupNotificationListeners(): void {
-    // Handle notifications received while app is in foreground
+  public async registerForPushNotifications(): Promise<string | null> {
+    if (!Device.isDevice) {
+      console.warn("Push notifications only work on physical devices");
+      return null;
+    }
+
+    try {
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== "granted") {
+        console.warn("Push notification permission not granted");
+        return null;
+      }
+
+      // Get push token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+
+      this.token = tokenData.data;
+
+      // Configure notification channel for Android
+      if (Platform.OS === "android") {
+        await this.setupAndroidChannels();
+      }
+
+      return this.token;
+    } catch (error) {
+      console.error("Failed to register for push notifications:", error);
+      return null;
+    }
+  }
+
+  public getToken(): string | null {
+    return this.token;
+  }
+
+  public async updatePreferences(
+    preferences: Partial<NotificationPreferences>
+  ): Promise<void> {
+    this.preferences = { ...this.preferences, ...preferences };
+    await this.savePreferences();
+  }
+
+  public getPreferences(): NotificationPreferences {
+    return { ...this.preferences };
+  }
+
+  public async scheduleLocalNotification(
+    data: NotificationData,
+    delay = 0
+  ): Promise<void> {
+    if (!this.shouldAllowNotification(data.type)) return;
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: data.title,
+          body: data.body,
+          data: data.data || {},
+          sound: this.preferences.sound ? "default" : undefined,
+        },
+        trigger: delay > 0 ? { seconds: delay } : null,
+      });
+    } catch (error) {
+      console.error("Failed to schedule local notification:", error);
+    }
+  }
+
+  public async cancelAllNotifications(): Promise<void> {
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+    } catch (error) {
+      console.error("Failed to cancel notifications:", error);
+    }
+  }
+
+  public async getBadgeCount(): Promise<number> {
+    try {
+      return await Notifications.getBadgeCountAsync();
+    } catch (error) {
+      console.error("Failed to get badge count:", error);
+      return 0;
+    }
+  }
+
+  public async setBadgeCount(count: number): Promise<void> {
+    try {
+      await Notifications.setBadgeCountAsync(count);
+    } catch (error) {
+      console.error("Failed to set badge count:", error);
+    }
+  }
+
+  public async clearBadge(): Promise<void> {
+    await this.setBadgeCount(0);
+  }
+
+  private async setupAndroidChannels(): Promise<void> {
+    const channels = [
+      {
+        id: "messages",
+        name: "Messages",
+        description: "New message notifications",
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
+        vibrationPattern: [0, 250, 250, 250],
+      },
+      {
+        id: "matches",
+        name: "Matches",
+        description: "New match notifications",
+        importance: Notifications.AndroidImportance.HIGH,
+        sound: "default",
+        vibrationPattern: [0, 500, 200, 500],
+      },
+      {
+        id: "interests",
+        name: "Interests",
+        description: "Interest notifications",
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: "default",
+      },
+      {
+        id: "system",
+        name: "System",
+        description: "System notifications",
+        importance: Notifications.AndroidImportance.DEFAULT,
+        sound: "default",
+      },
+    ];
+
+    for (const channel of channels) {
+      await Notifications.setNotificationChannelAsync(channel.id, channel);
+    }
+  }
+
+  private setupNotificationListeners(): void {
+    // Handle notification received while app is in foreground
     Notifications.addNotificationReceivedListener((notification) => {
-      console.log('Notification received in foreground:', notification);
+      console.log("Notification received:", notification);
       this.handleNotificationReceived(notification);
     });
 
-    // Handle notification responses (when user taps notification)
+    // Handle notification tapped
     Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log('Notification response received:', response);
-      this.handleNotificationOpened(response);
+      console.log("Notification tapped:", response);
+      this.handleNotificationTapped(response);
     });
   }
 
-  /**
-   * Handle notification received in foreground
-   */
-  private static handleNotificationReceived(notification: Notifications.Notification): void {
-    try {
-      const { title, body, data } = notification.request.content;
-      const notificationType = data?.type as NotificationType;
+  private async handleNotificationReceived(
+    notification: Notifications.Notification
+  ): Promise<void> {
+    const data = notification.request.content.data as NotificationData;
 
-      console.log('Processing foreground notification:', {
-        type: notificationType,
-        title,
-        body,
-        data,
-      });
-
-      // Update badge count based on notification type
-      this.updateBadgeCount(notificationType);
-
-    } catch (error) {
-      console.error('Error handling notification received:', error);
+    // Update badge count for messages
+    if (data.type === "message") {
+      const currentBadge = await this.getBadgeCount();
+      await this.setBadgeCount(currentBadge + 1);
     }
   }
 
-  /**
-   * Handle notification opened/clicked
-   */
-  private static handleNotificationOpened(response: Notifications.NotificationResponse): void {
-    try {
-      const { notification } = response;
-      const { title, body, data } = notification.request.content;
-      const notificationType = data?.type as NotificationType;
-      const navigationData = data?.navigationData as NotificationNavigationData;
-
-      console.log('Processing notification tap:', {
-        type: notificationType,
-        title,
-        body,
-        navigationData,
-      });
-
-      // Handle deep linking
-      if (navigationData?.screen) {
-        this.handleDeepLinking(navigationData, notificationType);
-      }
-
-      // Clear specific notification badge
-      this.handleNotificationClearance(notificationType);
-
-    } catch (error) {
-      console.error('Error handling notification opened:', error);
-    }
-  }
-
-  /**
-   * Handle deep linking from notifications
-   */
-  private static handleDeepLinking(
-    navigationData: NotificationNavigationData,
-    notificationType: NotificationType
+  private handleNotificationTapped(
+    response: Notifications.NotificationResponse
   ): void {
-    try {
-      if (!this.navigationRef) {
-        console.warn('Navigation ref not set, cannot handle deep linking');
-        return;
-      }
+    const data = response.notification.request.content.data as NotificationData;
 
-      const { screen, params } = navigationData;
+    // Navigate based on notification type
+    this.navigateFromNotification(data);
+  }
 
-      // Route to appropriate screen based on notification type
-      switch (notificationType) {
-        case 'new_message':
-          this.navigateToChat(params);
-          break;
-        
-        case 'new_interest':
-        case 'new_match':
-          this.navigateToMatches(params);
-          break;
-        
-        case 'profile_view':
-          this.navigateToProfileViewers(params);
-          break;
-        
-        case 'subscription_update':
-          this.navigateToSubscription(params);
-          break;
-        
-        case 'system_notification':
-          this.navigateToSettings(params);
-          break;
-        
-        default:
-          // Fallback navigation
-          this.navigationRef.navigate(screen, params);
-      }
-
-      console.log('Deep link navigation completed:', { screen, params, type: notificationType });
-
-    } catch (error) {
-      console.error('Error handling deep linking:', error);
+  private navigateFromNotification(data: NotificationData): void {
+    // This would integrate with your navigation system
+    switch (data.type) {
+      case "message":
+        if (data.conversationId) {
+          // Navigate to chat screen
+          console.log("Navigate to chat:", data.conversationId);
+        }
+        break;
+      case "match":
+        if (data.matchId) {
+          // Navigate to match screen
+          console.log("Navigate to match:", data.matchId);
+        }
+        break;
+      case "interest":
+        if (data.profileId) {
+          // Navigate to profile
+          console.log("Navigate to profile:", data.profileId);
+        }
+        break;
+      case "system":
+        // Navigate to appropriate system screen
+        console.log("Navigate to system screen");
+        break;
     }
   }
 
-  /**
-   * Navigate to chat screen
-   */
-  private static navigateToChat(params: any): void {
-    if (params?.conversationId) {
-      this.navigationRef.navigate('Chat', {
-        screen: 'ConversationScreen',
-        params: { conversationId: params.conversationId },
-      });
-    } else {
-      this.navigationRef.navigate('Chat');
+  private async shouldShowNotification(
+    notification: Notifications.Notification
+  ): Promise<boolean> {
+    const data = notification.request.content.data as NotificationData;
+
+    // Check if notification type is enabled
+    if (!this.shouldAllowNotification(data.type)) {
+      return false;
     }
-  }
 
-  /**
-   * Navigate to matches screen
-   */
-  private static navigateToMatches(params: any): void {
-    this.navigationRef.navigate('Matches', params);
-  }
-
-  /**
-   * Navigate to profile viewers (Premium Plus feature)
-   */
-  private static navigateToProfileViewers(params: any): void {
-    this.navigationRef.navigate('Profile', {
-      screen: 'ProfileViewersScreen',
-      params,
-    });
-  }
-
-  /**
-   * Navigate to subscription screen
-   */
-  private static navigateToSubscription(params: any): void {
-    this.navigationRef.navigate('Subscription', params);
-  }
-
-  /**
-   * Navigate to settings screen
-   */
-  private static navigateToSettings(params: any): void {
-    this.navigationRef.navigate('Settings', params);
-  }
-
-  /**
-   * Update badge count based on notification type
-   */
-  private static async updateBadgeCount(notificationType: NotificationType): Promise<void> {
-    try {
-      const currentCount = await NotificationPermissionsManager.getBadgeCount();
-      let increment = 0;
-
-      // Only increment for user-actionable notifications
-      switch (notificationType) {
-        case 'new_message':
-        case 'new_interest':
-        case 'new_match':
-          increment = 1;
-          break;
-        default:
-          // Don't increment for system notifications
-          break;
-      }
-
-      if (increment > 0) {
-        await NotificationPermissionsManager.setBadgeCount(currentCount + increment);
-      }
-
-    } catch (error) {
-      console.error('Error updating badge count:', error);
+    // Check quiet hours
+    if (this.preferences.quietHours.enabled && this.isInQuietHours()) {
+      return false;
     }
+
+    return true;
   }
 
-  /**
-   * Handle notification clearance (reduce badge count)
-   */
-  private static async handleNotificationClearance(notificationType: NotificationType): Promise<void> {
-    try {
-      // Clear badge for actionable notifications when user opens them
-      switch (notificationType) {
-        case 'new_message':
-        case 'new_interest':
-        case 'new_match':
-          const currentCount = await NotificationPermissionsManager.getBadgeCount();
-          if (currentCount > 0) {
-            await NotificationPermissionsManager.setBadgeCount(Math.max(0, currentCount - 1));
-          }
-          break;
-        default:
-          // Don't modify badge for other types
-          break;
-      }
-
-    } catch (error) {
-      console.error('Error handling notification clearance:', error);
-    }
-  }
-
-  /**
-   * Generate notification content based on type
-   */
-  static generateNotificationContent(
-    type: NotificationType,
-    data: Record<string, any>
-  ): Partial<NotificationPayload> {
+  private shouldAllowNotification(type: NotificationData["type"]): boolean {
     switch (type) {
-      case 'new_message':
-        return {
-          title: 'New Message',
-          body: `${data.senderName || 'Someone'} sent you a message`,
-        };
-
-      case 'new_interest':
-        return {
-          title: 'New Interest',
-          body: `${data.senderName || 'Someone'} is interested in you!`,
-        };
-
-      case 'new_match':
-        return {
-          title: 'It\'s a Match! 💕',
-          body: `You and ${data.matchName || 'someone'} liked each other`,
-        };
-
-      case 'profile_view':
-        return {
-          title: 'Profile View',
-          body: `${data.viewerName || 'Someone'} viewed your profile`,
-        };
-
-      case 'subscription_update':
-        return {
-          title: 'Subscription Update',
-          body: data.message || 'Your subscription has been updated',
-        };
-
-      case 'system_notification':
-        return {
-          title: 'Aroosi',
-          body: data.message || 'You have a new notification',
-        };
-
+      case "message":
+        return this.preferences.messages;
+      case "match":
+        return this.preferences.matches;
+      case "interest":
+        return this.preferences.interests;
+      case "system":
+        return this.preferences.system;
+      case "subscription":
+        return this.preferences.marketing;
       default:
-        return {
-          title: 'Aroosi',
-          body: 'You have a new notification',
-        };
+        return true;
     }
   }
 
-  /**
-   * Create local notification for testing
-   */
-  static async createTestNotification(type: NotificationType): Promise<void> {
-    try {
-      const content = this.generateNotificationContent(type, {
-        senderName: 'Test User',
-        matchName: 'Test Match',
-        viewerName: 'Test Viewer',
-        message: 'This is a test notification',
-      });
+  private isInQuietHours(): boolean {
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
+      .getMinutes()
+      .toString()
+      .padStart(2, "0")}`;
 
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: content.title || 'Test Notification',
-          body: content.body || 'This is a test notification',
-          data: {
-            type,
-            navigationData: {
-              screen: 'Matches',
-              params: { test: true },
-            },
-          },
-        },
-        trigger: null, // Show immediately
-      });
+    const { start, end } = this.preferences.quietHours;
 
-      console.log('Test notification scheduled:', type);
-
-    } catch (error) {
-      console.error('Error creating test notification:', error);
+    if (start <= end) {
+      // Same day quiet hours (e.g., 22:00 to 23:00)
+      return currentTime >= start && currentTime <= end;
+    } else {
+      // Overnight quiet hours (e.g., 22:00 to 08:00)
+      return currentTime >= start || currentTime <= end;
     }
   }
 
-  /**
-   * Clear all notifications
-   */
-  static async clearAllNotifications(): Promise<void> {
+  private async loadPreferences(): Promise<void> {
     try {
-      await NotificationPermissionsManager.dismissAllNotifications();
-      await NotificationPermissionsManager.clearBadge();
-      console.log('All notifications cleared');
+      const stored = await AsyncStorage.getItem("notification_preferences");
+      if (stored) {
+        this.preferences = { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) };
+      }
     } catch (error) {
-      console.error('Error clearing all notifications:', error);
+      console.error("Failed to load notification preferences:", error);
     }
+  }
+
+  private async savePreferences(): Promise<void> {
+    try {
+      await AsyncStorage.setItem(
+        "notification_preferences",
+        JSON.stringify(this.preferences)
+      );
+    } catch (error) {
+      console.error("Failed to save notification preferences:", error);
+    }
+  }
+}
+
+// OneSignal integration (if using OneSignal instead of Expo notifications)
+export class OneSignalManager {
+  private static instance: OneSignalManager;
+  private appId: string;
+  private userId: string | null = null;
+
+  private constructor(appId: string) {
+    this.appId = appId;
+  }
+
+  public static getInstance(appId: string): OneSignalManager {
+    if (!OneSignalManager.instance) {
+      OneSignalManager.instance = new OneSignalManager(appId);
+    }
+    return OneSignalManager.instance;
+  }
+
+  public async initialize(): Promise<void> {
+    // OneSignal initialization would go here
+    // This is a placeholder for OneSignal SDK integration
+    console.log("OneSignal initialized with app ID:", this.appId);
+  }
+
+  public async setUserId(userId: string): Promise<void> {
+    this.userId = userId;
+    // Set external user ID in OneSignal
+    console.log("OneSignal user ID set:", userId);
+  }
+
+  public async sendTag(key: string, value: string): Promise<void> {
+    // Send tag to OneSignal for user segmentation
+    console.log("OneSignal tag sent:", key, value);
+  }
+
+  public async sendTags(tags: Record<string, string>): Promise<void> {
+    // Send multiple tags to OneSignal
+    console.log("OneSignal tags sent:", tags);
+  }
+}
+
+// React hooks for notifications
+export function useNotifications() {
+  const [token, setToken] = React.useState<string | null>(null);
+  const [preferences, setPreferences] =
+    React.useState<NotificationPreferences>(DEFAULT_PREFERENCES);
+  const manager = NotificationManager.getInstance();
+
+  React.useEffect(() => {
+    const initializeNotifications = async () => {
+      await manager.initialize();
+      const notificationToken = manager.getToken();
+      setToken(notificationToken);
+      setPreferences(manager.getPreferences());
+    };
+
+    initializeNotifications();
+  }, []);
+
+  const updatePreferences = React.useCallback(
+    async (newPreferences: Partial<NotificationPreferences>) => {
+      await manager.updatePreferences(newPreferences);
+      setPreferences(manager.getPreferences());
+    },
+    [manager]
+  );
+
+  const scheduleNotification = React.useCallback(
+    (data: NotificationData, delay = 0) => {
+      return manager.scheduleLocalNotification(data, delay);
+    },
+    [manager]
+  );
+
+  const clearBadge = React.useCallback(() => {
+    return manager.clearBadge();
+  }, [manager]);
+
+  return {
+    token,
+    preferences,
+    updatePreferences,
+    scheduleNotification,
+    clearBadge,
+    setBadgeCount: manager.setBadgeCount.bind(manager),
+    getBadgeCount: manager.getBadgeCount.bind(manager),
+  };
+}
+
+// Deep linking utilities for notifications
+export class NotificationDeepLinking {
+  private static instance: NotificationDeepLinking;
+  private navigationRef: any = null;
+
+  private constructor() {}
+
+  public static getInstance(): NotificationDeepLinking {
+    if (!NotificationDeepLinking.instance) {
+      NotificationDeepLinking.instance = new NotificationDeepLinking();
+    }
+    return NotificationDeepLinking.instance;
+  }
+
+  public setNavigationRef(ref: any): void {
+    this.navigationRef = ref;
+  }
+
+  public handleDeepLink(data: NotificationData): void {
+    if (!this.navigationRef) {
+      console.warn("Navigation ref not set for deep linking");
+      return;
+    }
+
+    switch (data.type) {
+      case "message":
+        this.navigateToChat(data.conversationId, data.data);
+        break;
+      case "match":
+        this.navigateToMatch(data.matchId, data.data);
+        break;
+      case "interest":
+        this.navigateToProfile(data.profileId, data.data);
+        break;
+      case "system":
+        this.navigateToSystem(data.data);
+        break;
+      default:
+        this.navigateToHome();
+    }
+  }
+
+  private navigateToChat(conversationId?: string, data?: any): void {
+    if (conversationId) {
+      this.navigationRef.navigate("Chat", {
+        conversationId,
+        ...data,
+      });
+    }
+  }
+
+  private navigateToMatch(matchId?: string, data?: any): void {
+    if (matchId) {
+      this.navigationRef.navigate("Matches", {
+        matchId,
+        ...data,
+      });
+    }
+  }
+
+  private navigateToProfile(profileId?: string, data?: any): void {
+    if (profileId) {
+      this.navigationRef.navigate("ProfileDetail", {
+        profileId,
+        ...data,
+      });
+    }
+  }
+
+  private navigateToSystem(data?: any): void {
+    this.navigationRef.navigate("Settings", data);
+  }
+
+  private navigateToHome(): void {
+    this.navigationRef.navigate("Main");
   }
 }
