@@ -10,69 +10,109 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useSignIn } from '@clerk/clerk-expo';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { AuthStackParamList } from '../../navigation/AuthNavigator';
-import { Colors } from '../../../constants/Colors';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import { useAuth } from "../../../contexts/AuthContext";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { AuthStackParamList } from "../../navigation/AuthNavigator";
+import { Colors } from "../../../constants/Colors";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 
-type ForgotPasswordScreenNavigationProp = StackNavigationProp<AuthStackParamList, 'ForgotPassword'>;
+type ForgotPasswordScreenNavigationProp = StackNavigationProp<
+  AuthStackParamList,
+  "ForgotPassword"
+>;
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
-  const { signIn, setActive } = useSignIn();
+  const auth = useAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
 
   const onSendResetEmail = async () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email address');
+      Alert.alert("Error", "Please enter your email address");
       return;
     }
 
     setLoading(true);
     try {
-      await signIn?.create({
-        strategy: 'reset_password_email_code',
-        identifier: email,
-      });
-      setEmailSent(true);
-      Alert.alert(
-        'Email Sent',
-        'Check your email for instructions to reset your password.'
+      // Call custom password reset API
+      const response = await fetch(
+        `${
+          process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api"
+        }/auth/forgot-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email }),
+        }
       );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setEmailSent(true);
+        Alert.alert(
+          "Email Sent",
+          "Check your email for instructions to reset your password."
+        );
+      } else {
+        Alert.alert("Error", data.error || "Failed to send reset email");
+      }
     } catch (err: any) {
-      Alert.alert('Error', err.errors?.[0]?.message || 'Failed to send reset email');
+      Alert.alert("Error", "Failed to send reset email");
     }
     setLoading(false);
   };
 
   const onVerifyAndReset = async (code: string, newPassword: string) => {
     if (!code || !newPassword) {
-      Alert.alert('Error', 'Please enter both verification code and new password');
+      Alert.alert(
+        "Error",
+        "Please enter both verification code and new password"
+      );
       return;
     }
 
     setLoading(true);
     try {
-      const result = await signIn?.attemptFirstFactor({
-        strategy: 'reset_password_email_code',
-        code,
-        password: newPassword,
-      });
+      // Call custom password reset verification API
+      const response = await fetch(
+        `${
+          process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api"
+        }/auth/reset-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            code,
+            newPassword,
+          }),
+        }
+      );
 
-      if (result?.status === 'complete') {
-        await setActive({ session: result.createdSessionId });
-        navigation.navigate('Login');
-        Alert.alert('Success', 'Password reset successfully!');
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        navigation.navigate("Login");
+        Alert.alert("Success", "Password reset successfully!");
+      } else {
+        Alert.alert("Error", data.error || "Failed to reset password");
       }
     } catch (err: any) {
-      Alert.alert('Error', err.errors?.[0]?.message || 'Failed to reset password');
+      Alert.alert("Error", "Failed to reset password");
     }
     setLoading(false);
   };
@@ -157,7 +197,12 @@ export default function ForgotPasswordScreen() {
   });
 
   if (emailSent) {
-    return <ResetPasswordForm onVerifyAndReset={onVerifyAndReset} loading={loading} />;
+    return (
+      <ResetPasswordForm
+        onVerifyAndReset={onVerifyAndReset}
+        loading={loading}
+      />
+    );
   }
 
   return (

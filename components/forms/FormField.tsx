@@ -7,6 +7,10 @@ import {
   TextInputProps,
 } from "react-native";
 import { Colors } from "../../constants/Colors";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../hooks/useResponsive";
 
 interface FormFieldProps extends TextInputProps {
   label: string;
@@ -30,6 +34,51 @@ export function FormField({
   errorStyle,
   ...textInputProps
 }: FormFieldProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
+  const styles = StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
+    label: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      color: Colors.gray[900],
+      marginBottom: spacing.sm,
+      fontFamily: "NunitoSans-SemiBold",
+    },
+    required: {
+      color: Colors.error[500],
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: Colors.gray[300],
+      borderRadius: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + spacing.xs,
+      fontSize: fontSize.base,
+      backgroundColor: Colors.background.primary,
+      fontFamily: "NunitoSans-Regular",
+    },
+    inputError: {
+      borderColor: Colors.error[500],
+      backgroundColor: Colors.error[50],
+    },
+    error: {
+      fontSize: fontSize.sm,
+      color: Colors.error[500],
+      marginTop: spacing.xs,
+      fontFamily: "NunitoSans-Regular",
+    },
+    helperText: {
+      fontSize: fontSize.sm,
+      color: Colors.gray[600],
+      marginTop: spacing.xs,
+      fontFamily: "NunitoSans-Regular",
+    },
+  });
+
   return (
     <View style={[styles.container, containerStyle]}>
       <Text style={[styles.label, labelStyle]}>
@@ -52,44 +101,4 @@ export function FormField({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.gray[900],
-    marginBottom: 8,
-    fontFamily: "NunitoSans-SemiBold",
-  },
-  required: {
-    color: Colors.red[500],
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.gray[300],
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    backgroundColor: Colors.white,
-    fontFamily: "NunitoSans-Regular",
-  },
-  inputError: {
-    borderColor: Colors.red[500],
-    backgroundColor: Colors.red[50],
-  },
-  error: {
-    fontSize: 14,
-    color: Colors.red[500],
-    marginTop: 4,
-    fontFamily: "NunitoSans-Regular",
-  },
-  helperText: {
-    fontSize: 14,
-    color: Colors.gray[600],
-    marginTop: 4,
-    fontFamily: "NunitoSans-Regular",
-  },
-});
+

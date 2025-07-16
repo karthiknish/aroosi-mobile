@@ -10,7 +10,7 @@ jest.mock("@react-native-google-signin/google-signin");
 
 describe("Authentication System Tests", () => {
   let authProvider: AuthProvider;
-  const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
+  const mockToken = "mock.jwt.token.for.testing";
   const mockUser = {
     id: "user-123",
     email: "test@aroosi.app",

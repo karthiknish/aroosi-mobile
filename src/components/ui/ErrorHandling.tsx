@@ -10,6 +10,10 @@ import {
   AlertButton,
 } from "react-native";
 import { useTheme } from "../../../contexts/ThemeContext";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -79,6 +83,45 @@ const DefaultErrorFallback: React.FC<{
   resetError: () => void;
 }> = ({ error, resetError }) => {
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
+  const styles = StyleSheet.create({
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.xl,
+    },
+    errorIcon: {
+      fontSize: fontSize["4xl"],
+      marginBottom: spacing.md,
+    },
+    errorTitle: {
+      fontSize: fontSize["2xl"],
+      fontWeight: "600",
+      textAlign: "center",
+      marginBottom: spacing.sm + spacing.xs,
+    },
+    errorMessage: {
+      fontSize: fontSize.base,
+      textAlign: "center",
+      lineHeight: fontSize.base * 1.5,
+      marginBottom: spacing.lg,
+    },
+    retryButton: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + spacing.xs,
+      borderRadius: spacing.sm,
+      minWidth: spacing.xl * 3.75,
+    },
+    retryButtonText: {
+      color: "#fff",
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+  });
 
   return (
     <View
@@ -118,11 +161,51 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
   style,
 }) => {
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const errorMessage =
     typeof error === "string"
       ? error
       : error?.message || "An unexpected error occurred";
+
+  const styles = StyleSheet.create({
+    errorDisplay: {
+      margin: spacing.md,
+    },
+    errorCard: {
+      padding: spacing.md,
+      borderRadius: spacing.sm + spacing.xs,
+      borderLeftWidth: 4,
+      borderLeftColor: "#B45E5E",
+    },
+    errorDisplayTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+      marginBottom: spacing.sm,
+    },
+    errorDisplayMessage: {
+      fontSize: fontSize.sm,
+      lineHeight: fontSize.sm * 1.4,
+      marginBottom: spacing.sm + spacing.xs,
+    },
+    errorActions: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    errorActionButton: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: spacing.xs + 2,
+      flex: 1,
+    },
+    errorActionText: {
+      color: "#fff",
+      fontSize: fontSize.sm,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+  });
 
   return (
     <View style={[styles.errorDisplay, style]}>
@@ -238,6 +321,46 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
   onRetry,
 }) => {
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
+  const styles = StyleSheet.create({
+    networkErrorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: spacing.xl,
+    },
+    networkErrorIcon: {
+      fontSize: fontSize["4xl"],
+      marginBottom: spacing.md,
+      opacity: 0.6,
+    },
+    networkErrorTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: "600",
+      textAlign: "center",
+      marginBottom: spacing.sm,
+    },
+    networkErrorMessage: {
+      fontSize: fontSize.base,
+      textAlign: "center",
+      lineHeight: fontSize.base * 1.5,
+      marginBottom: spacing.lg,
+    },
+    retryButton: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + spacing.xs,
+      borderRadius: spacing.sm,
+      minWidth: spacing.xl * 3.75,
+    },
+    retryButtonText: {
+      color: "#fff",
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+  });
 
   return (
     <View
@@ -276,12 +399,32 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
 };
 
 // Validation Error Component
-export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({
-  errors,
-}) => {
+export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({ errors }) => {
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   if (errors.length === 0) return null;
+
+  const styles = StyleSheet.create({
+    validationContainer: {
+      margin: spacing.md,
+      padding: spacing.md,
+      borderRadius: spacing.sm,
+      borderWidth: 1,
+      borderColor: "#B45E5E",
+    },
+    validationTitle: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      marginBottom: spacing.sm,
+    },
+    validationError: {
+      fontSize: fontSize.sm,
+      lineHeight: fontSize.sm * 1.4,
+      marginBottom: spacing.xs,
+    },
+  });
 
   return (
     <View
@@ -307,114 +450,4 @@ export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-  },
-  errorIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  errorMessage: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 120,
-  },
-  retryButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  errorDisplay: {
-    margin: 16,
-  },
-  errorCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#B45E5E",
-  },
-  errorDisplayTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  errorDisplayMessage: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  errorActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  errorActionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-    flex: 1,
-  },
-  errorActionText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  networkErrorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-  },
-  networkErrorIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-    opacity: 0.6,
-  },
-  networkErrorTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  networkErrorMessage: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  validationContainer: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#B45E5E",
-  },
-  validationTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 8,
-  },
-  validationError: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-});
+

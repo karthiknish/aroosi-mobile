@@ -7,10 +7,13 @@ import {
   Alert,
   Switch,
 } from "react-native";
-import { useAuth, useUser } from '@clerk/clerk-expo';
-import { useState } from 'react';
+import { useAuth } from "../../../contexts/AuthContext";
+import { useState } from "react";
 import { Colors, Layout } from "../../../constants";
-import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface SettingsScreenProps {
@@ -20,7 +23,7 @@ interface SettingsScreenProps {
 interface SettingItem {
   title: string;
   subtitle?: string;
-  type: 'navigation' | 'toggle' | 'action';
+  type: "navigation" | "toggle" | "action";
   value?: boolean;
   onPress?: () => void;
   onToggle?: (value: boolean) => void;
@@ -29,11 +32,10 @@ interface SettingItem {
 }
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
-  const { signOut } = useAuth();
-  const { user } = useUser();
+  const { signOut, user } = useAuth();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  
+
   // Local state for toggles
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -41,48 +43,47 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [readReceipts, setReadReceipts] = useState(true);
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-              navigation.navigate('Auth');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to sign out. Please try again.');
-            }
-          },
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await signOut();
+            navigation.navigate("Auth");
+          } catch (error) {
+            Alert.alert("Error", "Failed to sign out. Please try again.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'This action cannot be undone. All your data will be permanently deleted.',
+      "Delete Account",
+      "This action cannot be undone. All your data will be permanently deleted.",
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: "Cancel", style: "cancel" },
         {
-          text: 'Delete Account',
-          style: 'destructive',
+          text: "Delete Account",
+          style: "destructive",
           onPress: () => {
             Alert.alert(
-              'Final Confirmation',
-              'Are you absolutely sure you want to delete your account? This cannot be undone.',
+              "Final Confirmation",
+              "Are you absolutely sure you want to delete your account? This cannot be undone.",
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: "Cancel", style: "cancel" },
                 {
-                  text: 'Yes, Delete',
-                  style: 'destructive',
+                  text: "Yes, Delete",
+                  style: "destructive",
                   onPress: () => {
                     // TODO: Implement account deletion
-                    Alert.alert('Info', 'Account deletion feature will be implemented soon.');
+                    Alert.alert(
+                      "Info",
+                      "Account deletion feature will be implemented soon."
+                    );
                   },
                 },
               ]
@@ -339,37 +340,34 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const renderSettingItem = (item: SettingItem, index: number) => (
     <TouchableOpacity
       key={index}
-      style={[
-        styles.settingItem,
-        item.destructive && styles.destructiveItem,
-      ]}
+      style={[styles.settingItem, item.destructive && styles.destructiveItem]}
       onPress={item.onPress}
-      disabled={item.type === 'toggle'}
+      disabled={item.type === "toggle"}
     >
       <View style={styles.settingContent}>
-        <Text style={[
-          styles.settingTitle,
-          item.destructive && styles.destructiveText,
-        ]}>
+        <Text
+          style={[
+            styles.settingTitle,
+            item.destructive && styles.destructiveText,
+          ]}
+        >
           {item.title}
         </Text>
         {item.subtitle && (
           <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
         )}
       </View>
-      
-      {item.type === 'toggle' && (
+
+      {item.type === "toggle" && (
         <Switch
           value={item.value}
           onValueChange={item.onToggle}
-          trackColor={{ false: '#767577', true: '#007AFF' }}
+          trackColor={{ false: "#767577", true: "#007AFF" }}
           thumbColor="#fff"
         />
       )}
-      
-      {item.type === 'navigation' && (
-        <Text style={styles.chevron}>›</Text>
-      )}
+
+      {item.type === "navigation" && <Text style={styles.chevron}>›</Text>}
     </TouchableOpacity>
   );
 
@@ -394,15 +392,13 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       <View style={styles.userInfo}>
         <View style={styles.userAvatar}>
           <Text style={styles.userInitial}>
-            {user?.firstName?.charAt(0) || "U"}
+            {user?.profile?.fullName?.charAt(0) ||
+              user?.email?.charAt(0) ||
+              "U"}
           </Text>
         </View>
-        <Text style={styles.userName}>
-          {user?.firstName} {user?.lastName}
-        </Text>
-        <Text style={styles.userEmail}>
-          {user?.primaryEmailAddress?.emailAddress}
-        </Text>
+        <Text style={styles.userName}>{user?.profile?.fullName || "User"}</Text>
+        <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
 
       {/* Settings Sections */}

@@ -9,6 +9,11 @@ import {
   Image,
 } from "react-native";
 import { Colors } from "@constants/Colors";
+import { Layout } from "@constants/Layout";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@hooks/useResponsive";
 
 const { height, width } = Dimensions.get("window");
 
@@ -17,6 +22,64 @@ interface StartupScreenProps {
 }
 
 export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
+  const styles = StyleSheet.create({
+    background: {
+      flex: 1,
+      height,
+      width,
+      justifyContent: "flex-end",
+    },
+    darkOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.4)",
+    },
+    overlay: {
+      width: "100%",
+      paddingHorizontal: spacing.xl,
+      paddingBottom: spacing.xl * 2,
+    },
+    button: {
+      backgroundColor: Colors.primary[500] || "#ff3366",
+      paddingVertical: spacing.md,
+      borderRadius: spacing.xs * 3,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: Colors.text?.inverse || "#ffffff",
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+    },
+    topContainer: {
+      alignItems: "center",
+      justifyContent: "flex-start",
+      paddingTop: spacing.xl * 2.5,
+      flex: 1,
+    },
+    logo: {
+      width: spacing.xl * 3.75, // 120px equivalent
+      height: spacing.xl * 3.75, // 120px equivalent
+      marginBottom: spacing.md,
+      backgroundColor: "white",
+    },
+    heading: {
+      fontFamily: Layout.typography.fontFamily.serif,
+      color: Colors.text?.inverse || "#ffffff",
+      fontSize: fontSize["2xl"],
+      fontWeight: "800",
+      textAlign: "center",
+      paddingHorizontal: spacing.lg,
+      marginTop: spacing.md + spacing.xs,
+      letterSpacing: 0.5,
+    },
+  });
+
   return (
     <ImageBackground
       source={{
@@ -25,6 +88,9 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
       style={styles.background}
       resizeMode="cover"
     >
+      {/* Dark overlay to make background image darker */}
+      <View style={styles.darkOverlay} />
+
       {/* Top branding section */}
       <View style={styles.topContainer}>
         {/* App Logo */}
@@ -47,44 +113,4 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-    height,
-    width,
-    justifyContent: "flex-end",
-  },
-  overlay: {
-    width: "100%",
-    paddingHorizontal: 32,
-    paddingBottom: 64,
-  },
-  button: {
-    backgroundColor: Colors.primary[500] || "#ff3366",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: Colors.text?.inverse || "#ffffff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  topContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 64,
-  },
-  logo: {
-    width: 120,
-    height: 120,
-    marginBottom: 16,
-  },
-  heading: {
-    color: Colors.text?.inverse || "#ffffff",
-    fontSize: 24,
-    fontWeight: "700",
-    textAlign: "center",
-    paddingHorizontal: 24,
-  },
-});
+

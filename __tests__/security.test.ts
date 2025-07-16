@@ -20,7 +20,7 @@ describe("Security and Data Protection Tests", () => {
 
   describe("Token Security", () => {
     test("should store tokens securely", async () => {
-      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
+      const token = "mock.jwt.token.for.testing";
       const refreshToken = "refresh.token.value";
 
       (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
@@ -57,8 +57,7 @@ describe("Security and Data Protection Tests", () => {
     });
 
     test("should validate token format", () => {
-      const validToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+      const validToken = "mock.valid.jwt.token.format";
       const invalidToken = "invalid.token";
 
       expect(authProvider.isValidTokenFormat(validToken)).toBe(true);
@@ -66,10 +65,8 @@ describe("Security and Data Protection Tests", () => {
     });
 
     test("should detect token expiration", () => {
-      const expiredToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjJ9.signature"; // Expired in 2018
-      const validToken =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature"; // Expires in far future
+      const expiredToken = "mock.expired.jwt.token"; // Mock expired token
+      const validToken = "mock.valid.jwt.token"; // Mock valid token
 
       expect(authProvider.isTokenExpired(expiredToken)).toBe(true);
       expect(authProvider.isTokenExpired(validToken)).toBe(false);

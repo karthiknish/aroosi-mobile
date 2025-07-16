@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useSignIn } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
@@ -27,7 +27,7 @@ type LoginScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function LoginScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn();
+  const { signIn, isLoading: authLoading } = useAuth();
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -37,8 +37,6 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const onSignInPress = async () => {
-    if (!isLoaded) return;
-
     if (!emailAddress || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -46,18 +44,18 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const completeSignIn = await signIn.create({
-        identifier: emailAddress,
-        password,
-      });
+      const result = await signIn(emailAddress, password);
 
-      await setActive({ session: completeSignIn.createdSessionId });
+      if (!result.success) {
+        Alert.alert(
+          "Sign In Failed",
+          result.error || "Invalid email or password"
+        );
+      }
+      // Navigation will be handled by the auth context
     } catch (err: any) {
       console.error("Sign in error:", err);
-      Alert.alert(
-        "Sign In Failed",
-        err.errors?.[0]?.message || "Invalid email or password"
-      );
+      Alert.alert("Sign In Failed", "An unexpected error occurred");
     } finally {
       setLoading(false);
     }

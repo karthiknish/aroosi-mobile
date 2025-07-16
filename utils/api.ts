@@ -1,4 +1,4 @@
-import { useAuth } from "../contexts/AuthContext";
+// Import moved to avoid circular dependency
 import {
   ApiResponse,
   Profile,
@@ -312,10 +312,7 @@ class ApiClient {
 
   // Interest response not available via API - auto-matching system
   // When both users send interests to each other, they automatically match
-  async respondToInterest(
-    interestId: string,
-    response: "accept" | "reject"
-  ): Promise<ApiResponse<never>> {
+  async respondToInterest(): Promise<ApiResponse<never>> {
     console.warn(
       "respondToInterest: Auto-matching system - interests automatically match when mutual"
     );
@@ -606,7 +603,7 @@ class ApiClient {
   }
 
   // Note: /subscription/upgrade endpoint not available
-  async updateSubscriptionTier(tier: string) {
+  async updateSubscriptionTier() {
     console.warn("updateSubscriptionTier: Endpoint not available");
     return {
       success: false,
@@ -835,6 +832,8 @@ export const apiClient = new ApiClient(API_BASE_URL);
 
 // Hook to initialize API client with auth
 export function useApiClient() {
+  // Import here to avoid circular dependency
+  const { useAuth } = require("../contexts/AuthContext");
   const { getToken } = useAuth();
 
   // Initialize auth provider once

@@ -31,13 +31,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
   navigationRef,
 }) => {
-  const { isSignedIn, userId } = useAuth();
-  
+  const { isAuthenticated, userId } = useAuth();
+
   // Temporary mock for OneSignal until we fix the integration
   const oneSignalData = {
     isInitialized: false,
     playerId: null,
-    permissionStatus: 'undetermined',
+    permissionStatus: "undetermined",
     isRegistered: false,
     requestPermission: async () => false,
     registerForPushNotifications: async () => false,
@@ -45,7 +45,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     setExternalUserId: (id: string) => {},
     clearExternalUserId: () => {},
   };
-  
+
   const initializationRef = useRef(false);
 
   // Initialize notification system
@@ -65,12 +65,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
   // Handle user authentication state changes
   useEffect(() => {
-    if (isSignedIn && userId) {
+    if (isAuthenticated && userId) {
       handleUserSignIn();
     } else {
       handleUserSignOut();
     }
-  }, [isSignedIn, userId]);
+  }, [isAuthenticated, userId]);
 
   /**
    * Initialize the notification system

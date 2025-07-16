@@ -1,10 +1,5 @@
 import React, { useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Dimensions,
-} from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -12,13 +7,130 @@ import Animated, {
   withSpring,
   withRepeat,
   withSequence,
-  interpolate,
-  Extrapolation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { Colors } from "../../../constants/Colors";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
-const { width: screenWidth } = Dimensions.get("window");
+// Create responsive styles function
+const createResponsiveStyles = (spacing: any, fontSize: any) =>
+  StyleSheet.create({
+    circularProgressContainer: {
+      justifyContent: "center",
+      alignItems: "center",
+      position: "relative",
+    },
+    circularProgressBackground: {
+      position: "absolute",
+    },
+    circularProgressForeground: {
+      position: "absolute",
+    },
+    circularProgressContent: {
+      position: "absolute",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    percentageText: {
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+    },
+    linearProgressContainer: {
+      width: "100%",
+    },
+    progressLabelContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: spacing.sm,
+    },
+    progressLabel: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      fontWeight: "500",
+    },
+    progressPercentage: {
+      fontSize: fontSize.sm,
+      color: Colors.text.primary,
+      fontWeight: "600",
+    },
+    progressTrack: {
+      width: "100%",
+      overflow: "hidden",
+    },
+    progressFill: {
+      height: "100%",
+    },
+    progressGradient: {
+      flex: 1,
+    },
+    stepProgressContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    verticalStepProgress: {
+      flexDirection: "column",
+      alignItems: "flex-start",
+    },
+    stepContainer: {
+      flex: 1,
+      alignItems: "center",
+    },
+    verticalStepContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: spacing.lg - spacing.xs,
+    },
+    stepIndicatorContainer: {
+      alignItems: "center",
+      position: "relative",
+    },
+    stepIndicator: {
+      width: spacing.xl,
+      height: spacing.xl,
+      borderRadius: spacing.md,
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 1,
+    },
+    stepNumber: {
+      color: Colors.background.primary,
+      fontSize: fontSize.sm,
+      fontWeight: "600",
+    },
+    stepConnector: {
+      position: "absolute",
+      zIndex: 0,
+    },
+    horizontalConnector: {
+      height: spacing.xs / 2,
+      width: "100%",
+      left: spacing.md,
+      top: spacing.md - spacing.xs,
+    },
+    verticalConnector: {
+      width: spacing.xs / 2,
+      height: spacing.xl + spacing.sm,
+      top: spacing.xl,
+      left: spacing.md - spacing.xs,
+    },
+    stepTitle: {
+      fontSize: fontSize.xs,
+      textAlign: "center",
+      marginTop: spacing.sm,
+      fontWeight: "500",
+    },
+    loadingDotsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    loadingDot: {
+      // Styles applied dynamically
+    },
+  });
 
 // Circular Progress Ring
 interface CircularProgressProps {
@@ -44,9 +156,10 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   duration = 1000,
   children,
 }) => {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+  const styles = createResponsiveStyles(spacing, fontSize);
   const animatedProgress = useSharedValue(0);
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
 
   useEffect(() => {
     if (animated) {
@@ -70,7 +183,9 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
   });
 
   return (
-    <View style={[styles.circularProgressContainer, { width: size, height: size }]}>
+    <View
+      style={[styles.circularProgressContainer, { width: size, height: size }]}
+    >
       {/* Background Circle */}
       <View
         style={[
@@ -84,7 +199,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
           },
         ]}
       />
-      
+
       {/* Progress Arc */}
       <Animated.View
         style={[
@@ -104,15 +219,14 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
       />
 
       <View style={styles.circularProgressContent}>
-        {children || (
-          showPercentage && (
+        {children ||
+          (showPercentage && (
             <Animated.View style={percentageStyle}>
               <Text style={[styles.percentageText, { color }]}>
                 {Math.round(progress * 100)}%
               </Text>
             </Animated.View>
-          )
-        )}
+          ))}
       </View>
     </View>
   );
@@ -142,6 +256,9 @@ export const LinearProgress: React.FC<LinearProgressProps> = ({
   label,
   style,
 }) => {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+  const styles = createResponsiveStyles(spacing, fontSize);
   const animatedProgress = useSharedValue(0);
 
   useEffect(() => {
@@ -208,6 +325,10 @@ export const StepProgress: React.FC<StepProgressProps> = ({
   orientation = "horizontal",
   style,
 }) => {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+  const styles = createResponsiveStyles(spacing, fontSize);
+
   const renderStep = (step: any, index: number) => {
     const isLast = index === steps.length - 1;
     const scale = useSharedValue(step.completed ? 1 : 0.8);
@@ -271,9 +392,10 @@ export const StepProgress: React.FC<StepProgressProps> = ({
           style={[
             styles.stepTitle,
             {
-              color: step.completed || step.active
-                ? Colors.text.primary
-                : Colors.text.secondary,
+              color:
+                step.completed || step.active
+                  ? Colors.text.primary
+                  : Colors.text.secondary,
             },
           ]}
         >
@@ -296,49 +418,6 @@ export const StepProgress: React.FC<StepProgressProps> = ({
   );
 };
 
-// Animated Counter
-interface AnimatedCounterProps {
-  value: number;
-  duration?: number;
-  style?: any;
-  textStyle?: any;
-  prefix?: string;
-  suffix?: string;
-  decimals?: number;
-}
-
-export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
-  value,
-  duration = 1000,
-  style,
-  textStyle,
-  prefix = "",
-  suffix = "",
-  decimals = 0,
-}) => {
-  const animatedValue = useSharedValue(0);
-
-  useEffect(() => {
-    animatedValue.value = withTiming(value, { duration });
-  }, [value, duration]);
-
-  const animatedTextStyle = useAnimatedStyle(() => {
-    const currentValue = animatedValue.value.toFixed(decimals);
-    return {
-      // Note: In a real implementation, you'd need to use a text animation library
-      // or create a custom solution for animating text values
-    };
-  });
-
-  return (
-    <Animated.View style={[style, animatedTextStyle]}>
-      <Text style={textStyle}>
-        {prefix}{value.toFixed(decimals)}{suffix}
-      </Text>
-    </Animated.View>
-  );
-};
-
 // Loading Dots Animation
 interface LoadingDotsProps {
   size?: number;
@@ -353,12 +432,15 @@ export const LoadingDots: React.FC<LoadingDotsProps> = ({
   count = 3,
   style,
 }) => {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+  const styles = createResponsiveStyles(spacing, fontSize);
+
   const dots = Array.from({ length: count }, (_, index) => {
     const scale = useSharedValue(1);
     const opacity = useSharedValue(0.3);
 
     useEffect(() => {
-      const delay = index * 200;
       scale.value = withRepeat(
         withSequence(
           withTiming(1, { duration: 0 }),
@@ -368,7 +450,7 @@ export const LoadingDots: React.FC<LoadingDotsProps> = ({
         -1,
         false
       );
-      
+
       opacity.value = withRepeat(
         withSequence(
           withTiming(0.3, { duration: 0 }),
@@ -438,123 +520,6 @@ export const Pulse: React.FC<PulseProps> = ({
   }));
 
   return (
-    <Animated.View style={[style, animatedStyle]}>
-      {children}
-    </Animated.View>
+    <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>
   );
 };
-
-const styles = StyleSheet.create({
-  circularProgressContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    position: "relative",
-  },
-  circularProgressBackground: {
-    position: "absolute",
-  },
-  circularProgressForeground: {
-    position: "absolute",
-  },
-  circularProgressContent: {
-    position: "absolute",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  percentageText: {
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  linearProgressContainer: {
-    width: "100%",
-  },
-  progressLabelContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: Colors.text.secondary,
-    fontWeight: "500",
-  },
-  progressPercentage: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    fontWeight: "600",
-  },
-  progressTrack: {
-    width: "100%",
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-  },
-  progressGradient: {
-    flex: 1,
-  },
-  stepProgressContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  verticalStepProgress: {
-    flexDirection: "column",
-    alignItems: "flex-start",
-  },
-  stepContainer: {
-    flex: 1,
-    alignItems: "center",
-  },
-  verticalStepContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  stepIndicatorContainer: {
-    alignItems: "center",
-    position: "relative",
-  },
-  stepIndicator: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1,
-  },
-  stepNumber: {
-    color: Colors.background.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  stepConnector: {
-    position: "absolute",
-    zIndex: 0,
-  },
-  horizontalConnector: {
-    height: 2,
-    width: "100%",
-    left: 16,
-    top: 15,
-  },
-  verticalConnector: {
-    width: 2,
-    height: 40,
-    top: 32,
-    left: 15,
-  },
-  stepTitle: {
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 8,
-    fontWeight: "500",
-  },
-  loadingDotsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  loadingDot: {
-    // Styles applied dynamically
-  },
-});

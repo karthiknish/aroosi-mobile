@@ -16,8 +16,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from \"../../../constants\";
+import { Colors, Layout } from "../../../constants";
 import * as Haptics from "expo-haptics";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -81,7 +85,7 @@ export const Toast: React.FC<ToastProps> = ({
   useEffect(() => {
     if (visible) {
       runOnJS(triggerHaptic)();
-      
+
       // Entrance animation
       opacity.value = withTiming(1, { duration: 300 });
       scale.value = withSpring(1, { damping: 15, stiffness: 300 });
@@ -321,7 +325,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 14,
-    fontWeight: \"600\",
+    fontWeight: "600",
     color: Colors.background.primary,
   },
   closeButton: {
@@ -337,7 +341,7 @@ const styles = StyleSheet.create({
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 12,
     color: Colors.background.primary,
-    fontWeight: \"600\",
+    fontWeight: "600",
   },
   toastContainer: {
     position: "absolute",

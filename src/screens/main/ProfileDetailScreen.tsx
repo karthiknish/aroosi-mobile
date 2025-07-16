@@ -11,19 +11,23 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
 import { useInterests } from "../../../hooks/useInterests";
 import { useSafety } from "../../../hooks/useSafety";
 import { useTheme } from "../../../contexts/ThemeContext";
-import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import SafetyActionSheet from "../../../components/safety/SafetyActionSheet";
 import { Colors } from "../../../constants";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 import { useInterestStatus } from "../../../hooks/useInterests";
 import { useBlockStatus } from "../../../hooks/useSafety";
 import { Profile } from "../../../types/profile";
 import type { ReportReason } from "../../../types/index";
-import ScreenContainer from "@components/common/ScreenContainer";
+import ScreenContainer from "../../../components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 
@@ -46,6 +50,8 @@ export default function ProfileDetailScreen({
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSafetySheet, setShowSafetySheet] = useState(false);
 
@@ -56,6 +62,160 @@ export default function ProfileDetailScreen({
   const { status: interestStatus, loading: interestLoading } =
     useInterestStatus(profileId);
   const { data: blockStatus } = useBlockStatus(profileId);
+
+  // Define styles early so they can be used in early returns
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + spacing.xs,
+      borderBottomWidth: 1,
+    },
+    backButton: {
+      padding: spacing.sm,
+    },
+    backText: {
+      fontSize: fontSize.base,
+      fontWeight: "500",
+    },
+    safetyButton: {
+      padding: spacing.sm,
+    },
+    safetyText: {
+      fontSize: fontSize.xl,
+      fontWeight: "bold",
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      marginTop: spacing.md,
+      fontSize: fontSize.base,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+    },
+    errorText: {
+      fontSize: fontSize.lg,
+      textAlign: "center",
+      marginBottom: spacing.lg,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    imageGallery: {
+      position: "relative",
+    },
+    profileImage: {
+      width: width,
+      height: width * 1.2,
+      resizeMode: "cover",
+    },
+    imageIndicators: {
+      flexDirection: "row",
+      justifyContent: "center",
+      position: "absolute",
+      bottom: spacing.lg,
+      left: 0,
+      right: 0,
+    },
+    indicator: {
+      width: spacing.sm,
+      height: spacing.sm,
+      borderRadius: spacing.xs,
+      marginHorizontal: spacing.xs,
+    },
+    noImageContainer: {
+      width: width,
+      height: width * 0.8,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    noImageText: {
+      fontSize: fontSize.base,
+    },
+    profileInfo: {
+      padding: spacing.md,
+    },
+    section: {
+      marginBottom: spacing.lg,
+      padding: spacing.md,
+      borderRadius: spacing.xs * 3,
+    },
+    name: {
+      fontSize: fontSize["2xl"] + spacing.xs,
+      fontWeight: "bold",
+      marginBottom: spacing.sm,
+    },
+    basicDetails: {
+      gap: spacing.xs,
+    },
+    detail: {
+      fontSize: fontSize.base,
+      marginBottom: spacing.xs,
+    },
+    sectionTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: "600",
+      marginBottom: spacing.sm * 1.5,
+    },
+    sectionText: {
+      fontSize: fontSize.base,
+      lineHeight: fontSize.base * 1.5,
+    },
+    detailRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border.primary,
+    },
+    detailLabel: {
+      fontSize: fontSize.sm,
+      flex: 1,
+    },
+    detailValue: {
+      fontSize: fontSize.base,
+      fontWeight: "500",
+      flex: 2,
+      textAlign: "right",
+    },
+    actionContainer: {
+      padding: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: Colors.border.primary,
+    },
+    interestButton: {
+      paddingVertical: spacing.md,
+      borderRadius: spacing.xs * 3,
+      alignItems: "center",
+    },
+    button: {
+      paddingVertical: spacing.sm * 1.5,
+      paddingHorizontal: spacing.lg,
+      borderRadius: spacing.sm,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: Colors.text.inverse,
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    contentStyle: {
+      flexGrow: 1,
+    },
+  });
 
   // Get profile data
   const {
@@ -707,156 +867,3 @@ export default function ProfileDetailScreen({
     </ScreenContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  safetyButton: {
-    padding: 8,
-  },
-  safetyText: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  errorText: {
-    fontSize: 18,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  imageGallery: {
-    position: "relative",
-  },
-  profileImage: {
-    width: width,
-    height: width * 1.2,
-    resizeMode: "cover",
-  },
-  imageIndicators: {
-    flexDirection: "row",
-    justifyContent: "center",
-    position: "absolute",
-    bottom: 20,
-    left: 0,
-    right: 0,
-  },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
-  noImageContainer: {
-    width: width,
-    height: width * 0.8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  noImageText: {
-    fontSize: 16,
-  },
-  profileInfo: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 20,
-    padding: 16,
-    borderRadius: 12,
-  },
-  name: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  basicDetails: {
-    gap: 4,
-  },
-  detail: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  sectionText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  detailLabel: {
-    fontSize: 14,
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: "500",
-    flex: 2,
-    textAlign: "right",
-  },
-  actionContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
-  },
-  interestButton: {
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonText: {
-    color: Colors.text.inverse,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  contentStyle: {
-    flexGrow: 1,
-  },
-});

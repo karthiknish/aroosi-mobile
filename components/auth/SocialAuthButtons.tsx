@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSignIn, useSignUp, useOAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../contexts/AuthContext";
 import { Colors, Layout } from "../../constants";
 import PlatformButton from "../ui/PlatformButton";
 import PlatformHaptics from "../../utils/PlatformHaptics";
@@ -19,9 +19,7 @@ export default function SocialAuthButtons({
   loading = false,
   setLoading,
 }: SocialAuthButtonsProps) {
-  const { signIn, setActive: setActiveSignIn } = useSignIn();
-  const { signUp, setActive: setActiveSignUp } = useSignUp();
-  const { startOAuthFlow: googleAuth } = useOAuth({ strategy: "oauth_google" });
+  const { signInWithGoogle } = useAuth();
 
   const handleGoogleAuth = async () => {
     if (loading) return;
@@ -30,37 +28,31 @@ export default function SocialAuthButtons({
     await PlatformHaptics.light();
 
     try {
-      const {
-        createdSessionId,
-        signIn: oauthSignIn,
-        signUp: oauthSignUp,
-        setActive,
-      } = await googleAuth();
+      // For now, we'll show a message that Google auth needs to be implemented
+      // In a real implementation, you would integrate with Google Sign-In
+      Alert.alert(
+        "Google Sign-In",
+        "Google authentication will be implemented with @react-native-google-signin/google-signin"
+      );
 
-      if (createdSessionId) {
-        // User completed OAuth flow
-        await setActive({ session: createdSessionId });
-        await PlatformHaptics.success();
-
-        // Navigation will be handled by the AuthContext/RootNavigator
-        // based on the user's authentication state and profile completion
-        onSuccess?.();
-      } else if (oauthSignIn) {
-        // Additional verification steps needed for sign in
-        await setActiveSignIn({ session: oauthSignIn.createdSessionId });
-        onSuccess?.();
-      } else if (oauthSignUp) {
-        // Additional verification steps needed for sign up
-        await setActiveSignUp({ session: oauthSignUp.createdSessionId });
-        onSuccess?.();
-      }
+      // Example implementation:
+      // import { GoogleSignin } from '@react-native-google-signin/google-signin';
+      // const userInfo = await GoogleSignin.signIn();
+      // const result = await signInWithGoogle(userInfo.idToken);
+      //
+      // if (result.success) {
+      //   await PlatformHaptics.success();
+      //   onSuccess?.();
+      // } else {
+      //   throw new Error(result.error);
+      // }
     } catch (err: any) {
       console.error("Google auth error:", err);
       await PlatformHaptics.error();
 
       let errorMessage = "Google authentication failed. Please try again.";
-      if (err.errors?.[0]?.message) {
-        errorMessage = err.errors[0].message;
+      if (err.message) {
+        errorMessage = err.message;
       }
 
       Alert.alert("Authentication Failed", errorMessage);

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Platform, Alert } from "react-native";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../contexts/AuthContext";
 import {
   initConnection,
   purchaseUpdatedListener,

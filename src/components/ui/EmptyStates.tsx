@@ -7,6 +7,10 @@ import {
   ViewStyle,
 } from "react-native";
 import { useTheme } from "../../../contexts/ThemeContext";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
 interface EmptyStateProps {
   icon?: string;
@@ -30,6 +34,46 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   style,
 }) => {
   const { theme } = useTheme();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.xl + spacing.md,
+    },
+    icon: {
+      fontSize: fontSize["4xl"],
+      marginBottom: spacing.md,
+    },
+    title: {
+      fontSize: fontSize["2xl"],
+      fontWeight: "600",
+      textAlign: "center",
+      marginBottom: spacing.sm + spacing.xs,
+    },
+    message: {
+      fontSize: fontSize.base,
+      textAlign: "center",
+      lineHeight: fontSize.base * 1.5,
+      marginBottom: spacing.lg,
+    },
+    actionButton: {
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + spacing.xs,
+      borderRadius: spacing.sm,
+      minWidth: spacing.xl * 3.75,
+    },
+    actionButtonText: {
+      color: "#fff",
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+  });
 
   return (
     <View style={[styles.container, style]}>
@@ -187,40 +231,4 @@ export const NoPermission: React.FC<SpecificEmptyStateProps> = ({
   />
 );
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-    paddingVertical: 48,
-  },
-  icon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  message: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  actionButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 120,
-  },
-  actionButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-});
+

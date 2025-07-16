@@ -13,7 +13,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useApiClient } from "../../../utils/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import {
   Profile,
   UpdateProfileData,
@@ -34,6 +34,10 @@ import {
   cleanPhoneNumber,
 } from "../../../utils/profileValidation";
 import { Colors, Layout } from "../../../constants";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 import ImageUpload from "@components/profile/ImageUpload";
 import { COUNTRIES } from "../../../constants/countries";
 import SearchableSelect from "../../../components/SearchableSelect";
@@ -134,6 +138,8 @@ export default function EditProfileScreen({
   const { userId } = useAuth();
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const [formData, setFormData] = useState<Partial<UpdateProfileData>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -421,7 +427,7 @@ export default function EditProfileScreen({
             selectedValue={formData.country || ""}
             placeholder="Select country"
             onValueChange={(value) => handleInputChange("country", value)}
-            containerStyle={{ marginBottom: 16 }}
+            containerStyle={{ marginBottom: spacing.md }}
           />
         </View>
 
@@ -1021,7 +1027,7 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: "white",
-    fontSize: 16,
+    fontSize: Layout.typography.fontSize.base,
     fontWeight: "bold",
   },
   checkboxLabel: {

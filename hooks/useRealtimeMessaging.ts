@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState } from 'react';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from "../contexts/AuthContext";
 import realtimeMessagingService from '../services/RealtimeMessagingService';
 import { Message, MessageStatus } from '../types/message';
 import { normalizeMessage } from '../utils/messageUtils';

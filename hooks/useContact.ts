@@ -1,56 +1,58 @@
 import { useState } from 'react';
 import { useEnhancedApiClient } from '../utils/enhancedApiClient';
 import { Contact, ContactFormData, ContactFormErrors, ContactSubmissionResult } from '../types/contact';
-import { useUser } from '@clerk/clerk-expo';
+import { useAuth } from "../contexts/AuthContext";
 
 export function useContact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<ContactFormErrors>({});
   const apiClient = useEnhancedApiClient();
-  const { user } = useUser();
+  const { user } = useAuth();
 
   const validateForm = (data: ContactFormData): ContactFormErrors => {
     const newErrors: ContactFormErrors = {};
 
     // Name validation
     if (!data.name.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors.name = "Name is required";
     } else if (data.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
+      newErrors.name = "Name must be at least 2 characters";
     } else if (data.name.trim().length > 50) {
-      newErrors.name = 'Name must be less than 50 characters';
+      newErrors.name = "Name must be less than 50 characters";
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!data.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!emailRegex.test(data.email.trim())) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = "Please enter a valid email address";
     }
 
     // Subject validation
     if (!data.subject.trim()) {
-      newErrors.subject = 'Subject is required';
+      newErrors.subject = "Subject is required";
     } else if (data.subject.trim().length < 5) {
-      newErrors.subject = 'Subject must be at least 5 characters';
+      newErrors.subject = "Subject must be at least 5 characters";
     } else if (data.subject.trim().length > 100) {
-      newErrors.subject = 'Subject must be less than 100 characters';
+      newErrors.subject = "Subject must be less than 100 characters";
     }
 
     // Message validation
     if (!data.message.trim()) {
-      newErrors.message = 'Message is required';
+      newErrors.message = "Message is required";
     } else if (data.message.trim().length < 10) {
-      newErrors.message = 'Message must be at least 10 characters';
+      newErrors.message = "Message must be at least 10 characters";
     } else if (data.message.trim().length > 1000) {
-      newErrors.message = 'Message must be less than 1000 characters';
+      newErrors.message = "Message must be less than 1000 characters";
     }
 
     return newErrors;
   };
 
-  const submitContactForm = async (data: ContactFormData): Promise<ContactSubmissionResult> => {
+  const submitContactForm = async (
+    data: ContactFormData
+  ): Promise<ContactSubmissionResult> => {
     setIsSubmitting(true);
     setErrors({});
 
@@ -59,7 +61,7 @@ export function useContact() {
       const validationErrors = validateForm(data);
       if (Object.keys(validationErrors).length > 0) {
         setErrors(validationErrors);
-        return { success: false, error: 'Please fix the form errors' };
+        return { success: false, error: "Please fix the form errors" };
       }
 
       // Prepare form data
@@ -74,25 +76,29 @@ export function useContact() {
       const response = await apiClient.submitContactForm(formData);
 
       if (response.success) {
-        return { 
-          success: true, 
-          data: response.data as Contact
+        return {
+          success: true,
+          data: response.data as Contact,
         };
       } else {
-        const errorMessage = typeof response.error === 'string' ? response.error : 'Failed to submit contact form';
+        const errorMessage =
+          typeof response.error === "string"
+            ? response.error
+            : "Failed to submit contact form";
         setErrors({ general: errorMessage });
-        return { 
-          success: false, 
-          error: errorMessage 
+        return {
+          success: false,
+          error: errorMessage,
         };
       }
     } catch (error) {
-      console.error('Contact form submission error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      console.error("Contact form submission error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "An unexpected error occurred";
       setErrors({ general: errorMessage });
-      return { 
-        success: false, 
-        error: errorMessage 
+      return {
+        success: false,
+        error: errorMessage,
       };
     } finally {
       setIsSubmitting(false);
@@ -105,10 +111,10 @@ export function useContact() {
 
   const getInitialFormData = (): ContactFormData => {
     return {
-      name: user?.fullName || '',
-      email: user?.primaryEmailAddress?.emailAddress || '',
-      subject: '',
-      message: '',
+      name: user?.profile?.fullName || "",
+      email: user?.email || "",
+      subject: "",
+      message: "",
     };
   };
 

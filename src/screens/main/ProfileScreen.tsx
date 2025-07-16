@@ -10,7 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useSubscription } from "../../../hooks/useSubscription";
 import { useApiClient } from "../../../utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -1407,7 +1407,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                     <Text
                       style={[
                         styles.statNumber,
-                        { color: theme.colors.primary[500], fontSize: 18 },
+                        {
+                          color: theme.colors.primary[500],
+                          fontSize: fontSize.lg,
+                        },
                       ]}
                     >
                       {profileImages?.length || 0}
@@ -1457,7 +1460,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                       <Text
                         style={[
                           styles.statNumber,
-                          { color: theme.colors.warning[500], fontSize: 18 },
+                          {
+                            color: theme.colors.warning[500],
+                            fontSize: fontSize.lg,
+                          },
                         ]}
                       >
                         {profileViewers?.length || 0}

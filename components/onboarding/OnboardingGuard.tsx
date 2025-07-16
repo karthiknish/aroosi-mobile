@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/clerk-expo';
+import { useAuth } from "../../contexts/AuthContext";
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { LoadingState } from '../error';
 

@@ -10,7 +10,7 @@ import {
   TextInput,
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Colors, Layout } from "../../../constants";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
@@ -24,6 +24,10 @@ import { GradientButton } from "@/components/ui/GradientComponents";
 import { AnimatedButton } from "@/components/ui/AnimatedComponents";
 import * as Haptics from "expo-haptics";
 import ScreenContainer from "@components/common/ScreenContainer";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../../hooks/useResponsive";
 
 interface ChatScreenProps {
   navigation: any;
@@ -48,6 +52,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const {
     data: messages = [],
@@ -307,6 +313,190 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     );
   };
 
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: Colors.background.secondary,
+    },
+    contentStyle: {
+      flexGrow: 1,
+    },
+    keyboardAvoidingView: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      backgroundColor: Colors.background.primary,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border.primary,
+    },
+    backButton: {
+      padding: spacing.sm,
+      marginRight: spacing.sm,
+    },
+    backButtonText: {
+      fontSize: fontSize.xl,
+      color: Colors.primary[500],
+    },
+    headerInfo: {
+      flex: 1,
+    },
+    headerName: {
+      fontFamily: Layout.typography.fontFamily.serif,
+      fontSize: fontSize.lg,
+      fontWeight: "600" as any,
+      color: Colors.text.primary,
+    },
+    connectionStatus: {
+      fontSize: fontSize.xs,
+      color: Colors.success[500],
+      fontWeight: "500" as any,
+    },
+    typingStatus: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      fontStyle: "italic",
+    },
+    profileButton: {
+      padding: spacing.sm,
+      marginLeft: spacing.sm,
+    },
+    profileButtonText: {
+      fontSize: fontSize.lg,
+    },
+    messagesContainer: {
+      flex: 1,
+    },
+    messagesContent: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+    },
+    dateSeparator: {
+      alignItems: "center",
+      marginVertical: spacing.lg,
+    },
+    dateText: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      backgroundColor: Colors.background.primary,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: Layout.radius.full,
+    },
+    messageContainer: {
+      marginVertical: spacing.xs,
+    },
+    ownMessageContainer: {
+      alignItems: "flex-end",
+    },
+    otherMessageContainer: {
+      alignItems: "flex-start",
+    },
+    messageBubble: {
+      maxWidth: "80%",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: Layout.radius.lg,
+    },
+    ownMessageBubble: {
+      backgroundColor: Colors.primary[500],
+      borderBottomRightRadius: Layout.radius.xs,
+    },
+    otherMessageBubble: {
+      backgroundColor: Colors.background.primary,
+      borderBottomLeftRadius: Layout.radius.xs,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+    },
+    messageText: {
+      fontSize: fontSize.base,
+      lineHeight: fontSize.base * 1.4,
+    },
+    ownMessageText: {
+      color: Colors.text.inverse,
+    },
+    otherMessageText: {
+      color: Colors.text.primary,
+    },
+    messageFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginTop: spacing.xs,
+    },
+    messageTime: {
+      fontSize: fontSize.xs,
+    },
+    ownMessageTime: {
+      color: Colors.primary[100],
+    },
+    otherMessageTime: {
+      color: Colors.text.tertiary,
+    },
+    messageStatus: {
+      marginLeft: spacing.xs,
+    },
+    chatInputContainer: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: Colors.background.primary,
+      borderTopWidth: 1,
+      borderTopColor: Colors.border.primary,
+    },
+    chatInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: Layout.radius.lg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      fontSize: fontSize.base,
+      maxHeight: 100,
+      backgroundColor: Colors.background.secondary,
+      marginRight: spacing.sm,
+    },
+    sendButton: {
+      width: spacing.xl + spacing.sm + spacing.xs,
+      height: spacing.xl + spacing.sm + spacing.xs,
+      borderRadius: Layout.radius.full,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    sendButtonActive: {
+      backgroundColor: Colors.primary[500],
+    },
+    sendButtonInactive: {
+      backgroundColor: Colors.gray[300],
+    },
+    sendButtonText: {
+      fontSize: fontSize.lg,
+      color: Colors.text.inverse,
+      fontWeight: "bold" as any,
+    },
+    voiceRecorderContainer: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: spacing.md,
+    },
+    voiceButton: {
+      width: spacing.xl + spacing.sm + spacing.xs,
+      height: spacing.xl + spacing.sm + spacing.xs,
+      borderRadius: Layout.radius.full,
+      backgroundColor: Colors.primary[500],
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: spacing.sm,
+    },
+    voiceButtonText: {
+      fontSize: fontSize.lg,
+    },
+  });
+
   if (isLoading) {
     return (
       <ScreenContainer
@@ -457,186 +647,4 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
-  contentStyle: {
-    flexGrow: 1,
-  },
-  keyboardAvoidingView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.md,
-    backgroundColor: Colors.background.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  backButton: {
-    padding: Layout.spacing.sm,
-    marginRight: Layout.spacing.sm,
-  },
-  backButtonText: {
-    fontSize: Layout.typography.fontSize.xl,
-    color: Colors.primary[500],
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  headerName: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600" as any,
-    color: Colors.text.primary,
-  },
-  connectionStatus: {
-    fontSize: Layout.typography.fontSize.xs,
-    color: Colors.success[500],
-    fontWeight: "500" as any,
-  },
-  typingStatus: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    fontStyle: "italic",
-  },
-  profileButton: {
-    padding: Layout.spacing.sm,
-    marginLeft: Layout.spacing.sm,
-  },
-  profileButtonText: {
-    fontSize: Layout.typography.fontSize.lg,
-  },
-  messagesContainer: {
-    flex: 1,
-  },
-  messagesContent: {
-    paddingVertical: Layout.spacing.md,
-    paddingHorizontal: Layout.spacing.md,
-  },
-  dateSeparator: {
-    alignItems: "center",
-    marginVertical: Layout.spacing.lg,
-  },
-  dateText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    backgroundColor: Colors.background.primary,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.xs,
-    borderRadius: Layout.radius.full,
-  },
-  messageContainer: {
-    marginVertical: Layout.spacing.xs,
-  },
-  ownMessageContainer: {
-    alignItems: "flex-end",
-  },
-  otherMessageContainer: {
-    alignItems: "flex-start",
-  },
-  messageBubble: {
-    maxWidth: "80%",
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    borderRadius: Layout.radius.lg,
-  },
-  ownMessageBubble: {
-    backgroundColor: Colors.primary[500],
-    borderBottomRightRadius: Layout.radius.xs,
-  },
-  otherMessageBubble: {
-    backgroundColor: Colors.background.primary,
-    borderBottomLeftRadius: Layout.radius.xs,
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-  },
-  messageText: {
-    fontSize: Layout.typography.fontSize.base,
-    lineHeight: 22,
-  },
-  ownMessageText: {
-    color: Colors.text.inverse,
-  },
-  otherMessageText: {
-    color: Colors.text.primary,
-  },
-  messageFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: Layout.spacing.xs,
-  },
-  messageTime: {
-    fontSize: Layout.typography.fontSize.xs,
-  },
-  ownMessageTime: {
-    color: Colors.primary[100],
-  },
-  otherMessageTime: {
-    color: Colors.text.tertiary,
-  },
-  messageStatus: {
-    marginLeft: Layout.spacing.xs,
-  },
-  chatInputContainer: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    backgroundColor: Colors.background.primary,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
-  },
-  chatInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.lg,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    maxHeight: 100,
-    backgroundColor: Colors.background.secondary,
-    marginRight: Layout.spacing.sm,
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Layout.radius.full,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendButtonActive: {
-    backgroundColor: Colors.primary[500],
-  },
-  sendButtonInactive: {
-    backgroundColor: Colors.gray[300],
-  },
-  sendButtonText: {
-    fontSize: Layout.typography.fontSize.lg,
-    color: Colors.text.inverse,
-    fontWeight: "bold" as any,
-  },
-  voiceRecorderContainer: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: Layout.spacing.md,
-  },
-  voiceButton: {
-    width: 44,
-    height: 44,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.primary[500],
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Layout.spacing.sm,
-  },
-  voiceButtonText: {
-    fontSize: Layout.typography.fontSize.lg,
-  },
-});
+

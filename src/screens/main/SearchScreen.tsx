@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { Colors, Layout } from "../../../constants";
 import { useTheme } from "../../../contexts/ThemeContext";
 import {

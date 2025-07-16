@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { useSignUp } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
@@ -27,7 +27,7 @@ type SignUpScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { signUp, verifyOTP, isLoading: authLoading } = useAuth();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -35,15 +35,21 @@ export default function SignUpScreen() {
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   const onSignUpPress = async () => {
-    if (!isLoaded) return;
-
-    if (!emailAddress || !password || !confirmPassword) {
+    if (
+      !emailAddress ||
+      !password ||
+      !confirmPassword ||
+      !firstName ||
+      !lastName
+    ) {
       Alert.alert("Error", "Please fill in all fields");
       return;
     }
@@ -68,40 +74,42 @@ export default function SignUpScreen() {
 
     setLoading(true);
     try {
-      await signUp.create({
-        emailAddress,
-        password,
-      });
+      const result = await signUp(emailAddress, password, firstName, lastName);
 
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      setPendingVerification(true);
+      if (result.success) {
+        setPendingVerification(true);
+        Alert.alert("Success", "Please check your email for verification code");
+      } else {
+        Alert.alert("Sign Up Failed", result.error || "An error occurred");
+      }
     } catch (err: any) {
       console.error("Sign up error:", err);
-      Alert.alert(
-        "Sign Up Failed",
-        err.errors?.[0]?.message || "An error occurred"
-      );
+      Alert.alert("Sign Up Failed", "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
   };
 
   const onPressVerify = async () => {
-    if (!isLoaded) return;
+    if (!code) {
+      Alert.alert("Error", "Please enter the verification code");
+      return;
+    }
 
     setLoading(true);
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
+      const result = await verifyOTP(emailAddress, code);
 
-      await setActive({ session: completeSignUp.createdSessionId });
+      if (!result.success) {
+        Alert.alert(
+          "Verification Failed",
+          result.error || "Invalid verification code"
+        );
+      }
+      // Navigation will be handled by the auth context
     } catch (err: any) {
       console.error("Verification error:", err);
-      Alert.alert(
-        "Verification Failed",
-        err.errors?.[0]?.message || "Invalid verification code"
-      );
+      Alert.alert("Verification Failed", "An unexpected error occurred");
     } finally {
       setLoading(false);
     }
@@ -246,6 +254,32 @@ export default function SignUpScreen() {
               </View>
 
               <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>First Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your first name"
+                    placeholderTextColor={Colors.text.secondary}
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    autoCapitalize="words"
+                    editable={!loading}
+                  />
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Last Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your last name"
+                    placeholderTextColor={Colors.text.secondary}
+                    value={lastName}
+                    onChangeText={setLastName}
+                    autoCapitalize="words"
+                    editable={!loading}
+                  />
+                </View>
+
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Email</Text>
                   <TextInput

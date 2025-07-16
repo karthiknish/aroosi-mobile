@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth } from "../contexts/AuthContext";
 import { useApiClient } from "../utils/api";
 import { Interest } from "../types/interest";
 
@@ -32,7 +32,7 @@ export interface UseInterestsResult {
 }
 
 export function useInterests(): UseInterestsResult {
-  const { user } = useUser();
+  const { user } = useAuth();
   const apiClient = useApiClient();
 
   const [sentInterests, setSentInterests] = useState<Interest[]>([]);
@@ -125,11 +125,13 @@ export function useInterests(): UseInterestsResult {
 
       try {
         setResponding(true);
-        
+
         // In the main project, there's no manual response - it's auto-matching
         // When both users send interests to each other, they automatically match
-        console.warn("Auto-matching system: Interests automatically match when both users express interest");
-        
+        console.warn(
+          "Auto-matching system: Interests automatically match when both users express interest"
+        );
+
         // For UI consistency, we can simulate the response locally
         // but the actual matching happens automatically on the backend
         setReceivedInterests((prev) =>
@@ -226,7 +228,7 @@ export function useInterests(): UseInterestsResult {
 
 // Hook for checking interest status between two users
 export function useInterestStatus(otherUserId?: string) {
-  const { user } = useUser();
+  const { user } = useAuth();
   const apiClient = useApiClient();
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

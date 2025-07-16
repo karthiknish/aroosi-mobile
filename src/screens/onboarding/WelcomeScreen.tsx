@@ -83,7 +83,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     },
     header: {
       alignItems: "center",
-      paddingTop: height > 700 ? spacing.xl * 2 : spacing.lg,
+      paddingTop: spacing.lg,
       paddingBottom: spacing.lg,
     },
     logoContainer: {
@@ -110,6 +110,14 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
       color: Colors.text.secondary,
       textAlign: "center",
       lineHeight: spacing.xl,
+    },
+    connectText: {
+      fontFamily: Layout.typography.fontFamily.sansBold,
+      fontSize: fontSize.lg,
+      color: Colors.text.primary,
+      textAlign: "center",
+      fontWeight: "700",
+      marginTop: spacing.md,
     },
     featuresContainer: {
       paddingVertical: height > 700 ? spacing.xl : spacing.lg,
@@ -223,6 +231,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
             ? "Let's finish setting up your profile"
             : "Find your perfect match in our trusted community"}
         </Text>
+        <Text style={styles.connectText}>Connect with Afghans worldwide</Text>
       </View>
 
       {/* Features */}

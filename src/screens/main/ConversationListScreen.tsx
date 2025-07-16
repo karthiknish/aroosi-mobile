@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
 import { Colors, Layout } from "../../../constants";

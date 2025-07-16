@@ -3,6 +3,7 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import React from "react";
 
 export interface NotificationData {
   type: "message" | "match" | "interest" | "system" | "subscription";
@@ -44,6 +45,94 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
     end: "08:00",
   },
 };
+
+export class NotificationHandler {
+  private static navigationRef: any = null;
+  private static isInitialized = false;
+
+  public static initialize(): void {
+    if (this.isInitialized) return;
+
+    try {
+      // Configure notification behavior
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+        }),
+      });
+
+      this.isInitialized = true;
+      console.log("NotificationHandler initialized");
+    } catch (error) {
+      console.error("Failed to initialize NotificationHandler:", error);
+    }
+  }
+
+  public static setNavigationRef(ref: any): void {
+    this.navigationRef = ref;
+  }
+
+  public static handleDeepLink(data: NotificationData): void {
+    if (!this.navigationRef) {
+      console.warn("Navigation ref not set for deep linking");
+      return;
+    }
+
+    switch (data.type) {
+      case "message":
+        this.navigateToChat(data.conversationId, data.data);
+        break;
+      case "match":
+        this.navigateToMatch(data.matchId, data.data);
+        break;
+      case "interest":
+        this.navigateToProfile(data.profileId, data.data);
+        break;
+      case "system":
+        this.navigateToSystem(data.data);
+        break;
+      default:
+        this.navigateToHome();
+    }
+  }
+
+  private static navigateToChat(conversationId?: string, data?: any): void {
+    if (conversationId) {
+      this.navigationRef.navigate("Chat", {
+        conversationId,
+        ...data,
+      });
+    }
+  }
+
+  private static navigateToMatch(matchId?: string, data?: any): void {
+    if (matchId) {
+      this.navigationRef.navigate("Matches", {
+        matchId,
+        ...data,
+      });
+    }
+  }
+
+  private static navigateToProfile(profileId?: string, data?: any): void {
+    if (profileId) {
+      this.navigationRef.navigate("ProfileDetail", {
+        profileId,
+        ...data,
+      });
+    }
+  }
+
+  private static navigateToSystem(data?: any): void {
+    this.navigationRef.navigate("Settings", data);
+  }
+
+  private static navigateToHome(): void {
+    this.navigationRef.navigate("Main");
+  }
+}
 
 export class NotificationManager {
   private static instance: NotificationManager;
@@ -267,35 +356,7 @@ export class NotificationManager {
     const data = response.notification.request.content.data as NotificationData;
 
     // Navigate based on notification type
-    this.navigateFromNotification(data);
-  }
-
-  private navigateFromNotification(data: NotificationData): void {
-    // This would integrate with your navigation system
-    switch (data.type) {
-      case "message":
-        if (data.conversationId) {
-          // Navigate to chat screen
-          console.log("Navigate to chat:", data.conversationId);
-        }
-        break;
-      case "match":
-        if (data.matchId) {
-          // Navigate to match screen
-          console.log("Navigate to match:", data.matchId);
-        }
-        break;
-      case "interest":
-        if (data.profileId) {
-          // Navigate to profile
-          console.log("Navigate to profile:", data.profileId);
-        }
-        break;
-      case "system":
-        // Navigate to appropriate system screen
-        console.log("Navigate to system screen");
-        break;
-    }
+    NotificationHandler.handleDeepLink(data);
   }
 
   private async shouldShowNotification(
@@ -374,46 +435,6 @@ export class NotificationManager {
   }
 }
 
-// OneSignal integration (if using OneSignal instead of Expo notifications)
-export class OneSignalManager {
-  private static instance: OneSignalManager;
-  private appId: string;
-  private userId: string | null = null;
-
-  private constructor(appId: string) {
-    this.appId = appId;
-  }
-
-  public static getInstance(appId: string): OneSignalManager {
-    if (!OneSignalManager.instance) {
-      OneSignalManager.instance = new OneSignalManager(appId);
-    }
-    return OneSignalManager.instance;
-  }
-
-  public async initialize(): Promise<void> {
-    // OneSignal initialization would go here
-    // This is a placeholder for OneSignal SDK integration
-    console.log("OneSignal initialized with app ID:", this.appId);
-  }
-
-  public async setUserId(userId: string): Promise<void> {
-    this.userId = userId;
-    // Set external user ID in OneSignal
-    console.log("OneSignal user ID set:", userId);
-  }
-
-  public async sendTag(key: string, value: string): Promise<void> {
-    // Send tag to OneSignal for user segmentation
-    console.log("OneSignal tag sent:", key, value);
-  }
-
-  public async sendTags(tags: Record<string, string>): Promise<void> {
-    // Send multiple tags to OneSignal
-    console.log("OneSignal tags sent:", tags);
-  }
-}
-
 // React hooks for notifications
 export function useNotifications() {
   const [token, setToken] = React.useState<string | null>(null);
@@ -460,82 +481,4 @@ export function useNotifications() {
     setBadgeCount: manager.setBadgeCount.bind(manager),
     getBadgeCount: manager.getBadgeCount.bind(manager),
   };
-}
-
-// Deep linking utilities for notifications
-export class NotificationDeepLinking {
-  private static instance: NotificationDeepLinking;
-  private navigationRef: any = null;
-
-  private constructor() {}
-
-  public static getInstance(): NotificationDeepLinking {
-    if (!NotificationDeepLinking.instance) {
-      NotificationDeepLinking.instance = new NotificationDeepLinking();
-    }
-    return NotificationDeepLinking.instance;
-  }
-
-  public setNavigationRef(ref: any): void {
-    this.navigationRef = ref;
-  }
-
-  public handleDeepLink(data: NotificationData): void {
-    if (!this.navigationRef) {
-      console.warn("Navigation ref not set for deep linking");
-      return;
-    }
-
-    switch (data.type) {
-      case "message":
-        this.navigateToChat(data.conversationId, data.data);
-        break;
-      case "match":
-        this.navigateToMatch(data.matchId, data.data);
-        break;
-      case "interest":
-        this.navigateToProfile(data.profileId, data.data);
-        break;
-      case "system":
-        this.navigateToSystem(data.data);
-        break;
-      default:
-        this.navigateToHome();
-    }
-  }
-
-  private navigateToChat(conversationId?: string, data?: any): void {
-    if (conversationId) {
-      this.navigationRef.navigate("Chat", {
-        conversationId,
-        ...data,
-      });
-    }
-  }
-
-  private navigateToMatch(matchId?: string, data?: any): void {
-    if (matchId) {
-      this.navigationRef.navigate("Matches", {
-        matchId,
-        ...data,
-      });
-    }
-  }
-
-  private navigateToProfile(profileId?: string, data?: any): void {
-    if (profileId) {
-      this.navigationRef.navigate("ProfileDetail", {
-        profileId,
-        ...data,
-      });
-    }
-  }
-
-  private navigateToSystem(data?: any): void {
-    this.navigationRef.navigate("Settings", data);
-  }
-
-  private navigateToHome(): void {
-    this.navigationRef.navigate("Main");
-  }
 }

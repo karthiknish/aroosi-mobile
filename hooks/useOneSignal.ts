@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 // import { OneSignal } from "react-native-onesignal"; // Temporarily disabled due to syntax error
-import { useAuth } from "@clerk/clerk-expo";
+import { useAuth } from "../contexts/AuthContext";
 import { useApiClient } from "../utils/api";
 import {
   PushRegistration,

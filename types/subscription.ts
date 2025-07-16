@@ -188,3 +188,16 @@ export interface PlanFeature {
   premium: boolean;
   premiumPlus: boolean;
 }
+
+// Cache entry interface for subscription caching
+export interface CacheEntry {
+  data: any;
+  expires: number;
+}
+
+// Validation result interface
+export interface ValidationResult {
+  valid: boolean;
+  subscription?: any;
+  error?: any;
+}

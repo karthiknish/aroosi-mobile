@@ -9,7 +9,7 @@ jest.mock("expo-secure-store");
 
 describe("API Client Integration Tests", () => {
   let apiClient: ApiClient;
-  const mockToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
+  const mockToken = "mock.jwt.token.for.testing";
 
   beforeEach(() => {
     jest.clearAllMocks();

@@ -1,9 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "@clerk/clerk-expo";
+import { useCallback } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../utils/api";
 import { errorHandler, withErrorHandlingAsync } from "../utils/errorHandling";
 import { AppError } from "../utils/errorHandling";
+import { SubscriptionErrorHandler } from "../utils/subscriptionErrorHandler";
+import {
+  CACHE_TTL,
+  OfflineSubscriptionManager,
+} from "../utils/subscriptionCache";
 import {
   UserSubscription,
   FeatureUsage,
@@ -12,10 +17,9 @@ import {
   SubscriptionFeatures,
   FeatureAvailabilityResult,
 } from "../types/subscription";
-import { FEATURE_LIMITS_BY_TIER } from "../utils/inAppPurchases";
+
 import { Platform } from "react-native";
 import { SUBSCRIPTION_PLANS } from "../utils/inAppPurchases";
-import { ApiResponse } from "../types";
 
 export interface UseSubscriptionResult extends SubscriptionInfo {
   // Loading states
@@ -43,7 +47,7 @@ export function useSubscription(): UseSubscriptionResult {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 
-  // Get subscription status using React Query - aligned with main project
+  // Get subscription status using React Query with caching - aligned with main project
   const {
     data: subscriptionData,
     isLoading: subscriptionLoading,
@@ -51,16 +55,28 @@ export function useSubscription(): UseSubscriptionResult {
   } = useQuery<UserSubscription | null>({
     queryKey: ["subscription", userId],
     queryFn: async (): Promise<UserSubscription | null> => {
-      const result = await apiClient.getSubscriptionStatus();
-      if (result && result.success && result.data) {
-        return result.data as UserSubscription;
-      }
-      return null;
+      if (!userId) return null;
+
+      // Use offline subscription manager for caching and offline support
+      return await OfflineSubscriptionManager.getSubscriptionStatus(
+        userId,
+        async () => {
+          const result = await apiClient.getSubscriptionStatus();
+          if (result && result.success && result.data) {
+            return { success: true, data: result.data };
+          }
+          throw new Error(
+            result?.error?.message || "Failed to fetch subscription status"
+          );
+        }
+      );
     },
     enabled: !!userId,
+    staleTime: CACHE_TTL.SUBSCRIPTION_STATUS,
+    gcTime: CACHE_TTL.SUBSCRIPTION_STATUS * 2,
   });
 
-  // Get usage stats using React Query
+  // Get usage stats using React Query with caching
   const {
     data: usageData,
     isLoading: usageLoading,
@@ -68,29 +84,52 @@ export function useSubscription(): UseSubscriptionResult {
   } = useQuery<FeatureUsage | null>({
     queryKey: ["usage", userId],
     queryFn: async (): Promise<FeatureUsage | null> => {
-      const result = (await apiClient.getUsageStats()) as ApiResponse<any>;
-      if (result && result.success && result.data) {
-        return result.data as FeatureUsage;
-      }
-      return null;
+      if (!userId) return null;
+
+      return await OfflineSubscriptionManager.getUsageStats(
+        userId,
+        async () => {
+          const result = await apiClient.getUsageStats();
+          if (result && result.success && result.data) {
+            return { success: true, data: result.data };
+          }
+          throw new Error(
+            result?.error?.message || "Failed to fetch usage stats"
+          );
+        }
+      );
     },
     enabled: !!userId,
+    staleTime: CACHE_TTL.USAGE_STATS,
+    gcTime: CACHE_TTL.USAGE_STATS * 2,
   });
 
-  // Get subscription features using React Query
-  const {
-    data: featuresData,
-    isLoading: featuresLoading,
-  } = useQuery({
+  // Get subscription features using React Query with caching
+  const { data: featuresData, isLoading: featuresLoading } = useQuery({
     queryKey: ["subscriptionFeatures", userId],
-    queryFn: async (): Promise<{ plan: SubscriptionPlan; features: SubscriptionFeatures; isActive: boolean } | null> => {
-      const result = await apiClient.getSubscriptionFeatures();
-      if (result && result.success && result.data) {
-        return result.data as { plan: SubscriptionPlan; features: SubscriptionFeatures; isActive: boolean };
-      }
-      return null;
+    queryFn: async (): Promise<{
+      plan: SubscriptionPlan;
+      features: SubscriptionFeatures;
+      isActive: boolean;
+    } | null> => {
+      if (!userId) return null;
+
+      return await OfflineSubscriptionManager.getFeatureAccess(
+        userId,
+        async () => {
+          const result = await apiClient.getSubscriptionFeatures();
+          if (result && result.success && result.data) {
+            return { success: true, data: result.data };
+          }
+          throw new Error(
+            result?.error?.message || "Failed to fetch subscription features"
+          );
+        }
+      );
     },
     enabled: !!userId,
+    staleTime: CACHE_TTL.FEATURE_ACCESS,
+    gcTime: CACHE_TTL.FEATURE_ACCESS * 2,
   });
 
   const loading = subscriptionLoading || usageLoading || featuresLoading;
@@ -113,11 +152,6 @@ export function useSubscription(): UseSubscriptionResult {
   // Check if subscription is active - aligned with main project
   const hasActiveSubscription = useCallback((): boolean => {
     return subscription?.isActive || false;
-  }, [subscription]);
-
-  // Get current subscription plan
-  const getCurrentPlan = useCallback(() => {
-    return subscription?.plan || "free";
   }, [subscription]);
 
   // Check if trial is active (not used in main project, but kept for compatibility)
@@ -179,7 +213,7 @@ export function useSubscription(): UseSubscriptionResult {
     (feature: string): number => {
       if (!usage || !usage.features) return 0;
 
-      const featureUsage = usage.features.find(f => f.name === feature);
+      const featureUsage = usage.features.find((f) => f.name === feature);
       if (!featureUsage) return 0;
 
       return featureUsage.remaining;
@@ -200,7 +234,7 @@ export function useSubscription(): UseSubscriptionResult {
     (feature: string): number => {
       if (!usage || !usage.features) return 0;
 
-      const featureUsage = usage.features.find(f => f.name === feature);
+      const featureUsage = usage.features.find((f) => f.name === feature);
       if (!featureUsage) return 0;
 
       return featureUsage.percentageUsed;
@@ -210,8 +244,7 @@ export function useSubscription(): UseSubscriptionResult {
 
   // Mutations using React Query - aligned with main project
   const trackFeatureUsageMutation = useMutation({
-    mutationFn: (feature: string) =>
-      apiClient.trackFeatureUsage(feature),
+    mutationFn: (feature: string) => apiClient.trackFeatureUsage(feature),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["usage", userId] });
     },
@@ -258,7 +291,7 @@ export function useSubscription(): UseSubscriptionResult {
 
   // Callback functions for the mutations
   const trackFeatureUsage = useCallback(
-    async (feature: keyof FeatureUsage, increment = 1): Promise<void> => {
+    async (feature: string, increment = 1): Promise<void> => {
       if (!userId) return;
 
       return withErrorHandlingAsync(
@@ -279,70 +312,120 @@ export function useSubscription(): UseSubscriptionResult {
   const purchaseSubscription = useCallback(
     async (planId: string): Promise<boolean> => {
       if (!userId) return false;
-      // Determine platform and productId
-      const platform = Platform.OS === "ios" ? "ios" : "android";
-      let productId = "";
-      // Find the correct productId for the plan and platform
-      if (platform === "ios") {
-        productId =
-          SUBSCRIPTION_PLANS.find((p) => p.tier === planId)?.appleProductId ||
-          "";
-      } else {
-        productId =
-          SUBSCRIPTION_PLANS.find((p) => p.tier === planId)?.googleProductId ||
-          "";
-      }
-      // Call the in-app purchase manager and get purchaseToken/receiptData
-      const { inAppPurchaseManager } = await import("../utils/inAppPurchases");
-      const purchaseResult = await inAppPurchaseManager.purchaseProduct(
-        productId
-      );
-      if (!purchaseResult.success) {
-        const appError = new AppError(
-          purchaseResult.error || "Purchase failed",
-          "purchase",
-          {
-            component: "useSubscription",
-            action: "purchaseSubscription",
-            userId,
-          },
-          true
+
+      try {
+        // Determine platform and productId
+        const platform = Platform.OS === "ios" ? "ios" : "android";
+        let productId = "";
+
+        // Find the correct productId for the plan and platform
+        const plan = SUBSCRIPTION_PLANS.find((p) => p.tier === planId);
+        if (!plan) {
+          console.error("Plan not found:", planId);
+          return false;
+        }
+
+        if (platform === "ios") {
+          productId = plan.appleProductId || "";
+        } else {
+          productId = plan.googleProductId || "";
+        }
+
+        if (!productId) {
+          console.error("Product ID not found for platform:", platform, planId);
+          return false;
+        }
+
+        console.log("Purchasing subscription:", {
+          planId,
+          platform,
+          productId,
+        });
+
+        // Initialize in-app purchase manager if needed
+        const { inAppPurchaseManager } = await import(
+          "../utils/inAppPurchases"
         );
+        const isInitialized = await inAppPurchaseManager.initialize();
+
+        if (!isInitialized) {
+          console.error("Failed to initialize in-app purchases");
+          return false;
+        }
+
+        // Attempt the purchase
+        const purchaseResult = await inAppPurchaseManager.purchaseProduct(
+          productId
+        );
+
+        if (!purchaseResult.success) {
+          if (purchaseResult.cancelled) {
+            console.log("Purchase was cancelled by user");
+            return false;
+          }
+
+          // Use subscription-specific error handling
+          const subscriptionError = SubscriptionErrorHandler.handle(
+            purchaseResult.error || "Purchase failed",
+            "purchase"
+          );
+
+          const userMessage =
+            SubscriptionErrorHandler.getUserFriendlyMessage(subscriptionError);
+          const appError = new AppError(
+            userMessage,
+            "purchase",
+            {
+              component: "useSubscription",
+              action: "purchaseSubscription",
+              userId,
+            },
+            true
+          );
+          errorHandler.showError(appError);
+          return false;
+        }
+
+        // Extract purchase data
+        const purchaseToken = purchaseResult.purchaseToken || "";
+        const receiptData = purchaseResult.receiptData;
+
+        console.log("Purchase successful, validating with server...");
+
+        // Validate with server
+        return new Promise<boolean>((resolve) => {
+          purchaseSubscriptionMutation.mutate(
+            { platform, productId, purchaseToken, receiptData },
+            {
+              onSuccess: (success) => {
+                console.log("Server validation result:", success);
+                resolve(success);
+              },
+              onError: (error) => {
+                console.error("Server validation failed:", error);
+                const appError = errorHandler.handle(error, {
+                  component: "useSubscription",
+                  action: "purchaseSubscription",
+                  userId,
+                  metadata: { planId, platform, productId },
+                });
+                errorHandler.showError(appError);
+                resolve(false);
+              },
+            }
+          );
+        });
+      } catch (error) {
+        console.error("Error in purchaseSubscription:", error);
+        const appError = errorHandler.handle(error, {
+          component: "useSubscription",
+          action: "purchaseSubscription",
+          userId,
+          metadata: { planId },
+        });
         errorHandler.showError(appError);
         return false;
       }
-      const purchaseToken = purchaseResult.purchaseToken;
-      const receiptData = purchaseResult.receiptData;
-      return (
-        withErrorHandlingAsync(
-          async () => {
-            return new Promise<boolean>((resolve) => {
-              purchaseSubscriptionMutation.mutate(
-                { platform, productId, purchaseToken, receiptData },
-                {
-                  onSuccess: (success) => resolve(success),
-                  onError: (error) => {
-                    const appError = errorHandler.handle(error, {
-                      component: "useSubscription",
-                      action: "purchaseSubscription",
-                      userId,
-                      metadata: { planId, platform, productId },
-                    });
-                    errorHandler.showError(appError);
-                    resolve(false);
-                  },
-                }
-              );
-            });
-          },
-          {
-            component: "useSubscription",
-            action: "purchaseSubscription",
-            userId,
-            metadata: { planId, platform, productId },
-          }
-        ) ?? false
-      );
     },
     [userId, purchaseSubscriptionMutation]
   );
@@ -370,9 +453,7 @@ export function useSubscription(): UseSubscriptionResult {
   const updatePaymentMethod = useCallback(async (): Promise<boolean> => {
     if (!subscription) return false;
     try {
-      const response = await apiClient.updateSubscriptionTier(
-        subscription.tier
-      );
+      const response = await apiClient.updateSubscriptionTier();
       if (response.success) {
         await refreshSubscription();
         return true;
@@ -400,7 +481,10 @@ export function useSubscription(): UseSubscriptionResult {
         } else {
           return {
             canUse: false,
-            reason: typeof response.error === 'string' ? response.error : "Feature check failed",
+            reason:
+              typeof response.error === "string"
+                ? response.error
+                : "Feature check failed",
           };
         }
       } catch (error) {

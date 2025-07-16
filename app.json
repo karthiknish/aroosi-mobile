@@ -18,22 +18,15 @@
       "relationships"
     ],
     "privacy": "public",
-    "platforms": [
-      "ios",
-      "android"
-    ],
+    "platforms": ["ios", "android"],
     "primaryColor": "#BFA67A",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#BFA67A"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "fonts": [
-      "./assets/fonts/Boldonse-Regular.ttf"
-    ],
+    "assetBundlePatterns": ["**/*"],
+    "fonts": ["./assets/fonts/Boldonse-Regular.ttf"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aroosi.mobile",
@@ -54,43 +47,35 @@
         "NSPhotoLibraryAddUsageDescription": "Aroosi can save photos shared by your matches to your photo library.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": true,
-        "CFBundleLocalizations": [
-          "en",
-          "fa",
-          "ps"
-        ],
-        "UIBackgroundModes": [
-          "background-fetch",
-          "remote-notification"
-        ],
+        "CFBundleLocalizations": ["en", "fa", "ps"],
+        "UIBackgroundModes": ["background-fetch", "remote-notification"],
         "UIViewControllerBasedStatusBarAppearance": true,
-        "UISupportedInterfaceOrientations": [
-          "UIInterfaceOrientationPortrait"
-        ],
+        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
         ],
-        "UIRequiredDeviceCapabilities": [
-          "armv7"
-        ],
+        "UIRequiredDeviceCapabilities": ["armv7"],
         "UIFileSharingEnabled": false,
         "UISupportsDocumentBrowser": false,
-        "LSRequiresIPhoneOS": true
+        "LSRequiresIPhoneOS": true,
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"
+          }
+        ]
       },
       "config": {
         "usesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.networking.wifi-info": true,
-        "com.apple.developer.kernel.increased-memory-limit": true
+        "com.apple.developer.kernel.increased-memory-limit": true,
+        "com.apple.developer.in-app-purchase": true
       },
-      "associatedDomains": [
-        "applinks:aroosi.app",
-        "applinks:www.aroosi.app"
-      ],
+      "associatedDomains": ["applinks:aroosi.app", "applinks:www.aroosi.app"],
       "scheme": "aroosi"
     },
     "android": {
@@ -128,7 +113,8 @@
         "POST_NOTIFICATIONS",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
-        "READ_CONTACTS"
+        "READ_CONTACTS",
+        "com.android.vending.BILLING"
       ],
       "blockedPermissions": [
         "ACCESS_BACKGROUND_LOCATION",
@@ -149,10 +135,7 @@
               "host": "www.aroosi.app"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         }
       ],
       "scheme": "aroosi",
@@ -181,9 +164,7 @@
           "icon": "./assets/notification-icon.png",
           "color": "#EC4899",
           "defaultChannel": "default",
-          "sounds": [
-            "notification.wav"
-          ]
+          "sounds": ["notification.wav"]
         }
       ],
       "expo-font",

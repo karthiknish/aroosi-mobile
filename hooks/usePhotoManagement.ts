@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import { useEnhancedApiClient } from "../utils/enhancedApiClient";
 import { photoService, PhotoUploadResult } from "../services/PhotoService";
 import { ProfileImage } from "../types/image";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface UsePhotoManagementResult {
   // Data
@@ -35,7 +35,7 @@ const MAX_PHOTOS = 5;
 
 export function usePhotoManagement(): UsePhotoManagementResult {
   const apiClient = useEnhancedApiClient();
-  const { user } = useUser();
+  const { user } = useAuth();
   const [images, setImages] = useState<ProfileImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -261,7 +261,9 @@ export function usePhotoManagement(): UsePhotoManagementResult {
                     userId: user?.id || "",
                   }));
 
-                  const response = await apiClient.batchProfileImageOperations(operations);
+                  const response = await apiClient.batchProfileImageOperations(
+                    operations
+                  );
 
                   if (response.success) {
                     // Remove from local state
@@ -303,8 +305,9 @@ export function usePhotoManagement(): UsePhotoManagementResult {
         // Check file size and dimensions
         const response = await fetch(imageUri);
         const blob = await response.blob();
-        
-        if (blob.size > 5 * 1024 * 1024) { // 5MB limit
+
+        if (blob.size > 5 * 1024 * 1024) {
+          // 5MB limit
           Alert.alert(
             "File Too Large",
             "Please select an image smaller than 5MB."

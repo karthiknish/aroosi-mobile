@@ -9,6 +9,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../../constants/Colors";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "../../hooks/useResponsive";
 
 interface Option {
   value: string;
@@ -38,6 +42,8 @@ export function FormSelect({
   containerStyle,
   disabled = false,
 }: FormSelectProps) {
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const [isVisible, setIsVisible] = useState(false);
 
   const selectedOption = options.find((option) => option.value === value);
@@ -46,6 +52,107 @@ export function FormSelect({
     onSelect(selectedValue);
     setIsVisible(false);
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
+    label: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      color: Colors.gray[900],
+      marginBottom: spacing.sm,
+      fontFamily: "NunitoSans-SemiBold",
+    },
+    required: {
+      color: Colors.error[500],
+    },
+    selector: {
+      borderWidth: 1,
+      borderColor: Colors.gray[300],
+      borderRadius: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + spacing.xs,
+      backgroundColor: Colors.background.primary,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    selectorError: {
+      borderColor: Colors.error[500],
+      backgroundColor: Colors.error[50],
+    },
+    selectorDisabled: {
+      backgroundColor: Colors.gray[100],
+      borderColor: Colors.gray[200],
+    },
+    selectorText: {
+      fontSize: fontSize.base,
+      color: Colors.gray[900],
+      fontFamily: "NunitoSans-Regular",
+    },
+    placeholder: {
+      color: Colors.gray[400],
+    },
+    disabledText: {
+      color: Colors.gray[400],
+    },
+    error: {
+      fontSize: fontSize.sm,
+      color: Colors.error[500],
+      marginTop: spacing.xs,
+      fontFamily: "NunitoSans-Regular",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      backgroundColor: Colors.background.primary,
+      borderTopLeftRadius: spacing.lg - spacing.xs,
+      borderTopRightRadius: spacing.lg - spacing.xs,
+      maxHeight: "70%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: spacing.lg - spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.gray[200],
+    },
+    modalTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+      color: Colors.gray[900],
+      fontFamily: "NunitoSans-SemiBold",
+    },
+    closeButton: {
+      padding: spacing.xs,
+    },
+    option: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg - spacing.xs,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.gray[100],
+    },
+    selectedOption: {
+      backgroundColor: Colors.primary[50],
+    },
+    optionText: {
+      fontSize: fontSize.base,
+      color: Colors.gray[900],
+      fontFamily: "NunitoSans-Regular",
+    },
+    selectedOptionText: {
+      color: Colors.primary[500],
+      fontWeight: "600",
+    },
+  });
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -135,103 +242,4 @@ export function FormSelect({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.gray[900],
-    marginBottom: 8,
-    fontFamily: "NunitoSans-SemiBold",
-  },
-  required: {
-    color: Colors.red[500],
-  },
-  selector: {
-    borderWidth: 1,
-    borderColor: Colors.gray[300],
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  selectorError: {
-    borderColor: Colors.red[500],
-    backgroundColor: Colors.red[50],
-  },
-  selectorDisabled: {
-    backgroundColor: Colors.gray[100],
-    borderColor: Colors.gray[200],
-  },
-  selectorText: {
-    fontSize: 16,
-    color: Colors.gray[900],
-    fontFamily: "NunitoSans-Regular",
-  },
-  placeholder: {
-    color: Colors.gray[400],
-  },
-  disabledText: {
-    color: Colors.gray[400],
-  },
-  error: {
-    fontSize: 14,
-    color: Colors.red[500],
-    marginTop: 4,
-    fontFamily: "NunitoSans-Regular",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "70%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.gray[900],
-    fontFamily: "NunitoSans-SemiBold",
-  },
-  closeButton: {
-    padding: 4,
-  },
-  option: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[100],
-  },
-  selectedOption: {
-    backgroundColor: Colors.primary[50],
-  },
-  optionText: {
-    fontSize: 16,
-    color: Colors.gray[900],
-    fontFamily: "NunitoSans-Regular",
-  },
-  selectedOptionText: {
-    color: Colors.primary[500],
-    fontWeight: "600",
-  },
-});
+
