@@ -1,631 +1,770 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { apiClient } from "./api";
-import { logger } from "./logger";
+import { ApiClient } from "./api";
 
 export interface MigrationResult {
   success: boolean;
-  version: string;
-  migratedData?: string[];
-  errors?: string[];
-  rollbackAvailable?: boolean;
+  migratedItems: number;
+  errors: string[];
+  backupCreated: boolean;
 }
 
-export interface UserMigrationData {
-  userId: string;
-  email: string;
-  profile?: any;
-  preferences?: any;
-  cachedData?: any;
+export interface MigrationStep {
+  id: string;
+  name: string;
+  description: string;
+  execute: () => Promise<boolean>;
+  rollback?: () => Promise<boolean>;
 }
-
-const CURRENT_VERSION = "2.0.0";
-const VERSION_KEY = "app_version";
-const MIGRATION_BACKUP_KEY = "migration_backup";
 
 export class MigrationManager {
-  private static instance: MigrationManager;
+  private apiClient: ApiClient;
+  private migrationSteps: MigrationStep[] = [];
 
-  private constructor() {}
-
-  public static getInstance(): MigrationManager {
-    if (!MigrationManager.instance) {
-      MigrationManager.instance = new MigrationManager();
-    }
-    return MigrationManager.instance;
+  constructor() {
+    this.apiClient = new ApiClient();
+    this.initializeMigrationSteps();
   }
 
-  public async checkMigrationNeeded(): Promise<boolean> {
-    try {
-      const storedVersion = await AsyncStorage.getItem(VERSION_KEY);
+  private initializeMigrationSteps(): void {
+    this.migrationSteps = [
+      {
+        id: "auth_system_migration",
+        name: "Authentication System Migration",
+        description: "Migrate from Clerk to custom JWT authentication",
+        execute: this.migrateAuthSystem.bind(this),
+        rollback: this.rollbackAuthSystem.bind(this),
+      },
+      {
+        id: "api_endpoints_migration",
+        name: "API Endpoints Migration",
+        description: "Update API endpoints to match web application",
+        execute: this.migrateApiEndpoints.bind(this),
+        rollback: this.rollbackApiEndpoints.bind(this),
+      },
+      {
+        id: "data_model_migration",
+        name: "Data Model Migration",
+        description: "Update data models to match web application schema",
+        execute: this.migrateDataModels.bind(this),
+        rollback: this.rollbackDataModels.bind(this),
+      },
+      {
+        id: "storage_migration",
+        name: "Storage Migration",
+        description: "Migrate storage keys and encryption",
+        execute: this.migrateStorage.bind(this),
+        rollback: this.rollbackStorage.bind(this),
+      },
+      {
+        id: "feature_flags_migration",
+        name: "Feature Flags Migration",
+        description: "Set up feature flags for gradual rollout",
+        execute: this.migrateFeatureFlags.bind(this),
+        rollback: this.rollbackFeatureFlags.bind(this),
+      },
+    ];
+  }
 
-      if (!storedVersion) {
-        // First time installation
-        await AsyncStorage.setItem(VERSION_KEY, CURRENT_VERSION);
-        return false;
+  async runMigration(): Promise<MigrationResult> {
+    const result: MigrationResult = {
+      success: true,
+      migratedItems: 0,
+      errors: [],
+      backupCreated: false,
+    };
+
+    try {
+      // Create backup before migration
+      result.backupCreated = await this.createBackup();
+
+      // Execute migration steps
+      for (const step of this.migrationSteps) {
+        try {
+          console.log(`Executing migration step: ${step.name}`);
+          const stepSuccess = await step.execute();
+
+          if (stepSuccess) {
+            result.migratedItems++;
+            await this.recordMigrationStep(step.id, "completed");
+          } else {
+            throw new Error(`Migration step ${step.name} failed`);
+          }
+        } catch (error) {
+          const errorMessage = `Failed to execute ${step.name}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          result.errors.push(errorMessage);
+          result.success = false;
+
+          // Attempt rollback
+          if (step.rollback) {
+            try {
+              await step.rollback();
+              await this.recordMigrationStep(step.id, "rolled_back");
+            } catch (rollbackError) {
+              result.errors.push(
+                `Rollback failed for ${step.name}: ${
+                  rollbackError instanceof Error
+                    ? rollbackError.message
+                    : "Unknown error"
+                }`
+              );
+            }
+          }
+
+          break; // Stop migration on first failure
+        }
       }
 
-      return this.compareVersions(storedVersion, CURRENT_VERSION) < 0;
+      // Verify migration success
+      if (result.success) {
+        const verificationResult = await this.verifyMigration();
+        if (!verificationResult.success) {
+          result.success = false;
+          result.errors.push(...verificationResult.errors);
+        }
+      }
     } catch (error) {
-      logger.error("Failed to check migration status", error);
+      result.success = false;
+      result.errors.push(
+        `Migration failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    // Record migration result
+    await this.recordMigrationResult(result);
+
+    return result;
+  }
+
+  private async createBackup(): Promise<boolean> {
+    try {
+      const backupData = {
+        timestamp: Date.now(),
+        version: "1.0.0",
+        data: {
+          asyncStorage: await this.backupAsyncStorage(),
+          secureStore: await this.backupSecureStore(),
+          userPreferences: await this.backupUserPreferences(),
+        },
+      };
+
+      await AsyncStorage.setItem(
+        "migration_backup",
+        JSON.stringify(backupData)
+      );
+      return true;
+    } catch (error) {
+      console.error("Failed to create backup:", error);
       return false;
     }
   }
 
-  public async performMigration(): Promise<MigrationResult> {
-    const result: MigrationResult = {
-      success: false,
-      version: CURRENT_VERSION,
-      migratedData: [],
-      errors: [],
-      rollbackAvailable: false,
-    };
-
+  private async backupAsyncStorage(): Promise<Record<string, string>> {
     try {
-      const storedVersion = await AsyncStorage.getItem(VERSION_KEY);
-      logger.info("Starting migration", {
-        from: storedVersion,
-        to: CURRENT_VERSION,
-      });
+      const keys = await AsyncStorage.getAllKeys();
+      const backup: Record<string, string> = {};
 
-      // Create backup before migration
-      await this.createMigrationBackup();
-      result.rollbackAvailable = true;
-
-      // Perform version-specific migrations
-      if (!storedVersion || this.compareVersions(storedVersion, "1.0.0") < 0) {
-        await this.migrateToV1(result);
+      for (const key of keys) {
+        const value = await AsyncStorage.getItem(key);
+        if (value !== null) {
+          backup[key] = value;
+        }
       }
 
-      if (this.compareVersions(storedVersion || "0.0.0", "2.0.0") < 0) {
-        await this.migrateToV2(result);
-      }
-
-      // Update version
-      await AsyncStorage.setItem(VERSION_KEY, CURRENT_VERSION);
-      result.success = true;
-
-      logger.info("Migration completed successfully", result);
-      return result;
+      return backup;
     } catch (error) {
-      logger.error("Migration failed", error);
-      result.errors?.push(
-        error instanceof Error ? error.message : "Unknown error"
-      );
-
-      // Attempt rollback
-      try {
-        await this.rollbackMigration();
-        result.errors?.push("Rollback completed");
-      } catch (rollbackError) {
-        result.errors?.push("Rollback failed");
-      }
-
-      return result;
+      console.error("Failed to backup AsyncStorage:", error);
+      return {};
     }
   }
 
-  // Migration to v1.0.0 - Initial Clerk to JWT migration
-  private async migrateToV1(result: MigrationResult): Promise<void> {
-    logger.info("Migrating to v1.0.0 - Clerk to JWT migration");
-
+  private async backupSecureStore(): Promise<Record<string, string>> {
     try {
-      // Check for old Clerk authentication data
-      const clerkData = await this.getClerkAuthData();
+      const secureKeys = ["auth_token", "refresh_token", "user_credentials"];
+      const backup: Record<string, string> = {};
 
-      if (clerkData) {
-        // Migrate user session
-        await this.migrateClerkToJWT(clerkData);
-        result.migratedData?.push("clerk_authentication");
-
-        // Clean up old Clerk data
-        await this.cleanupClerkData();
-        result.migratedData?.push("clerk_cleanup");
+      for (const key of secureKeys) {
+        try {
+          const value = await SecureStore.getItemAsync(key);
+          if (value !== null) {
+            backup[key] = value;
+          }
+        } catch (error) {
+          // Key might not exist, continue
+        }
       }
 
-      // Migrate old profile data structure
-      await this.migrateProfileData();
-      result.migratedData?.push("profile_data");
-
-      // Migrate cached data
-      await this.migrateCachedData();
-      result.migratedData?.push("cached_data");
+      return backup;
     } catch (error) {
-      logger.error("v1.0.0 migration failed", error);
-      throw error;
+      console.error("Failed to backup SecureStore:", error);
+      return {};
     }
   }
 
-  // Migration to v2.0.0 - Full alignment with web app
-  private async migrateToV2(result: MigrationResult): Promise<void> {
-    logger.info("Migrating to v2.0.0 - Web app alignment");
-
+  private async backupUserPreferences(): Promise<Record<string, any>> {
     try {
-      // Remove biometric authentication data
-      await this.removeBiometricAuth();
-      result.migratedData?.push("biometric_removal");
-
-      // Update interest system data
-      await this.migrateInterestSystem();
-      result.migratedData?.push("interest_system");
-
-      // Update message data structure
-      await this.migrateMessageData();
-      result.migratedData?.push("message_data");
-
-      // Update subscription data
-      await this.migrateSubscriptionData();
-      result.migratedData?.push("subscription_data");
-
-      // Update notification preferences
-      await this.migrateNotificationPreferences();
-      result.migratedData?.push("notification_preferences");
-
-      // Update cache structure
-      await this.migrateCacheStructure();
-      result.migratedData?.push("cache_structure");
-    } catch (error) {
-      logger.error("v2.0.0 migration failed", error);
-      throw error;
-    }
-  }
-
-  // Remove biometric authentication as requested
-  private async removeBiometricAuth(): Promise<void> {
-    try {
-      // Remove biometric settings
-      await AsyncStorage.removeItem("biometric_enabled");
-      await AsyncStorage.removeItem("biometric_type");
-      await SecureStore.deleteItemAsync("biometric_key");
-
-      // Update user preferences to remove biometric options
       const preferences = await AsyncStorage.getItem("user_preferences");
-      if (preferences) {
-        const parsed = JSON.parse(preferences);
-        delete parsed.biometricAuth;
-        delete parsed.biometricEnabled;
-        await AsyncStorage.setItem("user_preferences", JSON.stringify(parsed));
-      }
-
-      logger.info("Biometric authentication data removed");
+      return preferences ? JSON.parse(preferences) : {};
     } catch (error) {
-      logger.error("Failed to remove biometric auth data", error);
-      throw error;
+      console.error("Failed to backup user preferences:", error);
+      return {};
     }
   }
 
-  private async getClerkAuthData(): Promise<any> {
+  private async migrateAuthSystem(): Promise<boolean> {
     try {
-      // Check for old Clerk session data
-      const clerkSession = await AsyncStorage.getItem("clerk_session");
-      const clerkUser = await AsyncStorage.getItem("clerk_user");
+      // Check if Clerk token exists
+      const clerkToken = await AsyncStorage.getItem("clerk_token");
 
-      if (clerkSession || clerkUser) {
-        return {
-          session: clerkSession ? JSON.parse(clerkSession) : null,
-          user: clerkUser ? JSON.parse(clerkUser) : null,
-        };
+      if (clerkToken) {
+        // Exchange Clerk token for custom JWT
+        const exchangeResult = await this.apiClient.exchangeClerkToken(
+          clerkToken
+        );
+
+        if (exchangeResult.success && exchangeResult.token) {
+          // Store new JWT token
+          await SecureStore.setItemAsync("auth_token", exchangeResult.token);
+
+          if (exchangeResult.refreshToken) {
+            await SecureStore.setItemAsync(
+              "refresh_token",
+              exchangeResult.refreshToken
+            );
+          }
+
+          // Remove old Clerk data
+          await AsyncStorage.removeItem("clerk_token");
+          await AsyncStorage.removeItem("clerk_user");
+
+          return true;
+        }
       }
 
-      return null;
+      // No Clerk token found, migration not needed
+      return true;
     } catch (error) {
-      logger.error("Failed to get Clerk auth data", error);
-      return null;
+      console.error("Auth system migration failed:", error);
+      return false;
     }
   }
 
-  private async migrateClerkToJWT(clerkData: any): Promise<void> {
+  private async rollbackAuthSystem(): Promise<boolean> {
     try {
-      if (!clerkData.user?.emailAddress) {
-        throw new Error("No valid Clerk user data found");
+      // Restore from backup if needed
+      const backup = await AsyncStorage.getItem("migration_backup");
+      if (backup) {
+        const backupData = JSON.parse(backup);
+        const clerkToken = backupData.data.asyncStorage.clerk_token;
+
+        if (clerkToken) {
+          await AsyncStorage.setItem("clerk_token", clerkToken);
+        }
       }
 
-      // Attempt to authenticate with the backend using Clerk data
-      const migrationResponse = await apiClient.request("/auth/migrate-clerk", {
-        method: "POST",
-        body: JSON.stringify({
-          clerkUserId: clerkData.user.id,
-          email: clerkData.user.emailAddress,
-          sessionToken: clerkData.session?.id,
-        }),
-      });
+      // Remove new JWT tokens
+      await SecureStore.deleteItemAsync("auth_token");
+      await SecureStore.deleteItemAsync("refresh_token");
 
-      if (migrationResponse.success && migrationResponse.data?.tokens) {
-        // Store new JWT tokens
-        await SecureStore.setItemAsync(
-          "access_token",
-          migrationResponse.data.tokens.accessToken
-        );
-        await SecureStore.setItemAsync(
-          "refresh_token",
-          migrationResponse.data.tokens.refreshToken
-        );
-        await AsyncStorage.setItem(
-          "token_expires_at",
-          migrationResponse.data.tokens.expiresAt.toString()
-        );
-
-        // Store user data
-        await AsyncStorage.setItem(
-          "user_data",
-          JSON.stringify(migrationResponse.data.user)
-        );
-
-        logger.info("Successfully migrated Clerk authentication to JWT");
-      } else {
-        throw new Error("Failed to migrate authentication");
-      }
+      return true;
     } catch (error) {
-      logger.error("Clerk to JWT migration failed", error);
-      throw error;
+      console.error("Auth system rollback failed:", error);
+      return false;
     }
   }
 
-  private async cleanupClerkData(): Promise<void> {
-    const clerkKeys = [
-      "clerk_session",
-      "clerk_user",
-      "clerk_token",
-      "clerk_refresh_token",
-      "__clerk_client_jwt",
-      "__clerk_db_jwt",
-    ];
-
-    for (const key of clerkKeys) {
-      try {
-        await AsyncStorage.removeItem(key);
-        await SecureStore.deleteItemAsync(key);
-      } catch (error) {
-        // Ignore errors for keys that don't exist
-      }
-    }
-
-    logger.info("Clerk data cleanup completed");
-  }
-
-  private async migrateProfileData(): Promise<void> {
+  private async migrateApiEndpoints(): Promise<boolean> {
     try {
-      const profileData = await AsyncStorage.getItem("user_profile");
-      if (!profileData) return;
+      // Update API base URL
+      const newApiConfig = {
+        baseUrl: "https://www.aroosi.app/api",
+        version: "v1",
+        timeout: 30000,
+      };
 
-      const profile = JSON.parse(profileData);
+      await AsyncStorage.setItem("api_config", JSON.stringify(newApiConfig));
 
-      // Update profile structure to match new schema
-      const migratedProfile = {
-        ...profile,
-        // Rename old fields
-        ukCity: undefined, // Remove deprecated field
-        city: profile.city || profile.ukCity,
-
-        // Add new required fields with defaults
-        profileFor: profile.profileFor || "self",
-        isOnboardingComplete:
-          profile.isOnboardingComplete ?? profile.isProfileComplete,
-
-        // Update image structure
-        profileImageUrls: profile.profileImageUrls || profile.images || [],
-        profileImageIds: profile.profileImageIds || [],
-
-        // Ensure numeric fields are numbers
-        partnerPreferenceAgeMin: Number(profile.partnerPreferenceAgeMin) || 18,
-        partnerPreferenceAgeMax: Number(profile.partnerPreferenceAgeMax) || 65,
-        annualIncome: Number(profile.annualIncome) || 0,
+      // Update endpoint mappings
+      const endpointMappings = {
+        profile: "/profile",
+        search: "/search",
+        interests: "/interests",
+        matches: "/matches",
+        messages: "/messages",
+        subscription: "/subscription",
       };
 
       await AsyncStorage.setItem(
-        "user_profile",
-        JSON.stringify(migratedProfile)
+        "endpoint_mappings",
+        JSON.stringify(endpointMappings)
       );
-      logger.info("Profile data migration completed");
+
+      return true;
     } catch (error) {
-      logger.error("Profile data migration failed", error);
-      throw error;
+      console.error("API endpoints migration failed:", error);
+      return false;
     }
   }
 
-  private async migrateCachedData(): Promise<void> {
+  private async rollbackApiEndpoints(): Promise<boolean> {
     try {
-      // Migrate old cache keys to new structure
-      const oldCacheKeys = await AsyncStorage.getAllKeys();
-      const cacheKeysToMigrate = oldCacheKeys.filter(
-        (key) => key.startsWith("cache_") || key.startsWith("offline_")
-      );
+      // Restore old API configuration
+      await AsyncStorage.removeItem("api_config");
+      await AsyncStorage.removeItem("endpoint_mappings");
 
-      for (const oldKey of cacheKeysToMigrate) {
-        const data = await AsyncStorage.getItem(oldKey);
-        if (data) {
-          const newKey = `offline_cache_${oldKey.replace(
-            /^(cache_|offline_)/,
-            ""
-          )}`;
-          await AsyncStorage.setItem(newKey, data);
+      return true;
+    } catch (error) {
+      console.error("API endpoints rollback failed:", error);
+      return false;
+    }
+  }
+
+  private async migrateDataModels(): Promise<boolean> {
+    try {
+      // Update cached profile data to new schema
+      const cachedProfile = await AsyncStorage.getItem("cached_profile");
+
+      if (cachedProfile) {
+        const oldProfile = JSON.parse(cachedProfile);
+        const newProfile = this.transformProfileToNewSchema(oldProfile);
+        await AsyncStorage.setItem(
+          "cached_profile",
+          JSON.stringify(newProfile)
+        );
+      }
+
+      // Update cached interests data
+      const cachedInterests = await AsyncStorage.getItem("cached_interests");
+
+      if (cachedInterests) {
+        const oldInterests = JSON.parse(cachedInterests);
+        const newInterests = oldInterests.map((interest: any) =>
+          this.transformInterestToNewSchema(interest)
+        );
+        await AsyncStorage.setItem(
+          "cached_interests",
+          JSON.stringify(newInterests)
+        );
+      }
+
+      // Update cached messages data
+      const cachedMessages = await AsyncStorage.getItem("cached_messages");
+
+      if (cachedMessages) {
+        const oldMessages = JSON.parse(cachedMessages);
+        const newMessages = oldMessages.map((message: any) =>
+          this.transformMessageToNewSchema(message)
+        );
+        await AsyncStorage.setItem(
+          "cached_messages",
+          JSON.stringify(newMessages)
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Data models migration failed:", error);
+      return false;
+    }
+  }
+
+  private async rollbackDataModels(): Promise<boolean> {
+    try {
+      // Restore from backup
+      const backup = await AsyncStorage.getItem("migration_backup");
+      if (backup) {
+        const backupData = JSON.parse(backup);
+
+        if (backupData.data.asyncStorage.cached_profile) {
+          await AsyncStorage.setItem(
+            "cached_profile",
+            backupData.data.asyncStorage.cached_profile
+          );
+        }
+
+        if (backupData.data.asyncStorage.cached_interests) {
+          await AsyncStorage.setItem(
+            "cached_interests",
+            backupData.data.asyncStorage.cached_interests
+          );
+        }
+
+        if (backupData.data.asyncStorage.cached_messages) {
+          await AsyncStorage.setItem(
+            "cached_messages",
+            backupData.data.asyncStorage.cached_messages
+          );
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Data models rollback failed:", error);
+      return false;
+    }
+  }
+
+  private async migrateStorage(): Promise<boolean> {
+    try {
+      // Migrate storage keys to new naming convention
+      const keyMappings = {
+        user_token: "auth_token",
+        user_data: "cached_profile",
+        app_settings: "user_preferences",
+      };
+
+      for (const [oldKey, newKey] of Object.entries(keyMappings)) {
+        const value = await AsyncStorage.getItem(oldKey);
+        if (value !== null) {
+          await AsyncStorage.setItem(newKey, value);
           await AsyncStorage.removeItem(oldKey);
         }
       }
 
-      logger.info("Cached data migration completed");
-    } catch (error) {
-      logger.error("Cached data migration failed", error);
-      throw error;
-    }
-  }
+      // Update encryption keys
+      const encryptionConfig = {
+        algorithm: "AES-256-GCM",
+        keyDerivation: "PBKDF2",
+        iterations: 100000,
+      };
 
-  private async migrateInterestSystem(): Promise<void> {
-    try {
-      // Remove old manual interest response data
-      await AsyncStorage.removeItem("pending_interests");
-      await AsyncStorage.removeItem("interest_responses");
-
-      // Update interest data structure to match auto-matching system
-      const interestsData = await AsyncStorage.getItem("user_interests");
-      if (interestsData) {
-        const interests = JSON.parse(interestsData);
-        const migratedInterests = interests.map((interest: any) => ({
-          ...interest,
-          // Remove manual response fields
-          canRespond: undefined,
-          responseDeadline: undefined,
-          // Ensure status is compatible with auto-matching
-          status: interest.status === "pending" ? "pending" : interest.status,
-        }));
-
-        await AsyncStorage.setItem(
-          "user_interests",
-          JSON.stringify(migratedInterests)
-        );
-      }
-
-      logger.info("Interest system migration completed");
-    } catch (error) {
-      logger.error("Interest system migration failed", error);
-      throw error;
-    }
-  }
-
-  private async migrateMessageData(): Promise<void> {
-    try {
-      const messagesData = await AsyncStorage.getItem("cached_messages");
-      if (messagesData) {
-        const messages = JSON.parse(messagesData);
-        const migratedMessages = messages.map((message: any) => ({
-          ...message,
-          // Add new message fields
-          deliveredAt: message.deliveredAt || message.createdAt,
-          status: message.status || "sent",
-          // Update voice message structure
-          audioStorageId: message.audioStorageId || message.audioId,
-          // Update image message structure
-          imageStorageId: message.imageStorageId || message.imageId,
-        }));
-
-        await AsyncStorage.setItem(
-          "cached_messages",
-          JSON.stringify(migratedMessages)
-        );
-      }
-
-      logger.info("Message data migration completed");
-    } catch (error) {
-      logger.error("Message data migration failed", error);
-      throw error;
-    }
-  }
-
-  private async migrateSubscriptionData(): Promise<void> {
-    try {
-      const subscriptionData = await AsyncStorage.getItem(
-        "subscription_status"
-      );
-      if (subscriptionData) {
-        const subscription = JSON.parse(subscriptionData);
-        const migratedSubscription = {
-          ...subscription,
-          // Update plan names to match new system
-          plan: subscription.tier || subscription.plan || "free",
-          // Add new subscription fields
-          features: subscription.features || {},
-          paymentProvider: subscription.paymentProvider || "stripe",
-        };
-
-        await AsyncStorage.setItem(
-          "subscription_status",
-          JSON.stringify(migratedSubscription)
-        );
-      }
-
-      logger.info("Subscription data migration completed");
-    } catch (error) {
-      logger.error("Subscription data migration failed", error);
-      throw error;
-    }
-  }
-
-  private async migrateNotificationPreferences(): Promise<void> {
-    try {
-      const notificationPrefs = await AsyncStorage.getItem(
-        "notification_preferences"
-      );
-      if (notificationPrefs) {
-        const prefs = JSON.parse(notificationPrefs);
-        const migratedPrefs = {
-          ...prefs,
-          // Remove biometric-related notification settings
-          biometricReminder: undefined,
-          // Ensure all required preferences exist
-          messages: prefs.messages ?? true,
-          matches: prefs.matches ?? true,
-          interests: prefs.interests ?? true,
-          system: prefs.system ?? true,
-          marketing: prefs.marketing ?? false,
-        };
-
-        await AsyncStorage.setItem(
-          "notification_preferences",
-          JSON.stringify(migratedPrefs)
-        );
-      }
-
-      logger.info("Notification preferences migration completed");
-    } catch (error) {
-      logger.error("Notification preferences migration failed", error);
-      throw error;
-    }
-  }
-
-  private async migrateCacheStructure(): Promise<void> {
-    try {
-      // Update cache structure to new format
-      const cacheIndex = await AsyncStorage.getItem("cache_index");
-      if (cacheIndex) {
-        const index = JSON.parse(cacheIndex);
-        const migratedIndex = Object.entries(index).reduce(
-          (acc: any, [key, value]: [string, any]) => {
-            acc[`offline_cache_${key}`] = {
-              ...value,
-              version: "2.0.0",
-              timestamp: value.timestamp || Date.now(),
-            };
-            return acc;
-          },
-          {}
-        );
-
-        await AsyncStorage.setItem(
-          "offline_cache_index",
-          JSON.stringify(migratedIndex)
-        );
-        await AsyncStorage.removeItem("cache_index");
-      }
-
-      logger.info("Cache structure migration completed");
-    } catch (error) {
-      logger.error("Cache structure migration failed", error);
-      throw error;
-    }
-  }
-
-  private async createMigrationBackup(): Promise<void> {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const allData: Record<string, string> = {};
-
-      for (const key of allKeys) {
-        const value = await AsyncStorage.getItem(key);
-        if (value) {
-          allData[key] = value;
-        }
-      }
-
-      // Store backup
       await AsyncStorage.setItem(
-        MIGRATION_BACKUP_KEY,
-        JSON.stringify({
-          timestamp: Date.now(),
-          version: await AsyncStorage.getItem(VERSION_KEY),
-          data: allData,
-        })
+        "encryption_config",
+        JSON.stringify(encryptionConfig)
       );
 
-      logger.info("Migration backup created");
+      return true;
     } catch (error) {
-      logger.error("Failed to create migration backup", error);
-      throw error;
-    }
-  }
-
-  private async rollbackMigration(): Promise<void> {
-    try {
-      const backupData = await AsyncStorage.getItem(MIGRATION_BACKUP_KEY);
-      if (!backupData) {
-        throw new Error("No backup data available for rollback");
-      }
-
-      const backup = JSON.parse(backupData);
-
-      // Clear current data
-      await AsyncStorage.clear();
-
-      // Restore backup data
-      for (const [key, value] of Object.entries(backup.data)) {
-        await AsyncStorage.setItem(key, value as string);
-      }
-
-      logger.info("Migration rollback completed");
-    } catch (error) {
-      logger.error("Migration rollback failed", error);
-      throw error;
-    }
-  }
-
-  public async cleanupMigrationData(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(MIGRATION_BACKUP_KEY);
-      logger.info("Migration cleanup completed");
-    } catch (error) {
-      logger.error("Migration cleanup failed", error);
-    }
-  }
-
-  private compareVersions(version1: string, version2: string): number {
-    const v1Parts = version1.split(".").map(Number);
-    const v2Parts = version2.split(".").map(Number);
-
-    for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
-      const v1Part = v1Parts[i] || 0;
-      const v2Part = v2Parts[i] || 0;
-
-      if (v1Part < v2Part) return -1;
-      if (v1Part > v2Part) return 1;
-    }
-
-    return 0;
-  }
-
-  // Feature flag management for gradual rollout
-  public async enableFeatureFlag(flag: string, userId?: string): Promise<void> {
-    try {
-      const flags = await this.getFeatureFlags();
-      flags[flag] = true;
-
-      await AsyncStorage.setItem("feature_flags", JSON.stringify(flags));
-
-      if (userId) {
-        logger.info("Feature flag enabled", { flag, userId });
-      }
-    } catch (error) {
-      logger.error("Failed to enable feature flag", { flag, error });
-    }
-  }
-
-  public async isFeatureFlagEnabled(flag: string): Promise<boolean> {
-    try {
-      const flags = await this.getFeatureFlags();
-      return flags[flag] === true;
-    } catch (error) {
-      logger.error("Failed to check feature flag", { flag, error });
+      console.error("Storage migration failed:", error);
       return false;
     }
   }
 
-  private async getFeatureFlags(): Promise<Record<string, boolean>> {
+  private async rollbackStorage(): Promise<boolean> {
     try {
-      const flags = await AsyncStorage.getItem("feature_flags");
-      return flags ? JSON.parse(flags) : {};
+      // Restore old key names
+      const keyMappings = {
+        auth_token: "user_token",
+        cached_profile: "user_data",
+        user_preferences: "app_settings",
+      };
+
+      for (const [newKey, oldKey] of Object.entries(keyMappings)) {
+        const value = await AsyncStorage.getItem(newKey);
+        if (value !== null) {
+          await AsyncStorage.setItem(oldKey, value);
+          await AsyncStorage.removeItem(newKey);
+        }
+      }
+
+      await AsyncStorage.removeItem("encryption_config");
+
+      return true;
     } catch (error) {
-      return {};
+      console.error("Storage rollback failed:", error);
+      return false;
     }
   }
-}
 
-// Convenience functions
-export const migrationManager = MigrationManager.getInstance();
+  private async migrateFeatureFlags(): Promise<boolean> {
+    try {
+      const featureFlags = {
+        new_auth_system: true,
+        unified_api: true,
+        auto_matching: true,
+        real_time_messaging: true,
+        premium_features: true,
+        migration_complete: false,
+      };
 
-export async function checkAndPerformMigration(): Promise<MigrationResult | null> {
-  const needsMigration = await migrationManager.checkMigrationNeeded();
+      await AsyncStorage.setItem("feature_flags", JSON.stringify(featureFlags));
 
-  if (needsMigration) {
-    return await migrationManager.performMigration();
+      return true;
+    } catch (error) {
+      console.error("Feature flags migration failed:", error);
+      return false;
+    }
   }
 
-  return null;
+  private async rollbackFeatureFlags(): Promise<boolean> {
+    try {
+      const rollbackFlags = {
+        new_auth_system: false,
+        unified_api: false,
+        auto_matching: false,
+        real_time_messaging: false,
+        premium_features: false,
+        migration_complete: false,
+      };
+
+      await AsyncStorage.setItem(
+        "feature_flags",
+        JSON.stringify(rollbackFlags)
+      );
+
+      return true;
+    } catch (error) {
+      console.error("Feature flags rollback failed:", error);
+      return false;
+    }
+  }
+
+  private transformProfileToNewSchema(oldProfile: any): any {
+    return {
+      id: oldProfile.id || oldProfile._id,
+      userId: oldProfile.userId || oldProfile.user_id,
+      fullName: oldProfile.fullName || oldProfile.full_name,
+      email: oldProfile.email,
+      dateOfBirth: oldProfile.dateOfBirth || oldProfile.date_of_birth,
+      gender: oldProfile.gender,
+      profileFor: oldProfile.profileFor || oldProfile.profile_for,
+      phoneNumber: oldProfile.phoneNumber || oldProfile.phone_number,
+      country: oldProfile.country,
+      city: oldProfile.city,
+      height: oldProfile.height,
+      maritalStatus: oldProfile.maritalStatus || oldProfile.marital_status,
+      physicalStatus: oldProfile.physicalStatus || oldProfile.physical_status,
+      motherTongue: oldProfile.motherTongue || oldProfile.mother_tongue,
+      religion: oldProfile.religion,
+      ethnicity: oldProfile.ethnicity,
+      diet: oldProfile.diet,
+      smoking: oldProfile.smoking,
+      drinking: oldProfile.drinking,
+      education: oldProfile.education,
+      occupation: oldProfile.occupation,
+      annualIncome: oldProfile.annualIncome || oldProfile.annual_income,
+      aboutMe: oldProfile.aboutMe || oldProfile.about_me,
+      preferredGender:
+        oldProfile.preferredGender || oldProfile.preferred_gender,
+      partnerPreferenceAgeMin:
+        oldProfile.partnerPreferenceAgeMin ||
+        oldProfile.partner_preference_age_min,
+      partnerPreferenceAgeMax:
+        oldProfile.partnerPreferenceAgeMax ||
+        oldProfile.partner_preference_age_max,
+      partnerPreferenceCity:
+        oldProfile.partnerPreferenceCity ||
+        oldProfile.partner_preference_city ||
+        [],
+      isProfileComplete:
+        oldProfile.isProfileComplete || oldProfile.is_profile_complete || false,
+      isOnboardingComplete:
+        oldProfile.isOnboardingComplete ||
+        oldProfile.is_onboarding_complete ||
+        false,
+      isActive: oldProfile.isActive || oldProfile.is_active || true,
+      subscriptionPlan:
+        oldProfile.subscriptionPlan || oldProfile.subscription_plan || "free",
+      subscriptionExpiresAt:
+        oldProfile.subscriptionExpiresAt || oldProfile.subscription_expires_at,
+      profileImageIds:
+        oldProfile.profileImageIds || oldProfile.profile_image_ids || [],
+      profileImageUrls:
+        oldProfile.profileImageUrls || oldProfile.profile_image_urls || [],
+      createdAt: oldProfile.createdAt || oldProfile.created_at || Date.now(),
+      updatedAt: oldProfile.updatedAt || oldProfile.updated_at || Date.now(),
+    };
+  }
+
+  private transformInterestToNewSchema(oldInterest: any): any {
+    return {
+      _id: oldInterest._id || oldInterest.id,
+      fromUserId: oldInterest.fromUserId || oldInterest.from_user_id,
+      toUserId: oldInterest.toUserId || oldInterest.to_user_id,
+      status: oldInterest.status || "pending",
+      createdAt: oldInterest.createdAt || oldInterest.created_at || Date.now(),
+      updatedAt: oldInterest.updatedAt || oldInterest.updated_at || Date.now(),
+      fromProfile: oldInterest.fromProfile || oldInterest.from_profile,
+      toProfile: oldInterest.toProfile || oldInterest.to_profile,
+    };
+  }
+
+  private transformMessageToNewSchema(oldMessage: any): any {
+    return {
+      _id: oldMessage._id || oldMessage.id,
+      conversationId: oldMessage.conversationId || oldMessage.conversation_id,
+      fromUserId: oldMessage.fromUserId || oldMessage.from_user_id,
+      toUserId: oldMessage.toUserId || oldMessage.to_user_id,
+      text: oldMessage.text || oldMessage.content,
+      type: oldMessage.type || "text",
+      createdAt: oldMessage.createdAt || oldMessage.created_at || Date.now(),
+      readAt: oldMessage.readAt || oldMessage.read_at,
+      deliveredAt: oldMessage.deliveredAt || oldMessage.delivered_at,
+      status: oldMessage.status || "sent",
+      audioStorageId: oldMessage.audioStorageId || oldMessage.audio_storage_id,
+      duration: oldMessage.duration,
+      fileSize: oldMessage.fileSize || oldMessage.file_size,
+      mimeType: oldMessage.mimeType || oldMessage.mime_type,
+      imageStorageId: oldMessage.imageStorageId || oldMessage.image_storage_id,
+      imageUrl: oldMessage.imageUrl || oldMessage.image_url,
+    };
+  }
+
+  private async verifyMigration(): Promise<{
+    success: boolean;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+
+    try {
+      // Verify auth system
+      const authToken = await SecureStore.getItemAsync("auth_token");
+      if (!authToken) {
+        errors.push("Auth token not found after migration");
+      }
+
+      // Verify API configuration
+      const apiConfig = await AsyncStorage.getItem("api_config");
+      if (!apiConfig) {
+        errors.push("API configuration not found after migration");
+      }
+
+      // Verify feature flags
+      const featureFlags = await AsyncStorage.getItem("feature_flags");
+      if (!featureFlags) {
+        errors.push("Feature flags not found after migration");
+      }
+
+      // Test API connectivity
+      const connectivityTest = await this.apiClient.testConnectivity();
+      if (!connectivityTest.success) {
+        errors.push("API connectivity test failed after migration");
+      }
+    } catch (error) {
+      errors.push(
+        `Migration verification failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    return {
+      success: errors.length === 0,
+      errors,
+    };
+  }
+
+  private async recordMigrationStep(
+    stepId: string,
+    status: string
+  ): Promise<void> {
+    try {
+      const migrationLog =
+        (await AsyncStorage.getItem("migration_log")) || "[]";
+      const log = JSON.parse(migrationLog);
+
+      log.push({
+        stepId,
+        status,
+        timestamp: Date.now(),
+      });
+
+      await AsyncStorage.setItem("migration_log", JSON.stringify(log));
+    } catch (error) {
+      console.error("Failed to record migration step:", error);
+    }
+  }
+
+  private async recordMigrationResult(result: MigrationResult): Promise<void> {
+    try {
+      const migrationRecord = {
+        ...result,
+        timestamp: Date.now(),
+        version: "1.0.0",
+      };
+
+      await AsyncStorage.setItem(
+        "migration_result",
+        JSON.stringify(migrationRecord)
+      );
+
+      // Update feature flag if migration was successful
+      if (result.success) {
+        const featureFlags = await AsyncStorage.getItem("feature_flags");
+        if (featureFlags) {
+          const flags = JSON.parse(featureFlags);
+          flags.migration_complete = true;
+          await AsyncStorage.setItem("feature_flags", JSON.stringify(flags));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to record migration result:", error);
+    }
+  }
+
+  async getMigrationStatus(): Promise<{
+    isComplete: boolean;
+    lastMigration?: MigrationResult;
+    migrationLog: any[];
+  }> {
+    try {
+      const migrationResult = await AsyncStorage.getItem("migration_result");
+      const migrationLog =
+        (await AsyncStorage.getItem("migration_log")) || "[]";
+
+      return {
+        isComplete: migrationResult
+          ? JSON.parse(migrationResult).success
+          : false,
+        lastMigration: migrationResult
+          ? JSON.parse(migrationResult)
+          : undefined,
+        migrationLog: JSON.parse(migrationLog),
+      };
+    } catch (error) {
+      console.error("Failed to get migration status:", error);
+      return {
+        isComplete: false,
+        migrationLog: [],
+      };
+    }
+  }
+
+  async rollbackMigration(): Promise<MigrationResult> {
+    const result: MigrationResult = {
+      success: true,
+      migratedItems: 0,
+      errors: [],
+      backupCreated: false,
+    };
+
+    try {
+      // Restore from backup
+      const backup = await AsyncStorage.getItem("migration_backup");
+      if (!backup) {
+        throw new Error("No backup found for rollback");
+      }
+
+      const backupData = JSON.parse(backup);
+
+      // Restore AsyncStorage
+      await AsyncStorage.clear();
+      for (const [key, value] of Object.entries(backupData.data.asyncStorage)) {
+        await AsyncStorage.setItem(key, value as string);
+      }
+
+      // Restore SecureStore
+      for (const [key, value] of Object.entries(backupData.data.secureStore)) {
+        await SecureStore.setItemAsync(key, value as string);
+      }
+
+      result.migratedItems =
+        Object.keys(backupData.data.asyncStorage).length +
+        Object.keys(backupData.data.secureStore).length;
+    } catch (error) {
+      result.success = false;
+      result.errors.push(
+        `Rollback failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    }
+
+    await this.recordMigrationResult(result);
+    return result;
+  }
 }

@@ -1,439 +1,573 @@
-import {
-  createAccessibleButton,
-  createAccessibleLink,
-  createAccessibleHeading,
-  createAccessibleImage,
-  createAccessibleTextInput,
-  createAccessibleCheckbox,
-  createAccessibleSwitch,
-  createAccessibleSlider,
-  createAccessibleProgress,
-  createAccessibleAlert,
-  getFormFieldAccessibility,
-  getTabAccessibility,
-  getListItemAccessibility,
-  getProfileCardAccessibility,
-  getMessageAccessibility,
-} from "../utils/accessibility";
+import { describe, test, expect, beforeEach } from "@jest/globals";
+import { render, screen } from "@testing-library/react-native";
+import { AccessibilityHelper } from "../utils/accessibility";
 
-describe("Accessibility Utils", () => {
-  describe("createAccessibleButton", () => {
-    it("should create accessible button props", () => {
-      const props = createAccessibleButton(
-        "Submit Form",
-        "Submits the registration form"
+// Mock React Native components
+jest.mock("react-native", () => ({
+  View: "View",
+  Text: "Text",
+  TouchableOpacity: "TouchableOpacity",
+  TextInput: "TextInput",
+  Image: "Image",
+  ScrollView: "ScrollView",
+  AccessibilityInfo: {
+    isScreenReaderEnabled: jest.fn(),
+    announceForAccessibility: jest.fn(),
+    setAccessibilityFocus: jest.fn(),
+  },
+}));
+
+describe("Accessibility Tests", () => {
+  let accessibilityHelper: AccessibilityHelper;
+
+  beforeEach(() => {
+    accessibilityHelper = new AccessibilityHelper();
+  });
+
+  describe("Screen Reader Support", () => {
+    test("should provide proper accessibility labels for profile elements", () => {
+      const profileData = {
+        fullName: "John Doe",
+        age: 28,
+        city: "London",
+        occupation: "Software Engineer",
+      };
+
+      const accessibilityLabel =
+        accessibilityHelper.generateProfileLabel(profileData);
+
+      expect(accessibilityLabel).toBe(
+        "Profile of John Doe, 28 years old, from London, works as Software Engineer"
       );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("button");
-      expect(props.accessibilityLabel).toBe("Submit Form");
-      expect(props.accessibilityHint).toBe("Submits the registration form");
-      expect(props.accessibilityState?.disabled).toBe(false);
     });
 
-    it("should handle disabled state", () => {
-      const props = createAccessibleButton("Disabled Button", undefined, true);
+    test("should provide descriptive labels for interest buttons", () => {
+      const userProfile = {
+        fullName: "Jane Smith",
+        city: "Manchester",
+      };
 
-      expect(props.accessibilityState?.disabled).toBe(true);
-    });
-  });
-
-  describe("createAccessibleLink", () => {
-    it("should create accessible link props", () => {
-      const props = createAccessibleLink(
-        "Privacy Policy",
-        "Opens privacy policy page"
+      const sendInterestLabel = accessibilityHelper.generateInterestButtonLabel(
+        userProfile,
+        "send"
       );
+      const removeInterestLabel =
+        accessibilityHelper.generateInterestButtonLabel(userProfile, "remove");
 
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("link");
-      expect(props.accessibilityLabel).toBe("Privacy Policy");
-      expect(props.accessibilityHint).toBe("Opens privacy policy page");
-    });
-  });
-
-  describe("createAccessibleHeading", () => {
-    it("should create accessible heading props", () => {
-      const props = createAccessibleHeading("Profile Settings", 2);
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("header");
-      expect(props.accessibilityLabel).toBe("Profile Settings");
-      expect(props.accessibilityValue?.text).toBe("Heading level 2");
+      expect(sendInterestLabel).toBe(
+        "Send interest to Jane Smith from Manchester"
+      );
+      expect(removeInterestLabel).toBe(
+        "Remove interest from Jane Smith from Manchester"
+      );
     });
 
-    it("should handle heading without level", () => {
-      const props = createAccessibleHeading("Simple Heading");
+    test("should provide proper labels for message elements", () => {
+      const message = {
+        text: "Hello, how are you?",
+        fromUserId: "user-123",
+        fromUserName: "John Doe",
+        createdAt: Date.now(),
+        type: "text",
+      };
 
-      expect(props.accessibilityValue).toBeUndefined();
-    });
-  });
-
-  describe("createAccessibleImage", () => {
-    it("should create accessible image props", () => {
-      const props = createAccessibleImage("Profile photo of John Doe");
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("image");
-      expect(props.accessibilityLabel).toBe("Profile photo of John Doe");
-    });
-
-    it("should handle decorative images", () => {
-      const props = createAccessibleImage("Decorative border", true);
-
-      expect(props.accessible).toBe(false);
-    });
-  });
-
-  describe("createAccessibleTextInput", () => {
-    it("should create accessible text input props", () => {
-      const props = createAccessibleTextInput(
-        "Email Address",
-        "Enter your email address",
+      const messageLabel = accessibilityHelper.generateMessageLabel(
+        message,
         true
       );
 
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityLabel).toBe("Email Address, required");
-      expect(props.accessibilityHint).toBe("Enter your email address");
+      expect(messageLabel).toContain("Message from John Doe");
+      expect(messageLabel).toContain("Hello, how are you?");
+      expect(messageLabel).toContain("sent");
     });
 
-    it("should handle validation errors", () => {
-      const props = createAccessibleTextInput(
-        "Password",
-        "Enter a secure password",
-        true,
-        "Password must be at least 8 characters"
-      );
+    test("should provide proper labels for voice messages", () => {
+      const voiceMessage = {
+        type: "voice",
+        duration: 30000, // 30 seconds
+        fromUserName: "Jane Smith",
+        createdAt: Date.now(),
+      };
 
-      expect(props.accessibilityHint).toBe(
-        "Enter a secure password Password must be at least 8 characters"
-      );
-      expect(props.accessibilityState?.invalid).toBe(true);
-    });
-  });
+      const voiceLabel =
+        accessibilityHelper.generateVoiceMessageLabel(voiceMessage);
 
-  describe("createAccessibleCheckbox", () => {
-    it("should create accessible checkbox props", () => {
-      const props = createAccessibleCheckbox(
-        "Agree to terms",
-        true,
-        "Check to agree to terms and conditions"
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("checkbox");
-      expect(props.accessibilityLabel).toBe("Agree to terms");
-      expect(props.accessibilityHint).toBe(
-        "Check to agree to terms and conditions"
-      );
-      expect(props.accessibilityState?.checked).toBe(true);
-    });
-  });
-
-  describe("createAccessibleSwitch", () => {
-    it("should create accessible switch props", () => {
-      const props = createAccessibleSwitch(
-        "Enable notifications",
-        false,
-        "Toggle to enable push notifications"
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("switch");
-      expect(props.accessibilityLabel).toBe("Enable notifications");
-      expect(props.accessibilityHint).toBe(
-        "Toggle to enable push notifications"
-      );
-      expect(props.accessibilityState?.checked).toBe(false);
-    });
-  });
-
-  describe("createAccessibleSlider", () => {
-    it("should create accessible slider props", () => {
-      const props = createAccessibleSlider(
-        "Age Range",
-        25,
-        18,
-        65,
-        "Adjust minimum age preference"
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("slider");
-      expect(props.accessibilityLabel).toBe("Age Range");
-      expect(props.accessibilityHint).toBe("Adjust minimum age preference");
-      expect(props.accessibilityValue).toEqual({ min: 18, max: 65, now: 25 });
-    });
-  });
-
-  describe("createAccessibleProgress", () => {
-    it("should create accessible progress props", () => {
-      const props = createAccessibleProgress("Profile Completion", 75, 100);
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("progressbar");
-      expect(props.accessibilityLabel).toBe("Profile Completion, 75% complete");
-      expect(props.accessibilityValue).toEqual({ min: 0, max: 100, now: 75 });
-    });
-  });
-
-  describe("createAccessibleAlert", () => {
-    it("should create accessible alert props", () => {
-      const props = createAccessibleAlert(
-        "Profile saved successfully",
-        "success"
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("alert");
-      expect(props.accessibilityLabel).toBe(
-        "success: Profile saved successfully"
-      );
-      expect(props.accessibilityLiveRegion).toBe("polite");
+      expect(voiceLabel).toContain("Voice message from Jane Smith");
+      expect(voiceLabel).toContain("30 seconds long");
     });
 
-    it("should handle different alert types", () => {
-      const errorProps = createAccessibleAlert(
-        "Invalid email address",
-        "error"
-      );
-      expect(errorProps.accessibilityLabel).toBe(
-        "error: Invalid email address"
-      );
+    test("should announce important state changes", async () => {
+      const mockAnnounce = jest.fn();
+      accessibilityHelper.setAnnounceFunction(mockAnnounce);
 
-      const warningProps = createAccessibleAlert(
-        "Password strength is weak",
-        "warning"
+      await accessibilityHelper.announceNewMatch("Jane Doe");
+      await accessibilityHelper.announceNewMessage(
+        "John Smith",
+        "Hello there!"
       );
-      expect(warningProps.accessibilityLabel).toBe(
-        "warning: Password strength is weak"
+      await accessibilityHelper.announceInterestSent("Sarah Johnson");
+
+      expect(mockAnnounce).toHaveBeenCalledWith("New match with Jane Doe");
+      expect(mockAnnounce).toHaveBeenCalledWith(
+        "New message from John Smith: Hello there!"
+      );
+      expect(mockAnnounce).toHaveBeenCalledWith(
+        "Interest sent to Sarah Johnson"
       );
     });
   });
 
-  describe("getFormFieldAccessibility", () => {
-    it("should create form field accessibility props", () => {
-      const props = getFormFieldAccessibility(
-        "Full Name",
-        "John Doe",
-        undefined,
-        true
-      );
+  describe("Navigation Accessibility", () => {
+    test("should provide proper tab navigation order", () => {
+      const navigationItems = [
+        { name: "Home", accessibilityLabel: "Home tab" },
+        { name: "Search", accessibilityLabel: "Search profiles tab" },
+        { name: "Matches", accessibilityLabel: "Your matches tab" },
+        { name: "Messages", accessibilityLabel: "Messages tab" },
+        { name: "Profile", accessibilityLabel: "Your profile tab" },
+      ];
 
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityLabel).toBe(
-        "Full Name, required, current value: John Doe"
-      );
-      expect(props.accessibilityHint).toBe("Enter full name");
+      const tabOrder = accessibilityHelper.generateTabOrder(navigationItems);
+
+      expect(tabOrder).toHaveLength(5);
+      expect(tabOrder[0].accessibilityLabel).toBe("Home tab");
+      expect(tabOrder[4].accessibilityLabel).toBe("Your profile tab");
     });
 
-    it("should handle field with error", () => {
-      const props = getFormFieldAccessibility(
-        "Email",
-        "",
-        "Email is required",
-        true
-      );
+    test("should provide proper heading hierarchy", () => {
+      const screenStructure = {
+        title: "Profile Details",
+        sections: [
+          { title: "Basic Information", level: 2 },
+          { title: "Contact Details", level: 2 },
+          { title: "Preferences", level: 2 },
+          { title: "Partner Preferences", level: 3 },
+        ],
+      };
 
-      expect(props.accessibilityLabel).toBe("Email, required");
-      expect(props.accessibilityHint).toBe("Email is required");
-      expect(props.accessibilityState?.invalid).toBe(true);
+      const headings =
+        accessibilityHelper.generateHeadingStructure(screenStructure);
+
+      expect(headings[0].accessibilityRole).toBe("header");
+      expect(headings[0].accessibilityLevel).toBe(1);
+      expect(headings[4].accessibilityLevel).toBe(3);
+    });
+
+    test("should provide proper focus management", async () => {
+      const mockSetFocus = jest.fn();
+      accessibilityHelper.setFocusFunction(mockSetFocus);
+
+      await accessibilityHelper.focusOnElement("profile-name-input");
+      await accessibilityHelper.focusOnFirstError(["email-error"]);
+      await accessibilityHelper.focusOnModalContent("success-modal");
+
+      expect(mockSetFocus).toHaveBeenCalledWith("profile-name-input");
+      expect(mockSetFocus).toHaveBeenCalledWith("email-error");
+      expect(mockSetFocus).toHaveBeenCalledWith("success-modal");
     });
   });
 
-  describe("getTabAccessibility", () => {
-    it("should create tab accessibility props", () => {
-      const props = getTabAccessibility("Profile", true, 0, 4);
+  describe("Form Accessibility", () => {
+    test("should provide proper form field labels and hints", () => {
+      const formFields = [
+        {
+          name: "fullName",
+          label: "Full Name",
+          required: true,
+          hint: "Enter your first and last name",
+        },
+        {
+          name: "email",
+          label: "Email Address",
+          required: true,
+          hint: "We will use this to send you notifications",
+        },
+        {
+          name: "aboutMe",
+          label: "About Me",
+          required: false,
+          hint: "Tell others about yourself (optional)",
+        },
+      ];
 
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("tab");
-      expect(props.accessibilityLabel).toBe("Profile, tab 1 of 4");
-      expect(props.accessibilityState?.selected).toBe(true);
+      const accessibilityProps = formFields.map((field) =>
+        accessibilityHelper.generateFormFieldProps(field)
+      );
+
+      expect(accessibilityProps[0].accessibilityLabel).toBe(
+        "Full Name, required"
+      );
+      expect(accessibilityProps[0].accessibilityHint).toBe(
+        "Enter your first and last name"
+      );
+      expect(accessibilityProps[2].accessibilityLabel).toBe(
+        "About Me, optional"
+      );
     });
 
-    it("should handle unselected tab", () => {
-      const props = getTabAccessibility("Messages", false, 2, 4);
+    test("should provide proper error announcements", () => {
+      const formErrors = {
+        email: "Please enter a valid email address",
+        password: "Password must be at least 8 characters",
+        dateOfBirth: "You must be at least 18 years old",
+      };
 
-      expect(props.accessibilityLabel).toBe("Messages, tab 3 of 4");
-      expect(props.accessibilityState?.selected).toBe(false);
+      const errorAnnouncement =
+        accessibilityHelper.generateErrorAnnouncement(formErrors);
+
+      expect(errorAnnouncement).toContain("Form has 3 errors");
+      expect(errorAnnouncement).toContain(
+        "Email: Please enter a valid email address"
+      );
+      expect(errorAnnouncement).toContain(
+        "Password: Password must be at least 8 characters"
+      );
+    });
+
+    test("should provide proper validation feedback", () => {
+      const validationStates = [
+        { field: "email", isValid: true, message: "Email is valid" },
+        { field: "password", isValid: false, message: "Password is too short" },
+        { field: "confirmPassword", isValid: true, message: "Passwords match" },
+      ];
+
+      const feedbackProps = validationStates.map((state) =>
+        accessibilityHelper.generateValidationProps(state)
+      );
+
+      expect(feedbackProps[0].accessibilityState.invalid).toBe(false);
+      expect(feedbackProps[1].accessibilityState.invalid).toBe(true);
+      expect(feedbackProps[1].accessibilityLiveRegion).toBe("polite");
     });
   });
 
-  describe("getListItemAccessibility", () => {
-    it("should create list item accessibility props", () => {
-      const props = getListItemAccessibility(
-        "John Doe",
+  describe("Image Accessibility", () => {
+    test("should provide descriptive alt text for profile images", () => {
+      const profileData = {
+        fullName: "John Doe",
+        profileImages: [
+          { id: "img-1", isPrimary: true },
+          { id: "img-2", isPrimary: false },
+          { id: "img-3", isPrimary: false },
+        ],
+      };
+
+      const imageLabels = profileData.profileImages.map((img, index) =>
+        accessibilityHelper.generateImageLabel(
+          profileData.fullName,
+          index,
+          img.isPrimary
+        )
+      );
+
+      expect(imageLabels[0]).toBe("Primary profile photo of John Doe");
+      expect(imageLabels[1]).toBe("Profile photo 2 of John Doe");
+      expect(imageLabels[2]).toBe("Profile photo 3 of John Doe");
+    });
+
+    test("should handle missing or loading images", () => {
+      const loadingLabel = accessibilityHelper.generateImageLabel(
+        "Jane Smith",
         0,
-        10,
-        "Double tap to view profile"
+        true,
+        "loading"
       );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("listitem");
-      expect(props.accessibilityLabel).toBe("John Doe, 1 of 10");
-      expect(props.accessibilityHint).toBe("Double tap to view profile");
-    });
-  });
-
-  describe("getProfileCardAccessibility", () => {
-    it("should create profile card accessibility props", () => {
-      const props = getProfileCardAccessibility(
-        "Sarah Johnson",
-        28,
-        "New York"
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityRole).toBe("button");
-      expect(props.accessibilityLabel).toBe(
-        "Sarah Johnson, 28 years old, from New York"
-      );
-      expect(props.accessibilityHint).toBe("Double tap to view profile");
-    });
-
-    it("should handle profile without age or location", () => {
-      const props = getProfileCardAccessibility("Anonymous User");
-
-      expect(props.accessibilityLabel).toBe("Anonymous User");
-    });
-  });
-
-  describe("getMessageAccessibility", () => {
-    it("should create message accessibility props for own message", () => {
-      const props = getMessageAccessibility(
-        "John",
-        "Hello there!",
-        "2 minutes ago",
-        true
-      );
-
-      expect(props.accessible).toBe(true);
-      expect(props.accessibilityLabel).toBe(
-        "You said: Hello there!, sent 2 minutes ago"
-      );
-      expect(props.accessibilityRole).toBe("text");
-    });
-
-    it("should create message accessibility props for received message", () => {
-      const props = getMessageAccessibility(
-        "Sarah",
-        "Hi! How are you?",
-        "1 minute ago",
-        false
-      );
-
-      expect(props.accessibilityLabel).toBe(
-        "Sarah said: Hi! How are you?, sent 1 minute ago"
-      );
-    });
-  });
-
-  describe("Complex Accessibility Scenarios", () => {
-    it("should handle nested interactive elements", () => {
-      // Profile card with multiple interactive elements
-      const cardProps = getProfileCardAccessibility(
-        "Emma Wilson",
-        26,
-        "Boston"
-      );
-      const likeButtonProps = createAccessibleButton(
-        "Like Profile",
-        "Send interest to Emma Wilson"
-      );
-      const messageButtonProps = createAccessibleButton(
-        "Send Message",
-        "Start conversation with Emma Wilson"
-      );
-
-      expect(cardProps.accessibilityLabel).toContain("Emma Wilson");
-      expect(likeButtonProps.accessibilityHint).toContain("Emma Wilson");
-      expect(messageButtonProps.accessibilityHint).toContain("Emma Wilson");
-    });
-
-    it("should handle dynamic content updates", () => {
-      // Notification count that changes
-      const initialProps = createAccessibleButton("Messages", "View messages");
-      const updatedProps = createAccessibleButton(
-        "Messages (3)",
-        "View messages, 3 unread"
-      );
-
-      expect(initialProps.accessibilityLabel).toBe("Messages");
-      expect(updatedProps.accessibilityLabel).toBe("Messages (3)");
-      expect(updatedProps.accessibilityHint).toContain("3 unread");
-    });
-
-    it("should handle loading states", () => {
-      const loadingProps = createAccessibleButton(
-        "Loading...",
-        "Please wait while content loads",
-        true
-      );
-
-      expect(loadingProps.accessibilityState?.disabled).toBe(true);
-      expect(loadingProps.accessibilityHint).toContain("Please wait");
-    });
-
-    it("should handle error states", () => {
-      const errorAlert = createAccessibleAlert(
-        "Failed to load profile",
+      const errorLabel = accessibilityHelper.generateImageLabel(
+        "Jane Smith",
+        0,
+        true,
         "error"
       );
-      const retryButton = createAccessibleButton(
-        "Retry",
-        "Tap to try loading the profile again"
-      );
 
-      expect(errorAlert.accessibilityLabel).toContain("error");
-      expect(retryButton.accessibilityHint).toContain("try loading");
+      expect(loadingLabel).toBe("Loading primary profile photo of Jane Smith");
+      expect(errorLabel).toBe(
+        "Failed to load primary profile photo of Jane Smith"
+      );
+    });
+
+    test("should provide proper image gallery navigation", () => {
+      const galleryData = {
+        currentIndex: 1,
+        totalImages: 5,
+        userName: "Sarah Johnson",
+      };
+
+      const galleryLabel =
+        accessibilityHelper.generateGalleryLabel(galleryData);
+
+      expect(galleryLabel).toBe(
+        "Image 2 of 5 in Sarah Johnson's profile gallery"
+      );
     });
   });
 
-  describe("Screen Reader Compatibility", () => {
-    it("should provide meaningful labels for complex UI elements", () => {
-      // Match percentage indicator
-      const matchProps = createAccessibleProgress(
-        "Match Compatibility",
-        85,
-        100
-      );
-      expect(matchProps.accessibilityLabel).toBe(
-        "Match Compatibility, 85% complete"
+  describe("Interactive Elements", () => {
+    test("should provide proper button states and actions", () => {
+      const buttons = [
+        { type: "send-interest", isLoading: false, isDisabled: false },
+        { type: "send-message", isLoading: true, isDisabled: false },
+        { type: "block-user", isLoading: false, isDisabled: true },
+      ];
+
+      const buttonProps = buttons.map((button) =>
+        accessibilityHelper.generateButtonProps(button)
       );
 
-      // Online status indicator
-      const onlineProps = createAccessibleImage(
-        "User is currently online",
-        false
-      );
-      expect(onlineProps.accessibilityLabel).toBe("User is currently online");
+      expect(buttonProps[0].accessibilityLabel).toBe("Send interest");
+      expect(buttonProps[0].accessibilityState.disabled).toBe(false);
 
-      // Voice message duration
-      const voiceProps = createAccessibleButton(
-        "Play voice message",
-        "Voice message, 30 seconds duration"
-      );
-      expect(voiceProps.accessibilityHint).toContain("30 seconds");
+      expect(buttonProps[1].accessibilityLabel).toBe("Sending message");
+      expect(buttonProps[1].accessibilityState.busy).toBe(true);
+
+      expect(buttonProps[2].accessibilityState.disabled).toBe(true);
     });
 
-    it("should handle cultural and language considerations", () => {
-      // Names with special characters
-      const profileProps = getProfileCardAccessibility(
-        "José María",
-        30,
-        "México City"
-      );
-      expect(profileProps.accessibilityLabel).toContain("José María");
+    test("should provide proper toggle states", () => {
+      const toggles = [
+        { name: "notifications", isEnabled: true, label: "Push notifications" },
+        { name: "visibility", isEnabled: false, label: "Profile visibility" },
+      ];
 
-      // Different date formats
-      const messageProps = getMessageAccessibility(
-        "Ahmed",
-        "مرحبا",
-        "٥ دقائق مضت",
-        false
+      const toggleProps = toggles.map((toggle) =>
+        accessibilityHelper.generateToggleProps(toggle)
       );
-      expect(messageProps.accessibilityLabel).toContain("Ahmed");
+
+      expect(toggleProps[0].accessibilityLabel).toBe("Push notifications");
+      expect(toggleProps[0].accessibilityState.checked).toBe(true);
+      expect(toggleProps[0].accessibilityRole).toBe("switch");
+
+      expect(toggleProps[1].accessibilityState.checked).toBe(false);
+    });
+
+    test("should provide proper slider accessibility", () => {
+      const ageSlider = {
+        label: "Age range",
+        minValue: 18,
+        maxValue: 65,
+        currentMin: 25,
+        currentMax: 35,
+      };
+
+      const sliderProps = accessibilityHelper.generateSliderProps(ageSlider);
+
+      expect(sliderProps.accessibilityLabel).toBe(
+        "Age range from 25 to 35 years"
+      );
+      expect(sliderProps.accessibilityRole).toBe("adjustable");
+      expect(sliderProps.accessibilityValue.min).toBe(18);
+      expect(sliderProps.accessibilityValue.max).toBe(65);
+    });
+  });
+
+  describe("List and Collection Accessibility", () => {
+    test("should provide proper list item accessibility", () => {
+      const profileList = [
+        { id: "profile-1", fullName: "John Doe", city: "London" },
+        { id: "profile-2", fullName: "Jane Smith", city: "Manchester" },
+        { id: "profile-3", fullName: "Bob Johnson", city: "Birmingham" },
+      ];
+
+      const listProps = accessibilityHelper.generateListProps(
+        profileList,
+        "search results"
+      );
+
+      expect(listProps.accessibilityLabel).toBe(
+        "Search results, 3 profiles found"
+      );
+      expect(listProps.accessibilityRole).toBe("list");
+
+      const itemProps = profileList.map((profile, index) =>
+        accessibilityHelper.generateListItemProps(
+          profile,
+          index,
+          profileList.length
+        )
+      );
+
+      expect(itemProps[0].accessibilityLabel).toBe(
+        "Profile 1 of 3: John Doe from London"
+      );
+      expect(itemProps[0].accessibilityRole).toBe("button");
+    });
+
+    test("should provide proper conversation list accessibility", () => {
+      const conversations = [
+        {
+          id: "conv-1",
+          partnerName: "Alice Brown",
+          lastMessage: "Hello there!",
+          unreadCount: 2,
+          lastMessageTime: Date.now() - 3600000, // 1 hour ago
+        },
+        {
+          id: "conv-2",
+          partnerName: "Charlie Davis",
+          lastMessage: "How are you?",
+          unreadCount: 0,
+          lastMessageTime: Date.now() - 86400000, // 1 day ago
+        },
+      ];
+
+      const conversationProps = conversations.map((conv) =>
+        accessibilityHelper.generateConversationProps(conv)
+      );
+
+      expect(conversationProps[0].accessibilityLabel).toContain(
+        "Conversation with Alice Brown"
+      );
+      expect(conversationProps[0].accessibilityLabel).toContain(
+        "2 unread messages"
+      );
+      expect(conversationProps[0].accessibilityLabel).toContain(
+        "Last message: Hello there!"
+      );
+
+      expect(conversationProps[1].accessibilityLabel).toContain(
+        "No unread messages"
+      );
+    });
+  });
+
+  describe("Modal and Dialog Accessibility", () => {
+    test("should provide proper modal accessibility", () => {
+      const modalData = {
+        title: "Confirm Action",
+        message: "Are you sure you want to block this user?",
+        type: "confirmation",
+      };
+
+      const modalProps = accessibilityHelper.generateModalProps(modalData);
+
+      expect(modalProps.accessibilityRole).toBe("dialog");
+      expect(modalProps.accessibilityLabel).toBe("Confirm Action dialog");
+      expect(modalProps.accessibilityModal).toBe(true);
+    });
+
+    test("should provide proper alert accessibility", () => {
+      const alertData = {
+        type: "success",
+        title: "Profile Updated",
+        message: "Your profile has been successfully updated",
+      };
+
+      const alertProps = accessibilityHelper.generateAlertProps(alertData);
+
+      expect(alertProps.accessibilityRole).toBe("alert");
+      expect(alertProps.accessibilityLiveRegion).toBe("assertive");
+      expect(alertProps.accessibilityLabel).toBe(
+        "Success: Profile Updated. Your profile has been successfully updated"
+      );
+    });
+  });
+
+  describe("Dynamic Content Accessibility", () => {
+    test("should handle loading states properly", () => {
+      const loadingStates = [
+        { content: "profiles", isLoading: true },
+        { content: "messages", isLoading: false },
+        { content: "matches", isLoading: true },
+      ];
+
+      const loadingProps = loadingStates.map((state) =>
+        accessibilityHelper.generateLoadingProps(state)
+      );
+
+      expect(loadingProps[0].accessibilityLabel).toBe("Loading profiles");
+      expect(loadingProps[0].accessibilityState.busy).toBe(true);
+
+      expect(loadingProps[1].accessibilityState.busy).toBe(false);
+    });
+
+    test("should handle empty states properly", () => {
+      const emptyStates = [
+        { type: "no-matches", message: "No matches found" },
+        { type: "no-messages", message: "No messages yet" },
+        {
+          type: "no-search-results",
+          message: "No profiles match your criteria",
+        },
+      ];
+
+      const emptyProps = emptyStates.map((state) =>
+        accessibilityHelper.generateEmptyStateProps(state)
+      );
+
+      expect(emptyProps[0].accessibilityLabel).toBe("No matches found");
+      expect(emptyProps[0].accessibilityRole).toBe("text");
+      expect(emptyProps[2].accessibilityHint).toBe(
+        "Try adjusting your search filters"
+      );
+    });
+
+    test("should handle real-time updates properly", () => {
+      const updates = [
+        { type: "new-message", from: "John Doe", urgent: true },
+        { type: "new-match", with: "Jane Smith", urgent: false },
+        { type: "profile-view", by: "Bob Johnson", urgent: false },
+      ];
+
+      const updateProps = updates.map((update) =>
+        accessibilityHelper.generateUpdateProps(update)
+      );
+
+      expect(updateProps[0].accessibilityLiveRegion).toBe("assertive");
+      expect(updateProps[0].accessibilityLabel).toBe(
+        "New message from John Doe"
+      );
+
+      expect(updateProps[1].accessibilityLiveRegion).toBe("polite");
+      expect(updateProps[1].accessibilityLabel).toBe(
+        "New match with Jane Smith"
+      );
+    });
+  });
+
+  describe("Accessibility Testing Utilities", () => {
+    test("should validate accessibility compliance", () => {
+      const componentProps = {
+        accessibilityLabel: "Send message button",
+        accessibilityRole: "button",
+        accessibilityHint: "Double tap to send a message",
+      };
+
+      const validation =
+        accessibilityHelper.validateAccessibility(componentProps);
+
+      expect(validation.isValid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+    });
+
+    test("should detect accessibility issues", () => {
+      const problematicProps = {
+        // Missing accessibility label
+        accessibilityRole: "button",
+        // Missing hint for complex action
+      };
+
+      const validation =
+        accessibilityHelper.validateAccessibility(problematicProps);
+
+      expect(validation.isValid).toBe(false);
+      expect(validation.errors).toContain("Missing accessibilityLabel");
+    });
+
+    test("should provide accessibility improvement suggestions", () => {
+      const componentData = {
+        type: "image",
+        hasLabel: false,
+        isDecorative: false,
+        isInteractive: true,
+      };
+
+      const suggestions = accessibilityHelper.getSuggestions(componentData);
+
+      expect(suggestions).toContain(
+        "Add descriptive accessibilityLabel for image"
+      );
+      expect(suggestions).toContain(
+        "Consider adding accessibilityHint for interactive elements"
+      );
     });
   });
 });

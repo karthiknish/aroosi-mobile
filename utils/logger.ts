@@ -1,333 +1,443 @@
-import { CONFIG, ENV } from "../config/environment";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+  FATAL = 4,
+}
 
 export interface LogEntry {
+  timestamp: number;
   level: LogLevel;
+  category: string;
   message: string;
   data?: any;
-  timestamp: number;
   userId?: string;
   sessionId?: string;
-  component?: string;
+  buildVersion?: string;
+  platform?: string;
 }
 
 export interface LoggerConfig {
-  enableConsoleLogging: boolean;
-  enableRemoteLogging: boolean;
-  logLevel: LogLevel;
-  maxLogEntries: number;
-  sensitiveFields: string[];
+  level: LogLevel;
+  enableConsole: boolean;
+  enableStorage: boolean;
+  enableRemote: boolean;
+  maxStorageEntries: number;
+  remoteEndpoint?: string;
+  sessionId: string;
+  buildVersion: string;
 }
 
-const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-};
-
-const DEFAULT_CONFIG: LoggerConfig = {
-  enableConsoleLogging: ENV === "development",
-  enableRemoteLogging: ENV !== "development",
-  logLevel: ENV === "development" ? "debug" : "info",
-  maxLogEntries: 1000,
-  sensitiveFields: [
-    "password",
-    "token",
-    "accessToken",
-    "refreshToken",
-    "authorization",
-    "cookie",
-    "session",
-    "secret",
-    "key",
-    "ssn",
-    "creditCard",
-    "bankAccount",
-  ],
-};
-
 export class Logger {
-  private static instance: Logger;
   private config: LoggerConfig;
-  private logEntries: LogEntry[] = [];
-  private sessionId: string;
-  private userId?: string;
+  private logQueue: LogEntry[] = [];
+  private isFlushingLogs = false;
 
-  private constructor(config: Partial<LoggerConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    this.sessionId = this.generateSessionId();
+  constructor(config: Partial<LoggerConfig> = {}) {
+    this.config = {
+      level: LogLevel.INFO,
+      enableConsole: __DEV__,
+      enableStorage: true,
+      enableRemote: !__DEV__,
+      maxStorageEntries: 1000,
+      sessionId: this.generateSessionId(),
+      buildVersion: "1.0.0",
+      ...config,
+    };
   }
 
-  public static getInstance(config?: Partial<LoggerConfig>): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger(config);
-    }
-    return Logger.instance;
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  public setUserId(userId: string): void {
-    this.userId = userId;
+  debug(category: string, message: string, data?: any): void {
+    this.log(LogLevel.DEBUG, category, message, data);
   }
 
-  public setLogLevel(level: LogLevel): void {
-    this.config.logLevel = level;
+  info(category: string, message: string, data?: any): void {
+    this.log(LogLevel.INFO, category, message, data);
   }
 
-  public debug(message: string, data?: any, component?: string): void {
-    this.log("debug", message, data, component);
+  warn(category: string, message: string, data?: any): void {
+    this.log(LogLevel.WARN, category, message, data);
   }
 
-  public info(message: string, data?: any, component?: string): void {
-    this.log("info", message, data, component);
+  error(category: string, message: string, data?: any): void {
+    this.log(LogLevel.ERROR, category, message, data);
   }
 
-  public warn(message: string, data?: any, component?: string): void {
-    this.log("warn", message, data, component);
+  fatal(category: string, message: string, data?: any): void {
+    this.log(LogLevel.FATAL, category, message, data);
   }
 
-  public error(message: string, data?: any, component?: string): void {
-    this.log("error", message, data, component);
-  }
-
-  public log(
+  private log(
     level: LogLevel,
+    category: string,
     message: string,
-    data?: any,
-    component?: string
+    data?: any
   ): void {
-    // Check if log level is enabled
-    if (LOG_LEVELS[level] < LOG_LEVELS[this.config.logLevel]) {
+    if (level < this.config.level) {
       return;
     }
 
     const logEntry: LogEntry = {
+      timestamp: Date.now(),
       level,
+      category,
       message,
       data: this.sanitizeData(data),
-      timestamp: Date.now(),
-      userId: this.userId,
-      sessionId: this.sessionId,
-      component,
+      sessionId: this.config.sessionId,
+      buildVersion: this.config.buildVersion,
+      platform: "mobile",
     };
 
-    // Add to log entries
-    this.addLogEntry(logEntry);
+    // Add user ID if available
+    this.addUserContext(logEntry);
 
     // Console logging
-    if (this.config.enableConsoleLogging) {
+    if (this.config.enableConsole) {
       this.logToConsole(logEntry);
     }
 
+    // Storage logging
+    if (this.config.enableStorage) {
+      this.logToStorage(logEntry);
+    }
+
     // Remote logging
-    if (this.config.enableRemoteLogging) {
+    if (this.config.enableRemote) {
       this.logToRemote(logEntry);
-    }
-  }
-
-  // Specialized logging methods
-  public logApiCall(
-    method: string,
-    url: string,
-    status: number,
-    duration: number,
-    error?: Error
-  ): void {
-    const level = error || status >= 400 ? "error" : "info";
-    this.log(
-      level,
-      `API ${method} ${url}`,
-      {
-        method,
-        url: this.sanitizeUrl(url),
-        status,
-        duration,
-        error: error?.message,
-      },
-      "API"
-    );
-  }
-
-  public logUserAction(action: string, data?: any): void {
-    this.info(`User action: ${action}`, data, "UserAction");
-  }
-
-  public logScreenView(screenName: string, data?: any): void {
-    this.info(`Screen view: ${screenName}`, data, "Navigation");
-  }
-
-  public logPerformance(metric: string, value: number, data?: any): void {
-    this.info(`Performance: ${metric}`, { value, ...data }, "Performance");
-  }
-
-  public logSecurity(event: string, data?: any): void {
-    this.warn(`Security event: ${event}`, data, "Security");
-  }
-
-  public logError(error: Error, context?: any, component?: string): void {
-    this.error(
-      error.message,
-      {
-        name: error.name,
-        stack: error.stack,
-        context,
-      },
-      component
-    );
-  }
-
-  // Log retrieval methods
-  public getLogs(
-    level?: LogLevel,
-    component?: string,
-    limit?: number
-  ): LogEntry[] {
-    let filteredLogs = this.logEntries;
-
-    if (level) {
-      filteredLogs = filteredLogs.filter((entry) => entry.level === level);
-    }
-
-    if (component) {
-      filteredLogs = filteredLogs.filter(
-        (entry) => entry.component === component
-      );
-    }
-
-    if (limit) {
-      filteredLogs = filteredLogs.slice(-limit);
-    }
-
-    return filteredLogs;
-  }
-
-  public getLogsSince(timestamp: number): LogEntry[] {
-    return this.logEntries.filter((entry) => entry.timestamp >= timestamp);
-  }
-
-  public exportLogs(): string {
-    return JSON.stringify(this.logEntries, null, 2);
-  }
-
-  public clearLogs(): void {
-    this.logEntries = [];
-  }
-
-  // Configuration methods
-  public updateConfig(config: Partial<LoggerConfig>): void {
-    this.config = { ...this.config, ...config };
-  }
-
-  public getConfig(): LoggerConfig {
-    return { ...this.config };
-  }
-
-  // Private methods
-  private addLogEntry(entry: LogEntry): void {
-    this.logEntries.push(entry);
-
-    // Maintain max log entries
-    if (this.logEntries.length > this.config.maxLogEntries) {
-      this.logEntries = this.logEntries.slice(-this.config.maxLogEntries);
-    }
-  }
-
-  private logToConsole(entry: LogEntry): void {
-    const timestamp = new Date(entry.timestamp).toISOString();
-    const prefix = `[${timestamp}] [${entry.level.toUpperCase()}]`;
-    const component = entry.component ? ` [${entry.component}]` : "";
-    const userId = entry.userId ? ` [User: ${entry.userId}]` : "";
-
-    const logMessage = `${prefix}${component}${userId} ${entry.message}`;
-
-    switch (entry.level) {
-      case "debug":
-        console.debug(logMessage, entry.data);
-        break;
-      case "info":
-        console.info(logMessage, entry.data);
-        break;
-      case "warn":
-        console.warn(logMessage, entry.data);
-        break;
-      case "error":
-        console.error(logMessage, entry.data);
-        break;
-    }
-  }
-
-  private async logToRemote(entry: LogEntry): Promise<void> {
-    try {
-      // Only send error and warn logs to remote in production
-      if (ENV === "production" && !["error", "warn"].includes(entry.level)) {
-        return;
-      }
-
-      // Implement your remote logging service here
-      // This could be CloudWatch, Datadog, LogRocket, etc.
-
-      const payload = {
-        ...entry,
-        environment: ENV,
-        platform: "mobile",
-        version: CONFIG.APP_VERSION || "1.0.0",
-      };
-
-      // Example: Send to logging service
-      // await fetch('https://logs.example.com/api/logs', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(payload),
-      // });
-    } catch (error) {
-      // Don't log remote logging errors to avoid infinite loops
-      console.error("Failed to send log to remote service:", error);
     }
   }
 
   private sanitizeData(data: any): any {
     if (!data) return data;
 
-    if (typeof data === "string") {
-      return this.sanitizeString(data);
-    }
+    // Deep clone to avoid modifying original data
+    const sanitized = JSON.parse(JSON.stringify(data));
 
-    if (Array.isArray(data)) {
-      return data.map((item) => this.sanitizeData(item));
-    }
+    // Remove sensitive information
+    this.removeSensitiveFields(sanitized);
 
-    if (typeof data === "object") {
-      const sanitized: any = {};
-
-      for (const [key, value] of Object.entries(data)) {
-        if (this.isSensitiveField(key)) {
-          sanitized[key] = "[REDACTED]";
-        } else {
-          sanitized[key] = this.sanitizeData(value);
-        }
-      }
-
-      return sanitized;
-    }
-
-    return data;
+    return sanitized;
   }
 
-  private sanitizeString(str: string): string {
-    // Remove potential tokens or sensitive data from strings
-    return str
-      .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/g, "Bearer [REDACTED]")
-      .replace(/token[=:]\s*[A-Za-z0-9\-._~+/]+=*/gi, "token=[REDACTED]")
-      .replace(/password[=:]\s*\S+/gi, "password=[REDACTED]");
+  private removeSensitiveFields(obj: any): void {
+    if (typeof obj !== "object" || obj === null) return;
+
+    const sensitiveFields = [
+      "password",
+      "token",
+      "auth",
+      "authorization",
+      "secret",
+      "key",
+      "credential",
+      "phoneNumber",
+      "email",
+      "ssn",
+      "creditCard",
+      "bankAccount",
+      "pin",
+      "otp",
+    ];
+
+    for (const key in obj) {
+      if (
+        sensitiveFields.some((field) =>
+          key.toLowerCase().includes(field.toLowerCase())
+        )
+      ) {
+        if (typeof obj[key] === "string") {
+          obj[key] = this.maskSensitiveString(obj[key]);
+        } else {
+          obj[key] = "[REDACTED]";
+        }
+      } else if (typeof obj[key] === "object") {
+        this.removeSensitiveFields(obj[key]);
+      }
+    }
+  }
+
+  private maskSensitiveString(value: string): string {
+    if (value.length <= 4) return "***";
+
+    if (value.includes("@")) {
+      // Email masking
+      const [local, domain] = value.split("@");
+      return `${local.charAt(0)}***@${domain}`;
+    }
+
+    if (value.startsWith("+")) {
+      // Phone number masking
+      return `${value.substring(0, 3)}***${value.substring(value.length - 4)}`;
+    }
+
+    // General string masking
+    return `${value.substring(0, 2)}***${value.substring(value.length - 2)}`;
+  }
+
+  private async addUserContext(logEntry: LogEntry): Promise<void> {
+    try {
+      const userContext = await AsyncStorage.getItem("user_context");
+      if (userContext) {
+        const context = JSON.parse(userContext);
+        logEntry.userId = context.userId;
+      }
+    } catch (error) {
+      // Ignore errors when adding user context
+    }
+  }
+
+  private logToConsole(logEntry: LogEntry): void {
+    const levelName = LogLevel[logEntry.level];
+    const timestamp = new Date(logEntry.timestamp).toISOString();
+    const prefix = `[${timestamp}] [${levelName}] [${logEntry.category}]`;
+
+    const consoleMethod = this.getConsoleMethod(logEntry.level);
+
+    if (logEntry.data) {
+      consoleMethod(`${prefix} ${logEntry.message}`, logEntry.data);
+    } else {
+      consoleMethod(`${prefix} ${logEntry.message}`);
+    }
+  }
+
+  private getConsoleMethod(level: LogLevel): (...args: any[]) => void {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return console.debug;
+      case LogLevel.INFO:
+        return console.info;
+      case LogLevel.WARN:
+        return console.warn;
+      case LogLevel.ERROR:
+      case LogLevel.FATAL:
+        return console.error;
+      default:
+        return console.log;
+    }
+  }
+
+  private async logToStorage(logEntry: LogEntry): Promise<void> {
+    try {
+      this.logQueue.push(logEntry);
+
+      // Flush logs periodically or when queue is full
+      if (this.logQueue.length >= 50 || logEntry.level >= LogLevel.ERROR) {
+        await this.flushLogsToStorage();
+      }
+    } catch (error) {
+      console.error("Failed to log to storage:", error);
+    }
+  }
+
+  private async flushLogsToStorage(): Promise<void> {
+    if (this.isFlushingLogs || this.logQueue.length === 0) {
+      return;
+    }
+
+    this.isFlushingLogs = true;
+
+    try {
+      const existingLogs = await AsyncStorage.getItem("app_logs");
+      const logs: LogEntry[] = existingLogs ? JSON.parse(existingLogs) : [];
+
+      // Add new logs
+      logs.push(...this.logQueue);
+
+      // Trim logs if exceeding max entries
+      if (logs.length > this.config.maxStorageEntries) {
+        logs.splice(0, logs.length - this.config.maxStorageEntries);
+      }
+
+      await AsyncStorage.setItem("app_logs", JSON.stringify(logs));
+      this.logQueue = [];
+    } catch (error) {
+      console.error("Failed to flush logs to storage:", error);
+    } finally {
+      this.isFlushingLogs = false;
+    }
+  }
+
+  private async logToRemote(logEntry: LogEntry): Promise<void> {
+    if (!this.config.remoteEndpoint) {
+      return;
+    }
+
+    try {
+      // Only send important logs to remote to avoid spam
+      if (logEntry.level < LogLevel.WARN) {
+        return;
+      }
+
+      const response = await fetch(this.config.remoteEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          logs: [logEntry],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Remote logging failed: ${response.status}`);
+      }
+    } catch (error) {
+      // Don't log remote logging errors to avoid infinite loops
+      console.error("Remote logging failed:", error);
+    }
+  }
+
+  async getLogs(
+    options: {
+      level?: LogLevel;
+      category?: string;
+      startTime?: number;
+      endTime?: number;
+      limit?: number;
+    } = {}
+  ): Promise<LogEntry[]> {
+    try {
+      const storedLogs = await AsyncStorage.getItem("app_logs");
+      if (!storedLogs) return [];
+
+      let logs: LogEntry[] = JSON.parse(storedLogs);
+
+      // Apply filters
+      if (options.level !== undefined) {
+        logs = logs.filter((log) => log.level >= options.level!);
+      }
+
+      if (options.category) {
+        logs = logs.filter((log) => log.category === options.category);
+      }
+
+      if (options.startTime) {
+        logs = logs.filter((log) => log.timestamp >= options.startTime!);
+      }
+
+      if (options.endTime) {
+        logs = logs.filter((log) => log.timestamp <= options.endTime!);
+      }
+
+      // Sort by timestamp (newest first)
+      logs.sort((a, b) => b.timestamp - a.timestamp);
+
+      // Apply limit
+      if (options.limit) {
+        logs = logs.slice(0, options.limit);
+      }
+
+      return logs;
+    } catch (error) {
+      console.error("Failed to get logs:", error);
+      return [];
+    }
+  }
+
+  async clearLogs(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem("app_logs");
+      this.logQueue = [];
+    } catch (error) {
+      console.error("Failed to clear logs:", error);
+    }
+  }
+
+  async exportLogs(): Promise<string> {
+    try {
+      const logs = await this.getLogs();
+      return JSON.stringify(logs, null, 2);
+    } catch (error) {
+      console.error("Failed to export logs:", error);
+      return "[]";
+    }
+  }
+
+  async getLogStats(): Promise<{
+    totalLogs: number;
+    logsByLevel: Record<string, number>;
+    logsByCategory: Record<string, number>;
+    oldestLog?: number;
+    newestLog?: number;
+  }> {
+    try {
+      const logs = await this.getLogs();
+
+      const stats = {
+        totalLogs: logs.length,
+        logsByLevel: {} as Record<string, number>,
+        logsByCategory: {} as Record<string, number>,
+        oldestLog:
+          logs.length > 0
+            ? Math.min(...logs.map((log) => log.timestamp))
+            : undefined,
+        newestLog:
+          logs.length > 0
+            ? Math.max(...logs.map((log) => log.timestamp))
+            : undefined,
+      };
+
+      logs.forEach((log) => {
+        const levelName = LogLevel[log.level];
+        stats.logsByLevel[levelName] = (stats.logsByLevel[levelName] || 0) + 1;
+        stats.logsByCategory[log.category] =
+          (stats.logsByCategory[log.category] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      console.error("Failed to get log stats:", error);
+      return {
+        totalLogs: 0,
+        logsByLevel: {},
+        logsByCategory: {},
+      };
+    }
+  }
+
+  // Performance logging helpers
+  startTimer(category: string, operation: string): () => void {
+    const startTime = Date.now();
+
+    return () => {
+      const duration = Date.now() - startTime;
+      this.info(category, `${operation} completed`, { duration });
+    };
+  }
+
+  async logApiCall(
+    method: string,
+    url: string,
+    statusCode: number,
+    duration: number,
+    error?: any
+  ): Promise<void> {
+    const level = statusCode >= 400 ? LogLevel.ERROR : LogLevel.INFO;
+    const message = `${method} ${url} - ${statusCode}`;
+
+    const data = {
+      method,
+      url: this.sanitizeUrl(url),
+      statusCode,
+      duration,
+      error: error ? this.sanitizeData(error) : undefined,
+    };
+
+    this.log(level, "API", message, data);
   }
 
   private sanitizeUrl(url: string): string {
     try {
       const urlObj = new URL(url);
-
       // Remove sensitive query parameters
-      const sensitiveParams = ["token", "key", "secret", "password", "auth"];
+      const sensitiveParams = ["token", "key", "secret", "auth"];
+
       sensitiveParams.forEach((param) => {
         if (urlObj.searchParams.has(param)) {
           urlObj.searchParams.set(param, "[REDACTED]");
@@ -335,85 +445,95 @@ export class Logger {
       });
 
       return urlObj.toString();
-    } catch {
+    } catch (error) {
       return url;
     }
   }
 
-  private isSensitiveField(fieldName: string): boolean {
-    const lowerFieldName = fieldName.toLowerCase();
-    return this.config.sensitiveFields.some((sensitive) =>
-      lowerFieldName.includes(sensitive.toLowerCase())
-    );
+  async logUserAction(action: string, data?: any): Promise<void> {
+    this.info("USER_ACTION", action, data);
   }
 
-  private generateSessionId(): string {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  async logError(error: Error, context?: any): Promise<void> {
+    this.error("ERROR", error.message, {
+      name: error.name,
+      stack: error.stack,
+      context: this.sanitizeData(context),
+    });
+  }
+
+  async logSecurityEvent(event: string, data?: any): Promise<void> {
+    this.warn("SECURITY", event, data);
+  }
+
+  async logPerformanceMetric(
+    metric: string,
+    value: number,
+    unit: string
+  ): Promise<void> {
+    this.info("PERFORMANCE", `${metric}: ${value}${unit}`, {
+      metric,
+      value,
+      unit,
+    });
+  }
+
+  // Crash reporting
+  async logCrash(error: Error, isFatal: boolean = false): Promise<void> {
+    const level = isFatal ? LogLevel.FATAL : LogLevel.ERROR;
+
+    this.log(level, "CRASH", error.message, {
+      name: error.name,
+      stack: error.stack,
+      isFatal,
+      timestamp: Date.now(),
+    });
+
+    // Immediately flush to storage for crashes
+    await this.flushLogsToStorage();
+  }
+
+  // Configuration methods
+  setLogLevel(level: LogLevel): void {
+    this.config.level = level;
+  }
+
+  setRemoteEndpoint(endpoint: string): void {
+    this.config.remoteEndpoint = endpoint;
+    this.config.enableRemote = true;
+  }
+
+  enableConsoleLogging(enable: boolean): void {
+    this.config.enableConsole = enable;
+  }
+
+  enableStorageLogging(enable: boolean): void {
+    this.config.enableStorage = enable;
+  }
+
+  enableRemoteLogging(enable: boolean): void {
+    this.config.enableRemote = enable;
   }
 }
 
-// Create default logger instance
-export const logger = Logger.getInstance();
+// Global logger instance
+export const logger = new Logger({
+  level: __DEV__ ? LogLevel.DEBUG : LogLevel.INFO,
+  remoteEndpoint: "https://www.aroosi.app/api/logs",
+});
 
 // Convenience functions
-export function logDebug(
-  message: string,
-  data?: any,
-  component?: string
-): void {
-  logger.debug(message, data, component);
-}
+export const logDebug = (category: string, message: string, data?: any) =>
+  logger.debug(category, message, data);
 
-export function logInfo(message: string, data?: any, component?: string): void {
-  logger.info(message, data, component);
-}
+export const logInfo = (category: string, message: string, data?: any) =>
+  logger.info(category, message, data);
 
-export function logWarn(message: string, data?: any, component?: string): void {
-  logger.warn(message, data, component);
-}
+export const logWarn = (category: string, message: string, data?: any) =>
+  logger.warn(category, message, data);
 
-export function logError(
-  message: string,
-  data?: any,
-  component?: string
-): void {
-  logger.error(message, data, component);
-}
+export const logError = (category: string, message: string, data?: any) =>
+  logger.error(category, message, data);
 
-export function logApiCall(
-  method: string,
-  url: string,
-  status: number,
-  duration: number,
-  error?: Error
-): void {
-  logger.logApiCall(method, url, status, duration, error);
-}
-
-export function logUserAction(action: string, data?: any): void {
-  logger.logUserAction(action, data);
-}
-
-export function logScreenView(screenName: string, data?: any): void {
-  logger.logScreenView(screenName, data);
-}
-
-export function logPerformanceMetric(
-  metric: string,
-  value: number,
-  data?: any
-): void {
-  logger.logPerformance(metric, value, data);
-}
-
-export function logSecurityEvent(event: string, data?: any): void {
-  logger.logSecurity(event, data);
-}
-
-export function logException(
-  error: Error,
-  context?: any,
-  component?: string
-): void {
-  logger.logError(error, context, component);
-}
+export const logFatal = (category: string, message: string, data?: any) =>
+  logger.fatal(category, message, data);

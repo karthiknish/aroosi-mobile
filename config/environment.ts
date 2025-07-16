@@ -1,272 +1,347 @@
-import Constants from "expo-constants";
-
-export type Environment = "development" | "staging" | "production";
-
 export interface EnvironmentConfig {
+  // API Configuration
   API_BASE_URL: string;
-  WEB_APP_URL: string;
-  WEBSOCKET_URL: string;
+  API_VERSION: string;
+  API_TIMEOUT: number;
+
+  // Authentication
+  JWT_SECRET_KEY?: string;
+  GOOGLE_CLIENT_ID: string;
+
+  // Push Notifications
   ONESIGNAL_APP_ID: string;
-  GOOGLE_OAUTH_CLIENT_ID: string;
+
+  // Payments
+  STRIPE_PUBLISHABLE_KEY: string;
+
+  // Storage
+  CONVEX_URL?: string;
+  CONVEX_DEPLOYMENT?: string;
+
+  // Monitoring & Analytics
   SENTRY_DSN?: string;
-  ANALYTICS_KEY?: string;
-  FEATURE_FLAGS: {
-    VOICE_MESSAGES: boolean;
-    PUSH_NOTIFICATIONS: boolean;
-    OFFLINE_MODE: boolean;
-    PREMIUM_FEATURES: boolean;
-    REAL_TIME_MESSAGING: boolean;
-    IMAGE_COMPRESSION: boolean;
-    PERFORMANCE_MONITORING: boolean;
-  };
-  CACHE_CONFIG: {
-    IMAGE_CACHE_SIZE_MB: number;
-    OFFLINE_CACHE_SIZE_MB: number;
-    CACHE_EXPIRY_HOURS: number;
-  };
-  SUBSCRIPTION_CONFIG: {
-    PREMIUM_PRODUCT_ID: string;
-    PREMIUM_PLUS_PRODUCT_ID: string;
-    TRIAL_PERIOD_DAYS: number;
-  };
-  SECURITY_CONFIG: {
-    TOKEN_REFRESH_THRESHOLD_MINUTES: number;
-    SESSION_TIMEOUT_HOURS: number;
-    MAX_LOGIN_ATTEMPTS: number;
-  };
-  PERFORMANCE_CONFIG: {
-    API_TIMEOUT_MS: number;
-    IMAGE_UPLOAD_TIMEOUT_MS: number;
-    RETRY_ATTEMPTS: number;
-    RETRY_DELAY_MS: number;
-  };
+  ANALYTICS_ENDPOINT?: string;
+
+  // Feature Flags
+  ENABLE_REAL_TIME: boolean;
+  ENABLE_VOICE_MESSAGES: boolean;
+  ENABLE_PREMIUM_FEATURES: boolean;
+  ENABLE_BIOMETRIC_AUTH: boolean;
+  ENABLE_OFFLINE_MODE: boolean;
+
+  // Development
+  ENVIRONMENT: "development" | "staging" | "production";
+  DEBUG_MODE: boolean;
+  LOG_LEVEL: "debug" | "info" | "warn" | "error";
+
+  // Rate Limiting
+  API_RATE_LIMIT: number;
+  INTEREST_RATE_LIMIT: number;
+  MESSAGE_RATE_LIMIT: number;
+
+  // Cache Configuration
+  CACHE_TTL: number;
+  IMAGE_CACHE_SIZE: number;
+  OFFLINE_CACHE_SIZE: number;
+
+  // Security
+  ENABLE_SSL_PINNING: boolean;
+  ENABLE_ROOT_DETECTION: boolean;
+  ENABLE_SCREENSHOT_PROTECTION: boolean;
 }
 
-const developmentConfig: EnvironmentConfig = {
-  API_BASE_URL: "http://localhost:3000/api",
-  WEB_APP_URL: "http://localhost:3000",
-  WEBSOCKET_URL: "ws://localhost:3000",
-  ONESIGNAL_APP_ID: "dev-onesignal-app-id",
-  GOOGLE_OAUTH_CLIENT_ID: "dev-google-client-id",
-  SENTRY_DSN: undefined, // No error tracking in development
-  ANALYTICS_KEY: undefined, // No analytics in development
-  FEATURE_FLAGS: {
-    VOICE_MESSAGES: true,
-    PUSH_NOTIFICATIONS: true,
-    OFFLINE_MODE: true,
-    PREMIUM_FEATURES: true,
-    REAL_TIME_MESSAGING: true,
-    IMAGE_COMPRESSION: true,
-    PERFORMANCE_MONITORING: true,
-  },
-  CACHE_CONFIG: {
-    IMAGE_CACHE_SIZE_MB: 50, // Smaller cache for development
-    OFFLINE_CACHE_SIZE_MB: 25,
-    CACHE_EXPIRY_HOURS: 1, // Shorter expiry for testing
-  },
-  SUBSCRIPTION_CONFIG: {
-    PREMIUM_PRODUCT_ID: "com.aroosi.premium.monthly.dev",
-    PREMIUM_PLUS_PRODUCT_ID: "com.aroosi.premiumplus.monthly.dev",
-    TRIAL_PERIOD_DAYS: 7,
-  },
-  SECURITY_CONFIG: {
-    TOKEN_REFRESH_THRESHOLD_MINUTES: 5,
-    SESSION_TIMEOUT_HOURS: 24,
-    MAX_LOGIN_ATTEMPTS: 5, // More lenient for development
-  },
-  PERFORMANCE_CONFIG: {
-    API_TIMEOUT_MS: 10000, // 10 seconds
-    IMAGE_UPLOAD_TIMEOUT_MS: 30000, // 30 seconds
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY_MS: 1000,
-  },
-};
+const getEnvironmentConfig = (): EnvironmentConfig => {
+  const env = process.env.NODE_ENV || "development";
+  const isDevelopment = env === "development";
+  const isProduction = env === "production";
 
-const stagingConfig: EnvironmentConfig = {
-  API_BASE_URL: "https://staging-api.aroosi.com/api",
-  WEB_APP_URL: "https://staging.aroosi.com",
-  WEBSOCKET_URL: "wss://staging-api.aroosi.com",
-  ONESIGNAL_APP_ID: "staging-onesignal-app-id",
-  GOOGLE_OAUTH_CLIENT_ID: "staging-google-client-id",
-  SENTRY_DSN: "https://staging-sentry-dsn@sentry.io/project",
-  ANALYTICS_KEY: "staging-analytics-key",
-  FEATURE_FLAGS: {
-    VOICE_MESSAGES: true,
-    PUSH_NOTIFICATIONS: true,
-    OFFLINE_MODE: true,
-    PREMIUM_FEATURES: true,
-    REAL_TIME_MESSAGING: true,
-    IMAGE_COMPRESSION: true,
-    PERFORMANCE_MONITORING: true,
-  },
-  CACHE_CONFIG: {
-    IMAGE_CACHE_SIZE_MB: 100,
-    OFFLINE_CACHE_SIZE_MB: 50,
-    CACHE_EXPIRY_HOURS: 6,
-  },
-  SUBSCRIPTION_CONFIG: {
-    PREMIUM_PRODUCT_ID: "com.aroosi.premium.monthly.staging",
-    PREMIUM_PLUS_PRODUCT_ID: "com.aroosi.premiumplus.monthly.staging",
-    TRIAL_PERIOD_DAYS: 7,
-  },
-  SECURITY_CONFIG: {
-    TOKEN_REFRESH_THRESHOLD_MINUTES: 5,
-    SESSION_TIMEOUT_HOURS: 12,
-    MAX_LOGIN_ATTEMPTS: 3,
-  },
-  PERFORMANCE_CONFIG: {
-    API_TIMEOUT_MS: 8000,
-    IMAGE_UPLOAD_TIMEOUT_MS: 25000,
-    RETRY_ATTEMPTS: 3,
-    RETRY_DELAY_MS: 1500,
-  },
-};
+  // Base configuration
+  const baseConfig: EnvironmentConfig = {
+    // API Configuration
+    API_BASE_URL:
+      process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api",
+    API_VERSION: "v1",
+    API_TIMEOUT: 30000,
 
-const productionConfig: EnvironmentConfig = {
-  API_BASE_URL: "https://api.aroosi.com/api",
-  WEB_APP_URL: "https://aroosi.com",
-  WEBSOCKET_URL: "wss://api.aroosi.com",
-  ONESIGNAL_APP_ID: "production-onesignal-app-id",
-  GOOGLE_OAUTH_CLIENT_ID: "production-google-client-id",
-  SENTRY_DSN: "https://production-sentry-dsn@sentry.io/project",
-  ANALYTICS_KEY: "production-analytics-key",
-  FEATURE_FLAGS: {
-    VOICE_MESSAGES: true,
-    PUSH_NOTIFICATIONS: true,
-    OFFLINE_MODE: true,
-    PREMIUM_FEATURES: true,
-    REAL_TIME_MESSAGING: true,
-    IMAGE_COMPRESSION: true,
-    PERFORMANCE_MONITORING: false, // Disabled in production for performance
-  },
-  CACHE_CONFIG: {
-    IMAGE_CACHE_SIZE_MB: 200,
-    OFFLINE_CACHE_SIZE_MB: 100,
-    CACHE_EXPIRY_HOURS: 24,
-  },
-  SUBSCRIPTION_CONFIG: {
-    PREMIUM_PRODUCT_ID: "com.aroosi.premium.monthly",
-    PREMIUM_PLUS_PRODUCT_ID: "com.aroosi.premiumplus.monthly",
-    TRIAL_PERIOD_DAYS: 7,
-  },
-  SECURITY_CONFIG: {
-    TOKEN_REFRESH_THRESHOLD_MINUTES: 5,
-    SESSION_TIMEOUT_HOURS: 8,
-    MAX_LOGIN_ATTEMPTS: 3,
-  },
-  PERFORMANCE_CONFIG: {
-    API_TIMEOUT_MS: 5000,
-    IMAGE_UPLOAD_TIMEOUT_MS: 20000,
-    RETRY_ATTEMPTS: 2,
-    RETRY_DELAY_MS: 2000,
-  },
-};
+    // Authentication
+    GOOGLE_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "",
 
-function getEnvironment(): Environment {
-  // Check for explicit environment variable
-  const envVar = Constants.expoConfig?.extra?.environment;
-  if (envVar && ["development", "staging", "production"].includes(envVar)) {
-    return envVar as Environment;
-  }
+    // Push Notifications
+    ONESIGNAL_APP_ID: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || "",
 
-  // Determine environment based on release channel or other indicators
-  const releaseChannel = Constants.expoConfig?.extra?.releaseChannel;
+    // Payments
+    STRIPE_PUBLISHABLE_KEY:
+      process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
 
-  if (releaseChannel === "production") {
-    return "production";
-  } else if (releaseChannel === "staging") {
-    return "staging";
-  } else if (__DEV__) {
-    return "development";
-  } else {
-    return "production"; // Default to production for safety
-  }
-}
+    // Storage
+    CONVEX_URL: process.env.EXPO_PUBLIC_CONVEX_URL,
+    CONVEX_DEPLOYMENT: process.env.EXPO_PUBLIC_CONVEX_DEPLOYMENT,
 
-function getConfig(): EnvironmentConfig {
-  const environment = getEnvironment();
+    // Monitoring & Analytics
+    SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    ANALYTICS_ENDPOINT: process.env.EXPO_PUBLIC_ANALYTICS_ENDPOINT,
 
-  switch (environment) {
+    // Feature Flags
+    ENABLE_REAL_TIME: true,
+    ENABLE_VOICE_MESSAGES: true,
+    ENABLE_PREMIUM_FEATURES: true,
+    ENABLE_BIOMETRIC_AUTH: true,
+    ENABLE_OFFLINE_MODE: true,
+
+    // Development
+    ENVIRONMENT: env as "development" | "staging" | "production",
+    DEBUG_MODE: isDevelopment,
+    LOG_LEVEL: isDevelopment ? "debug" : "info",
+
+    // Rate Limiting
+    API_RATE_LIMIT: 100, // requests per minute
+    INTEREST_RATE_LIMIT: 20, // interests per day
+    MESSAGE_RATE_LIMIT: 100, // messages per day
+
+    // Cache Configuration
+    CACHE_TTL: 5 * 60 * 1000, // 5 minutes
+    IMAGE_CACHE_SIZE: 100 * 1024 * 1024, // 100MB
+    OFFLINE_CACHE_SIZE: 50 * 1024 * 1024, // 50MB
+
+    // Security
+    ENABLE_SSL_PINNING: isProduction,
+    ENABLE_ROOT_DETECTION: isProduction,
+    ENABLE_SCREENSHOT_PROTECTION: isProduction,
+  };
+
+  // Environment-specific overrides
+  switch (env) {
     case "development":
-      return developmentConfig;
+      return {
+        ...baseConfig,
+        API_BASE_URL:
+          process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api",
+        DEBUG_MODE: true,
+        LOG_LEVEL: "debug",
+        ENABLE_SSL_PINNING: false,
+        ENABLE_ROOT_DETECTION: false,
+        ENABLE_SCREENSHOT_PROTECTION: false,
+        API_RATE_LIMIT: 1000, // Higher limits for development
+        INTEREST_RATE_LIMIT: 100,
+        MESSAGE_RATE_LIMIT: 1000,
+      };
+
     case "staging":
-      return stagingConfig;
+      return {
+        ...baseConfig,
+        API_BASE_URL:
+          process.env.EXPO_PUBLIC_API_URL || "https://staging.aroosi.app/api",
+        DEBUG_MODE: true,
+        LOG_LEVEL: "debug",
+        ENABLE_SSL_PINNING: false,
+        ENABLE_ROOT_DETECTION: false,
+        ENABLE_SCREENSHOT_PROTECTION: false,
+        API_RATE_LIMIT: 200,
+        INTEREST_RATE_LIMIT: 50,
+        MESSAGE_RATE_LIMIT: 200,
+      };
+
     case "production":
-      return productionConfig;
+      return {
+        ...baseConfig,
+        API_BASE_URL:
+          process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api",
+        DEBUG_MODE: false,
+        LOG_LEVEL: "warn",
+        ENABLE_SSL_PINNING: true,
+        ENABLE_ROOT_DETECTION: true,
+        ENABLE_SCREENSHOT_PROTECTION: true,
+      };
+
     default:
-      return productionConfig;
+      return baseConfig;
   }
-}
+};
 
-export const ENV = getEnvironment();
-export const CONFIG = getConfig();
+// Export the configuration
+export const config = getEnvironmentConfig();
 
-// Feature flag utilities
-export function isFeatureEnabled(
-  feature: keyof EnvironmentConfig["FEATURE_FLAGS"]
-): boolean {
-  return CONFIG.FEATURE_FLAGS[feature];
-}
-
-export function getApiUrl(endpoint: string): string {
-  return `${CONFIG.API_BASE_URL}${
-    endpoint.startsWith("/") ? endpoint : `/${endpoint}`
-  }`;
-}
-
-export function getWebUrl(path: string = ""): string {
-  return `${CONFIG.WEB_APP_URL}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-// Environment-specific logging
-export function logEnvironmentInfo(): void {
-  console.log("🌍 Environment Configuration:");
-  console.log(`📍 Environment: ${ENV}`);
-  console.log(`🔗 API Base URL: ${CONFIG.API_BASE_URL}`);
-  console.log(`🌐 Web App URL: ${CONFIG.WEB_APP_URL}`);
-  console.log(`🚀 Feature Flags:`, CONFIG.FEATURE_FLAGS);
-
-  if (ENV === "development") {
-    console.log("🔧 Development mode - All features enabled");
-  } else if (ENV === "staging") {
-    console.log("🧪 Staging mode - Testing configuration");
-  } else {
-    console.log("🏭 Production mode - Optimized configuration");
-  }
-}
-
-// Configuration validation
-export function validateConfig(): boolean {
-  const requiredFields = [
-    "API_BASE_URL",
-    "WEB_APP_URL",
+// Validation function to ensure required environment variables are set
+export const validateEnvironmentConfig = (): {
+  isValid: boolean;
+  missingVars: string[];
+} => {
+  const requiredVars = [
+    "GOOGLE_CLIENT_ID",
     "ONESIGNAL_APP_ID",
-    "GOOGLE_OAUTH_CLIENT_ID",
+    "STRIPE_PUBLISHABLE_KEY",
   ];
 
-  for (const field of requiredFields) {
-    if (!CONFIG[field as keyof EnvironmentConfig]) {
-      console.error(`❌ Missing required configuration: ${field}`);
-      return false;
+  const missingVars: string[] = [];
+
+  requiredVars.forEach((varName) => {
+    const value = config[varName as keyof EnvironmentConfig];
+    if (!value || (typeof value === "string" && value.trim() === "")) {
+      missingVars.push(varName);
+    }
+  });
+
+  return {
+    isValid: missingVars.length === 0,
+    missingVars,
+  };
+};
+
+// Helper functions for feature flags
+export const isFeatureEnabled = (feature: keyof EnvironmentConfig): boolean => {
+  const value = config[feature];
+  return typeof value === "boolean" ? value : false;
+};
+
+export const getApiUrl = (endpoint: string): string => {
+  const baseUrl = config.API_BASE_URL.replace(/\/$/, ""); // Remove trailing slash
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  return `${baseUrl}${cleanEndpoint}`;
+};
+
+export const getApiHeaders = (): Record<string, string> => {
+  return {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-API-Version": config.API_VERSION,
+    "X-Client-Platform": "mobile",
+    "X-Client-Version": "1.0.0", // This could be dynamic
+  };
+};
+
+// Rate limiting helpers
+export const getRateLimit = (type: "api" | "interest" | "message"): number => {
+  switch (type) {
+    case "api":
+      return config.API_RATE_LIMIT;
+    case "interest":
+      return config.INTEREST_RATE_LIMIT;
+    case "message":
+      return config.MESSAGE_RATE_LIMIT;
+    default:
+      return 100;
+  }
+};
+
+// Cache configuration helpers
+export const getCacheConfig = () => ({
+  ttl: config.CACHE_TTL,
+  imageCacheSize: config.IMAGE_CACHE_SIZE,
+  offlineCacheSize: config.OFFLINE_CACHE_SIZE,
+});
+
+// Security configuration helpers
+export const getSecurityConfig = () => ({
+  sslPinning: config.ENABLE_SSL_PINNING,
+  rootDetection: config.ENABLE_ROOT_DETECTION,
+  screenshotProtection: config.ENABLE_SCREENSHOT_PROTECTION,
+});
+
+// Development helpers
+export const isDevelopment = (): boolean =>
+  config.ENVIRONMENT === "development";
+export const isStaging = (): boolean => config.ENVIRONMENT === "staging";
+export const isProduction = (): boolean => config.ENVIRONMENT === "production";
+export const isDebugMode = (): boolean => config.DEBUG_MODE;
+
+// Logging configuration
+export const getLogLevel = (): string => config.LOG_LEVEL;
+
+// Feature flag helpers
+export const canUseRealTime = (): boolean => config.ENABLE_REAL_TIME;
+export const canUseVoiceMessages = (): boolean => config.ENABLE_VOICE_MESSAGES;
+export const canUsePremiumFeatures = (): boolean =>
+  config.ENABLE_PREMIUM_FEATURES;
+export const canUseBiometricAuth = (): boolean => config.ENABLE_BIOMETRIC_AUTH;
+export const canUseOfflineMode = (): boolean => config.ENABLE_OFFLINE_MODE;
+
+// Configuration validation for runtime
+export const validateRuntimeConfig = (): {
+  isValid: boolean;
+  errors: string[];
+} => {
+  const errors: string[] = [];
+
+  // Validate API URL
+  try {
+    new URL(config.API_BASE_URL);
+  } catch {
+    errors.push("Invalid API_BASE_URL format");
+  }
+
+  // Validate timeout values
+  if (config.API_TIMEOUT <= 0) {
+    errors.push("API_TIMEOUT must be greater than 0");
+  }
+
+  // Validate cache sizes
+  if (config.IMAGE_CACHE_SIZE <= 0) {
+    errors.push("IMAGE_CACHE_SIZE must be greater than 0");
+  }
+
+  if (config.OFFLINE_CACHE_SIZE <= 0) {
+    errors.push("OFFLINE_CACHE_SIZE must be greater than 0");
+  }
+
+  // Validate rate limits
+  if (config.API_RATE_LIMIT <= 0) {
+    errors.push("API_RATE_LIMIT must be greater than 0");
+  }
+
+  // Validate required external service keys in production
+  if (isProduction()) {
+    if (!config.GOOGLE_CLIENT_ID) {
+      errors.push("GOOGLE_CLIENT_ID is required in production");
+    }
+
+    if (!config.ONESIGNAL_APP_ID) {
+      errors.push("ONESIGNAL_APP_ID is required in production");
+    }
+
+    if (!config.STRIPE_PUBLISHABLE_KEY) {
+      errors.push("STRIPE_PUBLISHABLE_KEY is required in production");
     }
   }
 
-  // Validate URLs
-  try {
-    new URL(CONFIG.API_BASE_URL);
-    new URL(CONFIG.WEB_APP_URL);
-  } catch (error) {
-    console.error("❌ Invalid URL configuration:", error);
-    return false;
-  }
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
 
-  console.log("✅ Configuration validation passed");
-  return true;
+// Export configuration summary for debugging
+export const getConfigSummary = () => ({
+  environment: config.ENVIRONMENT,
+  apiBaseUrl: config.API_BASE_URL,
+  debugMode: config.DEBUG_MODE,
+  logLevel: config.LOG_LEVEL,
+  featuresEnabled: {
+    realTime: config.ENABLE_REAL_TIME,
+    voiceMessages: config.ENABLE_VOICE_MESSAGES,
+    premiumFeatures: config.ENABLE_PREMIUM_FEATURES,
+    biometricAuth: config.ENABLE_BIOMETRIC_AUTH,
+    offlineMode: config.ENABLE_OFFLINE_MODE,
+  },
+  rateLimits: {
+    api: config.API_RATE_LIMIT,
+    interest: config.INTEREST_RATE_LIMIT,
+    message: config.MESSAGE_RATE_LIMIT,
+  },
+  security: {
+    sslPinning: config.ENABLE_SSL_PINNING,
+    rootDetection: config.ENABLE_ROOT_DETECTION,
+    screenshotProtection: config.ENABLE_SCREENSHOT_PROTECTION,
+  },
+});
+
+// Initialize configuration validation on import
+const validation = validateRuntimeConfig();
+if (!validation.isValid && isProduction()) {
+  console.error("Configuration validation failed:", validation.errors);
+  // In production, you might want to prevent app startup or show an error screen
 }
 
-// Export individual configs for testing
-export const configs = {
-  development: developmentConfig,
-  staging: stagingConfig,
-  production: productionConfig,
-};
+// Log configuration summary in development
+if (isDevelopment()) {
+  console.log("Environment Configuration:", getConfigSummary());
+}

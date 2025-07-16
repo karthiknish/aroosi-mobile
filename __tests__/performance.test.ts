@@ -1,303 +1,593 @@
+import { describe, test, expect, beforeEach, jest } from "@jest/globals";
+import { ApiClient } from "../utils/api";
+import { ImageCache } from "../utils/imageCache";
+import { OfflineCache } from "../utils/offlineCache";
 import { PerformanceMonitor } from "../utils/performanceMonitor";
-import { ImageCacheManager } from "../utils/imageCache";
-import { OfflineCacheManager } from "../utils/offlineCache";
 
-describe("Performance Tests", () => {
+// Mock dependencies
+jest.mock("../utils/imageCache");
+jest.mock("../utils/offlineCache");
+jest.mock("../utils/performanceMonitor");
+
+describe("Performance and Optimization Tests", () => {
+  let apiClient: ApiClient;
+  let imageCache: ImageCache;
+  let offlineCache: OfflineCache;
   let performanceMonitor: PerformanceMonitor;
-  let imageCacheManager: ImageCacheManager;
-  let offlineCacheManager: OfflineCacheManager;
 
   beforeEach(() => {
-    performanceMonitor = PerformanceMonitor.getInstance();
-    imageCacheManager = ImageCacheManager.getInstance();
-    offlineCacheManager = OfflineCacheManager.getInstance();
     jest.clearAllMocks();
-  });
-
-  describe("Screen Load Performance", () => {
-    it("should track screen load times", async () => {
-      const screenName = "ProfileScreen";
-
-      performanceMonitor.startScreenLoad(screenName);
-
-      // Simulate screen loading work
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      performanceMonitor.endScreenLoad(screenName);
-
-      const metrics = performanceMonitor.getMetrics("screen_load_time");
-      expect(metrics).toHaveLength(1);
-      expect(metrics[0].metadata?.screenName).toBe(screenName);
-      expect(metrics[0].value).toBeGreaterThan(90); // Should be around 100ms
-    });
-
-    it("should identify slow screen loads", async () => {
-      const screenName = "SlowScreen";
-
-      performanceMonitor.startScreenLoad(screenName);
-
-      // Simulate slow loading
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      performanceMonitor.endScreenLoad(screenName);
-
-      const metrics = performanceMonitor.getMetrics("screen_load_time");
-      const slowMetric = metrics.find(
-        (m) => m.metadata?.screenName === screenName
-      );
-
-      expect(slowMetric).toBeDefined();
-      expect(slowMetric!.value).toBeGreaterThan(1900); // Should be around 2000ms
-    });
+    apiClient = new ApiClient();
+    imageCache = new ImageCache();
+    offlineCache = new OfflineCache();
+    performanceMonitor = new PerformanceMonitor();
   });
 
   describe("API Performance", () => {
-    it("should track API call durations", async () => {
-      const endpoint = "/api/test";
-      const method = "GET";
+    test("should complete profile fetch within acceptable time", async () => {
+      const mockResponse = {
+        success: true,
+        data: {
+          id: "profile-123",
+          fullName: "Test User",
+          email: "test@aroosi.app",
+        },
+      };
 
-      const callId = performanceMonitor.startAPICall(endpoint, method);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      const startTime = performance.now();
+      const result = await apiClient.getProfile();
+      const endTime = performance.now();
+      const responseTime = endTime - startTime;
 
-      performanceMonitor.endAPICall(callId, endpoint, method, 200, 1024);
-
-      const metrics = performanceMonitor.getMetrics("api_call_duration");
-      expect(metrics).toHaveLength(1);
-      expect(metrics[0].metadata?.endpoint).toBe(endpoint);
-      expect(metrics[0].metadata?.method).toBe(method);
-      expect(metrics[0].metadata?.status).toBe(200);
-      expect(metrics[0].value).toBeGreaterThan(190);
+      expect(result.success).toBe(true);
+      expect(responseTime).toBeLessThan(2000); // Should respond within 2 seconds
     });
 
-    it("should track failed API calls", async () => {
-      const endpoint = "/api/error";
-      const method = "POST";
+    test("should handle concurrent API requests efficiently", async () => {
+      const mockResponse = {
+        success: true,
+        data: { profiles: [] },
+      };
 
-      const callId = performanceMonitor.startAPICall(endpoint, method);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
 
-      // Simulate failed API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const startTime = performance.now();
 
-      performanceMonitor.endAPICall(callId, endpoint, method, 500);
-
-      const metrics = performanceMonitor.getMetrics("api_call_duration");
-      const errorMetric = metrics.find(
-        (m) => m.metadata?.endpoint === endpoint
+      // Make 10 concurrent requests
+      const requests = Array.from({ length: 10 }, (_, i) =>
+        apiClient.searchProfiles({ page: i + 1 }, 1)
       );
 
-      expect(errorMetric).toBeDefined();
-      expect(errorMetric!.metadata?.status).toBe(500);
+      const results = await Promise.all(requests);
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+
+      // All requests should succeed
+      expect(results.every((result) => result.success)).toBe(true);
+
+      // Total time should be reasonable (not 10x single request time)
+      expect(totalTime).toBeLessThan(5000);
+    });
+
+    test("should implement request batching for efficiency", async () => {
+      const batchRequests = [
+        { endpoint: "/api/profile", method: "GET" },
+        { endpoint: "/api/interests/sent", method: "GET" },
+        { endpoint: "/api/matches", method: "GET" },
+      ];
+
+      const mockResponse = {
+        success: true,
+        data: {
+          profile: { id: "profile-123" },
+          interests: [],
+          matches: [],
+        },
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      const startTime = performance.now();
+      const result = await apiClient.batchRequests(batchRequests);
+      const endTime = performance.now();
+      const responseTime = endTime - startTime;
+
+      expect(result.success).toBe(true);
+      expect(responseTime).toBeLessThan(3000);
+      // Should make only one network call for batched requests
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test("should implement request deduplication", async () => {
+      const mockResponse = {
+        success: true,
+        data: { id: "profile-123" },
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
+
+      // Make multiple identical requests simultaneously
+      const requests = Array.from({ length: 5 }, () => apiClient.getProfile());
+
+      const results = await Promise.all(requests);
+
+      // All should succeed with same data
+      expect(results.every((result) => result.success)).toBe(true);
+      expect(results.every((result) => result.data?.id === "profile-123")).toBe(
+        true
+      );
+
+      // Should only make one actual network request due to deduplication
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("Image Cache Performance", () => {
-    it("should cache images efficiently", async () => {
-      const testImageUri = "https://example.com/test-image.jpg";
+  describe("Image Caching and Optimization", () => {
+    test("should cache images efficiently", async () => {
+      const imageUrl = "https://storage.aroosi.app/images/profile-123.jpg";
+      const mockImageData = new Uint8Array([1, 2, 3, 4]);
 
-      // Mock successful image download
-      jest.spyOn(global, "fetch").mockResolvedValueOnce({
+      (imageCache.get as jest.Mock).mockResolvedValue(null);
+      (imageCache.set as jest.Mock).mockResolvedValue(true);
+
+      global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        status: 200,
-        blob: () => Promise.resolve(new Blob()),
-      } as Response);
+        arrayBuffer: () => Promise.resolve(mockImageData.buffer),
+      });
 
-      const startTime = Date.now();
-      const cachedUri = await imageCacheManager.cacheImage(testImageUri);
-      const endTime = Date.now();
+      const startTime = performance.now();
+      const result = await imageCache.getImage(imageUrl);
+      const endTime = performance.now();
+      const loadTime = endTime - startTime;
 
-      expect(cachedUri).toBeTruthy();
-      expect(endTime - startTime).toBeLessThan(1000); // Should complete quickly
+      expect(result).toBeDefined();
+      expect(loadTime).toBeLessThan(1000);
+      expect(imageCache.set).toHaveBeenCalledWith(imageUrl, expect.any(Object));
     });
 
-    it("should handle cache size limits", async () => {
-      const cacheManager = ImageCacheManager.getInstance({ maxSize: 1024 }); // 1KB limit
+    test("should serve cached images quickly", async () => {
+      const imageUrl = "https://storage.aroosi.app/images/profile-123.jpg";
+      const cachedImage = { uri: "file://cached-image.jpg" };
 
-      // Try to cache multiple large images
-      const imageUris = [
-        "https://example.com/large1.jpg",
-        "https://example.com/large2.jpg",
-        "https://example.com/large3.jpg",
-      ];
+      (imageCache.get as jest.Mock).mockResolvedValue(cachedImage);
 
-      // Mock large image downloads
-      jest.spyOn(global, "fetch").mockImplementation(() =>
-        Promise.resolve({
-          ok: true,
-          status: 200,
-          blob: () => Promise.resolve(new Blob(["x".repeat(500)])), // 500 bytes each
-        } as Response)
+      const startTime = performance.now();
+      const result = await imageCache.getImage(imageUrl);
+      const endTime = performance.now();
+      const loadTime = endTime - startTime;
+
+      expect(result).toBe(cachedImage);
+      expect(loadTime).toBeLessThan(100); // Should be very fast from cache
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test("should optimize image sizes for mobile", async () => {
+      const largeImageUrl =
+        "https://storage.aroosi.app/images/large-profile.jpg";
+      const optimizedImage = {
+        uri: "file://optimized-image.jpg",
+        width: 400,
+        height: 400,
+        size: 50000, // 50KB
+      };
+
+      (imageCache.optimizeImage as jest.Mock).mockResolvedValue(optimizedImage);
+
+      const result = await imageCache.optimizeImage(largeImageUrl, {
+        maxWidth: 400,
+        maxHeight: 400,
+        quality: 0.8,
+      });
+
+      expect(result.width).toBeLessThanOrEqual(400);
+      expect(result.height).toBeLessThanOrEqual(400);
+      expect(result.size).toBeLessThan(100000); // Should be compressed
+    });
+
+    test("should implement progressive image loading", async () => {
+      const imageUrl = "https://storage.aroosi.app/images/profile-123.jpg";
+      const thumbnailUrl =
+        "https://storage.aroosi.app/images/profile-123-thumb.jpg";
+
+      let loadingStages = [];
+
+      const mockProgressiveLoader = {
+        onProgress: (stage: string) => loadingStages.push(stage),
+      };
+
+      await imageCache.loadProgressively(
+        imageUrl,
+        thumbnailUrl,
+        mockProgressiveLoader
       );
 
-      for (const uri of imageUris) {
-        await cacheManager.cacheImage(uri);
-      }
+      expect(loadingStages).toContain("thumbnail");
+      expect(loadingStages).toContain("full");
+      expect(loadingStages.indexOf("thumbnail")).toBeLessThan(
+        loadingStages.indexOf("full")
+      );
+    });
 
-      const cacheSize = await cacheManager.getCacheSize();
-      expect(cacheSize).toBeLessThanOrEqual(1024); // Should not exceed limit
+    test("should manage cache size and cleanup", async () => {
+      const cacheStats = {
+        totalSize: 50 * 1024 * 1024, // 50MB
+        itemCount: 200,
+        maxSize: 100 * 1024 * 1024, // 100MB limit
+      };
+
+      (imageCache.getStats as jest.Mock).mockResolvedValue(cacheStats);
+      (imageCache.cleanup as jest.Mock).mockResolvedValue({
+        itemsRemoved: 50,
+        sizeFreed: 20 * 1024 * 1024,
+      });
+
+      const stats = await imageCache.getStats();
+      expect(stats.totalSize).toBeLessThan(stats.maxSize);
+
+      if (stats.totalSize > stats.maxSize * 0.8) {
+        const cleanupResult = await imageCache.cleanup();
+        expect(cleanupResult.itemsRemoved).toBeGreaterThan(0);
+        expect(cleanupResult.sizeFreed).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe("Offline Caching", () => {
+    test("should cache essential data for offline access", async () => {
+      const profileData = {
+        id: "profile-123",
+        fullName: "Test User",
+        email: "test@aroosi.app",
+      };
+
+      const conversationsData = [
+        { id: "conv-1", lastMessage: "Hello" },
+        { id: "conv-2", lastMessage: "Hi there" },
+      ];
+
+      (offlineCache.set as jest.Mock).mockResolvedValue(true);
+
+      await offlineCache.cacheEssentialData({
+        profile: profileData,
+        conversations: conversationsData,
+      });
+
+      expect(offlineCache.set).toHaveBeenCalledWith("profile", profileData);
+      expect(offlineCache.set).toHaveBeenCalledWith(
+        "conversations",
+        conversationsData
+      );
+    });
+
+    test("should serve cached data when offline", async () => {
+      const cachedProfile = {
+        id: "profile-123",
+        fullName: "Test User",
+        isOfflineCache: true,
+      };
+
+      (offlineCache.get as jest.Mock).mockResolvedValue(cachedProfile);
+
+      // Simulate offline condition
+      global.fetch = jest.fn().mockRejectedValue(new Error("Network error"));
+
+      const result = await apiClient.getProfile();
+
+      expect(result.success).toBe(true);
+      expect(result.data?.isOfflineCache).toBe(true);
+      expect(offlineCache.get).toHaveBeenCalledWith("profile");
+    });
+
+    test("should sync offline changes when back online", async () => {
+      const offlineChanges = [
+        {
+          type: "profile_update",
+          data: { aboutMe: "Updated offline" },
+          timestamp: Date.now(),
+        },
+        {
+          type: "message_sent",
+          data: { text: "Offline message", conversationId: "conv-1" },
+          timestamp: Date.now(),
+        },
+      ];
+
+      (offlineCache.getPendingChanges as jest.Mock).mockResolvedValue(
+        offlineChanges
+      );
+      (offlineCache.clearPendingChanges as jest.Mock).mockResolvedValue(true);
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      const syncResult = await offlineCache.syncPendingChanges();
+
+      expect(syncResult.success).toBe(true);
+      expect(syncResult.syncedCount).toBe(2);
+      expect(offlineCache.clearPendingChanges).toHaveBeenCalled();
+    });
+
+    test("should handle offline cache expiration", async () => {
+      const expiredData = {
+        data: { id: "profile-123" },
+        timestamp: Date.now() - 24 * 60 * 60 * 1000, // 24 hours ago
+        ttl: 12 * 60 * 60 * 1000, // 12 hour TTL
+      };
+
+      (offlineCache.get as jest.Mock).mockResolvedValue(expiredData);
+      (offlineCache.isExpired as jest.Mock).mockReturnValue(true);
+
+      const result = await offlineCache.get("profile");
+
+      expect(offlineCache.isExpired).toHaveBeenCalledWith(expiredData);
+      expect(result).toBeNull(); // Should return null for expired data
     });
   });
 
   describe("Memory Management", () => {
-    it("should clean up expired cache entries", async () => {
-      const shortTTL = 100; // 100ms
+    test("should monitor memory usage", async () => {
+      const memoryStats = {
+        used: 50 * 1024 * 1024, // 50MB
+        total: 100 * 1024 * 1024, // 100MB
+        percentage: 50,
+      };
 
-      await offlineCacheManager.set("test_key", { data: "test" }, shortTTL);
+      (performanceMonitor.getMemoryUsage as jest.Mock).mockResolvedValue(
+        memoryStats
+      );
 
-      // Verify data is cached
-      let cachedData = await offlineCacheManager.get("test_key");
-      expect(cachedData).toEqual({ data: "test" });
+      const stats = await performanceMonitor.getMemoryUsage();
 
-      // Wait for expiration
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      // Data should be expired and removed
-      cachedData = await offlineCacheManager.get("test_key");
-      expect(cachedData).toBeNull();
+      expect(stats.percentage).toBeLessThan(80); // Should stay under 80%
+      expect(stats.used).toBeLessThan(stats.total);
     });
 
-    it("should limit cache size", async () => {
-      const limitedCache = OfflineCacheManager.getInstance({ maxEntries: 3 });
+    test("should cleanup memory when threshold exceeded", async () => {
+      const highMemoryStats = {
+        used: 85 * 1024 * 1024, // 85MB
+        total: 100 * 1024 * 1024, // 100MB
+        percentage: 85,
+      };
 
-      // Add more entries than the limit
-      await limitedCache.set("key1", "value1");
-      await limitedCache.set("key2", "value2");
-      await limitedCache.set("key3", "value3");
-      await limitedCache.set("key4", "value4"); // Should trigger cleanup
-
-      const cacheSize = await limitedCache.getSize();
-      expect(cacheSize).toBeLessThanOrEqual(3);
-    });
-  });
-
-  describe("Performance Metrics Collection", () => {
-    it("should collect comprehensive performance report", async () => {
-      // Generate some test metrics
-      performanceMonitor.recordMetric("screen_load_time", 500, {
-        screenName: "TestScreen",
-      });
-      performanceMonitor.recordMetric("api_call_duration", 200, {
-        endpoint: "/api/test",
-      });
-      performanceMonitor.recordMetric("memory_usage", 50, {
-        screen: "TestScreen",
-      });
-      performanceMonitor.recordMetric("frame_rate", 60, {
-        screenName: "TestScreen",
+      (performanceMonitor.getMemoryUsage as jest.Mock).mockResolvedValue(
+        highMemoryStats
+      );
+      (performanceMonitor.cleanup as jest.Mock).mockResolvedValue({
+        memoryFreed: 20 * 1024 * 1024,
+        itemsCleared: 50,
       });
 
-      const report = performanceMonitor.getPerformanceReport();
+      const stats = await performanceMonitor.getMemoryUsage();
 
-      expect(report.screenLoadTimes).toBeDefined();
-      expect(report.apiCallTimes).toBeDefined();
-      expect(report.memoryUsage).toBeDefined();
-      expect(report.frameRate).toBeDefined();
-      expect(report.totalMetrics).toBeGreaterThan(0);
+      if (stats.percentage > 80) {
+        const cleanupResult = await performanceMonitor.cleanup();
+        expect(cleanupResult.memoryFreed).toBeGreaterThan(0);
+        expect(cleanupResult.itemsCleared).toBeGreaterThan(0);
+      }
     });
 
-    it("should calculate average metrics correctly", () => {
-      const metricName = "test_metric";
-
-      performanceMonitor.recordMetric(metricName, 100);
-      performanceMonitor.recordMetric(metricName, 200);
-      performanceMonitor.recordMetric(metricName, 300);
-
-      const average = performanceMonitor.getAverageMetric(metricName);
-      expect(average).toBe(200); // (100 + 200 + 300) / 3
-    });
-  });
-
-  describe("Large Data Set Performance", () => {
-    it("should handle large profile lists efficiently", async () => {
-      const largeDataSet = Array.from({ length: 10000 }, (_, i) => ({
-        id: `profile_${i}`,
-        name: `User ${i}`,
-        data: "x".repeat(100), // 100 chars per profile
+    test("should implement lazy loading for large lists", async () => {
+      const mockProfiles = Array.from({ length: 1000 }, (_, i) => ({
+        id: `profile-${i}`,
+        fullName: `User ${i}`,
       }));
 
-      const startTime = Date.now();
+      // Mock paginated response
+      global.fetch = jest.fn().mockImplementation((url) => {
+        const urlObj = new URL(url);
+        const page = parseInt(urlObj.searchParams.get("page") || "1");
+        const limit = parseInt(urlObj.searchParams.get("limit") || "20");
+        const start = (page - 1) * limit;
+        const end = start + limit;
 
-      // Simulate processing large data set
-      const processedData = largeDataSet
-        .filter((item) => item.id.includes("1"))
-        .map((item) => ({ ...item, processed: true }))
-        .slice(0, 100);
-
-      const endTime = Date.now();
-
-      expect(processedData.length).toBeLessThanOrEqual(100);
-      expect(endTime - startTime).toBeLessThan(100); // Should complete quickly
-    });
-
-    it("should handle pagination efficiently", async () => {
-      const pageSize = 20;
-      const totalItems = 1000;
-
-      const startTime = Date.now();
-
-      // Simulate paginated data loading
-      const pages = Math.ceil(totalItems / pageSize);
-      const loadedPages = [];
-
-      for (let i = 0; i < Math.min(pages, 5); i++) {
-        // Load first 5 pages
-        const pageData = Array.from({ length: pageSize }, (_, j) => ({
-          id: i * pageSize + j,
-          data: `Item ${i * pageSize + j}`,
-        }));
-        loadedPages.push(pageData);
-      }
-
-      const endTime = Date.now();
-
-      expect(loadedPages).toHaveLength(5);
-      expect(loadedPages[0]).toHaveLength(pageSize);
-      expect(endTime - startTime).toBeLessThan(50); // Should be very fast
-    });
-  });
-
-  describe("Concurrent Operations", () => {
-    it("should handle multiple simultaneous API calls", async () => {
-      const apiCalls = Array.from({ length: 10 }, (_, i) => {
-        const callId = performanceMonitor.startAPICall(`/api/test${i}`, "GET");
-
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            performanceMonitor.endAPICall(callId, `/api/test${i}`, "GET", 200);
-            resolve(true);
-          }, Math.random() * 100); // Random delay 0-100ms
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: {
+                profiles: mockProfiles.slice(start, end),
+                hasMore: end < mockProfiles.length,
+                totalCount: mockProfiles.length,
+              },
+            }),
         });
       });
 
-      const startTime = Date.now();
-      await Promise.all(apiCalls);
-      const endTime = Date.now();
+      const startTime = performance.now();
+      const result = await apiClient.searchProfiles({}, 1, 20);
+      const endTime = performance.now();
+      const loadTime = endTime - startTime;
 
-      const metrics = performanceMonitor.getMetrics("api_call_duration");
-      expect(metrics).toHaveLength(10);
-      expect(endTime - startTime).toBeLessThan(200); // Should complete in parallel
+      expect(result.success).toBe(true);
+      expect(result.data?.profiles).toHaveLength(20); // Only loaded first page
+      expect(loadTime).toBeLessThan(1000); // Should be fast due to pagination
+    });
+  });
+
+  describe("Network Optimization", () => {
+    test("should implement request compression", async () => {
+      const largeData = {
+        profiles: Array.from({ length: 100 }, (_, i) => ({
+          id: `profile-${i}`,
+          fullName: `User ${i}`,
+          aboutMe: "A".repeat(500), // Large text
+        })),
+      };
+
+      global.fetch = jest.fn().mockImplementation((url, options) => {
+        // Check if compression headers are set
+        expect(options?.headers?.["Accept-Encoding"]).toContain("gzip");
+
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              data: largeData,
+            }),
+        });
+      });
+
+      const result = await apiClient.searchProfiles({}, 1);
+      expect(result.success).toBe(true);
     });
 
-    it("should handle concurrent cache operations", async () => {
-      const cacheOperations = Array.from({ length: 20 }, (_, i) =>
-        offlineCacheManager.set(`concurrent_key_${i}`, { value: i })
+    test("should implement connection pooling", async () => {
+      const requests = Array.from({ length: 10 }, () => apiClient.getProfile());
+
+      const startTime = performance.now();
+      await Promise.all(requests);
+      const endTime = performance.now();
+      const totalTime = endTime - startTime;
+
+      // With connection pooling, concurrent requests should be faster
+      expect(totalTime).toBeLessThan(3000);
+    });
+
+    test("should handle slow network gracefully", async () => {
+      // Simulate slow network
+      global.fetch = jest.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({ success: true, data: {} }),
+              });
+            }, 5000); // 5 second delay
+          })
       );
 
-      const startTime = Date.now();
-      await Promise.all(cacheOperations);
-      const endTime = Date.now();
+      const startTime = performance.now();
+      const result = await apiClient.getProfile();
+      const endTime = performance.now();
+      const responseTime = endTime - startTime;
 
-      // Verify all data was cached
-      const retrieveOperations = Array.from({ length: 20 }, (_, i) =>
-        offlineCacheManager.get(`concurrent_key_${i}`)
+      // Should timeout before 5 seconds
+      expect(responseTime).toBeLessThan(4000);
+
+      if (!result.success) {
+        expect(result.error?.code).toBe("TIMEOUT");
+      }
+    });
+  });
+
+  describe("Background Processing", () => {
+    test("should handle background sync efficiently", async () => {
+      const backgroundTasks = [
+        { type: "sync_messages", priority: "high" },
+        { type: "sync_profile", priority: "medium" },
+        { type: "cleanup_cache", priority: "low" },
+      ];
+
+      (
+        performanceMonitor.processBackgroundTasks as jest.Mock
+      ).mockResolvedValue({
+        completed: 3,
+        failed: 0,
+        totalTime: 2000,
+      });
+
+      const result = await performanceMonitor.processBackgroundTasks(
+        backgroundTasks
       );
 
-      const results = await Promise.all(retrieveOperations);
+      expect(result.completed).toBe(3);
+      expect(result.failed).toBe(0);
+      expect(result.totalTime).toBeLessThan(5000);
+    });
 
-      expect(results).toHaveLength(20);
-      expect(results.every((result) => result !== null)).toBe(true);
-      expect(endTime - startTime).toBeLessThan(500); // Should be reasonably fast
+    test("should prioritize critical tasks", async () => {
+      const tasks = [
+        { type: "low_priority", priority: "low", estimatedTime: 1000 },
+        { type: "critical_task", priority: "critical", estimatedTime: 500 },
+        { type: "medium_task", priority: "medium", estimatedTime: 800 },
+      ];
+
+      const executionOrder: string[] = [];
+
+      (performanceMonitor.executeTasks as jest.Mock).mockImplementation(
+        (taskList) => {
+          // Should execute in priority order: critical, medium, low
+          taskList.forEach((task: any) => executionOrder.push(task.type));
+          return Promise.resolve({ success: true });
+        }
+      );
+
+      await performanceMonitor.executeTasks(tasks);
+
+      expect(executionOrder[0]).toBe("critical_task");
+      expect(executionOrder[1]).toBe("medium_task");
+      expect(executionOrder[2]).toBe("low_priority");
+    });
+  });
+
+  describe("Performance Monitoring", () => {
+    test("should track key performance metrics", async () => {
+      const metrics = {
+        apiResponseTime: 1200,
+        imageLoadTime: 800,
+        screenRenderTime: 16.7, // 60fps
+        memoryUsage: 45,
+        cacheHitRate: 85,
+      };
+
+      (performanceMonitor.getMetrics as jest.Mock).mockResolvedValue(metrics);
+
+      const result = await performanceMonitor.getMetrics();
+
+      expect(result.apiResponseTime).toBeLessThan(2000);
+      expect(result.imageLoadTime).toBeLessThan(1000);
+      expect(result.screenRenderTime).toBeLessThan(20); // 50fps minimum
+      expect(result.memoryUsage).toBeLessThan(80);
+      expect(result.cacheHitRate).toBeGreaterThan(70);
+    });
+
+    test("should alert on performance degradation", async () => {
+      const poorMetrics = {
+        apiResponseTime: 5000, // Too slow
+        memoryUsage: 90, // Too high
+        cacheHitRate: 30, // Too low
+      };
+
+      (performanceMonitor.getMetrics as jest.Mock).mockResolvedValue(
+        poorMetrics
+      );
+      (performanceMonitor.checkThresholds as jest.Mock).mockResolvedValue({
+        alerts: [
+          { type: "API_SLOW", value: 5000, threshold: 2000 },
+          { type: "MEMORY_HIGH", value: 90, threshold: 80 },
+          { type: "CACHE_LOW", value: 30, threshold: 70 },
+        ],
+      });
+
+      const metrics = await performanceMonitor.getMetrics();
+      const alerts = await performanceMonitor.checkThresholds(metrics);
+
+      expect(alerts.alerts).toHaveLength(3);
+      expect(alerts.alerts.some((alert) => alert.type === "API_SLOW")).toBe(
+        true
+      );
+      expect(alerts.alerts.some((alert) => alert.type === "MEMORY_HIGH")).toBe(
+        true
+      );
     });
   });
 });

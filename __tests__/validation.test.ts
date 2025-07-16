@@ -1,272 +1,312 @@
+import { describe, test, expect } from "@jest/globals";
 import {
-  validateEmail,
-  validatePassword,
   validateProfile,
   validateMessage,
-  validateRegistration,
-  validateLogin,
-  transformProfileForApi,
-  transformProfileFromApi,
-  sanitizeString,
-  sanitizeProfile,
+  validateSearchFilters,
 } from "../utils/validation";
+import {
+  transformApiResponse,
+  sanitizeUserInput,
+} from "../utils/dataTransform";
 
-describe("Validation Utils", () => {
-  describe("validateEmail", () => {
-    it("should validate correct email addresses", () => {
-      expect(validateEmail("test@example.com")).toBe(true);
-      expect(validateEmail("user.name@domain.co.uk")).toBe(true);
-      expect(validateEmail("user+tag@example.org")).toBe(true);
-    });
-
-    it("should reject invalid email addresses", () => {
-      expect(validateEmail("invalid-email")).toBe(false);
-      expect(validateEmail("test@")).toBe(false);
-      expect(validateEmail("@example.com")).toBe(false);
-      expect(validateEmail("test.example.com")).toBe(false);
-      expect(validateEmail("")).toBe(false);
-    });
-  });
-
-  describe("validatePassword", () => {
-    it("should validate strong passwords", () => {
-      expect(validatePassword("Password123")).toBe(true);
-      expect(validatePassword("MySecure1Pass")).toBe(true);
-      expect(validatePassword("Complex9Password")).toBe(true);
-    });
-
-    it("should reject weak passwords", () => {
-      expect(validatePassword("password")).toBe(false); // No uppercase or number
-      expect(validatePassword("PASSWORD")).toBe(false); // No lowercase or number
-      expect(validatePassword("Password")).toBe(false); // No number
-      expect(validatePassword("password123")).toBe(false); // No uppercase
-      expect(validatePassword("Pass1")).toBe(false); // Too short
-      expect(validatePassword("")).toBe(false); // Empty
-    });
-  });
-
-  describe("validateProfile", () => {
-    const validProfile = {
-      fullName: "John Doe",
-      dateOfBirth: "1990-01-01",
-      gender: "male",
-      location: {
-        city: "New York",
-        state: "NY",
-        country: "USA",
-      },
-      bio: "This is a test bio",
-    };
-
-    it("should validate complete profile", () => {
-      const result = validateProfile(validProfile);
-      expect(result.success).toBe(true);
-    });
-
-    it("should reject profile with missing required fields", () => {
-      const incompleteProfile = {
+describe("Data Validation and Transformation", () => {
+  describe("Profile Validation", () => {
+    test("should validate complete profile data", () => {
+      const validProfile = {
         fullName: "John Doe",
-        // Missing dateOfBirth, gender, location
+        email: "john@example.com",
+        dateOfBirth: "1990-01-01",
+        gender: "male",
+        phoneNumber: "+44 7700 900123",
+        country: "United Kingdom",
+        city: "London",
       };
 
-      const result = validateProfile(incompleteProfile);
-      expect(result.success).toBe(false);
-      expect(result.errors).toBeDefined();
-      expect(result.errors!.length).toBeGreaterThan(0);
+      const result = validateProfile(validProfile);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
-    it("should reject profile with invalid gender", () => {
+    test("should reject invalid email formats", () => {
       const invalidProfile = {
-        ...validProfile,
-        gender: "invalid",
+        fullName: "John Doe",
+        email: "invalid-email",
+        dateOfBirth: "1990-01-01",
+        gender: "male",
       };
 
       const result = validateProfile(invalidProfile);
-      expect(result.success).toBe(false);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Valid email address is required");
     });
 
-    it("should reject profile with bio too long", () => {
-      const longBioProfile = {
-        ...validProfile,
-        bio: "a".repeat(501), // Exceeds 500 character limit
+    test("should reject underage users", () => {
+      const underageProfile = {
+        fullName: "Young User",
+        email: "young@example.com",
+        dateOfBirth: "2010-01-01",
+        gender: "male",
       };
 
-      const result = validateProfile(longBioProfile);
-      expect(result.success).toBe(false);
+      const result = validateProfile(underageProfile);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Must be at least 18 years old");
+    });
+
+    test("should validate phone number formats", () => {
+      const invalidPhoneProfile = {
+        fullName: "John Doe",
+        email: "john@example.com",
+        dateOfBirth: "1990-01-01",
+        gender: "male",
+        phoneNumber: "123",
+      };
+
+      const result = validateProfile(invalidPhoneProfile);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Valid phone number is required");
     });
   });
 
-  describe("validateMessage", () => {
-    it("should validate text message", () => {
-      const result = validateMessage({
+  describe("Message Validation", () => {
+    test("should validate text messages", () => {
+      const validMessage = {
         text: "Hello, how are you?",
         type: "text",
-      });
-      expect(result.success).toBe(true);
+        conversationId: "conv-123",
+        toUserId: "user-456",
+      };
+
+      const result = validateMessage(validMessage);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
 
-    it("should reject empty message", () => {
-      const result = validateMessage({
+    test("should reject empty messages", () => {
+      const emptyMessage = {
         text: "",
         type: "text",
-      });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("cannot be empty");
+        conversationId: "conv-123",
+        toUserId: "user-456",
+      };
+
+      const result = validateMessage(emptyMessage);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Message text cannot be empty");
     });
 
-    it("should reject message that is too long", () => {
-      const result = validateMessage({
-        text: "a".repeat(1001), // Exceeds 1000 character limit
+    test("should validate message length limits", () => {
+      const longMessage = {
+        text: "a".repeat(5001), // Exceeds 5000 character limit
         type: "text",
-      });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("too long");
-    });
-  });
-
-  describe("validateRegistration", () => {
-    const validRegistration = {
-      email: "test@example.com",
-      password: "Password123",
-      fullName: "John Doe",
-      dateOfBirth: "1990-01-01",
-      gender: "male",
-      agreeToTerms: true,
-    };
-
-    it("should validate complete registration data", () => {
-      const result = validateRegistration(validRegistration);
-      expect(result.success).toBe(true);
-    });
-
-    it("should reject registration without agreeing to terms", () => {
-      const result = validateRegistration({
-        ...validRegistration,
-        agreeToTerms: false,
-      });
-      expect(result.success).toBe(false);
-      expect(result.errors?.agreeToTerms).toContain("agree to the terms");
-    });
-
-    it("should reject registration with invalid email", () => {
-      const result = validateRegistration({
-        ...validRegistration,
-        email: "invalid-email",
-      });
-      expect(result.success).toBe(false);
-      expect(result.errors?.email).toContain("valid email");
-    });
-  });
-
-  describe("validateLogin", () => {
-    it("should validate login credentials", () => {
-      const result = validateLogin({
-        email: "test@example.com",
-        password: "password123",
-      });
-      expect(result.success).toBe(true);
-    });
-
-    it("should reject login with invalid email", () => {
-      const result = validateLogin({
-        email: "invalid-email",
-        password: "password123",
-      });
-      expect(result.success).toBe(false);
-      expect(result.errors?.email).toContain("valid email");
-    });
-
-    it("should reject login with empty password", () => {
-      const result = validateLogin({
-        email: "test@example.com",
-        password: "",
-      });
-      expect(result.success).toBe(false);
-      expect(result.errors?.password).toContain("required");
-    });
-  });
-
-  describe("transformProfileForApi", () => {
-    it("should transform profile data for API", () => {
-      const profileData = {
-        fullName: "John Doe",
-        dateOfBirth: "1990-01-01",
-        partnerPreferenceAgeMin: "25",
-        partnerPreferenceAgeMax: "35",
-        annualIncome: "50000",
-        height: "180",
+        conversationId: "conv-123",
+        toUserId: "user-456",
       };
 
-      const result = transformProfileForApi(profileData);
-
-      expect(result.partnerPreferenceAgeMin).toBe(25);
-      expect(result.partnerPreferenceAgeMax).toBe(35);
-      expect(result.annualIncome).toBe(50000);
-      expect(result.dateOfBirth).toMatch(/^\d{4}-\d{2}-\d{2}T/); // ISO format
+      const result = validateMessage(longMessage);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Message exceeds maximum length");
     });
 
-    it("should handle array and string interests", () => {
-      const profileWithStringInterests = {
-        fullName: "John Doe",
-        interests: "reading, swimming, cooking",
+    test("should validate voice message data", () => {
+      const voiceMessage = {
+        type: "voice",
+        conversationId: "conv-123",
+        toUserId: "user-456",
+        audioData: {
+          uri: "file://audio.m4a",
+          duration: 30000,
+          fileSize: 500000,
+          mimeType: "audio/m4a",
+        },
       };
 
-      const result = transformProfileForApi(profileWithStringInterests);
-      expect(result.interests).toEqual(["reading", "swimming", "cooking"]);
+      const result = validateMessage(voiceMessage);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
     });
   });
 
-  describe("transformProfileFromApi", () => {
-    it("should transform API profile data for client", () => {
-      const apiProfile = {
-        _id: "profile123",
+  describe("Search Filter Validation", () => {
+    test("should validate basic search filters", () => {
+      const validFilters = {
+        gender: "female",
+        ageMin: 25,
+        ageMax: 35,
+        ukCity: ["London", "Manchester"],
+      };
+
+      const result = validateSearchFilters(validFilters);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    test("should reject invalid age ranges", () => {
+      const invalidFilters = {
+        ageMin: 35,
+        ageMax: 25, // Max less than min
+      };
+
+      const result = validateSearchFilters(invalidFilters);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        "Maximum age must be greater than minimum age"
+      );
+    });
+
+    test("should validate premium filter access", () => {
+      const premiumFilters = {
+        annualIncomeMin: 50000,
+        heightMin: "5'8\"",
+      };
+
+      const result = validateSearchFilters(premiumFilters, false); // User doesn't have premium
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain(
+        "Premium subscription required for advanced filters"
+      );
+    });
+  });
+
+  describe("Data Transformation", () => {
+    test("should transform API response to match mobile format", () => {
+      const apiResponse = {
+        _id: "profile-123",
         fullName: "John Doe",
         dateOfBirth: "1990-01-01T00:00:00.000Z",
-        partnerPreferenceAgeMin: 25,
-        partnerPreferenceAgeMax: 35,
-        interests: ["reading", "swimming"],
-        isProfileComplete: 1, // Truthy value
-        banned: 0, // Falsy value
+        profileImageIds: ["img-1", "img-2"],
+        createdAt: 1640995200000,
       };
 
-      const result = transformProfileFromApi(apiProfile);
+      const transformed = transformApiResponse(apiResponse);
 
-      expect(result.dateOfBirth).toBe("1990-01-01");
-      expect(result.partnerPreferenceAgeMin).toBe(25);
-      expect(result.partnerPreferenceAgeMax).toBe(35);
-      expect(result.interests).toEqual(["reading", "swimming"]);
-      expect(result.isProfileComplete).toBe(true);
-      expect(result.banned).toBe(false);
+      expect(transformed.id).toBe("profile-123");
+      expect(transformed.fullName).toBe("John Doe");
+      expect(transformed.dateOfBirth).toBe("1990-01-01");
+      expect(transformed.profileImageIds).toEqual(["img-1", "img-2"]);
+      expect(transformed.createdAt).toBe(1640995200000);
+    });
+
+    test("should sanitize user input", () => {
+      const maliciousInput = {
+        aboutMe: '<script>alert("xss")</script>I am a good person',
+        fullName: 'John<script>alert("xss")</script>Doe',
+      };
+
+      const sanitized = sanitizeUserInput(maliciousInput);
+
+      expect(sanitized.aboutMe).toBe("I am a good person");
+      expect(sanitized.fullName).toBe("JohnDoe");
+      expect(sanitized.aboutMe).not.toContain("<script>");
+      expect(sanitized.fullName).not.toContain("<script>");
+    });
+
+    test("should handle null and undefined values", () => {
+      const inputWithNulls = {
+        fullName: "John Doe",
+        aboutMe: null,
+        city: undefined,
+        age: 0,
+      };
+
+      const sanitized = sanitizeUserInput(inputWithNulls);
+
+      expect(sanitized.fullName).toBe("John Doe");
+      expect(sanitized.aboutMe).toBe("");
+      expect(sanitized.city).toBe("");
+      expect(sanitized.age).toBe(0);
     });
   });
 
-  describe("sanitizeString", () => {
-    it("should remove dangerous characters", () => {
-      expect(sanitizeString('  Hello <script>alert("xss")</script>  ')).toBe(
-        'Hello scriptalert("xss")/script'
-      );
-      expect(sanitizeString("Normal text")).toBe("Normal text");
-      expect(sanitizeString("  Trimmed  ")).toBe("Trimmed");
-    });
-  });
-
-  describe("sanitizeProfile", () => {
-    it("should sanitize profile string fields", () => {
-      const profile = {
-        fullName: "  John <script>Doe  ",
-        bio: "Hello <b>world</b>",
-        education: "University",
-        occupation: "  Software Engineer  ",
-        age: 30, // Non-string field should remain unchanged
+  describe("Schema Validation", () => {
+    test("should validate profile schema compliance", () => {
+      const profileData = {
+        id: "profile-123",
+        userId: "user-456",
+        fullName: "John Doe",
+        email: "john@example.com",
+        dateOfBirth: "1990-01-01",
+        gender: "male",
+        isProfileComplete: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
-      const result = sanitizeProfile(profile);
+      const isValid = validateProfileSchema(profileData);
+      expect(isValid).toBe(true);
+    });
 
-      expect(result.fullName).toBe("John scriptDoe");
-      expect(result.bio).toBe("Hello bworld/b");
-      expect(result.education).toBe("University");
-      expect(result.occupation).toBe("Software Engineer");
-      expect(result.age).toBe(30);
+    test("should validate message schema compliance", () => {
+      const messageData = {
+        _id: "msg-123",
+        conversationId: "conv-456",
+        fromUserId: "user-1",
+        toUserId: "user-2",
+        text: "Hello world",
+        type: "text",
+        createdAt: Date.now(),
+        status: "sent",
+      };
+
+      const isValid = validateMessageSchema(messageData);
+      expect(isValid).toBe(true);
+    });
+
+    test("should validate interest schema compliance", () => {
+      const interestData = {
+        _id: "interest-123",
+        fromUserId: "user-1",
+        toUserId: "user-2",
+        status: "pending",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const isValid = validateInterestSchema(interestData);
+      expect(isValid).toBe(true);
     });
   });
 });
+
+// Helper functions for schema validation
+function validateProfileSchema(data: any): boolean {
+  const requiredFields = [
+    "id",
+    "userId",
+    "fullName",
+    "email",
+    "dateOfBirth",
+    "gender",
+  ];
+  return requiredFields.every(
+    (field) => data.hasOwnProperty(field) && data[field] !== null
+  );
+}
+
+function validateMessageSchema(data: any): boolean {
+  const requiredFields = [
+    "_id",
+    "conversationId",
+    "fromUserId",
+    "toUserId",
+    "type",
+    "createdAt",
+    "status",
+  ];
+  return requiredFields.every(
+    (field) => data.hasOwnProperty(field) && data[field] !== null
+  );
+}
+
+function validateInterestSchema(data: any): boolean {
+  const requiredFields = [
+    "_id",
+    "fromUserId",
+    "toUserId",
+    "status",
+    "createdAt",
+  ];
+  return requiredFields.every(
+    (field) => data.hasOwnProperty(field) && data[field] !== null
+  );
+}

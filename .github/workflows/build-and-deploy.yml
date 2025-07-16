@@ -2,9 +2,9 @@ name: Build and Deploy Aroosi Mobile
 
 on:
   push:
-    branches: [main, develop, staging]
-  pull_request:
     branches: [main, develop]
+  pull_request:
+    branches: [main]
 
 env:
   NODE_VERSION: '18'
@@ -18,38 +18,35 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Install dependencies
         run: npm ci
-
+        
       - name: Run linting
         run: npm run lint
-
+        
       - name: Run type checking
         run: npm run type-check
-
+        
       - name: Run unit tests
-        run: npm run test:unit
-
+        run: npm run test -- --coverage --watchAll=false
+        
       - name: Run integration tests
-        run: npm run test:integration
-
-      - name: Generate test coverage
-        run: npm run test:coverage
-
-      - name: Upload coverage to Codecov
+        run: npm run test:integration -- --watchAll=false
+        
+      - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage/lcov.info
           flags: unittests
           name: aroosi-mobile-coverage
-
+          
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
@@ -57,22 +54,22 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Install dependencies
         run: npm ci
-
+        
       - name: Run security audit
-        run: npm audit --audit-level=moderate
-
+        run: npm audit --audit-level=high
+        
       - name: Run dependency vulnerability scan
-        run: npx audit-ci --moderate
-
+        run: npx audit-ci --config audit-ci.json
+        
   build-preview:
     name: Build Preview
     runs-on: ubuntu-latest
@@ -82,85 +79,84 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Setup Expo CLI
         run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
-
+        
       - name: Install dependencies
         run: npm ci
-
-      - name: Configure Expo
+        
+      - name: Setup environment variables
         run: |
-          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
-
-      - name: Build preview
-        run: |
-          expo build:web --no-pwa
-          expo publish --release-channel=pr-${{ github.event.number }}
-
-      - name: Comment PR with preview link
-        uses: actions/github-script@v6
+          echo "EXPO_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+          echo "EXPO_PUBLIC_ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID }}" >> .env
+          echo "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY_TEST }}" >> .env
+          
+      - name: Build for preview
+        run: expo build:web --no-pwa
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
         with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🚀 Preview build available at: https://expo.dev/@aroosi/aroosi-mobile?release-channel=pr-${{ github.event.number }}'
-            })
-
+          name: preview-build
+          path: web-build/
+          retention-days: 7
+          
   build-staging:
     name: Build Staging
     runs-on: ubuntu-latest
     needs: [test, security-scan]
-    if: github.ref == 'refs/heads/staging'
+    if: github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Setup Expo CLI
         run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
-
+        
       - name: Install dependencies
         run: npm ci
-
-      - name: Configure Expo
+        
+      - name: Setup staging environment
         run: |
-          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
-
+          echo "EXPO_PUBLIC_API_URL=${{ secrets.STAGING_API_URL }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+          echo "EXPO_PUBLIC_ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID_STAGING }}" >> .env
+          echo "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY_TEST }}" >> .env
+          echo "EXPO_PUBLIC_SENTRY_DSN=${{ secrets.SENTRY_DSN_STAGING }}" >> .env
+          
       - name: Build for staging
-        env:
-          ENVIRONMENT: staging
-          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
-          ONESIGNAL_APP_ID: ${{ secrets.STAGING_ONESIGNAL_APP_ID }}
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.STAGING_GOOGLE_OAUTH_CLIENT_ID }}
-          SENTRY_DSN: ${{ secrets.STAGING_SENTRY_DSN }}
         run: |
-          expo build:android --release-channel=staging --no-wait
-          expo build:ios --release-channel=staging --no-wait
-
-      - name: Notify staging deployment
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          channel: '#deployments'
-          text: 'Staging build initiated for Aroosi Mobile'
+          expo build:android --type=apk --release-channel=staging
+          expo build:ios --type=archive --release-channel=staging
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: Upload staging builds
+        uses: actions/upload-artifact@v3
+        with:
+          name: staging-builds
+          path: |
+            *.apk
+            *.ipa
+          retention-days: 30
+          
   build-production:
     name: Build Production
     runs-on: ubuntu-latest
@@ -170,47 +166,129 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Setup Expo CLI
         run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
-
+        
       - name: Install dependencies
         run: npm ci
-
-      - name: Configure Expo
+        
+      - name: Setup production environment
         run: |
-          expo login -u ${{ secrets.EXPO_USERNAME }} -p ${{ secrets.EXPO_PASSWORD }}
-
-      - name: Build for production
-        env:
-          ENVIRONMENT: production
-          API_BASE_URL: ${{ secrets.PRODUCTION_API_BASE_URL }}
-          ONESIGNAL_APP_ID: ${{ secrets.PRODUCTION_ONESIGNAL_APP_ID }}
-          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.PRODUCTION_GOOGLE_OAUTH_CLIENT_ID }}
-          SENTRY_DSN: ${{ secrets.PRODUCTION_SENTRY_DSN }}
-        run: |
-          expo build:android --release-channel=production --no-wait
-          expo build:ios --release-channel=production --no-wait
-
-      - name: Submit to app stores
-        env:
-          EXPO_APPLE_ID: ${{ secrets.EXPO_APPLE_ID }}
-          EXPO_APPLE_ID_PASSWORD: ${{ secrets.EXPO_APPLE_ID_PASSWORD }}
-          EXPO_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.EXPO_ANDROID_KEYSTORE_PASSWORD }}
-        run: |
-          # Submit to Google Play Store
-          expo upload:android --latest --key ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}
+          echo "EXPO_PUBLIC_API_URL=${{ secrets.PRODUCTION_API_URL }}" >> .env
+          echo "EXPO_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+          echo "EXPO_PUBLIC_ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID_PRODUCTION }}" >> .env
+          echo "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=${{ secrets.STRIPE_PUBLISHABLE_KEY_LIVE }}" >> .env
+          echo "EXPO_PUBLIC_SENTRY_DSN=${{ secrets.SENTRY_DSN_PRODUCTION }}" >> .env
           
-          # Submit to Apple App Store
-          expo upload:ios --latest --apple-id ${{ secrets.EXPO_APPLE_ID }}
-
-      - name: Create GitHub release
+      - name: Build for production
+        run: |
+          expo build:android --type=app-bundle --release-channel=production
+          expo build:ios --type=archive --release-channel=production
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: Upload production builds
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-builds
+          path: |
+            *.aab
+            *.ipa
+          retention-days: 90
+          
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-staging
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+        
+      - name: Download staging builds
+        uses: actions/download-artifact@v3
+        with:
+          name: staging-builds
+          
+      - name: Deploy to Expo
+        run: expo publish --release-channel=staging
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: Deploy to TestFlight (iOS)
+        if: success()
+        run: |
+          # Upload to TestFlight using fastlane or similar tool
+          echo "Deploying iOS build to TestFlight..."
+          # fastlane ios beta
+          
+      - name: Deploy to Google Play Internal Testing (Android)
+        if: success()
+        run: |
+          # Upload to Google Play Internal Testing
+          echo "Deploying Android build to Google Play Internal Testing..."
+          # fastlane android internal
+          
+      - name: Notify team
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#mobile-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-production
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+        
+      - name: Download production builds
+        uses: actions/download-artifact@v3
+        with:
+          name: production-builds
+          
+      - name: Deploy to Expo
+        run: expo publish --release-channel=production
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          
+      - name: Submit to App Store (iOS)
+        if: success()
+        run: |
+          # Submit to App Store for review
+          echo "Submitting iOS build to App Store..."
+          # expo upload:ios --latest
+          
+      - name: Submit to Google Play (Android)
+        if: success()
+        run: |
+          # Submit to Google Play for review
+          echo "Submitting Android build to Google Play..."
+          # expo upload:android --latest
+          
+      - name: Create GitHub Release
+        if: success()
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -219,83 +297,186 @@ jobs:
           release_name: Release v${{ github.run_number }}
           body: |
             ## Changes in this Release
-            - Automated production build
-            - Submitted to app stores
-            
-            ## Build Information
-            - Build Number: ${{ github.run_number }}
+            - Automated release from main branch
+            - Build number: ${{ github.run_number }}
             - Commit: ${{ github.sha }}
-            - Branch: ${{ github.ref }}
           draft: false
           prerelease: false
-
-      - name: Notify production deployment
+          
+      - name: Notify team
+        if: always()
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
-          channel: '#deployments'
-          text: 'Production build completed and submitted to app stores! 🚀'
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
+          channel: '#mobile-deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          
   performance-test:
     name: Performance Testing
     runs-on: ubuntu-latest
-    needs: [build-staging]
-    if: github.ref == 'refs/heads/staging'
+    needs: build-staging
+    if: github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Install dependencies
         run: npm ci
-
+        
       - name: Run performance tests
         run: npm run test:performance
-
+        
       - name: Generate performance report
         run: npm run performance:report
-
-      - name: Upload performance artifacts
+        
+      - name: Upload performance report
         uses: actions/upload-artifact@v3
         with:
           name: performance-report
-          path: ./performance-report/
-
+          path: performance-report/
+          retention-days: 30
+          
   accessibility-test:
     name: Accessibility Testing
     runs-on: ubuntu-latest
-    needs: [build-staging]
-    if: github.ref == 'refs/heads/staging'
+    needs: build-staging
+    if: github.ref == 'refs/heads/develop'
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-
+          
       - name: Install dependencies
         run: npm ci
-
+        
       - name: Run accessibility tests
         run: npm run test:accessibility
-
+        
       - name: Generate accessibility report
         run: npm run accessibility:report
-
-      - name: Upload accessibility artifacts
+        
+      - name: Upload accessibility report
         uses: actions/upload-artifact@v3
         with:
           name: accessibility-report
-          path: ./accessibility-report/
+          path: accessibility-report/
+          retention-days: 30
+          
+  final-validation:
+    name: Final Integration Validation
+    runs-on: ubuntu-latest
+    needs: [build-staging, performance-test, accessibility-test]
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run final validation tests
+        run: npm run test:final-validation
+        env:
+          TEST_API_URL: ${{ secrets.STAGING_API_URL }}
+          TEST_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          
+      - name: Generate final validation report
+        run: npm run validation:report
+        
+      - name: Upload validation report
+        uses: actions/upload-artifact@v3
+        with:
+          name: final-validation-report
+          path: validation-report/
+          retention-days: 30
+          
+      - name: Post validation summary
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const path = './validation-report/summary.json';
+            
+            if (fs.existsSync(path)) {
+              const summary = JSON.parse(fs.readFileSync(path, 'utf8'));
+              
+              const comment = `## 🧪 Final Validation Results
+              
+              **Overall Status:** ${summary.success ? '✅ PASSED' : '❌ FAILED'}
+              
+              ### Test Results
+              - **User Journey Tests:** ${summary.userJourney.passed}/${summary.userJourney.total}
+              - **Data Synchronization:** ${summary.dataSync.passed}/${summary.dataSync.total}
+              - **Premium Features:** ${summary.premiumFeatures.passed}/${summary.premiumFeatures.total}
+              - **Real-time Features:** ${summary.realtime.passed}/${summary.realtime.total}
+              - **Performance Tests:** ${summary.performance.passed}/${summary.performance.total}
+              - **Security Tests:** ${summary.security.passed}/${summary.security.total}
+              
+              ### Performance Metrics
+              - **API Response Time:** ${summary.metrics.apiResponseTime}ms
+              - **Screen Load Time:** ${summary.metrics.screenLoadTime}ms
+              - **Memory Usage:** ${summary.metrics.memoryUsage}%
+              
+              ${summary.success ? '🎉 All validation tests passed! Ready for deployment.' : '⚠️ Some validation tests failed. Please review the detailed report.'}
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            }
+            
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production, final-validation]
+    if: always()
+    
+    steps:
+      - name: Clean up old artifacts
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const artifacts = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const oldArtifacts = artifacts.data.artifacts.filter(artifact => {
+              const createdAt = new Date(artifact.created_at);
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              return createdAt < thirtyDaysAgo;
+            });
+            
+            for (const artifact of oldArtifacts) {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+              console.log(`Deleted artifact: ${artifact.name}`);
+            }

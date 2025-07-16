@@ -17,7 +17,15 @@
     "typecheck": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "lint": "echo 'No linter configured'",
-    "test": "echo 'No tests configured'"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern=__tests__/(?!integration)",
+    "test:integration": "jest --testPathPattern=__tests__/integration",
+    "test:final-validation": "jest --testPathPattern=finalValidation",
+    "test:performance": "jest --testPathPattern=performance",
+    "test:accessibility": "jest --testPathPattern=accessibility",
+    "test:security": "jest --testPathPattern=security"
   },
   "dependencies": {
     "@expo-google-fonts/bodoni-moda": "^0.4.1",
@@ -29,6 +37,7 @@
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-community/datetimepicker": "8.4.1",
     "@react-native-community/netinfo": "^11.4.1",
+    "@react-native-google-signin/google-signin": "^15.0.0",
     "@react-native-picker/picker": "^2.9.0",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/native": "^7.1.6",
@@ -76,8 +85,15 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^12.9.0",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20",
     "@types/react": "~19.0.10",
+    "jest": "^29.7.0",
+    "jest-expo": "^51.0.4",
+    "react-test-renderer": "^18.3.1",
+    "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "typescript": "~5.8.3"
   },

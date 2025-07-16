@@ -1,452 +1,634 @@
-import { AuthManager } from "../utils/authManager";
-import { sanitizeString, sanitizeProfile } from "../utils/validation";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { describe, test, expect, beforeEach, jest } from "@jest/globals";
 import * as SecureStore from "expo-secure-store";
+import { ApiClient } from "../utils/api";
+import { AuthProvider } from "../contexts/AuthContext";
+import { sanitizeUserInput, validateInput } from "../utils/validation";
 
 // Mock dependencies
-jest.mock("@react-native-async-storage/async-storage");
 jest.mock("expo-secure-store");
+jest.mock("react-native-keychain");
 
-const mockAsyncStorage = AsyncStorage as jest.Mocked<typeof AsyncStorage>;
-const mockSecureStore = SecureStore as jest.Mocked<typeof SecureStore>;
+describe("Security and Data Protection Tests", () => {
+  let apiClient: ApiClient;
+  let authProvider: AuthProvider;
 
-describe("Security Tests", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    apiClient = new ApiClient();
+    authProvider = new AuthProvider();
   });
 
   describe("Token Security", () => {
-    it("should store sensitive tokens in secure storage", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should store tokens securely", async () => {
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token";
+      const refreshToken = "refresh.token.value";
 
-      const tokens = {
-        accessToken: "sensitive_access_token",
-        refreshToken: "sensitive_refresh_token",
-        expiresAt: Date.now() + 3600000,
-      };
+      (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 
-      await authManager.storeTokens(tokens);
+      await authProvider.storeTokens(token, refreshToken);
 
-      // Verify tokens are stored in SecureStore, not AsyncStorage
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        "access_token",
-        tokens.accessToken
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        "auth_token",
+        token
       );
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
         "refresh_token",
-        tokens.refreshToken
-      );
-
-      // Verify sensitive data is not in AsyncStorage
-      expect(mockAsyncStorage.setItem).not.toHaveBeenCalledWith(
-        expect.stringContaining("token"),
-        expect.any(String)
+        refreshToken
       );
     });
 
-    it("should clear all tokens on logout", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should retrieve tokens securely", async () => {
+      const storedToken = "stored.jwt.token";
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(storedToken);
 
-      await authManager.logout();
+      const token = await authProvider.getToken();
 
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
-        "access_token"
-      );
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
-        "refresh_token"
-      );
+      expect(token).toBe(storedToken);
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith("auth_token");
     });
 
-    it("should validate token format before storage", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should clear tokens on logout", async () => {
+      (SecureStore.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
 
-      // Invalid token format
-      const invalidTokens = {
-        accessToken: "", // Empty token
-        refreshToken: "invalid-token-format",
-        expiresAt: Date.now() - 1000, // Already expired
+      await authProvider.signOut();
+
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("auth_token");
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith("refresh_token");
+    });
+
+    test("should validate token format", () => {
+      const validToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c";
+      const invalidToken = "invalid.token";
+
+      expect(authProvider.isValidTokenFormat(validToken)).toBe(true);
+      expect(authProvider.isValidTokenFormat(invalidToken)).toBe(false);
+    });
+
+    test("should detect token expiration", () => {
+      const expiredToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjJ9.signature"; // Expired in 2018
+      const validToken =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature"; // Expires in far future
+
+      expect(authProvider.isTokenExpired(expiredToken)).toBe(true);
+      expect(authProvider.isTokenExpired(validToken)).toBe(false);
+    });
+
+    test("should handle token refresh securely", async () => {
+      const newToken = "new.jwt.token";
+      const newRefreshToken = "new.refresh.token";
+
+      const mockResponse = {
+        success: true,
+        token: newToken,
+        refreshToken: newRefreshToken,
       };
 
-      const result = await authManager.storeTokens(invalidTokens);
-      expect(result).toBe(false);
-    });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      });
 
-    it("should handle token expiration securely", async () => {
-      const authManager = AuthManager.getInstance();
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(
+        "old.refresh.token"
+      );
+      (SecureStore.setItemAsync as jest.Mock).mockResolvedValue(undefined);
 
-      // Mock expired token
-      mockSecureStore.getItemAsync.mockResolvedValueOnce("expired_token");
+      const result = await authProvider.refreshToken();
 
-      const isValid = await authManager.validateToken();
-      expect(isValid).toBe(false);
-
-      // Should clear expired token
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith(
-        "access_token"
+      expect(result.success).toBe(true);
+      expect(result.token).toBe(newToken);
+      expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+        "auth_token",
+        newToken
       );
     });
   });
 
-  describe("Input Sanitization", () => {
-    it("should sanitize user input to prevent XSS", () => {
-      const maliciousInput =
-        '<script>alert("XSS")</script>Hello World<img src="x" onerror="alert(1)">';
-      const sanitized = sanitizeString(maliciousInput);
-
-      expect(sanitized).not.toContain("<script>");
-      expect(sanitized).not.toContain("onerror");
-      expect(sanitized).not.toContain("<img");
-      expect(sanitized).toContain("Hello World");
-    });
-
-    it("should sanitize profile data", () => {
-      const maliciousProfile = {
-        fullName: '<script>alert("hack")</script>John Doe',
-        bio: 'Hello <iframe src="evil.com"></iframe> World',
-        education: "University<script>steal_data()</script>",
-        occupation: "Developer",
-        age: 25,
-      };
-
-      const sanitized = sanitizeProfile(maliciousProfile);
-
-      expect(sanitized.fullName).not.toContain("<script>");
-      expect(sanitized.bio).not.toContain("<iframe>");
-      expect(sanitized.education).not.toContain("<script>");
-      expect(sanitized.fullName).toContain("John Doe");
-      expect(sanitized.age).toBe(25); // Non-string fields unchanged
-    });
-
-    it("should handle SQL injection attempts", () => {
-      const sqlInjection = "'; DROP TABLE users; --";
-      const sanitized = sanitizeString(sqlInjection);
-
-      expect(sanitized).not.toContain("DROP TABLE");
-      expect(sanitized).not.toContain("--");
-    });
-
-    it("should preserve safe HTML entities", () => {
-      const safeInput = "Price: $100 &amp; free shipping";
-      const sanitized = sanitizeString(safeInput);
-
-      expect(sanitized).toContain("$100");
-      expect(sanitized).toContain("&amp;");
-    });
-  });
-
-  describe("Data Validation Security", () => {
-    it("should reject oversized input data", () => {
-      const oversizedBio = "a".repeat(10000); // 10KB bio
-      const profile = {
-        fullName: "John Doe",
-        bio: oversizedBio,
-      };
-
-      const sanitized = sanitizeProfile(profile);
-      expect(sanitized.bio.length).toBeLessThan(1000); // Should be truncated
-    });
-
-    it("should validate email format strictly", () => {
-      const maliciousEmails = [
-        "user@domain.com<script>alert(1)</script>",
-        "user+<script>@domain.com",
-        "user@domain.com\r\nBcc: attacker@evil.com",
-        "user@domain.com\x00admin@domain.com",
+  describe("Input Validation and Sanitization", () => {
+    test("should sanitize user input to prevent XSS", () => {
+      const maliciousInputs = [
+        '<script>alert("xss")</script>',
+        'javascript:alert("xss")',
+        '<img src="x" onerror="alert(\'xss\')" />',
+        "<svg onload=\"alert('xss')\" />",
+        '"><script>alert("xss")</script>',
       ];
 
-      maliciousEmails.forEach((email) => {
-        const sanitized = sanitizeString(email);
+      maliciousInputs.forEach((input) => {
+        const sanitized = sanitizeUserInput(input);
         expect(sanitized).not.toContain("<script>");
-        expect(sanitized).not.toContain("\r\n");
-        expect(sanitized).not.toContain("\x00");
+        expect(sanitized).not.toContain("javascript:");
+        expect(sanitized).not.toContain("onerror");
+        expect(sanitized).not.toContain("onload");
       });
     });
 
-    it("should validate phone number format", () => {
-      const maliciousPhones = [
-        "+1234567890<script>alert(1)</script>",
-        "123-456-7890\r\nX-Forwarded-For: evil.com",
-        "555-0123\x00admin",
+    test("should validate email addresses properly", () => {
+      const validEmails = [
+        "test@example.com",
+        "user.name@domain.co.uk",
+        "user+tag@example.org",
       ];
 
-      maliciousPhones.forEach((phone) => {
-        const sanitized = sanitizeString(phone);
-        expect(sanitized).not.toContain("<script>");
-        expect(sanitized).not.toContain("\r\n");
-        expect(sanitized).not.toContain("\x00");
+      const invalidEmails = [
+        "invalid-email",
+        "@domain.com",
+        "user@",
+        "user..name@domain.com",
+        "user@domain",
+        '<script>alert("xss")</script>@domain.com',
+      ];
+
+      validEmails.forEach((email) => {
+        expect(validateInput("email", email).isValid).toBe(true);
+      });
+
+      invalidEmails.forEach((email) => {
+        expect(validateInput("email", email).isValid).toBe(false);
+      });
+    });
+
+    test("should validate password strength", () => {
+      const strongPasswords = [
+        "StrongPass123!",
+        "MySecure@Password2024",
+        "Complex#Pass1",
+      ];
+
+      const weakPasswords = [
+        "password",
+        "123456",
+        "abc123",
+        "Password", // No special char or number
+        "password123", // No uppercase or special char
+        "PASSWORD123!", // No lowercase
+      ];
+
+      strongPasswords.forEach((password) => {
+        expect(validateInput("password", password).isValid).toBe(true);
+      });
+
+      weakPasswords.forEach((password) => {
+        expect(validateInput("password", password).isValid).toBe(false);
+      });
+    });
+
+    test("should validate phone numbers", () => {
+      const validPhones = [
+        "+44 7700 900123",
+        "+1 555 123 4567",
+        "+91 98765 43210",
+      ];
+
+      const invalidPhones = [
+        "123",
+        "abc-def-ghij",
+        "+44 abc def ghij",
+        '<script>alert("xss")</script>',
+      ];
+
+      validPhones.forEach((phone) => {
+        expect(validateInput("phone", phone).isValid).toBe(true);
+      });
+
+      invalidPhones.forEach((phone) => {
+        expect(validateInput("phone", phone).isValid).toBe(false);
+      });
+    });
+
+    test("should prevent SQL injection attempts", () => {
+      const sqlInjectionAttempts = [
+        "'; DROP TABLE users; --",
+        "' OR '1'='1",
+        "admin'--",
+        "' UNION SELECT * FROM users --",
+        "1; DELETE FROM profiles WHERE 1=1 --",
+      ];
+
+      sqlInjectionAttempts.forEach((attempt) => {
+        const sanitized = sanitizeUserInput(attempt);
+        expect(sanitized).not.toContain("DROP TABLE");
+        expect(sanitized).not.toContain("DELETE FROM");
+        expect(sanitized).not.toContain("UNION SELECT");
+        expect(sanitized).not.toContain("--");
+      });
+    });
+
+    test("should validate file uploads", () => {
+      const validImages = [
+        { name: "profile.jpg", type: "image/jpeg", size: 1024000 },
+        { name: "photo.png", type: "image/png", size: 2048000 },
+        { name: "picture.webp", type: "image/webp", size: 1536000 },
+      ];
+
+      const invalidFiles = [
+        { name: "script.js", type: "application/javascript", size: 1024 },
+        { name: "virus.exe", type: "application/x-executable", size: 5120 },
+        { name: "large.jpg", type: "image/jpeg", size: 10 * 1024 * 1024 }, // 10MB
+        { name: "image.svg", type: "image/svg+xml", size: 1024 }, // SVG can contain scripts
+      ];
+
+      validImages.forEach((file) => {
+        expect(validateInput("image", file).isValid).toBe(true);
+      });
+
+      invalidFiles.forEach((file) => {
+        expect(validateInput("image", file).isValid).toBe(false);
       });
     });
   });
 
   describe("API Security", () => {
-    it("should include proper headers for security", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should include proper authentication headers", async () => {
+      const mockToken = "valid.jwt.token";
+      (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(mockToken);
 
-      // Mock API request
-      const mockFetch = jest.spyOn(global, "fetch").mockResolvedValueOnce({
+      const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      await authManager.makeSecureRequest("/api/profile", {
-        method: "GET",
+        json: () => Promise.resolve({ success: true, data: {} }),
       });
+      global.fetch = mockFetch;
+
+      await apiClient.getProfile();
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
             "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
-            "Cache-Control": "no-cache",
           }),
         })
       );
     });
 
-    it("should handle CSRF protection", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should handle unauthorized responses properly", async () => {
+      const mockResponse = {
+        success: false,
+        error: {
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        },
+      };
 
-      // Mock CSRF token
-      mockSecureStore.getItemAsync.mockResolvedValueOnce("csrf_token_123");
-
-      const mockFetch = jest.spyOn(global, "fetch").mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as Response);
-
-      await authManager.makeSecureRequest("/api/profile", {
-        method: "POST",
-        body: JSON.stringify({ data: "test" }),
-      });
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            "X-CSRF-Token": "csrf_token_123",
-          }),
-        })
-      );
-    });
-
-    it("should validate SSL/TLS connections", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Should reject non-HTTPS URLs in production
-      const insecureUrl = "http://api.example.com/data";
-
-      await expect(
-        authManager.makeSecureRequest(insecureUrl, { method: "GET" })
-      ).rejects.toThrow("Insecure connection not allowed");
-    });
-
-    it("should handle rate limiting", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Mock rate limit response
-      const mockFetch = jest.spyOn(global, "fetch").mockResolvedValueOnce({
+      global.fetch = jest.fn().mockResolvedValue({
         ok: false,
-        status: 429,
-        headers: new Headers({
-          "Retry-After": "60",
-          "X-RateLimit-Remaining": "0",
-        }),
-        json: () =>
-          Promise.resolve({
-            error: {
-              code: "RATE_LIMIT_EXCEEDED",
-              message: "Too many requests",
-            },
-          }),
-      } as Response);
-
-      const result = await authManager.makeSecureRequest("/api/test", {
-        method: "GET",
+        status: 401,
+        json: () => Promise.resolve(mockResponse),
       });
+
+      const result = await apiClient.getProfile();
 
       expect(result.success).toBe(false);
-      expect(result.error?.code).toBe("RATE_LIMIT_EXCEEDED");
+      expect(result.error?.code).toBe("UNAUTHORIZED");
+    });
+
+    test("should validate SSL/TLS connections", async () => {
+      const httpUrl = "http://insecure.aroosi.app/api/profile";
+      const httpsUrl = "https://secure.aroosi.app/api/profile";
+
+      // Should reject HTTP URLs in production
+      expect(() => apiClient.validateUrl(httpUrl)).toThrow(
+        "Insecure connection not allowed"
+      );
+      expect(() => apiClient.validateUrl(httpsUrl)).not.toThrow();
+    });
+
+    test("should implement request signing for sensitive operations", async () => {
+      const sensitiveData = {
+        action: "delete_profile",
+        userId: "user-123",
+        timestamp: Date.now(),
+      };
+
+      const signature = apiClient.signRequest(sensitiveData, "secret-key");
+      const isValid = apiClient.verifySignature(
+        sensitiveData,
+        signature,
+        "secret-key"
+      );
+
+      expect(signature).toBeDefined();
+      expect(isValid).toBe(true);
+    });
+
+    test("should prevent CSRF attacks", async () => {
+      const csrfToken = "csrf-token-123";
+
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+      global.fetch = mockFetch;
+
+      await apiClient.updateProfile({ aboutMe: "Updated" }, csrfToken);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "X-CSRF-Token": csrfToken,
+          }),
+        })
+      );
+    });
+
+    test("should implement rate limiting protection", async () => {
+      const rateLimitResponse = {
+        success: false,
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many requests",
+          retryAfter: 60,
+        },
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        headers: new Map([["Retry-After", "60"]]),
+        json: () => Promise.resolve(rateLimitResponse),
+      });
+
+      const result = await apiClient.sendInterest("user-123");
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe("RATE_LIMITED");
+      expect(result.error?.retryAfter).toBe(60);
     });
   });
 
-  describe("Biometric Security", () => {
-    it("should validate biometric authentication", async () => {
-      const authManager = AuthManager.getInstance();
+  describe("Data Encryption", () => {
+    test("should encrypt sensitive data before storage", async () => {
+      const sensitiveData = {
+        phoneNumber: "+44 7700 900123",
+        email: "user@example.com",
+      };
 
-      // Mock successful biometric authentication
-      jest
-        .spyOn(authManager, "authenticateWithBiometrics")
-        .mockResolvedValueOnce(true);
+      const encrypted = await authProvider.encryptSensitiveData(sensitiveData);
+      const decrypted = await authProvider.decryptSensitiveData(encrypted);
 
-      const result = await authManager.enableBiometricLogin();
-      expect(result).toBe(true);
+      expect(encrypted).not.toEqual(sensitiveData);
+      expect(decrypted).toEqual(sensitiveData);
     });
 
-    it("should handle biometric authentication failure", async () => {
-      const authManager = AuthManager.getInstance();
+    test("should use different encryption keys for different data types", async () => {
+      const profileData = { name: "John Doe" };
+      const messageData = { text: "Hello" };
 
-      // Mock failed biometric authentication
-      jest
-        .spyOn(authManager, "authenticateWithBiometrics")
-        .mockResolvedValueOnce(false);
-
-      const result = await authManager.enableBiometricLogin();
-      expect(result).toBe(false);
-    });
-
-    it("should fallback to password when biometrics fail", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Mock biometric failure, then password success
-      jest
-        .spyOn(authManager, "authenticateWithBiometrics")
-        .mockResolvedValueOnce(false);
-      jest
-        .spyOn(authManager, "authenticateWithPassword")
-        .mockResolvedValueOnce(true);
-
-      const result = await authManager.authenticateUser();
-      expect(result).toBe(true);
-    });
-  });
-
-  describe("Session Security", () => {
-    it("should implement session timeout", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Mock old session
-      const oldTimestamp = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
-      mockAsyncStorage.getItem.mockResolvedValueOnce(oldTimestamp.toString());
-
-      const isSessionValid = await authManager.validateSession();
-      expect(isSessionValid).toBe(false);
-    });
-
-    it("should refresh session on activity", async () => {
-      const authManager = AuthManager.getInstance();
-
-      await authManager.refreshSession();
-
-      expect(mockAsyncStorage.setItem).toHaveBeenCalledWith(
-        "last_activity",
-        expect.any(String)
+      const encryptedProfile = await authProvider.encryptData(
+        profileData,
+        "profile"
       );
-    });
-
-    it("should handle concurrent sessions", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Mock multiple device tokens
-      const deviceTokens = ["device1_token", "device2_token", "device3_token"];
-      mockSecureStore.getItemAsync.mockResolvedValueOnce(
-        JSON.stringify(deviceTokens)
+      const encryptedMessage = await authProvider.encryptData(
+        messageData,
+        "message"
       );
 
-      const isValidSession = await authManager.validateDeviceSession(
-        "device1_token"
-      );
-      expect(isValidSession).toBe(true);
+      // Different data types should use different encryption patterns
+      expect(encryptedProfile).not.toEqual(encryptedMessage);
+    });
 
-      const isInvalidSession = await authManager.validateDeviceSession(
-        "unknown_device"
+    test("should handle encryption key rotation", async () => {
+      const data = { sensitive: "information" };
+
+      // Encrypt with old key
+      const encryptedOld = await authProvider.encryptData(
+        data,
+        "profile",
+        "old-key"
       );
-      expect(isInvalidSession).toBe(false);
+
+      // Rotate key
+      await authProvider.rotateEncryptionKey("profile", "new-key");
+
+      // Should still be able to decrypt old data
+      const decryptedOld = await authProvider.decryptData(
+        encryptedOld,
+        "profile"
+      );
+      expect(decryptedOld).toEqual(data);
+
+      // New encryptions should use new key
+      const encryptedNew = await authProvider.encryptData(data, "profile");
+      expect(encryptedNew).not.toEqual(encryptedOld);
     });
   });
 
   describe("Privacy Protection", () => {
-    it("should not log sensitive information", () => {
-      const consoleSpy = jest.spyOn(console, "log");
-
-      const sensitiveData = {
-        password: "secret123",
-        token: "bearer_token_xyz",
-        ssn: "123-45-6789",
-      };
-
-      // Simulate logging (should be filtered)
-      const authManager = AuthManager.getInstance();
-      authManager.logSecurely("User data", sensitiveData);
-
-      // Check that sensitive fields are not in logs
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("secret123")
-      );
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("bearer_token_xyz")
-      );
-    });
-
-    it("should encrypt stored user data", async () => {
-      const authManager = AuthManager.getInstance();
-
-      const userData = {
+    test("should mask sensitive information in logs", () => {
+      const logData = {
         email: "user@example.com",
-        profile: { name: "John Doe", phone: "555-0123" },
+        phoneNumber: "+44 7700 900123",
+        password: "secretpassword",
+        token: "jwt.token.here",
+        publicInfo: "This is public",
       };
 
-      await authManager.storeUserData(userData);
+      const maskedData = authProvider.maskSensitiveData(logData);
 
-      // Verify data is encrypted before storage
-      expect(mockSecureStore.setItemAsync).toHaveBeenCalledWith(
-        "user_data",
-        expect.not.stringContaining("user@example.com") // Should be encrypted
-      );
+      expect(maskedData.email).toBe("u***@example.com");
+      expect(maskedData.phoneNumber).toBe("+44 ***0123");
+      expect(maskedData.password).toBe("***");
+      expect(maskedData.token).toBe("jwt.***");
+      expect(maskedData.publicInfo).toBe("This is public");
     });
 
-    it("should implement data retention policies", async () => {
-      const authManager = AuthManager.getInstance();
-
-      // Mock old user data
+    test("should implement data retention policies", async () => {
       const oldData = {
-        timestamp: Date.now() - 366 * 24 * 60 * 60 * 1000, // Over 1 year old
-        userData: { email: "old@example.com" },
+        id: "data-123",
+        createdAt: Date.now() - 365 * 24 * 60 * 60 * 1000, // 1 year ago
+        type: "temporary",
       };
 
-      mockSecureStore.getItemAsync.mockResolvedValueOnce(
-        JSON.stringify(oldData)
-      );
+      const recentData = {
+        id: "data-456",
+        createdAt: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
+        type: "temporary",
+      };
 
-      await authManager.cleanupOldData();
+      const shouldDeleteOld = authProvider.shouldDeleteData(oldData);
+      const shouldDeleteRecent = authProvider.shouldDeleteData(recentData);
 
-      // Should delete old data
-      expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith("user_data");
+      expect(shouldDeleteOld).toBe(true);
+      expect(shouldDeleteRecent).toBe(false);
+    });
+
+    test("should anonymize user data on account deletion", async () => {
+      const userData = {
+        id: "user-123",
+        email: "user@example.com",
+        fullName: "John Doe",
+        phoneNumber: "+44 7700 900123",
+        messages: ["Hello", "How are you?"],
+        profileViews: ["user-456", "user-789"],
+      };
+
+      const anonymizedData = await authProvider.anonymizeUserData(userData);
+
+      expect(anonymizedData.id).toBe("user-123"); // Keep ID for referential integrity
+      expect(anonymizedData.email).toBe("[DELETED]");
+      expect(anonymizedData.fullName).toBe("[DELETED]");
+      expect(anonymizedData.phoneNumber).toBe("[DELETED]");
+      expect(anonymizedData.messages).toEqual(["[DELETED]", "[DELETED]"]);
+      expect(anonymizedData.profileViews).toEqual([]);
+    });
+
+    test("should implement consent management", async () => {
+      const consentData = {
+        userId: "user-123",
+        dataProcessing: true,
+        marketing: false,
+        analytics: true,
+        timestamp: Date.now(),
+      };
+
+      await authProvider.recordConsent(consentData);
+      const consent = await authProvider.getConsent("user-123");
+
+      expect(consent.dataProcessing).toBe(true);
+      expect(consent.marketing).toBe(false);
+      expect(consent.analytics).toBe(true);
     });
   });
 
-  describe("Error Handling Security", () => {
-    it("should not expose sensitive information in error messages", async () => {
-      const authManager = AuthManager.getInstance();
+  describe("Security Headers and Policies", () => {
+    test("should validate security headers in responses", async () => {
+      const mockHeaders = new Map([
+        ["Content-Security-Policy", "default-src 'self'"],
+        ["X-Content-Type-Options", "nosniff"],
+        ["X-Frame-Options", "DENY"],
+        ["X-XSS-Protection", "1; mode=block"],
+        ["Strict-Transport-Security", "max-age=31536000"],
+      ]);
 
-      // Mock database error with sensitive info
-      const mockError = new Error(
-        "Database connection failed: password=secret123, host=internal.db.com"
-      );
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        headers: mockHeaders,
+        json: () => Promise.resolve({ success: true }),
+      });
 
-      const sanitizedError = authManager.sanitizeError(mockError);
+      const result = await apiClient.getProfile();
+      const securityCheck = apiClient.validateSecurityHeaders(mockHeaders);
 
-      expect(sanitizedError.message).not.toContain("password=secret123");
-      expect(sanitizedError.message).not.toContain("internal.db.com");
-      expect(sanitizedError.message).toContain("Database connection failed");
+      expect(result.success).toBe(true);
+      expect(securityCheck.isSecure).toBe(true);
+      expect(securityCheck.missingHeaders).toHaveLength(0);
     });
 
-    it("should log security events", async () => {
-      const authManager = AuthManager.getInstance();
-      const securityLogger = jest.spyOn(authManager, "logSecurityEvent");
+    test("should detect missing security headers", async () => {
+      const incompleteHeaders = new Map([
+        ["Content-Type", "application/json"],
+        // Missing security headers
+      ]);
 
-      // Simulate failed login attempts
-      await authManager.login({ email: "test@example.com", password: "wrong" });
-      await authManager.login({ email: "test@example.com", password: "wrong" });
-      await authManager.login({ email: "test@example.com", password: "wrong" });
+      const securityCheck =
+        apiClient.validateSecurityHeaders(incompleteHeaders);
 
-      expect(securityLogger).toHaveBeenCalledWith("MULTIPLE_FAILED_LOGINS", {
-        email: "test@example.com",
-        attempts: 3,
-        timestamp: expect.any(Number),
-      });
+      expect(securityCheck.isSecure).toBe(false);
+      expect(securityCheck.missingHeaders).toContain("Content-Security-Policy");
+      expect(securityCheck.missingHeaders).toContain("X-Content-Type-Options");
+    });
+  });
+
+  describe("Biometric Security", () => {
+    test("should implement biometric authentication securely", async () => {
+      const biometricResult = await authProvider.authenticateWithBiometrics();
+
+      if (biometricResult.success) {
+        expect(biometricResult.token).toBeDefined();
+        expect(biometricResult.method).toBeOneOf([
+          "fingerprint",
+          "face",
+          "voice",
+        ]);
+      } else {
+        expect(biometricResult.error?.code).toBeOneOf([
+          "BIOMETRIC_NOT_AVAILABLE",
+          "BIOMETRIC_NOT_ENROLLED",
+          "BIOMETRIC_AUTH_FAILED",
+        ]);
+      }
+    });
+
+    test("should fallback to password when biometrics fail", async () => {
+      // Mock biometric failure
+      const biometricResult = {
+        success: false,
+        error: { code: "BIOMETRIC_AUTH_FAILED" },
+      };
+
+      const fallbackResult = await authProvider.handleBiometricFallback(
+        biometricResult
+      );
+
+      expect(fallbackResult.shouldShowPasswordPrompt).toBe(true);
+      expect(fallbackResult.fallbackMethod).toBe("password");
+    });
+
+    test("should secure biometric templates", async () => {
+      const biometricData = {
+        template: "biometric.template.data",
+        userId: "user-123",
+      };
+
+      const stored = await authProvider.storeBiometricTemplate(biometricData);
+      const retrieved = await authProvider.getBiometricTemplate("user-123");
+
+      expect(stored.success).toBe(true);
+      expect(retrieved.template).not.toBe(biometricData.template); // Should be encrypted
+    });
+  });
+
+  describe("Security Monitoring", () => {
+    test("should detect suspicious login attempts", async () => {
+      const loginAttempts = [
+        { ip: "192.168.1.1", timestamp: Date.now() - 1000, success: false },
+        { ip: "192.168.1.1", timestamp: Date.now() - 2000, success: false },
+        { ip: "192.168.1.1", timestamp: Date.now() - 3000, success: false },
+        { ip: "192.168.1.1", timestamp: Date.now() - 4000, success: false },
+        { ip: "192.168.1.1", timestamp: Date.now() - 5000, success: false },
+      ];
+
+      const suspiciousActivity =
+        authProvider.detectSuspiciousActivity(loginAttempts);
+
+      expect(suspiciousActivity.isSuspicious).toBe(true);
+      expect(suspiciousActivity.reason).toBe("Multiple failed login attempts");
+      expect(suspiciousActivity.recommendedAction).toBe("TEMPORARY_LOCK");
+    });
+
+    test("should log security events", async () => {
+      const securityEvent = {
+        type: "LOGIN_ATTEMPT",
+        userId: "user-123",
+        ip: "192.168.1.1",
+        userAgent: "Aroosi Mobile App",
+        success: true,
+        timestamp: Date.now(),
+      };
+
+      const logged = await authProvider.logSecurityEvent(securityEvent);
+
+      expect(logged.success).toBe(true);
+      expect(logged.eventId).toBeDefined();
+    });
+
+    test("should alert on security violations", async () => {
+      const violation = {
+        type: "UNAUTHORIZED_ACCESS_ATTEMPT",
+        severity: "HIGH",
+        userId: "user-123",
+        details: "Attempt to access blocked user profile",
+      };
+
+      const alert = await authProvider.createSecurityAlert(violation);
+
+      expect(alert.success).toBe(true);
+      expect(alert.alertId).toBeDefined();
+      expect(alert.notificationSent).toBe(true);
     });
   });
 });
