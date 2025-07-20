@@ -1,3 +1,4 @@
+/** @jsx React.createElement */
 import React, { useEffect, useRef, useState } from "react";
 import {
   View,
@@ -8,26 +9,40 @@ import {
   Platform,
   TouchableOpacity,
   TextInput,
+  Alert,
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { Colors, Layout } from "../../../constants";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import LoadingState from "@components/ui/LoadingState";
-import EmptyState from "@components/ui/EmptyState";
-import { useRealtimeMessaging } from "../../../hooks/useRealtimeMessaging";
-import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
-import { normalizeMessage } from "../../../utils/messageUtils";
-import { VoiceMessage, VoiceRecorder } from "@/components/ui/VoiceMessage";
-import { GradientButton } from "@/components/ui/GradientComponents";
-import { AnimatedButton } from "@/components/ui/AnimatedComponents";
+import LoadingState from "../../../components/ui/LoadingState";
+import EmptyState from "../../../components/ui/EmptyState";
 import * as Haptics from "expo-haptics";
-import ScreenContainer from "@components/common/ScreenContainer";
+// import ScreenContainer from "@components/common/ScreenContainer";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "../../../hooks/useResponsive";
+
+// Import our new messaging system
+import { useConversationMessaging } from "../../../hooks/useOfflineMessaging";
+import { useSubscription } from "../../../hooks/useSubscription";
+import { Message } from "../../../types/message";
+import { OfflineMessageStatus } from "../../../components/messaging/OfflineMessageStatus";
+
+// Import voice messaging components
+import { VoiceMessageDisplay } from "../../../components/messaging/VoiceMessage";
+import { VoiceRecorder } from "../../../components/messaging/VoiceRecorder";
+
+// Import real-time components
+import { TypingIndicator } from "../../../components/messaging/TypingIndicator";
+import { MessageStatusIndicator } from "../../../components/messaging/MessageStatusIndicator";
+import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
+
+// Import messaging features for subscription gating
+import {
+  useMessagingFeatures,
+  useVoiceMessageLimits,
+} from "../../../hooks/useMessagingFeatures";
 
 interface ChatScreenProps {
   navigation: any;
@@ -47,156 +62,149 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const route = useRoute<ChatScreenRoute>();
   const { conversationId, partnerName, partnerId } = route.params;
   const { userId } = useAuth();
-  const apiClient = useApiClient();
-  const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
   const [inputText, setInputText] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
 
+  // Use our new unified messaging system
   const {
-    data: messages = [],
-    isLoading,
+    messages,
+    loading,
     error,
-    refetch,
-  } = useQuery({
-    queryKey: ["messages", conversationId],
-    queryFn: async () => {
-      const response = await apiClient.getMessages(conversationId);
-      const data = response.data as { messages?: any[] };
-      let messagesList: any[] = [];
-      if (response.success) {
-        if (Array.isArray(data.messages)) {
-          messagesList = data.messages;
-        } else if (Array.isArray(data)) {
-          messagesList = data;
-        }
-      }
-      return messagesList.map(normalizeMessage);
-    },
-    enabled: !!conversationId,
-    refetchInterval: 30000, // Reduced frequency since we have real-time updates
-  });
+    sendMessage,
+    loadMessages,
+    isOnline,
+    isInitialized,
+    hasMessages,
+    canSend,
+  } = useConversationMessaging(conversationId);
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (text: string) => {
-      // Extract user IDs from conversationId (format: "userId1_userId2")
-      const userIds = conversationId.split("_");
-      const toUserId = userIds.find((id) => id !== userId) || partnerId;
-      const fromUserId = userId;
+  // Messaging features for subscription checks
+  const { canSendVoiceMessage } = useMessagingFeatures();
+  const { canSendVoice } = useVoiceMessageLimits();
 
-      if (!toUserId || !fromUserId) {
-        throw new Error("Invalid conversation participants");
-      }
-
-      return apiClient.sendMessage({
-        conversationId,
-        text,
-        toUserId,
-        fromUserId,
-      });
-    },
-    onSuccess: () => {
-      // Stop typing indicator when message is sent
-      typingIndicator.stopTyping();
-      setInputText("");
-      queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-    },
-  });
-
-  // Real-time messaging
-  const { isConnected, sendDeliveryReceipt } = useRealtimeMessaging({
+  // Real-time features
+  const typingIndicator = useTypingIndicator({
     conversationId,
-    onMessageReceived: (newMessage) => {
-      // Add new message to the list and scroll to bottom
-      queryClient.setQueryData(
-        ["messages", conversationId],
-        (oldMessages: any[]) => {
-          const updatedMessages = [...(oldMessages || []), newMessage];
-          return updatedMessages;
-        }
-      );
-
-      // Send delivery receipt for received messages
-      if (newMessage.fromUserId !== userId) {
-        sendDeliveryReceipt(newMessage._id, "delivered");
-      }
-    },
-    onMessageRead: (messageId, readByUserId) => {
-      // Update message read status
-      queryClient.setQueryData(
-        ["messages", conversationId],
-        (oldMessages: any[]) => {
-          return (oldMessages || []).map((msg: any) =>
-            msg._id === messageId
-              ? { ...msg, readAt: Date.now(), isRead: true }
-              : msg
-          );
-        }
-      );
-    },
-    onTypingStart: (typingUserId) => {
-      if (typingUserId !== userId) {
-        // Handle typing indicator from other user
-        console.log(`${typingUserId} started typing`);
-      }
-    },
-    onTypingStop: (typingUserId) => {
-      if (typingUserId !== userId) {
-        // Handle typing indicator stop from other user
-        console.log(`${typingUserId} stopped typing`);
-      }
-    },
+    userId: userId || "",
   });
-
-  // Typing indicator
-  const typingIndicator = useTypingIndicator(conversationId, userId || "");
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messages.length > 0) {
+    if (hasMessages) {
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 100);
     }
-  }, [messages]);
+  }, [messages, hasMessages]);
 
-  // Mark messages as read when screen is focused
+  // Load messages on mount
   useEffect(() => {
-    const unreadMessages = messages.filter(
-      (msg) => msg.toUserId === userId && !msg.readAt && !msg.isRead
-    );
-
-    if (unreadMessages.length > 0) {
-      // Mark conversation as read
-      apiClient.markConversationAsRead(conversationId);
-
-      // Send read receipts for individual messages
-      unreadMessages.forEach((msg) => {
-        sendDeliveryReceipt(msg._id, "read");
-      });
+    if (isInitialized && conversationId) {
+      loadMessages();
     }
-  }, [messages, userId, conversationId, apiClient, sendDeliveryReceipt]);
+  }, [isInitialized, conversationId, loadMessages]);
 
-  const handleSendMessage = async (content: string) => {
-    if (!content.trim()) return;
+  const handleSendMessage = async (
+    content: string,
+    type: "text" | "voice" | "image" = "text",
+    metadata?: { audioStorageId?: string; duration?: number; fileSize?: number }
+  ) => {
+    if (!content.trim() && type === "text") return;
+    if (!userId || !partnerId) return;
+
     try {
-      await sendMessageMutation.mutateAsync(content);
+      // Validate content first
+      if (type === "text") {
+        // Simple text validation
+        if (content.length > 1000) {
+          Alert.alert(
+            "Message Too Long",
+            "Messages must be under 1000 characters"
+          );
+          return;
+        }
+      }
+
+      // Check subscription permissions for voice messages
+      if (type === "voice") {
+        const voicePermission = canSendVoiceMessage(metadata?.duration);
+        if (!voicePermission.allowed) {
+          Alert.alert(
+            "Premium Feature",
+            voicePermission.reason ||
+              "Voice messages require a premium subscription",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Upgrade",
+                onPress: () => navigation.navigate("Subscription"),
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      // Send the message using our unified system
+      const messageData: any = {
+        conversationId,
+        fromUserId: userId,
+        toUserId: partnerId,
+        text: type === "text" ? content : "",
+        type,
+        createdAt: Date.now(),
+      };
+
+      // Add voice message metadata if present
+      if (type === "voice" && metadata) {
+        messageData.audioStorageId = metadata.audioStorageId;
+        messageData.duration = metadata.duration;
+        messageData.fileSize = metadata.fileSize;
+      }
+
+      const result = await sendMessage(messageData);
+
+      if (result.success) {
+        setInputText("");
+        setIsTyping(false);
+      } else {
+        Alert.alert(
+          "Send Failed",
+          result.error?.message || "Failed to send message"
+        );
+      }
     } catch (error) {
       console.error("Failed to send message:", error);
+      Alert.alert("Error", "Failed to send message. Please try again.");
     }
   };
 
   const handleInputChange = (text: string) => {
     setInputText(text);
+    setIsTyping(text.length > 0);
 
-    // Send typing indicator
-    if (text.length > 0) {
-      typingIndicator.startTyping();
-    } else {
-      typingIndicator.stopTyping();
-    }
+    // Update typing indicator
+    typingIndicator.handleTextChange(text);
+  };
+
+  const handleVoiceMessage = async (audioUri: string, duration: number) => {
+    console.log("Voice message:", audioUri, duration);
+    setShowVoiceRecorder(false);
+
+    // Send voice message with metadata
+    await handleSendMessage(
+      `Voice message (${Math.round(duration)}s)`,
+      "voice",
+      {
+        audioStorageId: audioUri, // This would be the storage ID after upload
+        duration: Math.round(duration),
+        fileSize: 0, // Would be set by the voice message manager
+      }
+    );
   };
 
   const formatMessageTime = (timestamp: number) => {
@@ -266,10 +274,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             ]}
           >
             {message.type === "voice" ? (
-              <VoiceMessage
-                audioUri={message.audioUri}
+              <VoiceMessageDisplay
+                uri={message.audioUri}
+                storageId={message.audioStorageId}
                 duration={message.duration}
-                isOwnMessage={isOwnMessage}
+                style={{ backgroundColor: "transparent" }}
+                small={false}
               />
             ) : (
               <Text
@@ -297,15 +307,11 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               </Text>
 
               {/* Message status indicator for sent messages */}
-              {isOwnMessage && (
-                <Text style={styles.messageStatus}>
-                  {message.readAt
-                    ? "✓✓"
-                    : message.status === "delivered"
-                    ? "✓"
-                    : "⏳"}
-                </Text>
-              )}
+              <MessageStatusIndicator
+                status={message.status}
+                isOwnMessage={isOwnMessage}
+                readAt={message.readAt}
+              />
             </View>
           </View>
         </View>
@@ -497,27 +503,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     },
   });
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <ScreenContainer
-        containerStyle={styles.container}
-        contentStyle={styles.contentStyle}
-      >
+      <View style={styles.container}>
         <LoadingState message="Loading conversation..." />
-      </ScreenContainer>
+      </View>
     );
   }
 
   return (
-    <ScreenContainer
-      containerStyle={styles.container}
-      contentStyle={styles.contentStyle}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
+        {/* Offline Message Status */}
+        <OfflineMessageStatus showDetails={false} />
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -529,12 +532,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{partnerName || "Chat"}</Text>
-            {isConnected && <Text style={styles.connectionStatus}>Online</Text>}
-            {typingIndicator.typingState.isTyping && (
-              <Text style={styles.typingStatus}>
-                {typingIndicator.getTypingText()}
-              </Text>
-            )}
+            {isOnline && <Text style={styles.connectionStatus}>Online</Text>}
+            {isTyping && <Text style={styles.typingStatus}>Typing...</Text>}
           </View>
 
           <TouchableOpacity
@@ -563,18 +562,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               title="Unable to load messages"
               message="Please check your connection and try again."
               actionText="Retry"
-              onAction={refetch}
+              onAction={() => loadMessages()}
             />
-          ) : messages.length === 0 ? (
+          ) : !hasMessages ? (
             <EmptyState
               title="Start the conversation"
               message="Send a message to break the ice!"
             />
           ) : (
             <>
-              {messages.map((message: any, index: number) =>
+              {messages.map((message: Message, index: number) =>
                 renderMessage(message, index)
               )}
+
+              {/* Typing indicator */}
+              <TypingIndicator
+                isVisible={typingIndicator.isAnyoneElseTyping}
+                userName={partnerName}
+              />
             </>
           )}
         </ScrollView>
@@ -583,12 +588,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         <View style={styles.chatInputContainer}>
           {showVoiceRecorder ? (
             <VoiceRecorder
-              onRecordingComplete={(uri, duration) => {
-                // Handle voice message sending
-                setShowVoiceRecorder(false);
-                // You would send the voice message here
-                console.log("Voice message recorded:", uri, duration);
-              }}
+              onRecordingComplete={handleVoiceMessage}
               onCancel={() => setShowVoiceRecorder(false)}
               style={styles.voiceRecorderContainer}
             />
@@ -597,6 +597,22 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => {
+                  // Check voice message permission first
+                  if (!canSendVoice) {
+                    Alert.alert(
+                      "Premium Feature",
+                      "Voice messages require a premium subscription",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "Upgrade",
+                          onPress: () => navigation.navigate("Subscription"),
+                        },
+                      ]
+                    );
+                    return;
+                  }
+
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   setShowVoiceRecorder(true);
                 }}
@@ -617,7 +633,6 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                   }
                 }}
                 returnKeyType="send"
-                blurOnSubmit={false}
               />
 
               <TouchableOpacity
@@ -633,18 +648,16 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                     handleSendMessage(inputText);
                   }
                 }}
-                disabled={!inputText.trim() || sendMessageMutation.isPending}
+                disabled={!inputText.trim() || !canSend}
               >
                 <Text style={styles.sendButtonText}>
-                  {sendMessageMutation.isPending ? "⏳" : "➤"}
+                  {loading ? "⏳" : "➤"}
                 </Text>
               </TouchableOpacity>
             </>
           )}
         </View>
       </KeyboardAvoidingView>
-    </ScreenContainer>
+    </View>
   );
 }
-
-

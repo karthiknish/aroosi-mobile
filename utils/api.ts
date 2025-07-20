@@ -391,32 +391,85 @@ class ApiClient {
     return this.request("/conversations");
   }
 
-  // Message APIs - Updated to match main project structure
+  // Message APIs - Aligned with unified messaging endpoints
   async getMessages(
     conversationId: string,
     options?: { limit?: number; before?: number }
   ): Promise<ApiResponse<Message[]>> {
+    // Validate conversation ID
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateConversationId(conversationId);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: validation.error || "Invalid conversation ID",
+          details: null,
+        },
+      };
+    }
+
     const params = new URLSearchParams({ conversationId });
     if (options?.limit) params.append("limit", options.limit.toString());
     if (options?.before) params.append("before", options.before.toString());
-    return this.request(`/match-messages?${params}`);
+
+    const response = await this.request<Message[]>(`/match-messages?${params}`);
+
+    // Normalize messages for backward compatibility
+    if (response.success && response.data) {
+      response.data = response.data.map(this.normalizeMessage);
+    }
+
+    return response;
   }
 
   async sendMessage(data: {
     conversationId: string;
-    text: string;
+    fromUserId: string;
     toUserId: string;
-    fromUserId?: string;
+    text?: string;
     type?: "text" | "voice" | "image";
     audioStorageId?: string;
     duration?: number;
     fileSize?: number;
     mimeType?: string;
   }): Promise<ApiResponse<Message>> {
-    return this.request("/match-messages", {
+    // Validate message data
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateMessageSendData(data);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: validation.error || "Invalid message data",
+          details: null,
+        },
+      };
+    }
+
+    const response = await this.request<Message>("/match-messages", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        conversationId: data.conversationId,
+        fromUserId: data.fromUserId,
+        toUserId: data.toUserId,
+        text: data.text || "",
+        type: data.type || "text",
+        audioStorageId: data.audioStorageId,
+        duration: data.duration,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
+      }),
     });
+
+    // Normalize message for backward compatibility
+    if (response.success && response.data) {
+      response.data = this.normalizeMessage(response.data);
+    }
+
+    return response;
   }
 
   async markMessagesAsRead(messageIds: string[]) {
@@ -426,9 +479,26 @@ class ApiClient {
     });
   }
 
-  async markConversationAsRead(conversationId: string) {
-    return this.request(`/conversations/${conversationId}/mark-read`, {
+  async markConversationAsRead(
+    conversationId: string
+  ): Promise<ApiResponse<void>> {
+    // Validate conversation ID
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateConversationId(conversationId);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: validation.error || "Invalid conversation ID",
+          details: null,
+        },
+      };
+    }
+
+    return this.request("/messages/read", {
       method: "POST",
+      body: JSON.stringify({ conversationId }),
     });
   }
 
@@ -500,6 +570,73 @@ class ApiClient {
     // Example: .../profile-images/{storageId}?...
     const match = uploadUrl.match(/profile-images\/([\w-]+)/);
     return match ? match[1] : "";
+  }
+
+  // Message normalization for backward compatibility
+  private normalizeMessage(rawMessage: any): Message {
+    return {
+      _id: rawMessage._id || rawMessage.id,
+      conversationId: rawMessage.conversationId,
+      fromUserId: rawMessage.fromUserId || rawMessage.senderId,
+      toUserId: rawMessage.toUserId || rawMessage.recipientId,
+      text: rawMessage.text || rawMessage.content || "",
+      type: rawMessage.type || "text",
+      createdAt: rawMessage.createdAt || rawMessage.timestamp || Date.now(),
+      readAt: rawMessage.readAt,
+
+      // Voice message fields
+      audioStorageId: rawMessage.audioStorageId,
+      duration: rawMessage.duration || rawMessage.voiceDuration,
+
+      // Image message fields
+      imageStorageId: rawMessage.imageStorageId,
+
+      // Common metadata
+      fileSize: rawMessage.fileSize,
+      mimeType: rawMessage.mimeType,
+
+      // Client-side fields
+      status: this.normalizeMessageStatus(rawMessage.status),
+      isOptimistic: rawMessage.isOptimistic || false,
+      deliveryReceipts: rawMessage.deliveryReceipts || [],
+
+      // Backward compatibility fields
+      id: rawMessage.id,
+      senderId: rawMessage.senderId,
+      content: rawMessage.content,
+      _creationTime: rawMessage._creationTime,
+      timestamp: rawMessage.timestamp,
+      isRead: rawMessage.isRead,
+      voiceUrl: rawMessage.voiceUrl,
+      voiceDuration: rawMessage.voiceDuration,
+      voiceWaveform: rawMessage.voiceWaveform,
+      fileUrl: rawMessage.fileUrl,
+      fileName: rawMessage.fileName,
+      thumbnailUrl: rawMessage.thumbnailUrl,
+      editedAt: rawMessage.editedAt,
+      replyToId: rawMessage.replyToId,
+      isSystemMessage: rawMessage.isSystemMessage,
+    };
+  }
+
+  // Normalize message status for consistency
+  private normalizeMessageStatus(
+    status: any
+  ): "pending" | "sent" | "delivered" | "read" | "failed" | undefined {
+    if (!status) return undefined;
+
+    // Map legacy statuses to new ones
+    switch (status) {
+      case "sending":
+        return "pending";
+      case "sent":
+      case "delivered":
+      case "read":
+      case "failed":
+        return status;
+      default:
+        return "sent"; // Default fallback
+    }
   }
 
   async saveImageMetadata(data: {
@@ -641,8 +778,10 @@ class ApiClient {
     });
   }
 
-  // Voice Messages - Updated to match main project
-  async generateVoiceUploadUrl() {
+  // Voice Messages - Aligned with unified messaging API
+  async generateVoiceUploadUrl(): Promise<
+    ApiResponse<{ uploadUrl: string; storageId: string }>
+  > {
     return this.request("/voice-messages/upload-url", {
       method: "POST",
     });
@@ -667,7 +806,20 @@ class ApiClient {
     });
   }
 
-  async getVoiceMessageUrl(storageId: string) {
+  async getVoiceMessageUrl(
+    storageId: string
+  ): Promise<ApiResponse<{ url: string }>> {
+    if (!storageId) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Storage ID is required",
+          details: null,
+        },
+      };
+    }
+
     return this.request(`/voice-messages/${storageId}/url`);
   }
 
@@ -787,22 +939,23 @@ class ApiClient {
     return this.request(`/interests?${searchParams}`);
   }
 
-  // Interest response by status not available via API - auto-matching system
+  // DEPRECATED: Manual interest responses are not supported in auto-matching system
+  // This method is kept for backward compatibility but will always return an error
   async respondToInterestByStatus(data: {
     interestId: string;
     status: "accepted" | "rejected";
   }): Promise<ApiResponse<never>> {
     console.warn(
-      "respondToInterestByStatus: Auto-matching system - interests automatically match when mutual"
+      "respondToInterestByStatus: DEPRECATED - Auto-matching system handles interest responses automatically"
     );
     return {
       success: false,
       error: {
-        code: "AUTO_MATCHING_SYSTEM",
+        code: "DEPRECATED_ENDPOINT",
         message:
-          "Auto-matching system - interests automatically match when both users express interest",
+          "Manual interest responses are deprecated. Matches are created automatically when mutual interest is detected.",
         details:
-          "Manual interest responses are not supported. Matches are created automatically when mutual interest is detected.",
+          "This endpoint is deprecated. Use sendInterest() to express interest, and matches will be created automatically when mutual.",
       },
     };
   }

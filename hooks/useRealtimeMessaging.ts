@@ -1,178 +1,347 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { AppState, AppStateStatus } from "react-native";
+import {
+  RealtimeMessagingService,
+  RealtimeMessage,
+  TypingIndicator,
+  DeliveryReceipt,
+  RealtimeEventHandlers,
+} from "../services/RealtimeMessagingService";
 import { useAuth } from "../contexts/AuthContext";
-import realtimeMessagingService from '../services/RealtimeMessagingService';
-import { Message, MessageStatus } from '../types/message';
-import { normalizeMessage } from '../utils/messageUtils';
 
-export interface UseRealtimeMessagingProps {
-  conversationId: string;
-  onMessageReceived?: (message: Message) => void;
-  onMessageRead?: (messageId: string, userId: string) => void;
-  onTypingStart?: (userId: string) => void;
-  onTypingStop?: (userId: string) => void;
-  onUserOnline?: (userId: string) => void;
-  onUserOffline?: (userId: string) => void;
+interface UseRealtimeMessagingOptions {
+  autoConnect?: boolean;
+  onMessage?: (message: RealtimeMessage) => void;
+  onTypingIndicator?: (indicator: TypingIndicator) => void;
+  onDeliveryReceipt?: (receipt: DeliveryReceipt) => void;
+  onConnectionChange?: (connected: boolean) => void;
+  onError?: (error: Error) => void;
 }
 
-export interface UseRealtimeMessagingResult {
-  isConnected: boolean;
-  connectionError: string | null;
-  sendTypingIndicator: (action: 'start' | 'stop') => Promise<void>;
-  sendDeliveryReceipt: (messageId: string, status: MessageStatus) => Promise<void>;
-  connect: () => void;
-  disconnect: () => void;
-}
-
-export function useRealtimeMessaging({
-  conversationId,
-  onMessageReceived,
-  onMessageRead,
-  onTypingStart,
-  onTypingStop,
-  onUserOnline,
-  onUserOffline,
-}: UseRealtimeMessagingProps): UseRealtimeMessagingResult {
-  const { getToken } = useAuth();
+/**
+ * Hook for managing real-time messaging functionality
+ */
+export function useRealtimeMessaging(
+  options: UseRealtimeMessagingOptions = {}
+) {
+  const { userId } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Map<string, Set<string>>>(
+    new Map()
+  );
+  const [messageQueue, setMessageQueue] = useState<RealtimeMessage[]>([]);
 
-  // Connect to real-time messaging
-  const connect = useCallback(async () => {
-    try {
-      const token = await getToken();
-      if (!token) {
-        throw new Error('No authentication token available');
+  const serviceRef = useRef<RealtimeMessagingService | null>(null);
+  const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+
+  // WebSocket URL - this should come from environment or config
+  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "wss://www.aroosi.app/ws";
+
+  // Initialize service
+  useEffect(() => {
+    if (!serviceRef.current) {
+      serviceRef.current = new RealtimeMessagingService(wsUrl);
+    }
+
+    return () => {
+      if (serviceRef.current) {
+        serviceRef.current.disconnect();
+        serviceRef.current = null;
+      }
+    };
+  }, [wsUrl]);
+
+  // Handle app state changes
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // App came to foreground, reconnect if needed
+        if (!isConnected && userId && options.autoConnect !== false) {
+          connect();
+        }
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App went to background, disconnect to save resources
+        disconnect();
+      }
+      appStateRef.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
+    return () => subscription?.remove();
+  }, [isConnected, userId, options.autoConnect]);
+
+  // Auto-connect when user is available
+  useEffect(() => {
+    if (
+      userId &&
+      options.autoConnect !== false &&
+      !isConnected &&
+      !isConnecting
+    ) {
+      connect();
+    }
+  }, [userId, options.autoConnect, isConnected, isConnecting]);
+
+  // Event handlers
+  const eventHandlers: RealtimeEventHandlers = {
+    onMessage: (message) => {
+      setMessageQueue((prev) => [...prev, message]);
+      options.onMessage?.(message);
+    },
+    onTypingIndicator: (indicator) => {
+      handleTypingIndicator(indicator);
+      options.onTypingIndicator?.(indicator);
+    },
+    onDeliveryReceipt: (receipt) => {
+      options.onDeliveryReceipt?.(receipt);
+    },
+    onConnectionChange: (connected) => {
+      setIsConnected(connected);
+      setIsConnecting(false);
+      if (connected) {
+        setError(null);
+      }
+      options.onConnectionChange?.(connected);
+    },
+    onError: (error) => {
+      setError(error);
+      setIsConnecting(false);
+      options.onError?.(error);
+    },
+  };
+
+  // Handle typing indicators
+  const handleTypingIndicator = useCallback((indicator: TypingIndicator) => {
+    const { conversationId, userId: typingUserId, isTyping } = indicator;
+
+    setTypingUsers((prev) => {
+      const newMap = new Map(prev);
+
+      if (!newMap.has(conversationId)) {
+        newMap.set(conversationId, new Set());
       }
 
-      realtimeMessagingService.connect(conversationId, token);
-    } catch (error) {
-      console.error('Failed to connect to real-time messaging:', error);
-      setConnectionError(error instanceof Error ? error.message : 'Connection failed');
-    }
-  }, [conversationId, getToken]);
+      const conversationTypers = newMap.get(conversationId)!;
 
-  // Disconnect from real-time messaging
+      if (isTyping) {
+        conversationTypers.add(typingUserId);
+
+        // Clear existing timeout
+        const timeoutKey = `${conversationId}-${typingUserId}`;
+        const existingTimeout = typingTimeoutsRef.current.get(timeoutKey);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+        }
+
+        // Set new timeout to remove typing indicator
+        const timeout = setTimeout(() => {
+          setTypingUsers((current) => {
+            const updated = new Map(current);
+            const typers = updated.get(conversationId);
+            if (typers) {
+              typers.delete(typingUserId);
+              if (typers.size === 0) {
+                updated.delete(conversationId);
+              }
+            }
+            return updated;
+          });
+          typingTimeoutsRef.current.delete(timeoutKey);
+        }, 3000); // Remove typing indicator after 3 seconds
+
+        typingTimeoutsRef.current.set(timeoutKey, timeout);
+      } else {
+        conversationTypers.delete(typingUserId);
+        if (conversationTypers.size === 0) {
+          newMap.delete(conversationId);
+        }
+
+        // Clear timeout
+        const timeoutKey = `${conversationId}-${typingUserId}`;
+        const existingTimeout = typingTimeoutsRef.current.get(timeoutKey);
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+          typingTimeoutsRef.current.delete(timeoutKey);
+        }
+      }
+
+      return newMap;
+    });
+  }, []);
+
+  // Connect to real-time service
+  const connect = useCallback(async () => {
+    if (!userId || !serviceRef.current || isConnecting) {
+      return false;
+    }
+
+    try {
+      setIsConnecting(true);
+      setError(null);
+
+      const success = await serviceRef.current.initialize(
+        userId,
+        eventHandlers
+      );
+
+      if (success) {
+        console.log("Real-time messaging connected");
+        return true;
+      } else {
+        setIsConnecting(false);
+        return false;
+      }
+    } catch (error) {
+      console.error("Failed to connect to real-time messaging:", error);
+      setError(error instanceof Error ? error : new Error("Connection failed"));
+      setIsConnecting(false);
+      return false;
+    }
+  }, [userId, isConnecting, eventHandlers]);
+
+  // Disconnect from real-time service
   const disconnect = useCallback(() => {
-    realtimeMessagingService.disconnect();
+    if (serviceRef.current) {
+      serviceRef.current.disconnect();
+    }
+    setIsConnected(false);
+    setIsConnecting(false);
+    setTypingUsers(new Map());
+
+    // Clear all typing timeouts
+    typingTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+    typingTimeoutsRef.current.clear();
   }, []);
 
   // Send typing indicator
-  const sendTypingIndicator = useCallback(async (action: 'start' | 'stop') => {
-    try {
-      await realtimeMessagingService.sendTypingIndicator(conversationId, action);
-    } catch (error) {
-      console.error('Failed to send typing indicator:', error);
-    }
-  }, [conversationId]);
+  const sendTypingIndicator = useCallback(
+    (conversationId: string, isTyping: boolean) => {
+      if (serviceRef.current && isConnected) {
+        serviceRef.current.sendTypingIndicator(conversationId, isTyping);
+      }
+    },
+    [isConnected]
+  );
 
   // Send delivery receipt
-  const sendDeliveryReceipt = useCallback(async (messageId: string, status: MessageStatus) => {
-    try {
-      await realtimeMessagingService.sendDeliveryReceipt(messageId, status);
-    } catch (error) {
-      console.error('Failed to send delivery receipt:', error);
-    }
+  const sendDeliveryReceipt = useCallback(
+    (
+      messageId: string,
+      conversationId: string,
+      status: "sent" | "delivered" | "read"
+    ) => {
+      if (serviceRef.current && isConnected) {
+        serviceRef.current.sendDeliveryReceipt(
+          messageId,
+          conversationId,
+          status
+        );
+      }
+    },
+    [isConnected]
+  );
+
+  // Send read receipt
+  const sendReadReceipt = useCallback(
+    (messageId: string, conversationId: string) => {
+      if (serviceRef.current && isConnected) {
+        serviceRef.current.sendReadReceipt(messageId, conversationId);
+      }
+    },
+    [isConnected]
+  );
+
+  // Join conversation
+  const joinConversation = useCallback(
+    (conversationId: string) => {
+      if (serviceRef.current && isConnected) {
+        serviceRef.current.joinConversation(conversationId);
+      }
+    },
+    [isConnected]
+  );
+
+  // Leave conversation
+  const leaveConversation = useCallback(
+    (conversationId: string) => {
+      if (serviceRef.current && isConnected) {
+        serviceRef.current.leaveConversation(conversationId);
+      }
+    },
+    [isConnected]
+  );
+
+  // Get typing users for a conversation
+  const getTypingUsers = useCallback(
+    (conversationId: string): string[] => {
+      const typers = typingUsers.get(conversationId);
+      return typers ? Array.from(typers) : [];
+    },
+    [typingUsers]
+  );
+
+  // Check if anyone is typing in a conversation
+  const isAnyoneTyping = useCallback(
+    (conversationId: string): boolean => {
+      const typers = typingUsers.get(conversationId);
+      return typers ? typers.size > 0 : false;
+    },
+    [typingUsers]
+  );
+
+  // Clear message queue
+  const clearMessageQueue = useCallback(() => {
+    setMessageQueue([]);
   }, []);
 
-  // Set up event listeners
-  useEffect(() => {
-    const handleConnected = () => {
-      setIsConnected(true);
-      setConnectionError(null);
-    };
-
-    const handleDisconnected = () => {
-      setIsConnected(false);
-    };
-
-    const handleError = (error: any) => {
-      setConnectionError(error?.message || 'Connection error');
-      setIsConnected(false);
-    };
-
-    const handleMessageReceived = (messageData: any) => {
-      if (onMessageReceived) {
-        const normalizedMessage = normalizeMessage(messageData);
-        onMessageReceived(normalizedMessage);
-      }
-    };
-
-    const handleMessageRead = (data: { messageId: string; userId: string }) => {
-      if (onMessageRead) {
-        onMessageRead(data.messageId, data.userId);
-      }
-    };
-
-    const handleTypingStart = (data: { userId: string; conversationId: string }) => {
-      if (data.conversationId === conversationId && onTypingStart) {
-        onTypingStart(data.userId);
-      }
-    };
-
-    const handleTypingStop = (data: { userId: string; conversationId: string }) => {
-      if (data.conversationId === conversationId && onTypingStop) {
-        onTypingStop(data.userId);
-      }
-    };
-
-    const handleUserOnline = (data: { userId: string }) => {
-      if (onUserOnline) {
-        onUserOnline(data.userId);
-      }
-    };
-
-    const handleUserOffline = (data: { userId: string }) => {
-      if (onUserOffline) {
-        onUserOffline(data.userId);
-      }
-    };
-
-    // Add event listeners
-    realtimeMessagingService.on('connected', handleConnected);
-    realtimeMessagingService.on('disconnected', handleDisconnected);
-    realtimeMessagingService.on('error', handleError);
-    realtimeMessagingService.on('messageReceived', handleMessageReceived);
-    realtimeMessagingService.on('messageRead', handleMessageRead);
-    realtimeMessagingService.on('typingStart', handleTypingStart);
-    realtimeMessagingService.on('typingStop', handleTypingStop);
-    realtimeMessagingService.on('userOnline', handleUserOnline);
-    realtimeMessagingService.on('userOffline', handleUserOffline);
-
-    // Auto-connect when component mounts
-    connect();
-
-    // Cleanup on unmount
-    return () => {
-      realtimeMessagingService.off('connected', handleConnected);
-      realtimeMessagingService.off('disconnected', handleDisconnected);
-      realtimeMessagingService.off('error', handleError);
-      realtimeMessagingService.off('messageReceived', handleMessageReceived);
-      realtimeMessagingService.off('messageRead', handleMessageRead);
-      realtimeMessagingService.off('typingStart', handleTypingStart);
-      realtimeMessagingService.off('typingStop', handleTypingStop);
-      realtimeMessagingService.off('userOnline', handleUserOnline);
-      realtimeMessagingService.off('userOffline', handleUserOffline);
-      
-      disconnect();
-    };
-  }, [
-    conversationId,
-    connect,
-    disconnect,
-    onMessageReceived,
-    onMessageRead,
-    onTypingStart,
-    onTypingStop,
-    onUserOnline,
-    onUserOffline,
-  ]);
+  // Get queued messages
+  const getQueuedMessages = useCallback(() => {
+    return messageQueue;
+  }, [messageQueue]);
 
   return {
+    // Connection state
     isConnected,
-    connectionError,
-    sendTypingIndicator,
-    sendDeliveryReceipt,
+    isConnecting,
+    error,
+
+    // Connection control
     connect,
     disconnect,
+
+    // Messaging functions
+    sendTypingIndicator,
+    sendDeliveryReceipt,
+    sendReadReceipt,
+    joinConversation,
+    leaveConversation,
+
+    // Typing indicators
+    getTypingUsers,
+    isAnyoneTyping,
+    typingUsers: Array.from(typingUsers.entries()).reduce(
+      (acc, [conversationId, users]) => {
+        acc[conversationId] = Array.from(users);
+        return acc;
+      },
+      {} as Record<string, string[]>
+    ),
+
+    // Message queue
+    messageQueue,
+    clearMessageQueue,
+    getQueuedMessages,
+
+    // Service reference (for advanced usage)
+    service: serviceRef.current,
   };
 }

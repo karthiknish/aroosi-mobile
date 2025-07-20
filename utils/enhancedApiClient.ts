@@ -276,22 +276,93 @@ class EnhancedApiClient {
     return this.request("/matches/unread");
   }
 
-  // Message APIs
-  async getMessages(conversationId: string) {
-    return this.request(`/match-messages?conversationId=${conversationId}`, {
+  // Message APIs - Aligned with unified messaging endpoints
+  async getMessages(
+    conversationId: string,
+    options?: { limit?: number; before?: number }
+  ) {
+    // Validate conversation ID
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateConversationId(conversationId);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error || "Invalid conversation ID",
+      };
+    }
+
+    const params = new URLSearchParams({ conversationId });
+    if (options?.limit) params.append("limit", options.limit.toString());
+    if (options?.before) params.append("before", options.before.toString());
+
+    const response = await this.request(`/match-messages?${params}`, {
       retryConfig: { maxRetries: 2 },
     });
+
+    // Normalize messages for backward compatibility
+    if (response.success && response.data) {
+      response.data = response.data.map(this.normalizeMessage);
+    }
+
+    return response;
   }
 
-  async sendMessage(conversationId: string, content: string) {
-    return this.request("/match-messages", {
+  async sendMessage(data: {
+    conversationId: string;
+    fromUserId: string;
+    toUserId: string;
+    text?: string;
+    type?: "text" | "voice" | "image";
+    audioStorageId?: string;
+    duration?: number;
+    fileSize?: number;
+    mimeType?: string;
+  }) {
+    // Validate message data
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateMessageSendData(data);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error || "Invalid message data",
+      };
+    }
+
+    const response = await this.request("/match-messages", {
       method: "POST",
-      body: JSON.stringify({ conversationId, content }),
+      body: JSON.stringify({
+        conversationId: data.conversationId,
+        fromUserId: data.fromUserId,
+        toUserId: data.toUserId,
+        text: data.text || "",
+        type: data.type || "text",
+        audioStorageId: data.audioStorageId,
+        duration: data.duration,
+        fileSize: data.fileSize,
+        mimeType: data.mimeType,
+      }),
       priority: "high",
     });
+
+    // Normalize message for backward compatibility
+    if (response.success && response.data) {
+      response.data = this.normalizeMessage(response.data);
+    }
+
+    return response;
   }
 
   async markMessagesAsRead(conversationId: string) {
+    // Validate conversation ID
+    const { MessageValidator } = await import("./messageValidation");
+    const validation = MessageValidator.validateConversationId(conversationId);
+    if (!validation.valid) {
+      return {
+        success: false,
+        error: validation.error || "Invalid conversation ID",
+      };
+    }
+
     return this.request("/messages/read", {
       method: "POST",
       body: JSON.stringify({ conversationId }),
@@ -347,6 +418,73 @@ class EnhancedApiClient {
   private extractStorageId(uploadUrl: string): string {
     const match = uploadUrl.match(/profile-images\/([\\w-]+)/);
     return match ? match[1] : "";
+  }
+
+  // Message normalization for backward compatibility
+  private normalizeMessage(rawMessage: any): any {
+    return {
+      _id: rawMessage._id || rawMessage.id,
+      conversationId: rawMessage.conversationId,
+      fromUserId: rawMessage.fromUserId || rawMessage.senderId,
+      toUserId: rawMessage.toUserId || rawMessage.recipientId,
+      text: rawMessage.text || rawMessage.content || "",
+      type: rawMessage.type || "text",
+      createdAt: rawMessage.createdAt || rawMessage.timestamp || Date.now(),
+      readAt: rawMessage.readAt,
+
+      // Voice message fields
+      audioStorageId: rawMessage.audioStorageId,
+      duration: rawMessage.duration || rawMessage.voiceDuration,
+
+      // Image message fields
+      imageStorageId: rawMessage.imageStorageId,
+
+      // Common metadata
+      fileSize: rawMessage.fileSize,
+      mimeType: rawMessage.mimeType,
+
+      // Client-side fields
+      status: this.normalizeMessageStatus(rawMessage.status),
+      isOptimistic: rawMessage.isOptimistic || false,
+      deliveryReceipts: rawMessage.deliveryReceipts || [],
+
+      // Backward compatibility fields
+      id: rawMessage.id,
+      senderId: rawMessage.senderId,
+      content: rawMessage.content,
+      _creationTime: rawMessage._creationTime,
+      timestamp: rawMessage.timestamp,
+      isRead: rawMessage.isRead,
+      voiceUrl: rawMessage.voiceUrl,
+      voiceDuration: rawMessage.voiceDuration,
+      voiceWaveform: rawMessage.voiceWaveform,
+      fileUrl: rawMessage.fileUrl,
+      fileName: rawMessage.fileName,
+      thumbnailUrl: rawMessage.thumbnailUrl,
+      editedAt: rawMessage.editedAt,
+      replyToId: rawMessage.replyToId,
+      isSystemMessage: rawMessage.isSystemMessage,
+    };
+  }
+
+  // Normalize message status for consistency
+  private normalizeMessageStatus(
+    status: any
+  ): "pending" | "sent" | "delivered" | "read" | "failed" | undefined {
+    if (!status) return undefined;
+
+    // Map legacy statuses to new ones
+    switch (status) {
+      case "sending":
+        return "pending";
+      case "sent":
+      case "delivered":
+      case "read":
+      case "failed":
+        return status;
+      default:
+        return "sent"; // Default fallback
+    }
   }
 
   async saveImageMetadata(data: {

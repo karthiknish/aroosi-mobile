@@ -221,10 +221,11 @@ export default function LoginScreen() {
             </View>
 
             <SocialAuthButtons
-              mode="sign-in"
-              loading={loading}
-              onSuccess={() => {
+              onGoogleSuccess={() => {
                 // Navigation handled by auth context
+              }}
+              onGoogleError={(error) => {
+                console.error("Google sign-in error:", error);
               }}
             />
 

@@ -9,10 +9,15 @@
     "paths": {
       "@/*": ["./src/*"],
       "@components/*": ["./components/*"],
+      "@components": ["./components/index.ts"],
       "@hooks/*": ["./hooks/*"],
       "@constants/*": ["./constants/*"],
       "@constants": ["./constants/index.ts"],
-      "@convex/*": ["./convex/*"]
+      "@convex/*": ["./convex/*"],
+      "@contexts/*": ["./contexts/*"],
+      "@contexts": ["./contexts/index.ts"],
+      "@services/*": ["./services/*"],
+      "@services": ["./services/index.ts"]
     },
     "skipLibCheck": true
   }

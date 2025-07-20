@@ -1,101 +1,101 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useApiClient } from "../utils/api";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRealtimeMessaging } from "./useRealtimeMessaging";
 
-export interface TypingState {
+interface UseTypingIndicatorOptions {
+  conversationId: string;
+  userId: string;
+  typingTimeout?: number;
+  sendTypingEvents?: boolean;
+}
+
+interface TypingState {
   isTyping: boolean;
-  users: string[]; // User IDs who are typing
-}
-export interface TypingIndicatorResponse {
   typingUsers: string[];
+  lastTypingTime: number;
 }
 
-export interface UseTypingIndicatorResult {
-  // Current typing state
-  typingState: TypingState;
-
-  // Actions
-  startTyping: () => void;
-  stopTyping: () => void;
-  setTyping: (isTyping: boolean) => void;
-
-  // Helpers
-  isUserTyping: (userId: string) => boolean;
-  getTypingUsers: () => string[];
-  getTypingText: () => string;
-}
-
-const TYPING_TIMEOUT = 3000; // 3 seconds
-const TYPING_DEBOUNCE = 300; // 300ms
-
-export function useTypingIndicator(
-  conversationId: string,
-  currentUserId: string
-): UseTypingIndicatorResult {
+/**
+ * Hook for managing typing indicators in real-time
+ */
+export function useTypingIndicator({
+  conversationId,
+  userId,
+  typingTimeout = 3000, // 3 seconds
+  sendTypingEvents = true,
+}: UseTypingIndicatorOptions) {
   const [typingState, setTypingState] = useState<TypingState>({
     isTyping: false,
-    users: [],
+    typingUsers: [],
+    lastTypingTime: 0,
   });
 
-  const apiClient = useApiClient();
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isCurrentlyTyping = useRef(false);
+  const lastTypingSentRef = useRef<number>(0);
+  const { service: realtimeService } = useRealtimeMessaging();
 
-  // Start typing
-  const startTyping = useCallback(() => {
-    // Clear any existing debounce
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Debounce typing start to avoid too many API calls
-    debounceTimeoutRef.current = setTimeout(async () => {
-      if (!isCurrentlyTyping.current) {
-        isCurrentlyTyping.current = true;
-
-        try {
-          await apiClient.sendTypingIndicator(conversationId, "start");
-        } catch (error) {
-          console.error("Failed to send typing indicator:", error);
-        }
-      }
-
-      // Auto-stop typing after timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping();
-      }, TYPING_TIMEOUT);
-    }, TYPING_DEBOUNCE);
-  }, [conversationId, apiClient]);
-
-  // Stop typing
-  const stopTyping = useCallback(async () => {
-    // Clear timeouts
+  // Clear typing timeout
+  const clearTypingTimeout = useCallback(() => {
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
     }
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+  }, []);
+
+  // Start typing indicator
+  const startTyping = useCallback(() => {
+    const now = Date.now();
+
+    // Update local state
+    setTypingState((prev) => ({
+      ...prev,
+      isTyping: true,
+      lastTypingTime: now,
+    }));
+
+    // Send typing event (throttled to avoid spam)
+    if (
+      sendTypingEvents &&
+      realtimeService &&
+      now - lastTypingSentRef.current > 1000
+    ) {
+      realtimeService.sendTypingIndicator(conversationId, true);
+      lastTypingSentRef.current = now;
     }
 
-    if (isCurrentlyTyping.current) {
-      isCurrentlyTyping.current = false;
+    // Clear existing timeout
+    clearTypingTimeout();
 
-      try {
-        await apiClient.sendTypingIndicator(conversationId, "stop");
-      } catch (error) {
-        console.error("Failed to send typing indicator:", error);
-      }
+    // Set timeout to stop typing
+    typingTimeoutRef.current = setTimeout(() => {
+      stopTyping();
+    }, typingTimeout);
+  }, [
+    conversationId,
+    sendTypingEvents,
+    realtimeService,
+    typingTimeout,
+    clearTypingTimeout,
+  ]);
+
+  // Stop typing indicator
+  const stopTyping = useCallback(() => {
+    setTypingState((prev) => ({
+      ...prev,
+      isTyping: false,
+    }));
+
+    // Send stop typing event
+    if (sendTypingEvents && realtimeService) {
+      realtimeService.sendTypingIndicator(conversationId, false);
     }
-  }, [conversationId, apiClient]);
 
-  // Set typing state (convenience method)
-  const setTyping = useCallback(
-    (isTyping: boolean) => {
-      if (isTyping) {
+    clearTypingTimeout();
+  }, [conversationId, sendTypingEvents, realtimeService, clearTypingTimeout]);
+
+  // Handle text input changes
+  const handleTextChange = useCallback(
+    (text: string) => {
+      if (text.length > 0) {
         startTyping();
       } else {
         stopTyping();
@@ -104,113 +104,137 @@ export function useTypingIndicator(
     [startTyping, stopTyping]
   );
 
-  // Listen for typing indicators from other users
-  useEffect(() => {
-    const handleTypingUpdate = (data: any) => {
-      const { userId, action, conversationId: msgConversationId } = data;
+  // Handle message sent
+  const handleMessageSent = useCallback(() => {
+    stopTyping();
+  }, [stopTyping]);
 
-      // Only handle typing for this conversation
-      if (msgConversationId !== conversationId) {
-        return;
-      }
-
-      // Don't show typing indicator for current user
-      if (userId === currentUserId) {
-        return;
+  // Update typing users from real-time events
+  const updateTypingUsers = useCallback(
+    (typingUserId: string, isTyping: boolean) => {
+      if (typingUserId === userId) {
+        return; // Don't track own typing
       }
 
       setTypingState((prev) => {
-        let newUsers = [...prev.users];
-
-        if (action === "start") {
-          // Add user to typing list if not already there
-          if (!newUsers.includes(userId)) {
-            newUsers.push(userId);
-          }
-        } else if (action === "stop") {
-          // Remove user from typing list
-          newUsers = newUsers.filter((id) => id !== userId);
-        }
+        const newTypingUsers = isTyping
+          ? [
+              ...prev.typingUsers.filter((id) => id !== typingUserId),
+              typingUserId,
+            ]
+          : prev.typingUsers.filter((id) => id !== typingUserId);
 
         return {
-          isTyping: newUsers.length > 0,
-          users: newUsers,
+          ...prev,
+          typingUsers: newTypingUsers,
         };
       });
-    };
+    },
+    [userId]
+  );
 
-    // In a real app, you'd listen to WebSocket events here
-    // For now, we'll simulate with a polling mechanism
-    const pollTypingIndicators = async () => {
-      try {
-        const response = await apiClient.getTypingIndicators(conversationId);
-        if (response.success && response.data) {
-          const typingUsers =
-            (response.data as TypingIndicatorResponse).typingUsers || [];
-          const filteredUsers = typingUsers.filter(
-            (userId: string) => userId !== currentUserId
-          );
+  // Setup real-time event listeners
+  useEffect(() => {
+    if (!realtimeService) return;
 
-          setTypingState({
-            isTyping: filteredUsers.length > 0,
-            users: filteredUsers,
-          });
-        }
-      } catch (error) {
-        console.error("Failed to poll typing indicators:", error);
+    const handleTypingStart = (data: {
+      conversationId: string;
+      userId: string;
+    }) => {
+      if (data.conversationId === conversationId) {
+        updateTypingUsers(data.userId, true);
       }
     };
 
-    // Poll every 2 seconds for typing indicators
-    const pollInterval = setInterval(pollTypingIndicators, 2000);
-
-    // Cleanup
-    return () => {
-      clearInterval(pollInterval);
-      stopTyping();
+    const handleTypingStop = (data: {
+      conversationId: string;
+      userId: string;
+    }) => {
+      if (data.conversationId === conversationId) {
+        updateTypingUsers(data.userId, false);
+      }
     };
-  }, [conversationId, currentUserId, apiClient, stopTyping]);
+
+    realtimeService.on("typing:start", handleTypingStart);
+    realtimeService.on("typing:stop", handleTypingStop);
+
+    return () => {
+      realtimeService.off("typing:start", handleTypingStart);
+      realtimeService.off("typing:stop", handleTypingStop);
+    };
+  }, [realtimeService, conversationId, updateTypingUsers]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopTyping();
+      clearTypingTimeout();
+      if (typingState.isTyping) {
+        stopTyping();
+      }
     };
-  }, [stopTyping]);
+  }, [clearTypingTimeout, stopTyping, typingState.isTyping]);
 
-  // Helper functions
-  const isUserTyping = useCallback(
-    (userId: string) => {
-      return typingState.users.includes(userId);
-    },
-    [typingState.users]
-  );
-
-  const getTypingUsers = useCallback(() => {
-    return typingState.users;
-  }, [typingState.users]);
-
+  // Get typing text for display
   const getTypingText = useCallback(() => {
-    const count = typingState.users.length;
+    const { typingUsers } = typingState;
 
-    if (count === 0) {
+    if (typingUsers.length === 0) {
       return "";
-    } else if (count === 1) {
-      return "typing...";
-    } else if (count === 2) {
-      return "typing...";
-    } else {
-      return `${count} people are typing...`;
     }
-  }, [typingState.users.length]);
+
+    if (typingUsers.length === 1) {
+      return "is typing...";
+    }
+
+    if (typingUsers.length === 2) {
+      return "are typing...";
+    }
+
+    return `${typingUsers.length} people are typing...`;
+  }, [typingState.typingUsers]);
 
   return {
-    typingState,
+    // State
+    isTyping: typingState.isTyping,
+    typingUsers: typingState.typingUsers,
+    isAnyoneElseTyping: typingState.typingUsers.length > 0,
+
+    // Actions
     startTyping,
     stopTyping,
-    setTyping,
-    isUserTyping,
-    getTypingUsers,
+    handleTextChange,
+    handleMessageSent,
+    updateTypingUsers,
+
+    // Utilities
+    getTypingText,
+    isConnected: !!realtimeService,
+  };
+}
+
+/**
+ * Simplified hook for basic typing indicator
+ */
+export function useSimpleTypingIndicator(
+  conversationId: string,
+  userId: string
+) {
+  const {
+    isTyping,
+    isAnyoneElseTyping,
+    handleTextChange,
+    handleMessageSent,
+    getTypingText,
+  } = useTypingIndicator({
+    conversationId,
+    userId,
+  });
+
+  return {
+    isTyping,
+    isAnyoneElseTyping,
+    handleTextChange,
+    handleMessageSent,
     getTypingText,
   };
 }

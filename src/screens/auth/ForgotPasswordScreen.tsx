@@ -10,15 +10,15 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { AuthStackParamList } from "../../navigation/AuthNavigator";
-import { Colors } from "../../../constants/Colors";
+import { AuthStackParamList } from "@/navigation/AuthNavigator";
+import { Colors } from "@constants/Colors";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<

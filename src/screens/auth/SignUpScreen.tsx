@@ -357,11 +357,12 @@ export default function SignUpScreen() {
                 </View>
 
                 <SocialAuthButtons
-                  loading={loading}
-                  onSuccess={() => {
+                  onGoogleSuccess={() => {
                     // Navigation handled by auth context
                   }}
-                  mode="sign-up"
+                  onGoogleError={(error) => {
+                    console.error("Google sign-up error:", error);
+                  }}
                 />
 
                 <TouchableOpacity

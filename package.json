@@ -25,7 +25,14 @@
     "test:final-validation": "jest --testPathPattern=finalValidation",
     "test:performance": "jest --testPathPattern=performance",
     "test:accessibility": "jest --testPathPattern=accessibility",
-    "test:security": "jest --testPathPattern=security"
+    "test:security": "jest --testPathPattern=security",
+    "test:messaging": "node __tests__/messaging/runTests.js",
+    "test:messaging:core": "node __tests__/messaging/runTests.js --core",
+    "test:messaging:integration": "node __tests__/messaging/runTests.js --integration",
+    "test:messaging:sync": "node __tests__/messaging/runTests.js --sync",
+    "test:messaging:performance": "node __tests__/messaging/runTests.js --performance",
+    "test:messaging:watch": "node __tests__/messaging/runTests.js --watch",
+    "test:messaging:coverage": "node __tests__/messaging/runTests.js --coverage"
   },
   "dependencies": {
     "@expo-google-fonts/bodoni-moda": "^0.4.1",

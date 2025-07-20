@@ -109,13 +109,11 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     interestId: string,
     response: "accept" | "reject"
   ) => {
-    try {
-      await apiClient.respondToInterest(interestId, response);
-      // Refresh interests after responding
-      // This would normally be handled by React Query invalidation
-    } catch (error) {
-      console.error("Error responding to interest:", error);
-    }
+    // Auto-matching system - no manual response needed
+    console.warn(
+      "Auto-matching system: Manual interest responses are not needed. " +
+        "Matches are created automatically when mutual interest exists."
+    );
   };
 
   const renderMatch = (match: Match, index: number) => (
@@ -211,24 +209,17 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           <Text style={styles.interestTime}>
             {new Date(interest.createdAt).toLocaleDateString()}
           </Text>
+          <Text
+            style={[
+              styles.interestNote,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            Auto-matching: If you also express interest, you'll match
+            automatically
+          </Text>
         </View>
       </TouchableOpacity>
-
-      <View style={styles.interestActions}>
-        <TouchableOpacity
-          style={[styles.interestButton, styles.acceptButton]}
-          onPress={() => handleRespondToInterest(interest._id, "accept")}
-        >
-          <Text style={styles.acceptButtonText}>💖</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.interestButton, styles.rejectButton]}
-          onPress={() => handleRespondToInterest(interest._id, "reject")}
-        >
-          <Text style={styles.rejectButtonText}>❌</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
@@ -506,6 +497,11 @@ const styles = StyleSheet.create({
   interestTime: {
     fontSize: Layout.typography.fontSize.xs,
     color: Colors.text.tertiary,
+  },
+  interestNote: {
+    fontSize: Layout.typography.fontSize.xs,
+    color: Colors.text.secondary,
+    marginTop: Layout.spacing.xs,
   },
   interestActions: {
     flexDirection: "row",

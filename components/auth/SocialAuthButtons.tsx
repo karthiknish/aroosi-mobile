@@ -1,131 +1,107 @@
 import React from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from "../../contexts/AuthContext";
-import { Colors, Layout } from "../../constants";
-import PlatformButton from "../ui/PlatformButton";
-import PlatformHaptics from "../../utils/PlatformHaptics";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { useAuth } from "@contexts/AuthContext";
+import { signInWithGoogle } from "@services/googleAuth";
+import { Colors } from "@constants/Colors";
 
 interface SocialAuthButtonsProps {
-  mode: "sign-in" | "sign-up";
-  onSuccess?: () => void;
-  loading?: boolean;
-  setLoading?: (loading: boolean) => void;
+  onGoogleSuccess?: () => void;
+  onGoogleError?: (error: string) => void;
 }
 
 export default function SocialAuthButtons({
-  mode,
-  onSuccess,
-  loading = false,
-  setLoading,
+  onGoogleSuccess,
+  onGoogleError,
 }: SocialAuthButtonsProps) {
-  const { signInWithGoogle } = useAuth();
+  const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
+  const { signInWithGoogle: authSignInWithGoogle } = useAuth();
 
-  const handleGoogleAuth = async () => {
-    if (loading) return;
-
-    setLoading?.(true);
-    await PlatformHaptics.light();
-
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
     try {
-      // For now, we'll show a message that Google auth needs to be implemented
-      // In a real implementation, you would integrate with Google Sign-In
-      Alert.alert(
-        "Google Sign-In",
-        "Google authentication will be implemented with @react-native-google-signin/google-signin"
-      );
+      const result = await signInWithGoogle();
 
-      // Example implementation:
-      // import { GoogleSignin } from '@react-native-google-signin/google-signin';
-      // const userInfo = await GoogleSignin.signIn();
-      // const result = await signInWithGoogle(userInfo.idToken);
-      //
-      // if (result.success) {
-      //   await PlatformHaptics.success();
-      //   onSuccess?.();
-      // } else {
-      //   throw new Error(result.error);
-      // }
-    } catch (err: any) {
-      console.error("Google auth error:", err);
-      await PlatformHaptics.error();
+      if (result.success && result.idToken) {
+        // Send the Google ID token to your backend
+        const authResult = await authSignInWithGoogle(result.idToken);
 
-      let errorMessage = "Google authentication failed. Please try again.";
-      if (err.message) {
-        errorMessage = err.message;
+        if (authResult.success) {
+          onGoogleSuccess?.();
+        } else {
+          const errorMessage =
+            authResult.error || "Google authentication failed";
+          onGoogleError?.(errorMessage);
+          Alert.alert("Authentication Error", errorMessage);
+        }
+      } else {
+        const errorMessage = result.error || "Google authentication failed";
+        onGoogleError?.(errorMessage);
+        Alert.alert("Authentication Error", errorMessage);
       }
-
-      Alert.alert("Authentication Failed", errorMessage);
+    } catch (error) {
+      console.error("Google sign-in error:", error);
+      const errorMessage = "An unexpected error occurred during Google sign-in";
+      onGoogleError?.(errorMessage);
+      Alert.alert("Authentication Error", errorMessage);
     } finally {
-      setLoading?.(false);
+      setIsGoogleLoading(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>
-          or {mode === "sign-in" ? "sign in" : "sign up"} with
-        </Text>
-        <View style={styles.dividerLine} />
-      </View>
-
-      <View style={styles.buttonsContainer}>
-        {/* Google */}
-        <PlatformButton
-          title="Continue with Google"
-          onPress={handleGoogleAuth}
-          variant="outline"
-          style={styles.googleButton}
-          textStyle={styles.googleButtonText}
-          icon={<Ionicons name="logo-google" size={20} color="#DB4437" />}
-          iconPosition="left"
-          disabled={loading}
-        />
-      </View>
+      <TouchableOpacity
+        style={[styles.button, styles.googleButton]}
+        onPress={handleGoogleSignIn}
+        disabled={isGoogleLoading}
+        accessibilityLabel="Sign in with Google"
+      >
+        {isGoogleLoading ? (
+          <ActivityIndicator size="small" color={Colors.text.inverse} />
+        ) : (
+          <Text style={[styles.buttonText, styles.googleButtonText]}>
+            Continue with Google
+          </Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: Layout.spacing.lg,
+    width: "100%",
+    marginTop: 20,
   },
-
-  divider: {
+  button: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: Layout.spacing.lg,
-  },
-
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border.primary,
-  },
-
-  dividerText: {
-    paddingHorizontal: Layout.spacing.md,
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-  },
-
-  buttonsContainer: {
-    gap: Layout.spacing.sm,
-  },
-
-  googleButton: {
-    backgroundColor: Colors.background.primary,
-    borderColor: Colors.border.primary,
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
     borderWidth: 1,
-    alignSelf: "stretch",
-    height: "auto",
-    paddingVertical: Layout.spacing.md,
+    borderColor: Colors.border.primary,
+    backgroundColor: Colors.background.secondary,
+    minHeight: 48,
   },
-
-  googleButtonText: {
+  googleButton: {
+    backgroundColor: "#4285F4",
+    borderColor: "#4285F4",
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: "600",
     color: Colors.text.primary,
-    fontWeight: "500",
+  },
+  googleButtonText: {
+    color: Colors.text.inverse,
   },
 });

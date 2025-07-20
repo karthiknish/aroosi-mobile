@@ -1,4 +1,5 @@
-import { InteractionManager, Platform } from "react-native";
+import React from 'react';
+import { InteractionManager, Platform, Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface PerformanceMetric {
@@ -42,7 +43,9 @@ export class PerformanceMonitor {
   private reportingEnabled = true;
 
   private constructor() {
-    this.loadStoredMetrics();
+    this.loadStoredMetrics().catch(error => {
+      console.error("Failed to load stored metrics during initialization:", error);
+    });
   }
 
   public static getInstance(): PerformanceMonitor {
@@ -103,13 +106,47 @@ export class PerformanceMonitor {
 
   // Memory usage tracking
   public recordMemoryUsage(screen?: string): void {
-    if (Platform.OS === "ios") {
-      // iOS memory tracking would require native module
-      // For now, we'll record a placeholder
-      this.recordMetric("memory_usage", 0, { screen, platform: "ios" });
-    } else {
-      // Android memory tracking
-      this.recordMetric("memory_usage", 0, { screen, platform: "android" });
+    try {
+      let memoryUsage = 0;
+      
+      if (Platform.OS === "ios") {
+        // iOS: Use performance.now() as a proxy for memory pressure
+        // In a real app, you'd use a native module like react-native-device-info
+        memoryUsage = this.getEstimatedMemoryUsage();
+      } else {
+        // Android: Use global performance memory info if available
+        memoryUsage = this.getAndroidMemoryUsage();
+      }
+      
+      this.recordMetric("memory_usage", memoryUsage, { screen, platform: Platform.OS });
+    } catch (error) {
+      console.warn("Failed to record memory usage:", error);
+      this.recordMetric("memory_usage", 0, { screen, platform: Platform.OS, error: true });
+    }
+  }
+
+  private getEstimatedMemoryUsage(): number {
+    // Fallback estimation based on JS heap usage
+    // This is a rough approximation - use native modules for accurate data
+    if (global.performance && (global.performance as any).memory) {
+      return (global.performance as any).memory.usedJSHeapSize || 0;
+    }
+    return 0;
+  }
+
+  private getAndroidMemoryUsage(): number {
+    // Try to get memory info from React Native's native modules
+    // This is a placeholder - implement with actual native module
+    try {
+      // In a real implementation, you'd use:
+      // import { NativeModules } from 'react-native';
+      // const { MemoryInfo } = NativeModules;
+      // return MemoryInfo?.getUsedMemory?.() || 0;
+      
+      // For now, use JS heap as fallback
+      return this.getEstimatedMemoryUsage();
+    } catch {
+      return 0;
     }
   }
 
@@ -117,18 +154,38 @@ export class PerformanceMonitor {
   public startFrameRateMonitoring(screenName: string): () => void {
     let frameCount = 0;
     let startTime = Date.now();
+    let isMonitoring = true;
+    let lastFrameTime = startTime;
+    let frameDrops = 0;
 
     const frameCallback = () => {
+      if (!isMonitoring) return;
+
+      const now = Date.now();
+      const frameDuration = now - lastFrameTime;
+      
+      // Count frame drops (frames taking longer than 16.67ms for 60fps)
+      if (frameDuration > 16.67) {
+        frameDrops++;
+      }
+      
       frameCount++;
+      lastFrameTime = now;
+      
       requestAnimationFrame(frameCallback);
     };
 
     requestAnimationFrame(frameCallback);
 
     const stopMonitoring = () => {
+      isMonitoring = false;
       const duration = Date.now() - startTime;
-      const fps = (frameCount / duration) * 1000;
+      const fps = Math.round((frameCount / duration) * 1000);
+      const dropRate = frameCount > 0 ? (frameDrops / frameCount) * 100 : 0;
+      
       this.recordMetric("frame_rate", fps, { screenName });
+      this.recordMetric("frame_drops", frameDrops, { screenName });
+      this.recordMetric("frame_drop_rate", dropRate, { screenName, unit: "%" });
     };
 
     return stopMonitoring;
@@ -154,13 +211,21 @@ export class PerformanceMonitor {
     value: number,
     metadata?: Record<string, any>
   ): void {
-    if (!this.reportingEnabled) return;
+    if (!this.reportingEnabled || !name || typeof value !== 'number') {
+      return;
+    }
+
+    // Validate value
+    if (!isFinite(value) || isNaN(value)) {
+      console.warn(`Invalid metric value: ${value} for ${name}`);
+      return;
+    }
 
     const metric: PerformanceMetric = {
-      name,
-      value,
+      name: name.trim(),
+      value: Math.max(0, value), // Ensure non-negative
       timestamp: Date.now(),
-      metadata,
+      metadata: this.sanitizeMetadata(metadata),
     };
 
     this.metrics.push(metric);
@@ -170,10 +235,26 @@ export class PerformanceMonitor {
       this.metrics = this.metrics.slice(-this.maxMetrics);
     }
 
-    // Store metrics periodically
+    // Store metrics periodically, but not too frequently
     if (this.metrics.length % 10 === 0) {
-      this.storeMetrics();
+      this.storeMetrics().catch(error => {
+        console.error("Failed to store metrics:", error);
+      });
     }
+  }
+
+  private sanitizeMetadata(metadata?: Record<string, any>): Record<string, any> | undefined {
+    if (!metadata) return undefined;
+    
+    const sanitized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(metadata)) {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        sanitized[key] = value;
+      } else if (value !== null && value !== undefined) {
+        sanitized[key] = String(value);
+      }
+    }
+    return sanitized;
   }
 
   // Get performance statistics
@@ -205,6 +286,7 @@ export class PerformanceMonitor {
     memoryUsage: number;
     frameRate: number;
     totalMetrics: number;
+    lastUpdated: number;
   } {
     const now = Date.now();
     const lastHour = now - 60 * 60 * 1000;
@@ -215,27 +297,56 @@ export class PerformanceMonitor {
     const frameRateMetrics = this.getMetrics("frame_rate", lastHour);
 
     const screenLoadTimes: Record<string, number> = {};
+    const screenCounts: Record<string, number> = {};
+    
     screenLoads.forEach((metric) => {
       const screenName = metric.metadata?.screenName;
-      if (screenName) {
-        screenLoadTimes[screenName] = metric.value;
+      if (screenName && typeof metric.value === 'number') {
+        if (!screenLoadTimes[screenName]) {
+          screenLoadTimes[screenName] = 0;
+          screenCounts[screenName] = 0;
+        }
+        screenLoadTimes[screenName] += metric.value;
+        screenCounts[screenName]++;
+      }
+    });
+
+    // Calculate averages for screens with multiple loads
+    Object.keys(screenLoadTimes).forEach(screenName => {
+      if (screenCounts[screenName] > 1) {
+        screenLoadTimes[screenName] = Math.round(screenLoadTimes[screenName] / screenCounts[screenName]);
       }
     });
 
     const apiCallTimes: Record<string, number> = {};
+    const apiCounts: Record<string, number> = {};
+    
     apiCalls.forEach((metric) => {
       const endpoint = metric.metadata?.endpoint;
-      if (endpoint) {
-        apiCallTimes[endpoint] = metric.value;
+      if (endpoint && typeof metric.value === 'number') {
+        if (!apiCallTimes[endpoint]) {
+          apiCallTimes[endpoint] = 0;
+          apiCounts[endpoint] = 0;
+        }
+        apiCallTimes[endpoint] += metric.value;
+        apiCounts[endpoint]++;
+      }
+    });
+
+    // Calculate averages for API calls
+    Object.keys(apiCallTimes).forEach(endpoint => {
+      if (apiCounts[endpoint] > 1) {
+        apiCallTimes[endpoint] = Math.round(apiCallTimes[endpoint] / apiCounts[endpoint]);
       }
     });
 
     return {
       screenLoadTimes,
       apiCallTimes,
-      memoryUsage: this.getAverageMetric("memory_usage", lastHour),
-      frameRate: this.getAverageMetric("frame_rate", lastHour),
+      memoryUsage: Math.round(this.getAverageMetric("memory_usage", lastHour)),
+      frameRate: Math.round(this.getAverageMetric("frame_rate", lastHour) * 10) / 10,
       totalMetrics: this.metrics.length,
+      lastUpdated: now,
     };
   }
 
@@ -254,12 +365,20 @@ export class PerformanceMonitor {
   // Storage
   private async storeMetrics(): Promise<void> {
     try {
-      await AsyncStorage.setItem(
-        "performance_metrics",
-        JSON.stringify(this.metrics.slice(-100)) // Store only last 100 metrics
-      );
+      const metricsToStore = this.metrics.slice(-100);
+      const serialized = JSON.stringify(metricsToStore);
+      
+      // Check storage size before saving
+      if (serialized.length > 500000) { // ~500KB limit
+        console.warn("Metrics data too large, truncating...");
+        const truncated = this.metrics.slice(-50);
+        await AsyncStorage.setItem("performance_metrics", JSON.stringify(truncated));
+      } else {
+        await AsyncStorage.setItem("performance_metrics", serialized);
+      }
     } catch (error) {
       console.error("Failed to store performance metrics:", error);
+      // Don't throw - this is non-critical
     }
   }
 
@@ -267,16 +386,30 @@ export class PerformanceMonitor {
     try {
       const stored = await AsyncStorage.getItem("performance_metrics");
       if (stored) {
-        this.metrics = JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          this.metrics = parsed.filter(metric => 
+            metric && 
+            typeof metric.name === 'string' && 
+            typeof metric.value === 'number' && 
+            typeof metric.timestamp === 'number'
+          );
+        }
       }
     } catch (error) {
       console.error("Failed to load stored metrics:", error);
+      this.metrics = []; // Reset on error
     }
   }
 
   public async clearMetrics(): Promise<void> {
-    this.metrics = [];
-    await AsyncStorage.removeItem("performance_metrics");
+    try {
+      this.metrics = [];
+      await AsyncStorage.removeItem("performance_metrics");
+    } catch (error) {
+      console.error("Failed to clear metrics:", error);
+      throw error; // Re-throw for caller to handle
+    }
   }
 }
 

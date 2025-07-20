@@ -1,344 +1,251 @@
-import { useState, useRef, useCallback } from "react";
-import { Audio } from "expo-audio";
-import { Alert } from "react-native";
-import PlatformHaptics from "../utils/PlatformHaptics";
-import React from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Audio } from "expo-av";
+import { Platform } from "react-native";
+import { useVoiceMessageLimits } from "./useMessagingFeatures";
 
-export interface VoiceRecordingState {
-  isRecording: boolean;
-  isPaused: boolean;
-  duration: number; // in milliseconds
-  recordingUri: string | null;
-  isPermissionGranted: boolean;
+interface VoiceRecordingOptions {
+  maxDuration?: number; // in seconds
+  quality?: Audio.RecordingOptionsQualityPreset;
+  onRecordingStart?: () => void;
+  onRecordingStop?: (uri: string, duration: number) => void;
+  onRecordingError?: (error: Error) => void;
+  onDurationExceeded?: () => void;
 }
 
-export interface UseVoiceRecordingResult {
-  // State
-  recordingState: VoiceRecordingState;
+/**
+ * Hook for voice recording functionality
+ */
+export function useVoiceRecording(options: VoiceRecordingOptions = {}) {
+  const {
+    maxDuration = 300, // 5 minutes default
+    quality = Audio.RecordingOptionsPresets.HIGH_QUALITY,
+    onRecordingStart,
+    onRecordingStop,
+    onRecordingError,
+    onDurationExceeded,
+  } = options;
 
-  // Actions
-  startRecording: () => Promise<boolean>;
-  stopRecording: () => Promise<string | null>;
-  pauseRecording: () => Promise<void>;
-  resumeRecording: () => Promise<void>;
-  cancelRecording: () => Promise<void>;
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
-  // Permissions
-  requestPermissions: () => Promise<boolean>;
-
-  // Playback for preview
-  playRecording: (uri: string) => Promise<void>;
-  stopPlayback: () => Promise<void>;
-}
-
-const RECORDING_OPTIONS = {
-  android: {
-    extension: ".m4a",
-    outputFormat: 2,
-    audioEncoder: 3,
-    sampleRate: 44100,
-    numberOfChannels: 2,
-    bitRate: 128000,
-  },
-  ios: {
-    extension: ".m4a",
-    outputFormat: "mpeg4aac",
-    audioQuality: 2,
-    sampleRate: 44100,
-    numberOfChannels: 2,
-    bitRate: 128000,
-    linearPCMBitDepth: 16,
-    linearPCMIsBigEndian: false,
-    linearPCMIsFloat: false,
-  },
-  web: {},
-};
-
-export function useVoiceRecording(): UseVoiceRecordingResult {
-  const [recordingState, setRecordingState] = useState<VoiceRecordingState>({
-    isRecording: false,
-    isPaused: false,
-    duration: 0,
-    recordingUri: null,
-    isPermissionGranted: false,
-  });
-
-  const recording = useRef<Audio.Recording | null>(null);
-  const sound = useRef<Audio.Sound | null>(null);
   const durationInterval = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
 
-  // Request audio permissions
-  const requestPermissions = useCallback(async (): Promise<boolean> => {
-    try {
-      const permission = await Audio.requestPermissionsAsync();
+  // Get subscription-based voice message limits
+  const { maxDuration: subscriptionMaxDuration, isDurationAllowed } =
+    useVoiceMessageLimits();
 
-      if (permission.status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Please allow microphone access to record voice messages.",
-          [{ text: "OK" }]
+  // Use the more restrictive of the two max durations
+  const effectiveMaxDuration =
+    subscriptionMaxDuration > 0 && subscriptionMaxDuration < maxDuration
+      ? subscriptionMaxDuration
+      : maxDuration;
+
+  // Request permissions on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const permission = await Audio.requestPermissionsAsync();
+        setHasPermission(permission.status === "granted");
+
+        if (permission.status !== "granted") {
+          setError("Permission to access microphone is required");
+        }
+
+        // Set audio mode for recording
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
+          interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to request permissions"
         );
-        return false;
+        onRecordingError?.(
+          err instanceof Error
+            ? err
+            : new Error("Failed to request permissions")
+        );
       }
+    })();
 
-      setRecordingState((prev) => ({ ...prev, isPermissionGranted: true }));
-      return true;
-    } catch (error) {
-      console.error("Failed to request audio permissions:", error);
-      return false;
-    }
+    // Cleanup
+    return () => {
+      if (durationInterval.current) {
+        clearInterval(durationInterval.current);
+      }
+    };
   }, []);
 
-  // Start recording
+  // Start recording function
   const startRecording = useCallback(async (): Promise<boolean> => {
     try {
-      // Check permissions first
-      const hasPermission = await requestPermissions();
-      if (!hasPermission) {
-        return false;
+      // Check permissions
+      if (hasPermission !== true) {
+        const permission = await Audio.requestPermissionsAsync();
+        setHasPermission(permission.status === "granted");
+
+        if (permission.status !== "granted") {
+          throw new Error("Permission to access microphone is required");
+        }
       }
 
-      // Set audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      // Reset state
+      setError(null);
+      setDuration(0);
+      setAudioUri(null);
 
-      // Create new recording
+      // Create recording
       const { recording: newRecording } = await Audio.Recording.createAsync(
-        RECORDING_OPTIONS
+        quality
       );
 
-      recording.current = newRecording;
+      setRecording(newRecording);
+      setIsRecording(true);
+      startTimeRef.current = Date.now();
 
-      // Start duration tracking
-      const startTime = Date.now();
+      // Start duration timer
       durationInterval.current = setInterval(() => {
-        setRecordingState((prev) => ({
-          ...prev,
-          duration: Date.now() - startTime,
-        }));
+        const currentDuration = Math.floor(
+          (Date.now() - startTimeRef.current) / 1000
+        );
+        setDuration(currentDuration);
+
+        // Check if max duration exceeded
+        if (currentDuration >= effectiveMaxDuration) {
+          stopRecording();
+          onDurationExceeded?.();
+        }
       }, 100);
 
-      setRecordingState((prev) => ({
-        ...prev,
-        isRecording: true,
-        isPaused: false,
-        duration: 0,
-        recordingUri: null,
-      }));
-
-      // Haptic feedback
-      await PlatformHaptics.light();
-
+      onRecordingStart?.();
       return true;
-    } catch (error) {
-      console.error("Failed to start recording:", error);
-      Alert.alert("Error", "Failed to start recording. Please try again.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to start recording"
+      );
+      onRecordingError?.(
+        err instanceof Error ? err : new Error("Failed to start recording")
+      );
       return false;
     }
-  }, [requestPermissions]);
+  }, [
+    hasPermission,
+    quality,
+    effectiveMaxDuration,
+    onRecordingStart,
+    onDurationExceeded,
+    onRecordingError,
+  ]);
 
-  // Stop recording
-  const stopRecording = useCallback(async (): Promise<string | null> => {
+  // Stop recording function
+  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+    if (!recording) {
+      return null;
+    }
+
     try {
-      if (!recording.current) {
-        return null;
-      }
-
-      // Stop duration tracking
+      // Stop the timer
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
         durationInterval.current = null;
       }
 
       // Stop recording
-      await recording.current.stopAndUnloadAsync();
-      const uri = recording.current.getURI();
-      recording.current = null;
-
-      // Reset audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
-
-      setRecordingState((prev) => ({
-        ...prev,
-        isRecording: false,
-        isPaused: false,
-        recordingUri: uri,
-      }));
-
-      // Haptic feedback
-      await PlatformHaptics.success();
-
-      return uri;
-    } catch (error) {
-      console.error("Failed to stop recording:", error);
-      return null;
-    }
-  }, []);
-
-  // Pause recording
-  const pauseRecording = useCallback(async (): Promise<void> => {
-    try {
-      if (!recording.current) {
-        return;
-      }
-
-      await recording.current.pauseAsync();
-
-      // Pause duration tracking
-      if (durationInterval.current) {
-        clearInterval(durationInterval.current);
-        durationInterval.current = null;
-      }
-
-      setRecordingState((prev) => ({
-        ...prev,
-        isPaused: true,
-      }));
-
-      await PlatformHaptics.light();
-    } catch (error) {
-      console.error("Failed to pause recording:", error);
-    }
-  }, []);
-
-  // Resume recording
-  const resumeRecording = useCallback(async (): Promise<void> => {
-    try {
-      if (!recording.current) {
-        return;
-      }
-
-      await recording.current.startAsync();
-
-      // Resume duration tracking
-      const currentDuration = recordingState.duration;
-      const resumeTime = Date.now() - currentDuration;
-
-      durationInterval.current = setInterval(() => {
-        setRecordingState((prev) => ({
-          ...prev,
-          duration: Date.now() - resumeTime,
-        }));
-      }, 100);
-
-      setRecordingState((prev) => ({
-        ...prev,
-        isPaused: false,
-      }));
-
-      await PlatformHaptics.light();
-    } catch (error) {
-      console.error("Failed to resume recording:", error);
-    }
-  }, [recordingState.duration]);
-
-  // Cancel recording
-  const cancelRecording = useCallback(async (): Promise<void> => {
-    try {
-      if (!recording.current) {
-        return;
-      }
-
-      // Stop duration tracking
-      if (durationInterval.current) {
-        clearInterval(durationInterval.current);
-        durationInterval.current = null;
-      }
-
-      // Stop and unload recording
-      await recording.current.stopAndUnloadAsync();
-      recording.current = null;
-
-      // Reset audio mode
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-      });
-
-      setRecordingState({
-        isRecording: false,
-        isPaused: false,
-        duration: 0,
-        recordingUri: null,
-        isPermissionGranted: recordingState.isPermissionGranted,
-      });
-
-      await PlatformHaptics.warning();
-    } catch (error) {
-      console.error("Failed to cancel recording:", error);
-    }
-  }, [recordingState.isPermissionGranted]);
-
-  // Play recording for preview
-  const playRecording = useCallback(async (uri: string): Promise<void> => {
-    try {
-      // Stop any existing playback
-      if (sound.current) {
-        await sound.current.unloadAsync();
-        sound.current = null;
-      }
-
-      // Create and play sound
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true }
+      await recording.stopAndUnloadAsync();
+      const finalDuration = Math.floor(
+        (Date.now() - startTimeRef.current) / 1000
       );
+      setDuration(finalDuration);
 
-      sound.current = newSound;
+      // Get recording URI
+      const uri = recording.getURI();
+      setAudioUri(uri || null);
+      setIsRecording(false);
+      setRecording(null);
 
-      // Set completion callback
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          stopPlayback();
+      if (uri) {
+        onRecordingStop?.(uri, finalDuration);
+
+        // Convert URI to Blob for web compatibility
+        if (Platform.OS === "web") {
+          const response = await fetch(uri);
+          return response.blob();
+        } else {
+          // For native platforms, create a mock blob
+          return new Blob([], { type: "audio/m4a" });
         }
-      });
-
-      await PlatformHaptics.light();
-    } catch (error) {
-      console.error("Failed to play recording:", error);
-    }
-  }, []);
-
-  // Stop playback
-  const stopPlayback = useCallback(async (): Promise<void> => {
-    try {
-      if (sound.current) {
-        await sound.current.stopAsync();
-        await sound.current.unloadAsync();
-        sound.current = null;
       }
-    } catch (error) {
-      console.error("Failed to stop playback:", error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to stop recording");
+      onRecordingError?.(
+        err instanceof Error ? err : new Error("Failed to stop recording")
+      );
     }
-  }, []);
 
-  // Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
+    return null;
+  }, [recording, onRecordingStop, onRecordingError]);
+
+  // Cancel recording function
+  const cancelRecording = useCallback(() => {
+    if (!recording) {
+      return;
+    }
+
+    try {
+      // Stop the timer
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
+        durationInterval.current = null;
       }
-      if (recording.current) {
-        recording.current.stopAndUnloadAsync();
-      }
-      if (sound.current) {
-        sound.current.unloadAsync();
-      }
-    };
-  }, []);
+
+      // Stop and delete recording
+      recording.stopAndUnloadAsync();
+
+      setIsRecording(false);
+      setRecording(null);
+      setAudioUri(null);
+      setDuration(0);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to cancel recording"
+      );
+      onRecordingError?.(
+        err instanceof Error ? err : new Error("Failed to cancel recording")
+      );
+    }
+  }, [recording, onRecordingError]);
+
+  // Check if current duration is allowed by subscription
+  const isDurationValid = useCallback(
+    (currentDuration: number = duration) => {
+      return isDurationAllowed(currentDuration);
+    },
+    [duration, isDurationAllowed]
+  );
 
   return {
-    recordingState,
+    // Core functionality
     startRecording,
     stopRecording,
-    pauseRecording,
-    resumeRecording,
     cancelRecording,
-    requestPermissions,
-    playRecording,
-    stopPlayback,
+
+    // State
+    isRecording,
+    duration,
+    audioUri,
+    error,
+    hasPermission,
+
+    // Subscription validation
+    maxDuration: effectiveMaxDuration,
+    isDurationValid,
   };
 }

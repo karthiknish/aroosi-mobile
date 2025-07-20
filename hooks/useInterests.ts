@@ -12,12 +12,16 @@ export interface UseInterestsResult {
   // Loading states
   loading: boolean;
   sending: boolean;
-  responding: boolean;
+  responding: boolean; // Kept for backward compatibility but will be unused
 
   // Actions
   loadSentInterests: () => Promise<void>;
   loadReceivedInterests: () => Promise<void>;
   sendInterest: (toUserId: string) => Promise<boolean>;
+  /**
+   * @deprecated Manual interest responses are not supported in auto-matching system
+   * This method is kept for backward compatibility but will always return false
+   */
   respondToInterest: (
     interestId: string,
     response: "accept" | "reject"
@@ -29,6 +33,9 @@ export interface UseInterestsResult {
   pendingReceivedCount: number;
   acceptedCount: number;
   matchedCount: number;
+  
+  // Helper functions
+  isMutualInterest: (userId: string) => boolean;
 }
 
 export function useInterests(): UseInterestsResult {
@@ -96,7 +103,7 @@ export function useInterests(): UseInterestsResult {
 
       try {
         setSending(true);
-        const response = await apiClient.sendInterest(toUserId, user.id);
+        const response = await apiClient.sendInterest(toUserId);
 
         if (response.success) {
           // Reload sent interests to get updated list
@@ -115,48 +122,20 @@ export function useInterests(): UseInterestsResult {
   );
 
   // Respond to interest (accept/reject)
-  // Note: Auto-matching system - interests automatically match when mutual
+  // @deprecated - Auto-matching system handles interest responses automatically
   const respondToInterest = useCallback(
     async (
       interestId: string,
       response: "accept" | "reject"
     ): Promise<boolean> => {
-      if (responding) return false;
-
-      try {
-        setResponding(true);
-
-        // In the main project, there's no manual response - it's auto-matching
-        // When both users send interests to each other, they automatically match
-        console.warn(
-          "Auto-matching system: Interests automatically match when both users express interest"
-        );
-
-        // For UI consistency, we can simulate the response locally
-        // but the actual matching happens automatically on the backend
-        setReceivedInterests((prev) =>
-          prev.map((interest) => {
-            const id = (interest as any).id || interest._id;
-            return id === interestId
-              ? {
-                  ...interest,
-                  status: response === "accept" ? "accepted" : "rejected",
-                }
-              : interest;
-          })
-        );
-
-        // Reload interests to get updated state from server
-        await Promise.all([loadSentInterests(), loadReceivedInterests()]);
-        return true; // Return true for UI consistency
-      } catch (error) {
-        console.error("Error in interest response simulation:", error);
-        return false;
-      } finally {
-        setResponding(false);
-      }
+      console.warn(
+        "respondToInterest is deprecated. Auto-matching system handles interest responses automatically when mutual interest is detected."
+      );
+      
+      // Return false to indicate this action is not supported
+      return false;
     },
-    [responding, loadSentInterests, loadReceivedInterests]
+    []
   );
 
   // Remove interest - matches main project behavior
@@ -165,7 +144,7 @@ export function useInterests(): UseInterestsResult {
       if (!user) return false;
 
       try {
-        const response = await apiClient.removeInterest(toUserId, user.id);
+        const response = await apiClient.removeInterest(toUserId);
 
         if (response.success) {
           // Remove from local state - handle both _id and id for compatibility
@@ -192,6 +171,19 @@ export function useInterests(): UseInterestsResult {
     (interest) => interest.status === "accepted"
   ).length;
   const matchedCount = acceptedCount; // In auto-matching system, accepted = matched
+
+  // Helper function to check for mutual interest
+  const isMutualInterest = useCallback((userId: string) => {
+    const hasSentInterest = sentInterests.some(
+      interest => interest.toUserId === userId && interest.status === "pending"
+    );
+    
+    const hasReceivedInterest = receivedInterests.some(
+      interest => interest.fromUserId === userId && interest.status === "pending"
+    );
+    
+    return hasSentInterest && hasReceivedInterest;
+  }, [sentInterests, receivedInterests]);
 
   // Auto-load on mount and user change
   useEffect(() => {
@@ -223,6 +215,7 @@ export function useInterests(): UseInterestsResult {
     pendingReceivedCount,
     acceptedCount,
     matchedCount,
+    isMutualInterest,
   };
 }
 
@@ -240,7 +233,7 @@ export function useInterestStatus(otherUserId?: string) {
       setLoading(true);
       const response = await apiClient.getInterestStatus(user.id, otherUserId);
       if (response.success && response.data) {
-        setStatus(response.data as string);
+        setStatus(response.data.status);
       }
     } catch (error) {
       console.error("Error checking interest status:", error);

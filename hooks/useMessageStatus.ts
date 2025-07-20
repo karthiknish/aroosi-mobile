@@ -1,206 +1,295 @@
 import { useState, useEffect, useCallback } from "react";
-import { useApiClient } from "../utils/api";
-import {
-  Message,
-  MessageStatus,
-  MessageDeliveryReceipt,
-} from "../types/message";
+import { useRealtimeMessaging } from "./useRealtimeMessaging";
+import { Message, MessageStatus } from "../types/message";
 
-export interface UseMessageStatusResult {
-  // Message tracking
-  updateMessageStatus: (messageId: string, status: MessageStatus) => void;
-  getMessageStatus: (messageId: string) => MessageStatus;
-
-  // Delivery receipts
-  markAsDelivered: (messageId: string) => Promise<void>;
-  markAsRead: (messageId: string) => Promise<void>;
-  sendDeliveryReceipt: (
-    messageId: string,
-    status: MessageStatus
-  ) => Promise<void>;
-
-  // Batch operations
-  markMultipleAsRead: (messageIds: string[]) => Promise<void>;
-  markConversationAsRead: (conversationId: string) => Promise<void>;
-
-  // Helpers
-  isMessageRead: (message: Message, currentUserId: string) => boolean;
-  getReadByUsers: (message: Message) => string[];
-  getDeliveredToUsers: (message: Message) => string[];
+interface MessageStatusState {
+  messageStatuses: Record<string, MessageStatus>;
+  deliveryReceipts: Record<string, number>; // messageId -> timestamp
+  readReceipts: Record<string, number>; // messageId -> timestamp
 }
 
-export function useMessageStatus(
-  conversationId: string,
-  currentUserId: string
-): UseMessageStatusResult {
-  const [messageStatuses, setMessageStatuses] = useState<
-    Map<string, MessageStatus>
-  >(new Map());
-  const apiClient = useApiClient();
+interface UseMessageStatusOptions {
+  conversationId: string;
+  userId: string;
+  autoSendReceipts?: boolean;
+}
 
-  // Update message status locally
+/**
+ * Hook for tracking message delivery and read status
+ */
+export function useMessageStatus({
+  conversationId,
+  userId,
+  autoSendReceipts = true,
+}: UseMessageStatusOptions) {
+  const [statusState, setStatusState] = useState<MessageStatusState>({
+    messageStatuses: {},
+    deliveryReceipts: {},
+    readReceipts: {},
+  });
+
+  const { service: realtimeService } = useRealtimeMessaging();
+
+  // Update message status
   const updateMessageStatus = useCallback(
     (messageId: string, status: MessageStatus) => {
-      setMessageStatuses((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(messageId, status);
-        return newMap;
+      setStatusState((prev) => ({
+        ...prev,
+        messageStatuses: {
+          ...prev.messageStatuses,
+          [messageId]: status,
+        },
+      }));
+    },
+    []
+  );
+
+  // Send delivery receipt
+  const sendDeliveryReceipt = useCallback(
+    (messageId: string) => {
+      if (realtimeService) {
+        realtimeService.sendDeliveryReceipt(
+          messageId,
+          "delivered",
+          conversationId
+        );
+
+        setStatusState((prev) => ({
+          ...prev,
+          deliveryReceipts: {
+            ...prev.deliveryReceipts,
+            [messageId]: Date.now(),
+          },
+        }));
+      }
+    },
+    [realtimeService]
+  );
+
+  // Send read receipt
+  const sendReadReceipt = useCallback(
+    (messageId: string) => {
+      if (realtimeService) {
+        realtimeService.sendDeliveryReceipt(messageId, "read", conversationId);
+
+        setStatusState((prev) => ({
+          ...prev,
+          readReceipts: {
+            ...prev.readReceipts,
+            [messageId]: Date.now(),
+          },
+        }));
+      }
+    },
+    [realtimeService]
+  );
+
+  // Mark messages as delivered when received
+  const handleMessageReceived = useCallback(
+    (message: Message) => {
+      if (message.fromUserId !== userId && autoSendReceipts) {
+        // Send delivery receipt for messages from others
+        sendDeliveryReceipt(message._id);
+      }
+
+      // Update local status
+      updateMessageStatus(message._id, "delivered");
+    },
+    [userId, autoSendReceipts, sendDeliveryReceipt, updateMessageStatus]
+  );
+
+  // Mark messages as read when viewed
+  const markMessagesAsRead = useCallback(
+    (messageIds: string[]) => {
+      messageIds.forEach((messageId) => {
+        if (autoSendReceipts) {
+          sendReadReceipt(messageId);
+        }
+        updateMessageStatus(messageId, "read");
       });
     },
-    []
+    [autoSendReceipts, sendReadReceipt, updateMessageStatus]
   );
 
-  // Get message status
-  const getMessageStatus = useCallback(
-    (messageId: string): MessageStatus => {
-      return messageStatuses.get(messageId) || "sent";
+  // Handle message sent
+  const handleMessageSent = useCallback(
+    (messageId: string) => {
+      updateMessageStatus(messageId, "sent");
     },
-    [messageStatuses]
+    [updateMessageStatus]
   );
 
-  // Send delivery receipt to server
-  const sendDeliveryReceipt = useCallback(
-    async (messageId: string, status: MessageStatus): Promise<void> => {
-      try {
-        await apiClient.sendDeliveryReceipt(messageId, status);
-        updateMessageStatus(messageId, status);
-      } catch (error) {
-        console.error("Failed to send delivery receipt:", error);
-      }
+  // Handle message failed
+  const handleMessageFailed = useCallback(
+    (messageId: string) => {
+      updateMessageStatus(messageId, "failed");
     },
-    [apiClient, updateMessageStatus]
+    [updateMessageStatus]
   );
 
-  // Mark message as delivered
-  const markAsDelivered = useCallback(
-    async (messageId: string): Promise<void> => {
-      await sendDeliveryReceipt(messageId, "delivered");
-    },
-    [sendDeliveryReceipt]
-  );
-
-  // Mark message as read
-  const markAsRead = useCallback(
-    async (messageId: string): Promise<void> => {
-      await sendDeliveryReceipt(messageId, "read");
-    },
-    [sendDeliveryReceipt]
-  );
-
-  // Mark multiple messages as read
-  const markMultipleAsRead = useCallback(
-    async (messageIds: string[]): Promise<void> => {
-      try {
-        await apiClient.markMessagesAsRead(messageIds);
-
-        // Update local status for all messages
-        messageIds.forEach((messageId) => {
-          updateMessageStatus(messageId, "read");
-        });
-      } catch (error) {
-        console.error("Failed to mark messages as read:", error);
-      }
-    },
-    [apiClient, updateMessageStatus]
-  );
-
-  // Mark entire conversation as read - Updated to match main project
-  const markConversationAsRead = useCallback(
-    async (conversationId: string): Promise<void> => {
-      try {
-        await apiClient.markConversationAsRead(conversationId);
-        
-        // Update local status for all messages in conversation
-        // This is a simplified approach - in a real app you'd track message IDs
-        console.log(`Marked conversation ${conversationId} as read`);
-      } catch (error) {
-        console.error("Failed to mark conversation as read:", error);
-      }
-    },
-    [apiClient]
-  );
-
-  // Check if message is read by recipient
-  const isMessageRead = useCallback(
-    (message: Message, currentUserId: string): boolean => {
-      if (message.senderId === currentUserId) {
-        // For sent messages, check if recipient has read it
-        return (
-          message.deliveryReceipts?.some(
-            (receipt) =>
-              receipt.userId !== currentUserId && receipt.status === "read"
-          ) || false
-        );
-      }
-      return false;
-    },
-    []
-  );
-
-  // Get users who have read the message
-  const getReadByUsers = useCallback((message: Message): string[] => {
-    return (
-      message.deliveryReceipts
-        ?.filter((receipt) => receipt.status === "read")
-        ?.map((receipt) => receipt.userId) || []
-    );
-  }, []);
-
-  // Get users who have received the message
-  const getDeliveredToUsers = useCallback((message: Message): string[] => {
-    return (
-      message.deliveryReceipts
-        ?.filter(
-          (receipt) =>
-            receipt.status === "delivered" || receipt.status === "read"
-        )
-        ?.map((receipt) => receipt.userId) || []
-    );
-  }, []);
-
-  // Listen for delivery receipt updates
+  // Setup real-time event listeners
   useEffect(() => {
-    const handleDeliveryReceiptUpdate = (data: MessageDeliveryReceipt) => {
-      updateMessageStatus(data.messageId, data.status);
-    };
+    if (!realtimeService) return;
 
-    // In a real app, you'd listen to WebSocket events here
-    // For now, we'll simulate with periodic polling
-    const pollDeliveryReceipts = async () => {
-      try {
-        const response = await apiClient.getDeliveryReceipts(conversationId);
-        if (response.success && response.data) {
-          const receipts =
-            (response.data as { receipts: MessageDeliveryReceipt[] })
-              .receipts || [];
-
-          receipts.forEach((receipt: MessageDeliveryReceipt) => {
-            updateMessageStatus(receipt.messageId, receipt.status);
-          });
+    const handleDeliveryReceipt = (data: {
+      messageId: string;
+      conversationId: string;
+      status: string;
+      timestamp: number;
+    }) => {
+      if (data.conversationId === conversationId) {
+        if (data.status === "delivered") {
+          setStatusState((prev) => ({
+            ...prev,
+            deliveryReceipts: {
+              ...prev.deliveryReceipts,
+              [data.messageId]: data.timestamp,
+            },
+          }));
+          updateMessageStatus(data.messageId, "delivered");
+        } else if (data.status === "read") {
+          setStatusState((prev) => ({
+            ...prev,
+            readReceipts: {
+              ...prev.readReceipts,
+              [data.messageId]: data.timestamp,
+            },
+          }));
+          updateMessageStatus(data.messageId, "read");
         }
-      } catch (error) {
-        console.error("Failed to poll delivery receipts:", error);
       }
     };
 
-    // Poll every 10 seconds for delivery receipts
-    const pollInterval = setInterval(pollDeliveryReceipts, 10000);
+    const handleMessageDelivered = (data: { messageId: string }) => {
+      updateMessageStatus(data.messageId, "delivered");
+    };
+
+    const handleMessageRead = (data: {
+      messageId: string;
+      readByUserId: string;
+    }) => {
+      if (data.readByUserId !== userId) {
+        updateMessageStatus(data.messageId, "read");
+      }
+    };
+
+    realtimeService.on("message:delivered", handleMessageDelivered);
+    realtimeService.on("message:read", handleMessageRead);
+    realtimeService.on("delivery_receipt", handleDeliveryReceipt);
 
     return () => {
-      clearInterval(pollInterval);
+      realtimeService.off("message:delivered", handleMessageDelivered);
+      realtimeService.off("message:read", handleMessageRead);
+      realtimeService.off("delivery_receipt", handleDeliveryReceipt);
     };
-  }, [conversationId, apiClient, updateMessageStatus]);
+  }, [realtimeService, conversationId, userId, updateMessageStatus]);
+
+  // Get status for a specific message
+  const getMessageStatus = useCallback(
+    (messageId: string): MessageStatus => {
+      return statusState.messageStatuses[messageId] || "pending";
+    },
+    [statusState.messageStatuses]
+  );
+
+  // Check if message is read
+  const isMessageRead = useCallback(
+    (messageId: string): boolean => {
+      return (
+        !!statusState.readReceipts[messageId] ||
+        statusState.messageStatuses[messageId] === "read"
+      );
+    },
+    [statusState.readReceipts, statusState.messageStatuses]
+  );
+
+  // Check if message is delivered
+  const isMessageDelivered = useCallback(
+    (messageId: string): boolean => {
+      return (
+        !!statusState.deliveryReceipts[messageId] ||
+        statusState.messageStatuses[messageId] === "delivered" ||
+        isMessageRead(messageId)
+      );
+    },
+    [statusState.deliveryReceipts, statusState.messageStatuses, isMessageRead]
+  );
+
+  // Get read timestamp
+  const getReadTimestamp = useCallback(
+    (messageId: string): number | undefined => {
+      return statusState.readReceipts[messageId];
+    },
+    [statusState.readReceipts]
+  );
+
+  // Get delivery timestamp
+  const getDeliveryTimestamp = useCallback(
+    (messageId: string): number | undefined => {
+      return statusState.deliveryReceipts[messageId];
+    },
+    [statusState.deliveryReceipts]
+  );
+
+  // Get unread messages
+  const getUnreadMessages = useCallback(
+    (messages: Message[]): Message[] => {
+      return messages.filter(
+        (msg) => msg.fromUserId !== userId && !isMessageRead(msg._id)
+      );
+    },
+    [userId, isMessageRead]
+  );
 
   return {
+    // State
+    messageStatuses: statusState.messageStatuses,
+    deliveryReceipts: statusState.deliveryReceipts,
+    readReceipts: statusState.readReceipts,
+
+    // Actions
     updateMessageStatus,
-    getMessageStatus,
-    markAsDelivered,
-    markAsRead,
     sendDeliveryReceipt,
-    markMultipleAsRead,
-    markConversationAsRead,
+    sendReadReceipt,
+    markMessagesAsRead,
+    handleMessageReceived,
+    handleMessageSent,
+    handleMessageFailed,
+
+    // Utilities
+    getMessageStatus,
     isMessageRead,
-    getReadByUsers,
-    getDeliveredToUsers,
+    isMessageDelivered,
+    getReadTimestamp,
+    getDeliveryTimestamp,
+    getUnreadMessages,
+
+    // Connection status
+    isConnected: !!realtimeService,
+  };
+}
+
+/**
+ * Hook for tracking status of a single message
+ */
+export function useSingleMessageStatus(
+  messageId: string,
+  conversationId: string,
+  userId: string
+) {
+  const {
+    getMessageStatus,
+    isMessageRead,
+    isMessageDelivered,
+    getReadTimestamp,
+    getDeliveryTimestamp,
+  } = useMessageStatus({ conversationId, userId });
+
+  return {
+    status: getMessageStatus(messageId),
+    isRead: isMessageRead(messageId),
+    isDelivered: isMessageDelivered(messageId),
+    readAt: getReadTimestamp(messageId),
+    deliveredAt: getDeliveryTimestamp(messageId),
   };
 }
