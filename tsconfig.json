@@ -17,7 +17,11 @@
       "@contexts/*": ["./contexts/*"],
       "@contexts": ["./contexts/index.ts"],
       "@services/*": ["./services/*"],
-      "@services": ["./services/index.ts"]
+      "@services": ["./services/index.ts"],
+      "@utils/*": ["./utils/*"],
+      "@utils": ["./utils/index.ts"],
+      "@types/*": ["./types/*"],
+      "@types": ["./types/index.ts"]
     },
     "skipLibCheck": true
   }

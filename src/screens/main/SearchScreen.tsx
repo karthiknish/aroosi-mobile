@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,283 +8,449 @@ import {
   TextInput,
   RefreshControl,
   ScrollView,
+  FlatList,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import { useAuth } from "../../../contexts/AuthContext";
-import { Colors, Layout } from "../../../constants";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { useApiClient } from "@utils/api";
+import { useAuth } from "@contexts/AuthContext";
+import { Colors, Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
 } from "@/components/ui/LoadingStates";
-import { NoSearchResults, NetworkError } from "@/components/ui/EmptyStates";
-import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
+import { NoSearchResults } from "@/components/ui/EmptyStates";
+import { ErrorBoundary } from "@/components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
   SlideInView,
   AnimatedButton,
-  HeartButton,
-  StaggeredList,
 } from "@/components/ui/AnimatedComponents";
-import { Profile } from "../../../types/profile";
+import { SearchFilters } from "@types";
 
 interface SearchScreenProps {
   navigation: any;
 }
 
-interface SearchFilters {
-  ageMin: string;
-  ageMax: string;
-  location: string;
-  education: string;
-  religion: string;
+// Filter options matching main aroosi project
+const commonCountries = [
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Australia",
+  "New Zealand",
+  "Afghanistan",
+  "United Arab Emirates",
+  "Qatar",
+  "Saudi Arabia",
+  "Kuwait",
+  "Bahrain",
+  "Oman",
+  "Germany",
+  "France",
+  "Netherlands",
+  "Belgium",
+  "Switzerland",
+  "Austria",
+  "Sweden",
+  "Norway",
+  "Denmark",
+  "Finland",
+  "Italy",
+  "Spain",
+  "Portugal",
+  "Ireland",
+  "Other",
+];
+
+const ethnicityOptions = [
+  "any",
+  "Pashtun",
+  "Tajik",
+  "Hazara",
+  "Uzbek",
+  "Turkmen",
+  "Nuristani",
+  "Aimaq",
+  "Baloch",
+  "Sadat",
+];
+
+const motherTongueOptions = [
+  "any",
+  "Pashto",
+  "Dari",
+  "Uzbeki",
+  "Turkmeni",
+  "Nuristani",
+  "Balochi",
+];
+
+const languageOptions = [
+  "any",
+  "English",
+  "Pashto",
+  "Dari",
+  "Farsi",
+  "Urdu",
+  "Arabic",
+  "German",
+  "Turkish",
+];
+
+function getAge(dateOfBirth: string): number {
+  if (!dateOfBirth) return 0;
+  const dob = new Date(dateOfBirth);
+  const diff = Date.now() - dob.getTime();
+  const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  return isNaN(age) ? 0 : age;
 }
 
 export default function SearchScreen({ navigation }: SearchScreenProps) {
   const { userId } = useAuth();
   const { theme } = useTheme();
   const apiClient = useApiClient();
-  const [filters, setFilters] = useState<SearchFilters>({
-    ageMin: "18",
-    ageMax: "35",
-    location: "",
-    education: "",
-    religion: "",
-  });
+  
+  // State matching main aroosi project
+  const [city, setCity] = useState("");
+  const [country, setCountry] = useState("any");
+  const [ageMin, setAgeMin] = useState("");
+  const [ageMax, setAgeMax] = useState("");
+  const [ethnicity, setEthnicity] = useState("any");
+  const [motherTongue, setMotherTongue] = useState("any");
+  const [language, setLanguage] = useState("any");
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(12);
   const [showFilters, setShowFilters] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Build filters object
+  const filters: SearchFilters = useMemo(() => ({
+    city: city || undefined,
+    country: country === "any" ? undefined : country,
+    ageMin: ageMin ? parseInt(ageMin) : undefined,
+    ageMax: ageMax ? parseInt(ageMax) : undefined,
+    ethnicity: ethnicity === "any" ? undefined : ethnicity,
+    motherTongue: motherTongue === "any" ? undefined : motherTongue,
+    language: language === "any" ? undefined : language,
+  }), [city, country, ageMin, ageMax, ethnicity, motherTongue, language]);
+
   const {
-    data: profiles = [],
+    data: searchResults,
     isLoading,
     error,
     refetch,
     isFetching,
-  } = useQuery<Profile[], Error>({
-    queryKey: ["searchProfiles", filters],
+  } = useQuery({
+    queryKey: ["searchProfiles", filters, page, pageSize],
     queryFn: async () => {
-      const response = await apiClient.searchProfiles(filters);
-      return response.success ? (response.data as Profile[]) : [];
+      const searchParams = {
+        ...filters,
+        page,
+        pageSize,
+      };
+      const response = await apiClient.searchProfiles(searchParams);
+      if (response.success && response.data) {
+        return response.data;
+      }
+      throw new Error("Failed to fetch search results");
     },
     enabled: !!userId,
     retry: 2,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  const { profiles = [], total = 0 } = searchResults || {};
+  const totalPages = Math.ceil(total / pageSize);
+
   const handleRefresh = async () => {
     setRefreshing(true);
+    setPage(0);
     await refetch();
     setRefreshing(false);
   };
 
-  const handleFilterChange = (field: keyof SearchFilters, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleFilterChange = (field: string, value: string) => {
+    setPage(0);
+    switch (field) {
+      case "city":
+        setCity(value);
+        break;
+      case "country":
+        setCountry(value);
+        break;
+      case "ageMin":
+        setAgeMin(value);
+        break;
+      case "ageMax":
+        setAgeMax(value);
+        break;
+      case "ethnicity":
+        setEthnicity(value);
+        break;
+      case "motherTongue":
+        setMotherTongue(value);
+        break;
+      case "language":
+        setLanguage(value);
+        break;
+    }
   };
 
   const handleProfilePress = (profileId: string) => {
     navigation.navigate("ProfileDetail", { profileId });
   };
 
-  const renderProfile = (profile: any, index: number) => (
-    <FadeInView key={profile._id} delay={index * 100} duration={300}>
-      <ScaleInView delay={index * 50}>
-        <AnimatedButton
-          style={[
-            styles.profileCard,
-            {
-              backgroundColor: theme.colors.background.primary,
-              borderColor: theme.colors.border.primary,
-            },
-          ]}
-          onPress={() => handleProfilePress(profile._id)}
-          animationType="scale"
-          scaleValue={0.98}
-        >
-          <View style={styles.profileImageContainer}>
-            {profile.images && profile.images.length > 0 ? (
-              <ScaleInView delay={200 + index * 50} fromScale={0.5}>
-                <View
-                  style={[
-                    styles.profileImagePlaceholder,
-                    { backgroundColor: theme.colors.neutral[100] },
-                  ]}
-                >
-                  <Text style={styles.profileImageText}>📷</Text>
-                </View>
-              </ScaleInView>
-            ) : (
-              <ScaleInView delay={200 + index * 50} fromScale={0.5}>
-                <View
-                  style={[
-                    styles.profileImagePlaceholder,
-                    { backgroundColor: theme.colors.neutral[100] },
-                  ]}
-                >
-                  <Text style={styles.profileImageText}>👤</Text>
-                </View>
-              </ScaleInView>
-            )}
-          </View>
-
-          <View style={styles.profileInfo}>
-            <SlideInView
-              direction="left"
-              delay={300 + index * 50}
-              distance={20}
-            >
-              <Text
-                style={[
-                  styles.profileName,
-                  { color: theme.colors.text.primary },
-                ]}
-              >
-                {profile.firstName} {profile.lastName}
+  const renderProfile = ({ item: profileResult, index }: { item: any; index: number }) => {
+    const age = getAge(profileResult.profile?.dateOfBirth || "");
+    
+    return (
+      <FadeInView key={profileResult.userId} delay={index * 100} duration={300}>
+        <ScaleInView delay={index * 50}>
+          <AnimatedButton
+            style={[
+              styles.profileCard,
+              {
+                backgroundColor: theme.colors.background.primary,
+                borderColor: theme.colors.border.primary,
+              },
+            ]}
+            onPress={() => handleProfilePress(profileResult.userId)}
+            animationType="scale"
+            scaleValue={0.98}
+          >
+            <View style={styles.profileImageContainer}>
+              {profileResult.profile?.profileImageUrls?.length > 0 ? (
+                <ScaleInView delay={200 + index * 50} fromScale={0.5}>
+                  <View
+                    style={[
+                      styles.profileImagePlaceholder,
+                      { backgroundColor: theme.colors.neutral[100] },
+                    ]}
+                  >
+                    <Text style={styles.profileImageText}>📷</Text>
+                  </View>
+                </ScaleInView>
+              ) : (
+                <ScaleInView delay={200 + index * 50} fromScale={0.5}>
+                  <View
+                    style={[
+                      styles.profileImagePlaceholder,
+                      { backgroundColor: theme.colors.neutral[100] },
+                    ]}
+                  >
+                    <Text style={styles.profileImageText}>👤</Text>
+                  </View>
+                </ScaleInView>
+              )}
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={[styles.profileName, { color: theme.colors.text.primary }]}>
+                {profileResult.profile?.fullName || "Unknown"}
               </Text>
-            </SlideInView>
-            {profile.age && (
-              <SlideInView
-                direction="left"
-                delay={350 + index * 50}
-                distance={15}
-              >
-                <Text
-                  style={[
-                    styles.profileAge,
-                    { color: theme.colors.text.secondary },
-                  ]}
-                >
-                  {profile.age} years old
-                </Text>
-              </SlideInView>
-            )}
-            {profile.location && (
-              <SlideInView
-                direction="left"
-                delay={400 + index * 50}
-                distance={10}
-              >
-                <Text
-                  style={[
-                    styles.profileLocation,
-                    { color: theme.colors.text.secondary },
-                  ]}
-                >
-                  {profile.location}
-                </Text>
-              </SlideInView>
-            )}
-            {profile.bio && (
-              <SlideInView
-                direction="left"
-                delay={450 + index * 50}
-                distance={5}
-              >
-                <Text
-                  style={[
-                    styles.profileBio,
-                    { color: theme.colors.text.secondary },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {profile.bio}
-                </Text>
-              </SlideInView>
-            )}
-          </View>
-
-          <View style={styles.profileActions}>
-            <ScaleInView delay={500 + index * 50} fromScale={0.3}>
-              <HeartButton
-                isLiked={false}
-                onToggle={() => {
-                  // Handle like action
-                  console.log("Liked profile:", profile._id);
-                }}
-                size={24}
-                likedColor={theme.colors.primary[500]}
-                unlikedColor={theme.colors.neutral[400]}
-              />
-            </ScaleInView>
-          </View>
-        </AnimatedButton>
-      </ScaleInView>
-    </FadeInView>
-  );
+              <Text style={[styles.profileAge, { color: theme.colors.text.secondary }]}>
+                {age > 0 ? `${age} years old` : "Age not specified"}
+              </Text>
+              <Text style={[styles.profileLocation, { color: theme.colors.text.secondary }]}>
+                {profileResult.profile?.city || "Location not specified"}
+              </Text>
+            </View>
+          </AnimatedButton>
+        </ScaleInView>
+      </FadeInView>
+    );
+  };
 
   const renderFilters = () => (
     <SlideInView direction="down" duration={300}>
-      <View
-        style={[
-          styles.filtersContainer,
-          {
-            backgroundColor: theme.colors.background.primary,
-            borderBottomColor: theme.colors.border.primary,
-          },
-        ]}
-      >
-        <Text style={styles.filtersTitle}>Search Filters</Text>
+      <View style={[styles.filtersContainer, { backgroundColor: theme.colors.background.primary }]}>
+        <Text style={[styles.filtersTitle, { color: theme.colors.text.primary }]}>
+          Filters
+        </Text>
+        
+        <View style={styles.filterRow}>
+          <View style={styles.filterItem}>
+            <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+              City
+            </Text>
+            <TextInput
+              style={[styles.filterInput, {
+                borderColor: theme.colors.border.primary,
+                color: theme.colors.text.primary,
+                backgroundColor: theme.colors.background.primary,
+              }]}
+              placeholder="Enter city"
+              placeholderTextColor={theme.colors.text.secondary}
+              value={city}
+              onChangeText={(value) => handleFilterChange("city", value)}
+            />
+          </View>
+        </View>
+
+        <View style={styles.filterItem}>
+          <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+            Country
+          </Text>
+          <View style={styles.pickerContainer}>
+            {["any", ...commonCountries].map((countryOption) => (
+              <TouchableOpacity
+                key={countryOption}
+                style={[
+                  styles.pickerOption,
+                  { borderColor: theme.colors.border.primary },
+                  country === countryOption && [
+                    styles.pickerOptionSelected,
+                    { backgroundColor: theme.colors.primary[500] },
+                  ],
+                ]}
+                onPress={() => handleFilterChange("country", countryOption)}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    { color: theme.colors.text.primary },
+                    country === countryOption && styles.pickerOptionTextSelected,
+                  ]}
+                >
+                  {countryOption === "any" ? "Any Country" : countryOption}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
         <View style={styles.filterRow}>
           <View style={styles.filterItem}>
-            <Text style={styles.filterLabel}>Age Range</Text>
+            <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+              Age Range
+            </Text>
             <View style={styles.ageRangeContainer}>
               <TextInput
-                style={styles.ageInput}
-                value={filters.ageMin}
+                style={[styles.ageInput, {
+                  borderColor: theme.colors.border.primary,
+                  color: theme.colors.text.primary,
+                  backgroundColor: theme.colors.background.primary,
+                }]}
+                placeholder="Min"
+                placeholderTextColor={theme.colors.text.secondary}
+                value={ageMin}
                 onChangeText={(value) => handleFilterChange("ageMin", value)}
-                placeholder="18"
                 keyboardType="numeric"
-                maxLength={2}
               />
-              <Text style={styles.ageRangeSeparator}>-</Text>
+              <Text style={[styles.ageRangeSeparator, { color: theme.colors.text.secondary }]}>
+                -
+              </Text>
               <TextInput
-                style={styles.ageInput}
-                value={filters.ageMax}
+                style={[styles.ageInput, {
+                  borderColor: theme.colors.border.primary,
+                  color: theme.colors.text.primary,
+                  backgroundColor: theme.colors.background.primary,
+                }]}
+                placeholder="Max"
+                placeholderTextColor={theme.colors.text.secondary}
+                value={ageMax}
                 onChangeText={(value) => handleFilterChange("ageMax", value)}
-                placeholder="35"
                 keyboardType="numeric"
-                maxLength={2}
               />
             </View>
           </View>
         </View>
 
         <View style={styles.filterItem}>
-          <Text style={styles.filterLabel}>Location</Text>
-          <TextInput
-            style={styles.filterInput}
-            value={filters.location}
-            onChangeText={(value) => handleFilterChange("location", value)}
-            placeholder="Enter city or area"
-            autoCapitalize="words"
-          />
+          <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+            Ethnicity
+          </Text>
+          <View style={styles.pickerContainer}>
+            {ethnicityOptions.map((ethnicityOption) => (
+              <TouchableOpacity
+                key={ethnicityOption}
+                style={[
+                  styles.pickerOption,
+                  { borderColor: theme.colors.border.primary },
+                  ethnicity === ethnicityOption && [
+                    styles.pickerOptionSelected,
+                    { backgroundColor: theme.colors.primary[500] },
+                  ],
+                ]}
+                onPress={() => handleFilterChange("ethnicity", ethnicityOption)}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    { color: theme.colors.text.primary },
+                    ethnicity === ethnicityOption && styles.pickerOptionTextSelected,
+                  ]}
+                >
+                  {ethnicityOption === "any" ? "Any Ethnicity" : ethnicityOption}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.filterItem}>
-          <Text style={styles.filterLabel}>Education</Text>
-          <TextInput
-            style={styles.filterInput}
-            value={filters.education}
-            onChangeText={(value) => handleFilterChange("education", value)}
-            placeholder="Education level or field"
-            autoCapitalize="words"
-          />
+          <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+            Mother Tongue
+          </Text>
+          <View style={styles.pickerContainer}>
+            {motherTongueOptions.map((tongueOption) => (
+              <TouchableOpacity
+                key={tongueOption}
+                style={[
+                  styles.pickerOption,
+                  { borderColor: theme.colors.border.primary },
+                  motherTongue === tongueOption && [
+                    styles.pickerOptionSelected,
+                    { backgroundColor: theme.colors.primary[500] },
+                  ],
+                ]}
+                onPress={() => handleFilterChange("motherTongue", tongueOption)}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    { color: theme.colors.text.primary },
+                    motherTongue === tongueOption && styles.pickerOptionTextSelected,
+                  ]}
+                >
+                  {tongueOption === "any" ? "Any Mother Tongue" : tongueOption}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.filterItem}>
-          <Text style={styles.filterLabel}>Religion</Text>
-          <TextInput
-            style={styles.filterInput}
-            value={filters.religion}
-            onChangeText={(value) => handleFilterChange("religion", value)}
-            placeholder="Religious preference"
-            autoCapitalize="words"
-          />
+          <Text style={[styles.filterLabel, { color: theme.colors.text.primary }]}>
+            Language
+          </Text>
+          <View style={styles.pickerContainer}>
+            {languageOptions.map((langOption) => (
+              <TouchableOpacity
+                key={langOption}
+                style={[
+                  styles.pickerOption,
+                  { borderColor: theme.colors.border.primary },
+                  language === langOption && [
+                    styles.pickerOptionSelected,
+                    { backgroundColor: theme.colors.primary[500] },
+                  ],
+                ]}
+                onPress={() => handleFilterChange("language", langOption)}
+              >
+                <Text
+                  style={[
+                    styles.pickerOptionText,
+                    { color: theme.colors.text.primary },
+                    language === langOption && styles.pickerOptionTextSelected,
+                  ]}
+                >
+                  {langOption === "any" ? "Any Language" : langOption}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <AnimatedButton
@@ -311,6 +477,40 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
     </SlideInView>
   );
 
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <View style={styles.paginationContainer}>
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            page === 0 && styles.paginationButtonDisabled,
+          ]}
+          onPress={() => setPage(Math.max(0, page - 1))}
+          disabled={page === 0}
+        >
+          <Text style={styles.paginationButtonText}>Previous</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.paginationText}>
+          Page {page + 1} of {totalPages}
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.paginationButton,
+            page >= totalPages - 1 && styles.paginationButtonDisabled,
+          ]}
+          onPress={() => setPage(Math.min(totalPages - 1, page + 1))}
+          disabled={page >= totalPages - 1}
+        >
+          <Text style={styles.paginationButtonText}>Next</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <View
@@ -331,10 +531,10 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           <Text
             style={[styles.headerTitle, { color: theme.colors.text.primary }]}
           >
-            Discover
+            Search Profiles
           </Text>
         </View>
-        <ProfileCardSkeleton count={3} />
+        <ProfileCardSkeleton count={6} />
       </View>
     );
   }
@@ -365,7 +565,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                   { color: theme.colors.text.primary },
                 ]}
               >
-                Discover
+                Search Profiles
               </Text>
             </SlideInView>
             <ScaleInView delay={200}>
@@ -387,8 +587,11 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
         {showFilters && renderFilters()}
 
         {/* Content */}
-        <ScrollView
-          style={styles.scrollView}
+        <FlatList
+          data={profiles}
+          renderItem={renderProfile}
+          keyExtractor={(item) => item.userId}
+          contentContainerStyle={styles.profilesList}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -398,38 +601,42 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
               tintColor={theme.colors.primary[500]}
             />
           }
-        >
-          {error ? (
-            <ApiErrorDisplay error={error} onRetry={refetch} />
-          ) : !profiles || profiles.length === 0 ? (
-            <NoSearchResults
-              onActionPress={() => {
-                setFilters({
-                  ageMin: "18",
-                  ageMax: "35",
-                  location: "",
-                  education: "",
-                  religion: "",
-                });
-                refetch();
-              }}
-            />
-          ) : (
-            <View style={styles.profilesList}>
-              {isFetching && !refreshing && (
-                <FadeInView>
-                  <View style={styles.loadingOverlay}>
-                    <ActivityIndicator
-                      size="small"
-                      color={theme.colors.primary[500]}
-                    />
-                  </View>
-                </FadeInView>
-              )}
-              {profiles.map((profile, index) => renderProfile(profile, index))}
-            </View>
-          )}
-        </ScrollView>
+          ListEmptyComponent={
+            error ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <Text style={{ color: theme.colors.text.secondary, marginBottom: 10 }}>
+                  Error loading profiles. Please try again.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: theme.colors.primary[500],
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 5
+                  }}
+                  onPress={() => refetch()}
+                >
+                  <Text style={{ color: 'white' }}>Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <NoSearchResults
+                onActionPress={() => {
+                  setCity("");
+                  setCountry("any");
+                  setAgeMin("");
+                  setAgeMax("");
+                  setEthnicity("any");
+                  setMotherTongue("any");
+                  setLanguage("any");
+                  setPage(0);
+                  refetch();
+                }}
+              />
+            )
+          }
+          ListFooterComponent={renderPagination}
+        />
       </View>
     </ErrorBoundary>
   );
@@ -525,6 +732,31 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.base,
     color: Colors.text.secondary,
   },
+  pickerContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Layout.spacing.xs,
+  },
+  pickerOption: {
+    paddingHorizontal: Layout.spacing.md,
+    paddingVertical: Layout.spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.border.primary,
+    borderRadius: Layout.radius.md,
+    marginRight: Layout.spacing.xs,
+    marginBottom: Layout.spacing.xs,
+  },
+  pickerOptionSelected: {
+    backgroundColor: Colors.primary[500],
+    borderColor: Colors.primary[500],
+  },
+  pickerOptionText: {
+    fontSize: Layout.typography.fontSize.sm,
+    color: Colors.text.primary,
+  },
+  pickerOptionTextSelected: {
+    color: Colors.text.inverse,
+  },
   applyFiltersButton: {
     backgroundColor: Colors.primary[500],
     paddingVertical: Layout.spacing.md,
@@ -536,9 +768,6 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.base,
     fontWeight: Layout.typography.fontWeight.medium,
-  },
-  scrollView: {
-    flex: 1,
   },
   profilesList: {
     paddingHorizontal: Layout.spacing.lg,
@@ -588,23 +817,28 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
     marginBottom: Layout.spacing.xs,
   },
-  profileBio: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    lineHeight: 20,
-  },
-  profileActions: {
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: Layout.spacing.lg,
+    paddingVertical: Layout.spacing.md,
   },
-  actionButton: {
-    width: 48,
-    height: 48,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.primary[50],
-    justifyContent: "center",
-    alignItems: "center",
+  paginationButton: {
+    paddingHorizontal: Layout.spacing.md,
+    paddingVertical: Layout.spacing.sm,
+    backgroundColor: Colors.primary[500],
+    borderRadius: Layout.radius.md,
   },
-  actionButtonText: {
-    fontSize: Layout.typography.fontSize.lg,
+  paginationButtonDisabled: {
+    backgroundColor: Colors.neutral[300],
+  },
+  paginationButtonText: {
+    color: Colors.text.inverse,
+    fontSize: Layout.typography.fontSize.base,
+  },
+  paginationText: {
+    fontSize: Layout.typography.fontSize.base,
+    color: Colors.text.primary,
   },
 });

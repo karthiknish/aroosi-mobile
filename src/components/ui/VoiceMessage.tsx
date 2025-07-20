@@ -25,7 +25,7 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { Colors } from "../../../constants/Colors";
+import { Colors } from "@constants/Colors";
 
 const { width: screenWidth } = Dimensions.get("window");
 

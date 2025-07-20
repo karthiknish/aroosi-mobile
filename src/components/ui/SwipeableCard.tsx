@@ -23,7 +23,7 @@ import Animated, {
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from \"../../../constants\";
+import { Colors, Layout } from "@constants";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const CARD_WIDTH = screenWidth * 0.9;

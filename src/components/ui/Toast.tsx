@@ -16,12 +16,12 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from "../../../constants";
+import { Colors, Layout } from "@constants";
 import * as Haptics from "expo-haptics";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
 
 const { width: screenWidth } = Dimensions.get("window");
 

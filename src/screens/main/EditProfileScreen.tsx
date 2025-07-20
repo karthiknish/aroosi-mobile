@@ -11,9 +11,9 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import { useApiClient } from "../../../utils/api";
+import { useApiClient } from "@utils/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useAuth } from "@contexts/AuthContext";
 import {
   Profile,
   UpdateProfileData,
@@ -27,21 +27,21 @@ import {
   formatHeight,
   cmToFeetInches,
   feetInchesToCm,
-} from "../../../types/profile";
+} from "@types/profile";
 import {
   validateUpdateProfile,
   formatPhoneNumber,
   cleanPhoneNumber,
-} from "../../../utils/profileValidation";
-import { Colors, Layout } from "../../../constants";
+} from "@utils/profileValidation";
+import { Colors, Layout } from "@constants";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
 import ImageUpload from "@components/profile/ImageUpload";
-import { COUNTRIES } from "../../../constants/countries";
-import SearchableSelect from "../../../components/SearchableSelect";
-import { MOTHER_TONGUES, ETHNICITIES } from "../../../constants/options";
+import { COUNTRIES } from "@constants/countries";
+import SearchableSelect from "@components/SearchableSelect";
+import { MOTHER_TONGUES, ETHNICITIES } from "@constants/options";
 
 interface EditProfileScreenProps {
   navigation: any;

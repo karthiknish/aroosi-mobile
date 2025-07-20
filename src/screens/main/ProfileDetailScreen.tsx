@@ -11,23 +11,23 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useAuth } from "@contexts/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import { useInterests } from "../../../hooks/useInterests";
-import { useSafety } from "../../../hooks/useSafety";
-import { useTheme } from "../../../contexts/ThemeContext";
-import SafetyActionSheet from "../../../components/safety/SafetyActionSheet";
-import { Colors } from "../../../constants";
+import { useApiClient } from "@utils/api";
+import { useInterests } from "@hooks/useInterests";
+import { useSafety } from "@hooks/useSafety";
+import { useTheme } from "@contexts/ThemeContext";
+import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import { Colors } from "@constants";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
-import { useInterestStatus } from "../../../hooks/useInterests";
-import { useBlockStatus } from "../../../hooks/useSafety";
-import { Profile } from "../../../types/profile";
-import type { ReportReason } from "../../../types/index";
-import ScreenContainer from "../../../components/common/ScreenContainer";
+} from "@hooks/useResponsive";
+import { useInterestStatus } from "@hooks/useInterests";
+import { useBlockStatus } from "@hooks/useSafety";
+import { Profile } from "@types";
+import type { ReportReason } from "@types";
+import ScreenContainer from "@components/common/ScreenContainer";
 
 const { width } = Dimensions.get("window");
 

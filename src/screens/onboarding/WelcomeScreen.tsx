@@ -7,12 +7,12 @@ import {
   Dimensions,
   Platform,
 } from "react-native";
-import { Colors, Layout } from "../../../constants";
+import { Colors, Layout } from "@constants";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
-import { useAuth } from "../../../contexts/AuthContext";
+} from "@hooks/useResponsive";
+import { useAuth } from "@contexts/AuthContext";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface WelcomeScreenProps {

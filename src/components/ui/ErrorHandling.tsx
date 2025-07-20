@@ -9,11 +9,11 @@ import {
   StyleProp,
   AlertButton,
 } from "react-native";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
 
 interface ErrorBoundaryState {
   hasError: boolean;

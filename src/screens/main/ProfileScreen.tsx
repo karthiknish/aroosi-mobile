@@ -10,17 +10,17 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
-import { useSubscription } from "../../../hooks/useSubscription";
-import { useApiClient } from "../../../utils/api";
+import { useAuth } from "@contexts/AuthContext";
+import { useSubscription } from "@hooks/useSubscription";
+import { useApiClient } from "@utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Colors, Layout } from "../../../constants";
-import { Profile, ProfileImage } from "../../../types";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { Colors, Layout } from "@constants";
+import { Profile, ProfileImage } from "@types";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+} from "@hooks/useResponsive";
 import {
   GradientButton,
   GlassmorphismCard,

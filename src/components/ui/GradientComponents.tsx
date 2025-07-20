@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors } from "../../../constants/Colors";
+import { Colors } from "@constants/Colors";
 
 // Gradient Button Component
 interface GradientButtonProps extends TouchableOpacityProps {
