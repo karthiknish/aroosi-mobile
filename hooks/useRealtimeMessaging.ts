@@ -8,6 +8,7 @@ import {
   RealtimeEventHandlers,
 } from "../services/RealtimeMessagingService";
 import { useAuth } from "../contexts/AuthContext";
+import { WEBSOCKET_CONFIG } from "../utils/websocketConfig";
 
 interface UseRealtimeMessagingOptions {
   autoConnect?: boolean;
@@ -37,8 +38,8 @@ export function useRealtimeMessaging(
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
-  // WebSocket URL - this should come from environment or config
-  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || "wss://www.aroosi.app/ws";
+  // WebSocket URL - using Vercel-compatible configuration
+  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || WEBSOCKET_CONFIG.getUrl();
 
   // Initialize service
   useEffect(() => {

@@ -357,6 +357,10 @@ export interface CreateProfileData {
   partnerPreferenceCity?: string[] | string;
   profileFor?: ProfileFor;
   hideFromFreeUsers?: boolean;
+  // Local image references for profile creation (before authentication)
+  localImageIds?: string[];
+  // Image IDs for profile creation (after authentication)
+  profileImageIds?: string[];
 }
 
 // Update profile data

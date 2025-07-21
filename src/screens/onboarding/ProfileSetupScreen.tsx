@@ -38,7 +38,7 @@ import {
   cleanPhoneNumber,
 } from "@utils/profileValidation";
 import { Colors, Layout } from "@constants";
-import ImageUpload from "@components/profile/ImageUpload";
+import LocalImageUpload from "@components/profile/LocalImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
 import { MOTHER_TONGUES, ETHNICITIES } from "@constants/options";
@@ -69,6 +69,7 @@ export default function ProfileSetupScreen({
     country: "UK",
     profileFor: "self",
   });
+  const [localImages, setLocalImages] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [heightFeet, setHeightFeet] = useState(5);
   const [heightInches, setHeightInches] = useState(6);
@@ -77,9 +78,22 @@ export default function ProfileSetupScreen({
   // Create profile mutation
   const createProfileMutation = useMutation({
     mutationFn: async (profileData: CreateProfileData) => {
-      return apiClient.createProfile(profileData);
+      // Include local image IDs for later upload after authentication
+      const profileDataWithImages = {
+        ...profileData,
+        profileImageIds: formData.localImageIds || [],
+      };
+      return apiClient.createProfile(profileDataWithImages);
     },
     onSuccess: () => {
+      // After successful profile creation, local images will be handled
+      // by the authentication flow when user logs in
+      if (formData.localImageIds && formData.localImageIds.length > 0) {
+        console.log(
+          "Profile created with local images, will upload after authentication"
+        );
+      }
+
       Alert.alert(
         "Profile Created!",
         "Your profile has been created successfully. You can now start browsing.",
@@ -713,11 +727,17 @@ export default function ProfileSetupScreen({
         Add photos to showcase your personality
       </Text>
 
-      <ImageUpload
+      <LocalImageUpload
         title="Upload Photos"
         subtitle="Your first photo will be your main profile picture"
         maxImages={5}
         required={false}
+        onImagesChange={(images) => {
+          // Store local image IDs for later upload after authentication
+          const imageIds = images.map((img) => img.id);
+          setLocalImages(imageIds);
+          setFormData((prev) => ({ ...prev, localImageIds: imageIds }));
+        }}
       />
 
       <View style={styles.photoGuidelines}>

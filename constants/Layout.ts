@@ -2,6 +2,7 @@ import { Dimensions, Platform } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
+// Enhanced responsive layout system
 export const Layout = {
   window: {
     width,
@@ -16,6 +17,7 @@ export const Layout = {
     lg: 414, // iPhone 12/13/14 Plus
     xl: 428, // iPhone 12/13/14 Pro Max
     tablet: 768, // iPad
+    desktop: 1024,
   },
 
   // Device type detection
@@ -23,6 +25,8 @@ export const Layout = {
   isMediumDevice: width >= 375 && width < 414,
   isLargeDevice: width >= 414 && width < 768,
   isTablet: width >= 768,
+  isPortrait: height > width,
+  isLandscape: width > height,
 
   // Dynamic spacing based on device size
   getResponsiveSpacing: (base: number) => {
@@ -66,7 +70,7 @@ export const Layout = {
     return defaultValue;
   },
 
-  // Responsive spacing
+  // Enhanced responsive spacing
   spacing: {
     xs: (() => {
       if (width < 375) return 3;
@@ -114,112 +118,40 @@ export const Layout = {
   typography: {
     // Font families (matching web app)
     fontFamily: {
-      sans: "NunitoSans-Regular", // Nunito Sans for body text
+      sans: "NunitoSans-Regular",
       sansMedium: "NunitoSans-Medium",
       sansSemiBold: "NunitoSans-SemiBold",
       sansBold: "NunitoSans-Bold",
-      serif: "Boldonse-Regular", // Always use Boldonse-Regular for headings
-      serifBold: "Boldonse-Regular", // Always use Boldonse-Regular for bold headings
+      serif: "Boldonse-Regular",
+      serifBold: "Boldonse-Regular",
       mono: "Courier New",
     },
 
-    // Responsive font sizes with better scaling
+    // Responsive font sizes
     fontSize: {
-      xs: (() => {
-        if (width < 375) return 11;
-        if (width >= 428) return 13;
-        return 12;
-      })(),
-      sm: (() => {
-        if (width < 375) return 13;
-        if (width >= 428) return 15;
-        return 14;
-      })(),
-      base: (() => {
-        if (width < 375) return 15;
-        if (width >= 428) return 17;
-        return 16;
-      })(),
-      lg: (() => {
-        if (width < 375) return 17;
-        if (width >= 428) return 19;
-        return 18;
-      })(),
-      xl: (() => {
-        if (width < 375) return 19;
-        if (width >= 428) return 21;
-        return 20;
-      })(),
-      "2xl": (() => {
-        if (width < 375) return 22;
-        if (width >= 428) return 26;
-        return 24;
-      })(),
-      "3xl": (() => {
-        if (width < 375) return 28;
-        if (width >= 428) return 32;
-        return 30;
-      })(),
-      "4xl": (() => {
-        if (width < 375) return 34;
-        if (width >= 428) return 38;
-        return 36;
-      })(),
-      "5xl": (() => {
-        if (width < 375) return 44;
-        if (width >= 428) return 52;
-        return 48;
-      })(),
+      xs: 12,
+      sm: 14,
+      base: 16,
+      lg: 18,
+      xl: 20,
+      "2xl": 24,
+      "3xl": 30,
+      "4xl": 36,
+      "5xl": 48,
     },
 
     // Responsive line heights
     lineHeight: {
-      xs: (() => {
-        if (width < 375) return 15;
-        if (width >= 428) return 17;
-        return 16;
-      })(),
-      sm: (() => {
-        if (width < 375) return 19;
-        if (width >= 428) return 21;
-        return 20;
-      })(),
-      base: (() => {
-        if (width < 375) return 22;
-        if (width >= 428) return 26;
-        return 24;
-      })(),
-      lg: (() => {
-        if (width < 375) return 25;
-        if (width >= 428) return 29;
-        return 27;
-      })(),
-      xl: (() => {
-        if (width < 375) return 27;
-        if (width >= 428) return 31;
-        return 29;
-      })(),
-      "2xl": (() => {
-        if (width < 375) return 30;
-        if (width >= 428) return 34;
-        return 32;
-      })(),
-      "3xl": (() => {
-        if (width < 375) return 34;
-        if (width >= 428) return 38;
-        return 36;
-      })(),
-      "4xl": (() => {
-        if (width < 375) return 38;
-        if (width >= 428) return 42;
-        return 40;
-      })(),
-      "5xl": (() => {
-        if (width < 375) return 48;
-        if (width >= 428) return 56;
-        return 52;
-      })(),
-      heading: 1.3, // Heading line height from web
+      xs: 16,
+      sm: 20,
+      base: 24,
+      lg: 27,
+      xl: 29,
+      "2xl": 32,
+      "3xl": 36,
+      "4xl": 40,
+      "5xl": 52,
+      heading: 1.3,
     },
 
     fontWeight: {
@@ -233,7 +165,7 @@ export const Layout = {
   // Header heights
   header: {
     height: 64,
-    heightWithSafeArea: 104, // Approximate with status bar
+    heightWithSafeArea: 104,
   },
 
   // Tab bar
@@ -243,8 +175,8 @@ export const Layout = {
 
   // Safe areas (approximate)
   safeArea: {
-    top: 44,
-    bottom: 34,
+    top: Platform.select({ ios: 44, android: 0, default: 0 }),
+    bottom: Platform.select({ ios: 34, android: 0, default: 0 }),
   },
 
   // Card dimensions
@@ -267,6 +199,74 @@ export const Layout = {
     dropdown: 800,
     header: 700,
     fab: 600,
+  },
+
+  // Enhanced responsive grid
+  grid: {
+    container: {
+      paddingHorizontal: 16,
+    },
+    gutterWidth: 16,
+    columns: 4,
+  },
+
+  // Component-specific responsive values
+  components: {
+    button: {
+      minHeight: 44,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      fontSize: 16,
+    },
+    input: {
+      minHeight: 48,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      fontSize: 16,
+    },
+    card: {
+      padding: 16,
+      borderRadius: 16,
+      margin: 8,
+    },
+    avatar: {
+      small: 32,
+      medium: 48,
+      large: 64,
+      xlarge: 96,
+    },
+  },
+
+  // Utility functions
+  utils: {
+    // Clamp value between min and max
+    clamp: (value: number, min: number, max: number) =>
+      Math.min(Math.max(value, min), max),
+
+    // Linear interpolation
+    lerp: (start: number, end: number, factor: number) =>
+      start + (end - start) * factor,
+
+    // Normalize value between 0 and 1
+    normalize: (value: number, min: number, max: number) =>
+      (value - min) / (max - min),
+
+    // Map value from one range to another
+    mapRange: (
+      value: number,
+      inMin: number,
+      inMax: number,
+      outMin: number,
+      outMax: number
+    ) => ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin,
+
+    // Get responsive value based on device type
+    deviceBased: <T>(small: T, medium: T, large: T, tablet?: T): T => {
+      if (Layout.isTablet && tablet !== undefined) return tablet;
+      if (Layout.isSmallDevice) return small;
+      if (Layout.isLargeDevice) return large;
+      return medium;
+    },
   },
 };
 
