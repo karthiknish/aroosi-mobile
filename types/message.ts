@@ -1,27 +1,3 @@
-// Core message status types aligned across platforms
-export type MessageStatus =
-  | "pending"
-  | "sent"
-  | "delivered"
-  | "read"
-  | "failed";
-
-// Legacy status support for backward compatibility
-export type LegacyMessageStatus =
-  | "sending"
-  | "sent"
-  | "delivered"
-  | "read"
-  | "failed";
-
-export interface MessageDeliveryReceipt {
-  messageId: string;
-  userId: string;
-  status: MessageStatus;
-  timestamp: number;
-}
-
-// Unified Message interface aligned with web platform
 export interface Message {
   _id: string;
   conversationId: string;
@@ -29,6 +5,8 @@ export interface Message {
   toUserId: string;
   text: string;
   type: "text" | "voice" | "image";
+  createdAt: number;
+  readAt?: number;
 
   // Voice message fields
   audioStorageId?: string;
@@ -40,15 +18,13 @@ export interface Message {
   // Common metadata
   fileSize?: number;
   mimeType?: string;
-  createdAt: number;
-  readAt?: number;
 
-  // Client-side fields
-  status?: MessageStatus;
+  // Client-side status lifecycle (broadened as requested)
+  status?: "pending" | "sent" | "delivered" | "read" | "failed";
   isOptimistic?: boolean;
-  deliveryReceipts?: MessageDeliveryReceipt[];
+  deliveryReceipts?: any[];
 
-  // Backward compatibility fields
+  // Backward compatibility fields (kept optional)
   id?: string;
   senderId?: string;
   content?: string;
@@ -64,25 +40,4 @@ export interface Message {
   editedAt?: number;
   replyToId?: string;
   isSystemMessage?: boolean;
-}
-
-// Unified Conversation interface aligned with web platform
-export interface Conversation {
-  id: string;
-  participants: string[];
-  lastMessage?: Message;
-  lastActivity: number;
-  unreadCount: number;
-  isBlocked: boolean;
-
-  // Backward compatibility fields
-  _id?: string;
-  conversationId?: string;
-  lastMessageAt?: number;
-  isTyping?: string[];
-  title?: string;
-  description?: string;
-  isGroup?: boolean;
-  createdAt?: number;
-  updatedAt?: number;
 }

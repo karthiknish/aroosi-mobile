@@ -57,69 +57,48 @@ class EnhancedApiClient {
     }
     const {
       skipErrorHandling = false,
+      // priority and retryConfig are retained for future adaptation, but transport is delegated
       priority = "medium",
       retryConfig,
       ...fetchOptions
     } = options;
 
     try {
-      const url = `${this.baseUrl}${endpoint}`;
-      const authHeaders = await this.getAuthHeaders();
+      // Delegate to base ApiClient for actual HTTP (single transport semantics)
+      const result = await ApiClient.request<any>(endpoint, {
+        method: (fetchOptions.method as any) || "GET",
+        headers: fetchOptions.headers as any,
+        body: fetchOptions.body,
+        signal: fetchOptions.signal as any,
+      } as any);
 
-      // Add breadcrumb for tracking
-      errorReporter.addBreadcrumb(`API Request: ${endpoint}`, "api");
-
-      const requestOptions: RequestInit = {
-        ...fetchOptions,
-        // Always include cookies for session auth
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders,
-          ...fetchOptions.headers,
-        },
-      };
-
-      if (__DEV__) {
-        console.log("📝 Request headers:", requestOptions.headers);
-      }
-
-      // Use enhanced network manager for automatic retry and offline queueing
-      const response = await networkManager.fetch(
-        url,
-        requestOptions,
-        retryConfig,
-        priority
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const error = new AppError(
-          data.error || `HTTP ${response.status}`,
-          this.classifyHttpError(response.status),
+      if (!result.success) {
+        const appError = new AppError(
+          result.error?.message || "API error",
+          this.classifyHttpError(400),
           { metadata: { endpoint } },
-          response.status < 500, // Only retry server errors
-          data.userMessage
+          true,
+          result.error?.message
         );
 
         if (!skipErrorHandling) {
-          errorHandler.handle(error, { metadata: { endpoint } });
-          await errorReporter.reportError(error, { metadata: { endpoint } });
+          errorHandler.handle(appError, { metadata: { endpoint } });
+          await errorReporter.reportError(appError, { metadata: { endpoint } });
         }
 
         return {
           success: false,
-          error: error.userMessage,
+          error: {
+            code: result.error?.code || "API_ERROR",
+            message: result.error?.message || "Request failed",
+          },
         };
       }
 
-      // Add success breadcrumb
       errorReporter.addBreadcrumb(`API Success: ${endpoint}`, "api");
-
       return {
         success: true,
-        data,
+        data: result.data,
       };
     } catch (error) {
       const appError = errorHandler.handle(error as Error, {
@@ -132,7 +111,10 @@ class EnhancedApiClient {
 
       return {
         success: false,
-        error: appError.userMessage,
+        error: {
+          code: appError.type?.toUpperCase?.() || "API_ERROR",
+          message: appError.userMessage || "Request failed",
+        },
       };
     }
   }
@@ -1023,7 +1005,8 @@ export const enhancedApiClient = new EnhancedApiClient(API_BASE_URL);
 
 // Hook to initialize API client with auth
 export function useEnhancedApiClient() {
-  const { getToken } = useAuth();
+  // Cookie-session model: no token; keep compatibility without using getToken
+  const getToken = undefined as any;
 
   // Initialize auth provider once
   if (!enhancedApiClient["authInitialized"]) {

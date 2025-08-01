@@ -40,6 +40,24 @@ class ApiClient {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  // Public wrapper used by enhancedApiClient as shared transport
+  public async transportRequest<T = any>(
+    endpoint: string,
+    options: {
+      method?: "GET" | "POST" | "PUT" | "DELETE";
+      headers?: Record<string, string>;
+      body?: any;
+      signal?: AbortSignal;
+    } = {}
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+      signal: options.signal,
+    } as any);
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -269,14 +287,15 @@ class ApiClient {
     const response = await this.request(`/search?${params}`);
 
     if (response.success && response.data) {
-      const envelope = response.data?.data ?? response.data;
+      const base: any = response.data as any;
+      const envelope = base?.data ?? base;
       return {
         success: true,
         data: {
-          profiles: Array.isArray(envelope.profiles) ? envelope.profiles : [],
-          total: typeof envelope.total === "number" ? envelope.total : 0,
-          hasMore: envelope.hasMore || false,
-          nextPage: envelope.nextPage || null,
+          profiles: Array.isArray(envelope?.profiles) ? envelope.profiles : [],
+          total: typeof envelope?.total === "number" ? envelope.total : 0,
+          hasMore: !!envelope?.hasMore,
+          nextPage: envelope?.nextPage ?? null,
         },
       };
     }
@@ -576,7 +595,7 @@ class ApiClient {
   }
 
   // Message normalization for backward compatibility
-  private normalizeMessage(rawMessage: any): Message {
+  private normalizeMessage(rawMessage: any): import("../types/message").Message {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,

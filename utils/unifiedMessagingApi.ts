@@ -124,7 +124,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "VALIDATION_ERROR", message: validation.error },
-      } as ApiResponse<Message>;
+      } as ApiResponse<UnifiedMessage>;
     }
 
     try {

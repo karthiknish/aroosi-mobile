@@ -204,30 +204,8 @@ export interface Match {
 }
 
 // Message system types (aligned with main project)
-export interface Message {
-  _id: string;
-  conversationId: string;
-  fromUserId: string;
-  toUserId: string;
-  text: string;
-  type?: "text" | "voice" | "image";
-  createdAt: number;
-  readAt?: number;
-
-  // Voice message fields
-  audioStorageId?: string;
-  duration?: number;
-  fileSize?: number;
-  mimeType?: string;
-
-  // Image message fields
-  imageStorageId?: string;
-  imageUrl?: string;
-
-  // Delivery tracking
-  deliveredAt?: number;
-  status?: "sent" | "delivered" | "read";
-}
+import type { Message } from "./message";
+export type { Message } from "./message";
 
 export interface Conversation {
   _id: string;
