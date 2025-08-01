@@ -54,6 +54,7 @@ class ApiClient {
 
       const response = await fetch(url, {
         ...options,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...authHeaders,
@@ -630,6 +631,9 @@ class ApiClient {
     // Map legacy statuses to new ones
     switch (status) {
       case "sending":
+        return "pending";
+      case "queued":
+      case "uploading":
         return "pending";
       case "sent":
       case "delivered":

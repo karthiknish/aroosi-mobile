@@ -71,6 +71,8 @@ class EnhancedApiClient {
 
       const requestOptions: RequestInit = {
         ...fetchOptions,
+        // Always include cookies for session auth
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...authHeaders,
@@ -387,6 +389,7 @@ class EnhancedApiClient {
     try {
       const response = await fetch(uploadUrl, {
         method: "PUT",
+        // Storage uploads typically do not use cookies; keep minimal headers
         headers: {
           "Content-Type": contentType,
         },
@@ -975,6 +978,7 @@ class EnhancedApiClient {
       const authHeaders = await this.getAuthHeaders();
       const response = await fetch(`${this.baseUrl}/voice-messages/upload`, {
         method: "POST",
+        credentials: "include",
         headers: {
           ...authHeaders,
           // Don't set Content-Type for FormData

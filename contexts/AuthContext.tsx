@@ -5,7 +5,8 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { AppState, AppStateStatus } from "react-native";
 import { Profile } from "../types/profile";
 
 // API Base URL must be provided via environment
@@ -69,6 +70,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +148,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
     initAuth();
-  }, [fetchUser]);
+
+    // Session-aware app resume revalidation
+    let currentState: AppStateStatus = AppState.currentState;
+    const onChange = (nextState: AppStateStatus) => {
+      // When app comes to foreground, revalidate session and critical queries
+      if (currentState.match(/inactive|background/) && nextState === "active") {
+        refreshUser(); // refresh session user
+        // Revalidate critical data tied to session
+        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+        queryClient.invalidateQueries({ queryKey: ["matches"] });
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
+      }
+      currentState = nextState;
+    };
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, [fetchUser, queryClient, refreshUser]);
 
   // Sign in with email/password
   const signIn = useCallback(async (email: string, password: string) => {
@@ -195,6 +214,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // After signup, session may be active; fetch user
       const u = await fetchUser();
       setUser(u);
+      // Invalidate queries that depend on session
+      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
       return { success: true };
     } catch (e) {
       console.error("Sign up error:", e);
@@ -225,6 +249,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const u = await fetchUser();
       setUser(u);
+      // Invalidate queries that depend on session
+      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
+      queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
       return { success: true };
     } catch (e) {
       console.error("Google sign-in error:", e);
@@ -297,8 +326,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       setError(null);
+      // Clear session-tied caches on logout
+      queryClient.removeQueries({ queryKey: ["currentProfile"], exact: false });
+      queryClient.removeQueries({ queryKey: ["matches"], exact: false });
+      queryClient.removeQueries({ queryKey: ["conversations"], exact: false });
+      queryClient.removeQueries({ queryKey: ["unreadCounts"], exact: false });
     }
-  }, []);
+  }, [queryClient]);
 
   // Debug: Log the full profile object whenever it changes and is non-null
   useEffect(() => {

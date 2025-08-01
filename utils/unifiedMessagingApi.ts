@@ -1,5 +1,5 @@
 import { MessagingAPI, ApiResponse } from "../types/messaging";
-import { Message, Conversation } from "../types/message";
+import { Message as UnifiedMessage, Conversation } from "../types/message";
 import { MessageValidator } from "./messageValidation";
 import { ApiRetryManager } from "./apiRetryManager";
 
@@ -40,6 +40,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
 
       const response = await fetch(url, {
         ...options,
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
           ...authHeaders,
@@ -63,7 +64,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   async getMessages(
     conversationId: string,
     options?: { limit?: number; before?: number }
-  ): Promise<ApiResponse<Message[]>> {
+  ): Promise<ApiResponse<UnifiedMessage[]>> {
     // Validate conversation ID
     const validation = MessageValidator.validateConversationId(conversationId);
     if (!validation.valid) {
@@ -82,7 +83,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      const response = await this.request<Message[]>(
+      const response = await this.request<UnifiedMessage[]>(
         `/match-messages?${params}`
       );
 
@@ -98,7 +99,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "API_ERROR", message },
-      } as ApiResponse<Message[]>;
+      } as ApiResponse<UnifiedMessage[]>;
     }
   }
 
@@ -116,7 +117,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     duration?: number;
     fileSize?: number;
     mimeType?: string;
-  }): Promise<ApiResponse<Message>> {
+  }): Promise<ApiResponse<UnifiedMessage>> {
     // Validate message data
     const validation = MessageValidator.validateMessageSendData(data);
     if (!validation.valid) {
@@ -127,7 +128,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      const response = await this.request<Message>("/match-messages", {
+      const response = await this.request<UnifiedMessage>("/match-messages", {
         method: "POST",
         body: JSON.stringify({
           conversationId: data.conversationId,
@@ -154,7 +155,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "API_ERROR", message },
-      } as ApiResponse<Message>;
+      } as ApiResponse<UnifiedMessage>;
     }
   }
 
@@ -373,7 +374,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   /**
    * Normalize message data for backward compatibility
    */
-  private normalizeMessage(rawMessage: any): Message {
+  private normalizeMessage(rawMessage: any): UnifiedMessage {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,
