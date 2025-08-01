@@ -223,7 +223,7 @@ export function useRealtimeMessaging(
     typingTimeoutsRef.current.clear();
   }, []);
 
-  // Send typing indicator
+  // Send typing indicator (single canonical path via RealtimeMessagingService)
   const sendTypingIndicator = useCallback(
     (conversationId: string, isTyping: boolean) => {
       if (serviceRef.current && isConnected) {
@@ -233,7 +233,7 @@ export function useRealtimeMessaging(
     [isConnected]
   );
 
-  // Send delivery receipt
+  // Send delivery receipt (single canonical path via RealtimeMessagingService)
   const sendDeliveryReceipt = useCallback(
     (
       messageId: string,
@@ -251,7 +251,7 @@ export function useRealtimeMessaging(
     [isConnected]
   );
 
-  // Send read receipt
+  // Send read receipt (single canonical path via RealtimeMessagingService)
   const sendReadReceipt = useCallback(
     (messageId: string, conversationId: string) => {
       if (serviceRef.current && isConnected) {

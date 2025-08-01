@@ -40,6 +40,19 @@ export class PhotoService {
   // Compression quality
   private readonly COMPRESSION_QUALITY = 0.8;
 
+  // Helper to use centralized picker (library by default)
+  private async pickOneFromLibrary(): Promise<string | null> {
+    try {
+      const { pickFromLibrary } = await import("../utils/imagePicker");
+      const res = await pickFromLibrary({ allowsEditing: true, aspect: [1, 1], quality: 1 });
+      if (res.canceled || !res.assets?.[0]?.uri) return null;
+      return res.assets[0].uri;
+    } catch (e) {
+      console.error("pickOneFromLibrary error:", e);
+      return null;
+    }
+  }
+
   /**
    * Request camera and media library permissions
    */
@@ -68,146 +81,39 @@ export class PhotoService {
     }
   }
 
-  /**
-   * Show photo selection options (camera or library)
-   */
-  showPhotoOptions(): Promise<ImagePicker.ImagePickerResult | null> {
-    // Non-blocking UX preferred; if callers expect a chooser, they should present UI.
-    // For backward compatibility, open image library by default.
-    return this.openImageLibrary();
-  }
+  // removed legacy showPhotoOptions (use utils/imagePicker.* instead)
+
+  // removed legacy openCamera (use utils/imagePicker.pickFromCamera instead)
+
+  // removed legacy openImageLibrary (use utils/imagePicker.pickFromLibrary instead)
 
   /**
-   * Open camera to take a photo
-   */
-  private async openCamera(): Promise<ImagePicker.ImagePickerResult | null> {
-    try {
-      const hasPermission = await this.requestPermissions();
-      if (!hasPermission) return null;
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-        exif: false,
-      });
-
-      return result;
-    } catch (error) {
-      console.error("Error opening camera:", error);
-      // UI should surface a toast based on returned null
-      return null;
-    }
-  }
-
-  /**
-   * Open image library to select a photo
-   */
-  private async openImageLibrary(): Promise<ImagePicker.ImagePickerResult | null> {
-    try {
-      const hasPermission = await this.requestPermissions();
-      if (!hasPermission) return null;
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-        exif: false,
-      });
-
-      return result;
-    } catch (error) {
-      console.error("Error opening image library:", error);
-      // UI should surface a toast based on returned null
-      return null;
-    }
-  }
-
-  /**
-   * Process and compress an image
+   * Process and compress an image (unified processor)
    */
   async processImage(imageUri: string): Promise<ProcessedPhoto | null> {
     try {
-      // First, get image info to check size and dimensions
-      const imageInfo = await ImageManipulator.manipulateAsync(imageUri, [], {
-        format: ImageManipulator.SaveFormat.JPEG,
+      const { processImage, DEFAULT_PROCESS_IMAGE_OPTIONS } = await import("../utils/imageProcessing");
+      const processed = await processImage(imageUri, {
+        maxWidth: this.MAX_WIDTH,
+        maxHeight: this.MAX_HEIGHT,
+        quality: this.COMPRESSION_QUALITY,
+        format: "jpeg",
+        preserveAspectRatio: true,
       });
 
-      let processedUri = imageUri;
-      let needsProcessing = false;
-
-      // Check if image needs resizing
-      if (
-        imageInfo.width > this.MAX_WIDTH ||
-        imageInfo.height > this.MAX_HEIGHT
-      ) {
-        needsProcessing = true;
-      }
-
-      // Check file size (estimate based on dimensions)
-      const estimatedSize = imageInfo.width * imageInfo.height * 3; // RGB
-      if (estimatedSize > this.MAX_FILE_SIZE) {
-        needsProcessing = true;
-      }
-
-      // Process image if needed
-      if (needsProcessing) {
-        const manipulateActions: ImageManipulator.Action[] = [];
-
-        // Resize if too large
-        if (
-          imageInfo.width > this.MAX_WIDTH ||
-          imageInfo.height > this.MAX_HEIGHT
-        ) {
-          const aspectRatio = imageInfo.width / imageInfo.height;
-          let newWidth = this.MAX_WIDTH;
-          let newHeight = this.MAX_HEIGHT;
-
-          if (aspectRatio > 1) {
-            newHeight = this.MAX_WIDTH / aspectRatio;
-          } else {
-            newWidth = this.MAX_HEIGHT * aspectRatio;
-          }
-
-          manipulateActions.push({
-            resize: { width: newWidth, height: newHeight },
-          });
-        }
-
-        const processed = await ImageManipulator.manipulateAsync(
-          imageUri,
-          manipulateActions,
-          {
-            compress: this.COMPRESSION_QUALITY,
-            format: ImageManipulator.SaveFormat.JPEG,
-          }
-        );
-
-        processedUri = processed.uri;
-      }
-
-      // Get final image info
-      const finalInfo = await ImageManipulator.manipulateAsync(
-        processedUri,
-        [],
-        { format: ImageManipulator.SaveFormat.JPEG }
-      );
-
       return {
-        uri: processedUri,
+        uri: processed.uri,
         metadata: {
-          width: finalInfo.width,
-          height: finalInfo.height,
-          size: 0, // We'll calculate this during upload
-          type: "image/jpeg",
+          width: processed.width,
+          height: processed.height,
+          size: 0, // compute during upload if needed
+          type: processed.type,
         },
-        compressed: needsProcessing,
+        compressed:
+          processed.width < this.MAX_WIDTH || processed.height < this.MAX_HEIGHT,
       };
     } catch (error) {
       console.error("Error processing image:", error);
-      // UI should surface a toast based on returned null
       return null;
     }
   }
@@ -332,23 +238,24 @@ export class PhotoService {
     PhotoUploadResult & { profileImage?: ProfileImage }
   > {
     try {
-      // Show photo selection options
-      const pickerResult = await this.showPhotoOptions();
+      // Use centralized picker (library by default)
+      const { pickFromLibrary } = await import("../utils/imagePicker");
+      const pickerResult = await pickFromLibrary({ allowsEditing: true, aspect: [1, 1], quality: 1 });
 
-      if (!pickerResult || pickerResult.canceled || !pickerResult.assets?.[0]) {
+      if (!pickerResult || pickerResult.canceled || !pickerResult.assets?.[0]?.uri) {
         return { success: false, error: "No photo selected" };
       }
 
-      const asset = pickerResult.assets[0];
+      const pickedUri = pickerResult.assets[0].uri;
 
       // Validate image before processing
-      const isValid = await this.validateImage(asset.uri);
+      const isValid = await this.validateImage(pickedUri);
       if (!isValid) {
         return { success: false, error: "Invalid image selected" };
       }
 
       // Process the image
-      const processedPhoto = await this.processImage(asset.uri);
+      const processedPhoto = await this.processImage(pickedUri);
 
       if (!processedPhoto) {
         return { success: false, error: "Failed to process image" };
@@ -370,29 +277,25 @@ export class PhotoService {
   }
 
   /**
-   * Validate image before processing
+   * Validate image before processing (unified validator)
    */
-  validateImage(imageUri: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      Image.getSize(
-        imageUri,
-        (width, height) => {
-          // Check minimum dimensions
-          if (width < 200 || height < 200) {
-            // UI should surface a toast via caller; we only return validation result
-            resolve(false);
-            return;
-          }
-
-          resolve(true);
-        },
-        (error) => {
-          console.error("Error getting image size:", error);
-          // UI should surface a toast via caller; we only return validation result
-          resolve(false);
-        }
-      );
-    });
+  async validateImage(imageUri: string): Promise<boolean> {
+    try {
+      const { validateImageUri, DEFAULT_VALIDATION_OPTIONS } = await import("../utils/imageValidation");
+      const result = await validateImageUri(imageUri, {
+        maxFileSizeBytes: DEFAULT_VALIDATION_OPTIONS.maxFileSizeBytes, // 5MB default
+        minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth,                 // 200
+        minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight,               // 200
+        allowedFormats: DEFAULT_VALIDATION_OPTIONS.allowedFormats,
+      });
+      if (!result.isValid) {
+        console.warn("Image validation failed:", result.errors.join("; "));
+      }
+      return result.isValid;
+    } catch (e) {
+      console.error("Validation error:", e);
+      return false;
+    }
   }
 
   /**

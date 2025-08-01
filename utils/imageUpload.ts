@@ -1,8 +1,10 @@
+import React from "react";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
-import { apiClient } from "./api";
+// Move to enhancedApiClient for standardized flow
+import { enhancedApiClient } from "./enhancedApiClient";
 
 export interface ImageUploadOptions {
   quality?: number;
@@ -75,79 +77,52 @@ export class ImageUploadManager {
   public async pickImageFromCamera(
     options: ImageUploadOptions = {}
   ): Promise<ImageUploadResult> {
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      return {
-        success: false,
-        error: "Camera permission not granted",
-      };
-    }
-
     try {
       const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const { pickFromCamera } = await import("./imagePicker");
+      const result = await pickFromCamera({
         allowsEditing: mergedOptions.allowsEditing,
         aspect: mergedOptions.aspect,
         quality: mergedOptions.quality,
       });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return {
-          success: false,
-          error: "Image selection cancelled",
-        };
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return { success: false, error: "Image selection cancelled" };
       }
 
-      const asset = result.assets[0];
-      return await this.processAndUploadImage(asset.uri, mergedOptions);
+      return await this.processAndUploadImage(
+        result.assets[0].uri,
+        mergedOptions
+      );
     } catch (error) {
       console.error("Failed to pick image from camera:", error);
-      return {
-        success: false,
-        error: "Failed to capture image",
-      };
+      return { success: false, error: "Failed to capture image" };
     }
   }
 
   public async pickImageFromLibrary(
     options: ImageUploadOptions = {}
   ): Promise<ImageUploadResult> {
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      return {
-        success: false,
-        error: "Media library permission not granted",
-      };
-    }
-
     try {
       const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const { pickFromLibrary } = await import("./imagePicker");
+      const result = await pickFromLibrary({
         allowsEditing: mergedOptions.allowsEditing,
         aspect: mergedOptions.aspect,
         quality: mergedOptions.quality,
-        allowsMultipleSelection: false,
       });
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
-        return {
-          success: false,
-          error: "Image selection cancelled",
-        };
+      if (result.canceled || !result.assets?.[0]?.uri) {
+        return { success: false, error: "Image selection cancelled" };
       }
 
-      const asset = result.assets[0];
-      return await this.processAndUploadImage(asset.uri, mergedOptions);
+      return await this.processAndUploadImage(
+        result.assets[0].uri,
+        mergedOptions
+      );
     } catch (error) {
       console.error("Failed to pick image from library:", error);
-      return {
-        success: false,
-        error: "Failed to select image",
-      };
+      return { success: false, error: "Failed to select image" };
     }
   }
 
@@ -155,58 +130,38 @@ export class ImageUploadManager {
     maxCount = 6,
     options: ImageUploadOptions = {}
   ): Promise<ImageUploadResult[]> {
-    const hasPermission = await this.requestPermissions();
-    if (!hasPermission) {
-      return [
-        {
-          success: false,
-          error: "Media library permission not granted",
-        },
-      ];
-    }
-
     try {
       const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Disable editing for multiple selection
+      const { pickMultiple } = await import("./imagePicker");
+      const result = await pickMultiple(maxCount, {
         quality: mergedOptions.quality,
-        allowsMultipleSelection: true,
-        selectionLimit: maxCount,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
-        return [
-          {
-            success: false,
-            error: "Image selection cancelled",
-          },
-        ];
+        return [{ success: false, error: "Image selection cancelled" }];
       }
 
       const uploadPromises = result.assets.map((asset) =>
         this.processAndUploadImage(asset.uri, mergedOptions)
       );
-
       return await Promise.all(uploadPromises);
     } catch (error) {
       console.error("Failed to pick multiple images:", error);
-      return [
-        {
-          success: false,
-          error: "Failed to select images",
-        },
-      ];
+      return [{ success: false, error: "Failed to select images" }];
     }
   }
 
   public async validateImage(uri: string): Promise<ImageValidationResult> {
-    const result: ImageValidationResult = {
-      isValid: true,
-      errors: [],
-      warnings: [],
-    };
+    // Delegate to unified validator
+    const { validateImageUri, DEFAULT_VALIDATION_OPTIONS } = await import(
+      "./imageValidation"
+    );
+    const result = await validateImageUri(uri, {
+      maxFileSizeBytes: DEFAULT_VALIDATION_OPTIONS.maxFileSizeBytes,
+      minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth,
+      minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight,
+      allowedFormats: DEFAULT_VALIDATION_OPTIONS.allowedFormats,
+    });
 
     try {
       // Check file existence
@@ -239,9 +194,8 @@ export class ImageUploadManager {
       }
 
       // Get image dimensions
-      const imageInfo = await ImageManipulator.manipulateAsync(uri, [], {
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
+      // Dimensions are probed by the unified validator where necessary.
+      // If specific dimension info is required, consider utils/imageProcessing.probeDimensions later.
 
       // Note: ImageManipulator doesn't provide dimensions directly
       // We'll need to use a different approach or accept this limitation
@@ -268,7 +222,16 @@ export class ImageUploadManager {
       }
 
       // Process image (resize, compress, etc.)
-      const processedUri = await this.processImage(uri, options);
+      // Delegate processing to unified processor
+      const { processImage } = await import("./imageProcessing");
+      const processed = await processImage(uri, {
+        maxWidth: options.maxWidth,
+        maxHeight: options.maxHeight,
+        quality: options.quality,
+        format: options.compress ? "jpeg" : "png",
+        preserveAspectRatio: true,
+      });
+      const processedUri = processed.uri;
 
       // Upload to server
       const uploadResult = await this.uploadToServer(processedUri);
@@ -330,21 +293,23 @@ export class ImageUploadManager {
   }> {
     try {
       // First, get upload URL from server
-      const uploadUrlResponse = await apiClient.request("/images/upload-url", {
-        method: "POST",
-        body: JSON.stringify({
-          contentType: "image/jpeg",
-        }),
-      });
+      // Standardized: get upload URL via enhancedApiClient
+      const uploadUrlResponse: any = await enhancedApiClient.getUploadUrl();
 
-      if (!uploadUrlResponse.success || !uploadUrlResponse.data?.uploadUrl) {
+      if (
+        !uploadUrlResponse?.success ||
+        !(uploadUrlResponse.data as any)?.uploadUrl
+      ) {
         return {
           success: false,
           error: "Failed to get upload URL",
         };
       }
 
-      const { uploadUrl, storageId } = uploadUrlResponse.data;
+      const { uploadUrl, storageId } = uploadUrlResponse.data as {
+        uploadUrl: string;
+        storageId: string;
+      };
 
       // Upload file to storage
       const fileInfo = await FileSystem.getInfoAsync(uri);
@@ -370,17 +335,17 @@ export class ImageUploadManager {
       }
 
       // Confirm upload with server
-      const confirmResponse = await apiClient.request(
-        "/images/confirm-upload",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            storageId,
-          }),
-        }
-      );
+      // Save image metadata to finalize and obtain URL (aligns with PhotoService)
+      const fsInfo2 = await FileSystem.getInfoAsync(uri);
+      const confirmResponse: any = await enhancedApiClient.saveImageMetadata({
+        userId: "", // unknown at this layer
+        storageId,
+        fileName: uri.split("/").pop() || `image-${Date.now()}.jpg`,
+        contentType: "image/jpeg",
+        fileSize: fileInfo.exists ? fileInfo.size || 0 : 0,
+      });
 
-      if (!confirmResponse.success) {
+      if (!confirmResponse?.success) {
         return {
           success: false,
           error: "Failed to confirm image upload",
@@ -390,7 +355,7 @@ export class ImageUploadManager {
       return {
         success: true,
         storageId,
-        url: confirmResponse.data?.url,
+        url: (confirmResponse.data as any)?.url,
       };
     } catch (error) {
       console.error("Failed to upload image to server:", error);
@@ -403,11 +368,10 @@ export class ImageUploadManager {
 
   public async deleteImage(storageId: string): Promise<boolean> {
     try {
-      const response = await apiClient.request(`/images/${storageId}`, {
-        method: "DELETE",
-      });
-
-      return response.success;
+      const response: any = (enhancedApiClient as any).deleteImage
+        ? await (enhancedApiClient as any).deleteImage(storageId)
+        : await (enhancedApiClient as any).request?.(`/images/${storageId}`, { method: "DELETE" });
+      return !!response?.success;
     } catch (error) {
       console.error("Failed to delete image:", error);
       return false;
@@ -416,14 +380,14 @@ export class ImageUploadManager {
 
   public async reorderImages(imageIds: string[]): Promise<boolean> {
     try {
-      const response = await apiClient.request("/images/reorder", {
-        method: "POST",
-        body: JSON.stringify({
-          imageIds,
-        }),
-      });
+      const response: any = (enhancedApiClient as any).updateImageOrder
+        ? await (enhancedApiClient as any).updateImageOrder(imageIds)
+        : await (enhancedApiClient as any).request?.("/images/reorder", {
+            method: "POST",
+            body: JSON.stringify({ imageIds }),
+          });
 
-      return response.success;
+      return !!response?.success;
     } catch (error) {
       console.error("Failed to reorder images:", error);
       return false;

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import * as ImagePicker from "expo-image-picker";
+import { pickFromLibrary } from "../utils/imagePicker";
 import { ImageType } from "../types/image";
 import { IMAGE_VALIDATION } from "../types/image";
 
@@ -39,23 +39,17 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
   const validateImageBeforeUpload = useCallback(
     async (imageUri: string): Promise<boolean> => {
       try {
-        // Check file info
-        const fileInfo = await ImagePicker.getPendingResultAsync();
-
-        // For local validation, we'll use basic checks
-        if (!imageUri) {
-          return false;
+        const { validateImageUri, DEFAULT_VALIDATION_OPTIONS } = await import("../utils/imageValidation");
+        const result = await validateImageUri(imageUri, {
+          maxFileSizeBytes: DEFAULT_VALIDATION_OPTIONS.maxFileSizeBytes,
+          minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth,
+          minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight,
+          allowedFormats: DEFAULT_VALIDATION_OPTIONS.allowedFormats,
+        });
+        if (!result.isValid) {
+          console.warn("Local image validation failed:", result.errors.join("; "));
         }
-
-        // Check file extension
-        const extension = imageUri.split(".").pop()?.toLowerCase();
-        const allowedExtensions = ["jpg", "jpeg", "png", "webp"];
-
-        if (!extension || !allowedExtensions.includes(extension)) {
-          return false;
-        }
-
-        return true;
+        return result.isValid;
       } catch (error) {
         console.error("Error validating image:", error);
         return false;
@@ -73,46 +67,38 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
     try {
       setUploading(true);
 
-      // Request permission
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        return false;
-      }
-
-      // Launch image picker
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      // Launch image picker via centralized utility (permissions handled internally)
+      const result = await pickFromLibrary({
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-
-        // Validate the image
-        const isValid = await validateImageBeforeUpload(asset.uri);
-        if (!isValid) {
-          return false;
-        }
-
-        // Create local image object
-        const newImage: LocalImageType = {
-          id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          url: asset.uri,
-          fileName: asset.fileName || `image-${Date.now()}.jpg`,
-          size: asset.fileSize || 0,
-          storageId: `local-${Date.now()}`,
-          uploadedAt: Date.now(),
-          isMain: images.length === 0, // First photo is main by default
-        };
-
-        setImages((prev) => [...prev, newImage]);
-        return true;
+      if (result.canceled || !result.assets?.length || !result.assets[0]?.uri) {
+        return false;
       }
 
-      return false;
+      const asset = result.assets[0];
+
+      // Validate the image
+      const isValid = await validateImageBeforeUpload(asset.uri);
+      if (!isValid) {
+        return false;
+      }
+
+      // Create local image object
+      const newImage: LocalImageType = {
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        url: asset.uri,
+        fileName: asset.fileName || `image-${Date.now()}.jpg`,
+        size: asset.fileSize || 0,
+        storageId: `local-${Date.now()}`,
+        uploadedAt: Date.now(),
+        isMain: images.length === 0, // First photo is main by default
+      };
+
+      setImages((prev) => [...prev, newImage]);
+      return true;
     } catch (error) {
       console.error("Error adding photo:", error);
       return false;

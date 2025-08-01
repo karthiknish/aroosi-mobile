@@ -6,12 +6,13 @@ import React, {
   useCallback,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import * as SecureStore from "expo-secure-store";
 import { Profile } from "../types/profile";
 
-// API Base URL - same as in api.ts
-const DEFAULT_API_BASE_URL = "https://aroosi.app/api";
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
+// API Base URL must be provided via environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
+if (!API_BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
+}
 
 interface User {
   id: string;
@@ -34,10 +35,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   error: string | null;
 
-  // Legacy compatibility properties
-  isSignedIn: boolean;
-  isLoaded: boolean;
-  isProfileComplete: boolean;
+  // Derived
   isOnboardingComplete: boolean;
   isAdmin: boolean;
   userId: string;
@@ -70,19 +68,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Secure token storage keys
-const TOKEN_KEY = "auth_token"; // no longer used for session cookie; kept for backward compatibility
-const REFRESH_TOKEN_KEY = "refresh_token";
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Legacy token helpers kept as no-ops for compatibility
-  const getStoredToken = useCallback(async (): Promise<string | null> => null, []);
-  const storeToken = useCallback(async (_newToken: string): Promise<void> => {}, []);
-  const removeToken = useCallback(async (): Promise<void> => {}, []);
+  // No token storage for cookie-session auth
 
   // Fetch current user using cookie session
   const fetchUser = useCallback(async (): Promise<User | null> => {
@@ -145,11 +136,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchProfile();
   }, [refreshUser, refetchProfile]);
 
-  // Get token method
-  const getToken = useCallback(async (): Promise<string | null> => {
-    // No token for cookie sessions
-    return null;
-  }, []);
 
   // Initialize auth state
   useEffect(() => {
@@ -345,11 +331,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     expiresAt: typedProfile?.subscriptionExpiresAt,
   };
 
-  // Computed values for legacy compatibility
+  // Computed values
   const isAuthenticated = !!user;
-  const isSignedIn = isAuthenticated;
-  const isLoaded = !isLoading;
-  const isProfileComplete = user?.profile?.isProfileComplete || false;
   const isAdmin = user?.role === "admin";
   const userId = user?.id || "";
 
@@ -359,10 +342,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated,
     error,
 
-    // Legacy compatibility
-    isSignedIn,
-    isLoaded,
-    isProfileComplete,
     isOnboardingComplete,
     isAdmin,
     userId,

@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from "react-native";
 
-import * as ImagePicker from "expo-image-picker";
+import { pickFromCamera, pickFromLibrary } from "../../utils/imagePicker";
 
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, Colors, Layout } from "../../constants";
@@ -48,15 +48,8 @@ export default function PlatformPhotoPicker({
   const toast = useToast();
 
   const requestPermissions = async () => {
-    const { status: cameraStatus } =
-      await ImagePicker.requestCameraPermissionsAsync();
-    const { status: mediaStatus } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    return {
-      camera: cameraStatus === "granted",
-      media: mediaStatus === "granted",
-    };
+    // Permissions are handled inside utils/imagePicker; keep stub for UI messages
+    return { camera: true, media: true };
   };
 
   const openCamera = async () => {
@@ -67,14 +60,8 @@ export default function PlatformPhotoPicker({
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing,
-        aspect,
-        quality,
-      });
-
-      if (!result.canceled && result.assets[0]) {
+      const result = await pickFromCamera({ allowsEditing, aspect, quality });
+      if (!result.canceled && result.assets?.[0]?.uri) {
         onImageSelected(result.assets[0].uri);
       }
     } catch (error) {
@@ -91,8 +78,7 @@ export default function PlatformPhotoPicker({
         return;
       }
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      const result = await pickFromLibrary({
         allowsEditing,
         aspect,
         quality,
@@ -100,7 +86,7 @@ export default function PlatformPhotoPicker({
         selectionLimit: maxImages,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      if (!result.canceled && result.assets?.[0]?.uri) {
         onImageSelected(result.assets[0].uri);
       }
     } catch (error) {

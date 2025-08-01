@@ -1,14 +1,16 @@
 import { MessagingAPI, ApiResponse } from "../types/messaging";
 import { Message, Conversation } from "../types/message";
 import { MessageValidator } from "./messageValidation";
-import { MessagingErrorHandler, RetryManager } from "./messagingErrors";
+import { ApiRetryManager } from "./apiRetryManager";
 
-// Prefer env variable if defined; otherwise default to live API
-const DEFAULT_API_BASE_URL = "https://www.aroosi.app/api";
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
+// Base URL must be provided via environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
+if (!API_BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
+}
 
 /**
- * Unified Messaging API Client aligned with web platform
+ * Unified Messaging API Client aligned with web platform (uses EXPO_PUBLIC_API_URL only)
  * Implements the MessagingAPI interface for consistent cross-platform behavior
  */
 export class UnifiedMessagingAPI implements MessagingAPI {
@@ -32,7 +34,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    return RetryManager.executeWithAutoRetry(async () => {
+    return ApiRetryManager.executeWithRetry(async () => {
       const url = `${this.baseUrl}${endpoint}`;
       const authHeaders = await this.getAuthHeaders();
 
@@ -45,10 +47,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
         },
       });
 
-      // Use the unified response interceptor
-      const { ApiResponseInterceptor } = await import(
-        "./apiResponseInterceptor"
-      );
+      const { ApiResponseInterceptor } = await import("./apiResponseInterceptor");
       return await ApiResponseInterceptor.interceptResponse<T>(
         response,
         `UnifiedMessagingAPI ${endpoint}`,
@@ -70,8 +69,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!validation.valid) {
       return {
         success: false,
-        error: validation.error,
-      };
+        error: { code: "VALIDATION_ERROR", message: validation.error },
+      } as ApiResponse<Message[]>;
     }
 
     const params = new URLSearchParams({ conversationId });
@@ -93,12 +92,13 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       }
 
       return response;
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(error, "getMessages");
+    } catch (error: any) {
+      const message =
+        error?.message || (typeof error === "string" ? error : "getMessages failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<Message[]>;
     }
   }
 
@@ -122,8 +122,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!validation.valid) {
       return {
         success: false,
-        error: validation.error,
-      };
+        error: { code: "VALIDATION_ERROR", message: validation.error },
+      } as ApiResponse<Message>;
     }
 
     try {
@@ -148,12 +148,13 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       }
 
       return response;
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(error, "sendMessage");
+    } catch (error: any) {
+      const message =
+        error?.message || (typeof error === "string" ? error : "sendMessage failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<Message>;
     }
   }
 
@@ -169,8 +170,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!validation.valid) {
       return {
         success: false,
-        error: validation.error,
-      };
+        error: { code: "VALIDATION_ERROR", message: validation.error },
+      } as ApiResponse<void>;
     }
 
     try {
@@ -178,15 +179,14 @@ export class UnifiedMessagingAPI implements MessagingAPI {
         method: "POST",
         body: JSON.stringify({ conversationId }),
       });
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "markConversationAsRead"
-      );
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "markConversationAsRead failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<void>;
     }
   }
 
@@ -203,15 +203,14 @@ export class UnifiedMessagingAPI implements MessagingAPI {
           method: "POST",
         }
       );
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "generateVoiceUploadUrl"
-      );
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "generateVoiceUploadUrl failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<{ uploadUrl: string; storageId: string }>;
     }
   }
 
@@ -224,65 +223,61 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!storageId) {
       return {
         success: false,
-        error: "Storage ID is required",
-      };
+        error: { code: "VALIDATION_ERROR", message: "Storage ID is required" },
+      } as ApiResponse<{ url: string }>;
     }
 
     try {
-      return await this.request<{ url: string }>(
-        `/voice-messages/${storageId}/url`
-      );
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "getVoiceMessageUrl"
-      );
+      return await this.request<{ url: string }>(`/voice-messages/${storageId}/url`);
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "getVoiceMessageUrl failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<{ url: string }>;
     }
   }
 
   /**
    * Send typing indicator
+   * Canonical REST path routes through enhancedApiClient for consistency
    */
   async sendTypingIndicator(
     conversationId: string,
     action: "start" | "stop"
   ): Promise<void> {
-    // Validate conversation ID
     const validation = MessageValidator.validateConversationId(conversationId);
     if (!validation.valid) {
       throw new Error(validation.error);
     }
-
     try {
-      await this.request("/typing-indicators", {
-        method: "POST",
-        body: JSON.stringify({ conversationId, action }),
-      });
+      const { enhancedApiClient } = await import("./enhancedApiClient");
+      await enhancedApiClient.sendTypingIndicator(conversationId, action);
     } catch (error) {
-      // Don't throw for typing indicators - they're not critical
       console.warn("Failed to send typing indicator:", error);
     }
   }
 
   /**
    * Send delivery receipt
+   * Canonical REST path routes through enhancedApiClient for consistency
    */
   async sendDeliveryReceipt(messageId: string, status: string): Promise<void> {
-    if (!messageId || !status) {
-      return; // Silently fail for non-critical feature
-    }
-
+    if (!messageId || !status) return;
     try {
+      const { enhancedApiClient } = await import("./enhancedApiClient");
+      if (typeof enhancedApiClient.sendDeliveryReceipt === "function") {
+        await enhancedApiClient.sendDeliveryReceipt(messageId, status);
+        return;
+      }
+      // Fallback to public endpoint via this.request (avoid calling private client.request)
       await this.request("/delivery-receipts", {
         method: "POST",
         body: JSON.stringify({ messageId, status }),
       });
     } catch (error) {
-      // Don't throw for delivery receipts - they're not critical
       console.warn("Failed to send delivery receipt:", error);
     }
   }
@@ -300,15 +295,14 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       }
 
       return response;
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "getConversations"
-      );
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "getConversations failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<Conversation[]>;
     }
   }
 
@@ -321,8 +315,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!participantIds || participantIds.length === 0) {
       return {
         success: false,
-        error: "Participant IDs are required",
-      };
+        error: { code: "VALIDATION_ERROR", message: "Participant IDs are required" },
+      } as ApiResponse<Conversation>;
     }
 
     try {
@@ -337,15 +331,14 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       }
 
       return response;
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "createConversation"
-      );
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "createConversation failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<Conversation>;
     }
   }
 
@@ -358,23 +351,22 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     if (!validation.valid) {
       return {
         success: false,
-        error: validation.error,
-      };
+        error: { code: "VALIDATION_ERROR", message: validation.error },
+      } as ApiResponse<void>;
     }
 
     try {
       return await this.request<void>(`/conversations/${conversationId}`, {
         method: "DELETE",
       });
-    } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(
-        error,
-        "deleteConversation"
-      );
+    } catch (error: any) {
+      const message =
+        error?.message ||
+        (typeof error === "string" ? error : "deleteConversation failed");
       return {
         success: false,
-        error: messagingError.message,
-      };
+        error: { code: "API_ERROR", message },
+      } as ApiResponse<void>;
     }
   }
 

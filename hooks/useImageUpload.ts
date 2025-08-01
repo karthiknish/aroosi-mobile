@@ -46,16 +46,10 @@ export function useImageUpload(): UseImageUploadReturn {
     mutationFn: async (imageResult: ImagePickerResult) => {
       if (!userId) throw new Error("User not authenticated");
 
-      // Validate file type
-      if (!IMAGE_VALIDATION.ALLOWED_TYPES.includes(imageResult.type)) {
-        throw new Error(
-          "Unsupported image type. Please use JPEG, PNG, or WebP."
-        );
-      }
-
-      // Validate file size
-      if (imageResult.size > IMAGE_VALIDATION.MAX_SIZE_BYTES) {
-        throw new Error("Image too large. Maximum size is 5MB.");
+      // Unified validation
+      const validationError = await validateImage(imageResult);
+      if (validationError) {
+        throw new Error(validationError);
       }
 
       // Check image count limit
@@ -222,17 +216,31 @@ export function useImageUpload(): UseImageUploadReturn {
 }
 
 // Utility function to validate image before upload
-export function validateImage(imageResult: ImagePickerResult): string | null {
-  // Check file type
-  if (!IMAGE_VALIDATION.ALLOWED_TYPES.includes(imageResult.type)) {
-    return "Unsupported image type. Please use JPEG, PNG, or WebP.";
-  }
+export async function validateImage(imageResult: ImagePickerResult): Promise<string | null> {
+  try {
+    const { validatePickedImage, DEFAULT_VALIDATION_OPTIONS } = await import("../utils/imageValidation");
+    const unified = await validatePickedImage(
+      {
+        uri: imageResult.uri,
+        type: imageResult.type,
+        size: imageResult.size,
+        name: imageResult.name,
+      },
+      {
+        maxFileSizeBytes: DEFAULT_VALIDATION_OPTIONS.maxFileSizeBytes,
+        minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth,
+        minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight,
+        allowedFormats: DEFAULT_VALIDATION_OPTIONS.allowedFormats,
+      }
+    );
 
-  // Check file size
-  if (imageResult.size > IMAGE_VALIDATION.MAX_SIZE_BYTES) {
-    const sizeMB = (IMAGE_VALIDATION.MAX_SIZE_BYTES / (1024 * 1024)).toFixed(0);
-    return `Image too large. Maximum size is ${sizeMB}MB.`;
+    if (!unified.isValid) {
+      // Return the first error as a user-friendly string
+      return unified.errors[0] || "Invalid image.";
+    }
+    return null;
+  } catch (e) {
+    console.error("Unified image validation error:", e);
+    return "Failed to validate image";
   }
-
-  return null;
 }

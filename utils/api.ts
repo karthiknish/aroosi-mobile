@@ -17,9 +17,11 @@ import {
 } from "../types/profile";
 import { validateProfileData, validateFormData } from "./typeValidation";
 
-// Prefer env variable if defined; otherwise default to live API
-const DEFAULT_API_BASE_URL = "https://www.aroosi.app/api";
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
+// Base URL must be provided via environment
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
+if (!API_BASE_URL) {
+  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
+}
 
 class ApiClient {
   private baseUrl: string;
