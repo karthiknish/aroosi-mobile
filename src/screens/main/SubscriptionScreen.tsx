@@ -127,10 +127,12 @@ export default function SubscriptionScreen({
           [{ text: "OK" }]
         );
       }
-    } catch (error) {
-      Alert.alert("Error", "Something went wrong. Please try again later.", [
-        { text: "OK" },
-      ]);
+    } catch (error: any) {
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Something went wrong. Please try again later.";
+      Alert.alert("Error", message, [{ text: "OK" }]);
     } finally {
       setPurchasing(null);
     }
@@ -146,8 +148,15 @@ export default function SubscriptionScreen({
         setSelectedPlan(null);
       }
       return success;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upgrade error:", error);
+      Alert.alert(
+        "Upgrade Error",
+        typeof error?.message === "string"
+          ? error.message
+          : "An unexpected error occurred while upgrading.",
+        [{ text: "OK" }]
+      );
       return false;
     } finally {
       setPurchasing(null);
@@ -179,17 +188,27 @@ export default function SubscriptionScreen({
   };
 
   const handleRestorePurchases = async () => {
-    const success = await restorePurchases();
-    if (success) {
+    try {
+      const success = await restorePurchases();
+      if (success) {
+        Alert.alert(
+          "Purchases Restored",
+          "Your previous purchases have been restored.",
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert(
+          "No Purchases Found",
+          "No previous purchases were found to restore.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error: any) {
       Alert.alert(
-        "Purchases Restored",
-        "Your previous purchases have been restored.",
-        [{ text: "OK" }]
-      );
-    } else {
-      Alert.alert(
-        "No Purchases Found",
-        "No previous purchases were found to restore.",
+        "Restore Error",
+        typeof error?.message === "string"
+          ? error.message
+          : "We couldn't restore purchases at this time.",
         [{ text: "OK" }]
       );
     }
@@ -312,6 +331,9 @@ export default function SubscriptionScreen({
               </Text>
             )}
           </TouchableOpacity>
+          <Text style={styles.purchaseHelpText}>
+            You can cancel anytime from Settings. Your plan will auto-renew each month.
+          </Text>
         </View>
       )}
 
@@ -394,28 +416,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: Layout.spacing.lg,
+    paddingVertical: Layout.spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: Colors.border.primary,
   },
   backButton: {
     padding: 8,
   },
   backButtonText: {
-    fontSize: 16,
+    fontSize: Layout.typography.fontSize.base,
     color: Colors.primary[500],
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: Layout.typography.fontSize.lg,
+    fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
   },
   placeholder: {
     width: 50,
   },
   statusCard: {
-    margin: Layout.spacing.lg,
+    marginHorizontal: Layout.spacing.lg,
+    marginTop: Layout.spacing.lg,
+    marginBottom: Layout.spacing.lg,
     padding: Layout.spacing.lg,
     backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.lg,
@@ -453,86 +477,92 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.lg,
     fontWeight: Layout.typography.fontWeight.bold,
   },
+  purchaseHelpText: {
+    marginTop: Layout.spacing.sm,
+    textAlign: "center",
+    color: Colors.text.secondary,
+    fontSize: Layout.typography.fontSize.sm,
+  },
   statusTitle: {
     fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.lg,
+    fontWeight: Layout.typography.fontWeight.semibold,
     color: Colors.text.primary,
-    marginBottom: 12,
+    marginBottom: Layout.spacing.sm,
   },
   statusActive: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
     color: Colors.success[500],
-    marginBottom: 4,
+    marginBottom: Layout.spacing.xs,
   },
   statusTrial: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
     color: Colors.warning[500],
-    marginBottom: 4,
+    marginBottom: Layout.spacing.xs,
   },
   statusFree: {
-    fontSize: 16,
+    fontSize: Layout.typography.fontSize.base,
     color: Colors.text.secondary,
   },
   statusExpiry: {
-    fontSize: 14,
+    fontSize: Layout.typography.fontSize.sm,
     color: Colors.text.secondary,
   },
   managementSection: {
-    paddingHorizontal: 20,
-    marginTop: 20,
+    paddingHorizontal: Layout.spacing.lg,
+    marginTop: Layout.spacing.lg,
   },
   usageHistoryButton: {
     backgroundColor: Colors.background.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: Layout.spacing.md,
+    borderRadius: Layout.radius.md,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: Layout.spacing.md,
     borderWidth: 1,
     borderColor: Colors.primary[500],
   },
   usageHistoryButtonText: {
     color: Colors.primary[500],
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
   },
   cancelButton: {
     backgroundColor: Colors.background.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: Layout.spacing.md,
+    borderRadius: Layout.radius.md,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: Layout.spacing.md,
     borderWidth: 1,
     borderColor: Colors.error[500],
   },
   cancelButtonText: {
     color: Colors.error[500],
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
   },
   restoreButton: {
     backgroundColor: Colors.background.primary,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: Layout.spacing.md,
+    borderRadius: Layout.radius.md,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.primary[500],
   },
   restoreButtonText: {
     color: Colors.primary[500],
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
   },
   termsSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: Layout.spacing.lg,
+    paddingVertical: Layout.spacing.lg,
   },
   termsText: {
-    fontSize: 12,
+    fontSize: Layout.typography.fontSize.xs,
     color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 18,

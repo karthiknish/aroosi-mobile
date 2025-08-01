@@ -6,8 +6,7 @@ export type MaritalStatus = "single" | "divorced" | "widowed" | "annulled";
 export type Diet =
   | "vegetarian"
   | "non-vegetarian"
-  | "vegan"
-  | "eggetarian"
+  | "halal"
   | "other"
   | "";
 export type SmokingDrinking = "no" | "occasionally" | "yes" | "";
@@ -396,8 +395,7 @@ export const MARITAL_STATUS_OPTIONS: { value: MaritalStatus; label: string }[] =
 export const DIET_OPTIONS: { value: Diet; label: string }[] = [
   { value: "vegetarian", label: "Vegetarian" },
   { value: "non-vegetarian", label: "Non-Vegetarian" },
-  { value: "vegan", label: "Vegan" },
-  { value: "eggetarian", label: "Eggetarian" },
+  { value: "halal", label: "Halal Only" },
   { value: "other", label: "Other" },
 ];
 

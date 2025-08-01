@@ -14,10 +14,11 @@ import RootNavigator from "@/navigation/RootNavigator";
 import { NotificationProvider } from "@/providers/NotificationProvider";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { ToastProvider } from "./contexts/ToastContext";
+import { ToastProvider } from "@providers/ToastContext";
 import { FontLoader } from "@components/FontLoader";
 import { Colors } from "@constants/Colors";
 import { photoService } from "./services/PhotoService";
+import ErrorBoundary from "./providers/ErrorBoundary";
 
 // Initialize React Query client
 const queryClient = new QueryClient({
@@ -62,12 +63,14 @@ export default function App() {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 >
-                  <NavigationContainer ref={navigationRef}>
-                    <NotificationProvider navigationRef={navigationRef}>
-                      <StatusBar style="auto" />
-                      <RootNavigator />
-                    </NotificationProvider>
-                  </NavigationContainer>
+                  <ErrorBoundary>
+                    <NavigationContainer ref={navigationRef}>
+                      <NotificationProvider navigationRef={navigationRef}>
+                        <StatusBar style="auto" />
+                        <RootNavigator />
+                      </NotificationProvider>
+                    </NavigationContainer>
+                  </ErrorBoundary>
                 </LinearGradient>
               </SafeAreaProvider>
             </ToastProvider>

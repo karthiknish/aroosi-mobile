@@ -41,7 +41,7 @@ import { Colors, Layout } from "@constants";
 import LocalImageUpload from "@components/profile/LocalImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
-import { MOTHER_TONGUES, ETHNICITIES } from "@constants/options";
+import { MOTHER_TONGUE_OPTIONS, RELIGION_OPTIONS, ETHNICITY_OPTIONS } from "../../../constants/languages";
 
 interface ProfileSetupScreenProps {
   navigation: any;
@@ -131,7 +131,7 @@ export default function ProfileSetupScreen({
   const validateCurrentStep = (): boolean => {
     const stepValidations = {
       1: ["fullName", "dateOfBirth", "gender", "preferredGender"],
-      2: ["city"],
+      2: ["country", "city"],
       3: ["height", "maritalStatus"],
       4: ["education", "occupation", "annualIncome"],
       5: [], // Cultural fields are optional
@@ -143,8 +143,8 @@ export default function ProfileSetupScreen({
       stepValidations[currentStep as keyof typeof stepValidations] || [];
     const stepErrors: Record<string, string> = {};
 
+    const fullValidation = validateCreateProfile(formData);
     fieldsToValidate.forEach((field) => {
-      const fullValidation = validateCreateProfile(formData);
       if (fullValidation[field]) {
         stepErrors[field] = fullValidation[field];
       }
@@ -234,24 +234,22 @@ export default function ProfileSetupScreen({
       <Text style={styles.stepSubtitle}>Let's start with the basics</Text>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Religion</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.religion || ""}
-          onChangeText={(text) => handleInputChange("religion", text)}
-          placeholder="e.g., Hindu, Muslim, Christian, etc."
-          maxLength={50}
+        <SearchableSelect
+          label="Religion"
+          options={RELIGION_OPTIONS}
+          selectedValue={formData.religion || ""}
+          placeholder="Select religion"
+          onValueChange={(v) => handleInputChange("religion", v)}
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Mother Tongue</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.motherTongue || ""}
-          onChangeText={(text) => handleInputChange("motherTongue", text)}
-          placeholder="e.g., English, Hindi, Urdu, etc."
-          maxLength={50}
+        <SearchableSelect
+          label="Mother Tongue"
+          options={MOTHER_TONGUE_OPTIONS}
+          selectedValue={formData.motherTongue || ""}
+          placeholder="Select mother tongue"
+          onValueChange={(v) => handleInputChange("motherTongue", v)}
         />
       </View>
 
@@ -343,7 +341,6 @@ export default function ProfileSetupScreen({
       <Text style={styles.stepSubtitle}>Where are you based?</Text>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Country - searchable select</Text>
         <SearchableSelect
           label="Country *"
           options={COUNTRIES}
@@ -351,6 +348,11 @@ export default function ProfileSetupScreen({
           placeholder="Select country"
           onValueChange={(value) => handleInputChange("country", value)}
         />
+        {errors.country && (
+          <Text style={[styles.errorText, { marginTop: Layout.spacing.xs }]}>
+            {errors.country}
+          </Text>
+        )}
       </View>
 
       <View style={styles.formGroup}>
@@ -500,7 +502,7 @@ export default function ProfileSetupScreen({
 
         <SearchableSelect
           label="Mother Tongue"
-          options={MOTHER_TONGUES}
+          options={MOTHER_TONGUE_OPTIONS}
           selectedValue={formData.motherTongue || ""}
           placeholder="Select mother tongue"
           onValueChange={(v) => handleInputChange("motherTongue", v)}
@@ -508,7 +510,7 @@ export default function ProfileSetupScreen({
 
         <SearchableSelect
           label="Ethnicity"
-          options={ETHNICITIES}
+          options={ETHNICITY_OPTIONS}
           selectedValue={formData.ethnicity || ""}
           placeholder="Select ethnicity"
           onValueChange={(v) => handleInputChange("ethnicity", v)}
@@ -518,13 +520,12 @@ export default function ProfileSetupScreen({
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Religion</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.religion || ""}
-          onChangeText={(text) => handleInputChange("religion", text)}
-          placeholder="e.g., Hindu, Muslim, Christian, etc."
-          maxLength={50}
+        <SearchableSelect
+          label="Religion"
+          options={RELIGION_OPTIONS}
+          selectedValue={formData.religion || ""}
+          placeholder="Select religion"
+          onValueChange={(v) => handleInputChange("religion", v)}
         />
       </View>
 

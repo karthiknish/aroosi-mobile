@@ -1,16 +1,18 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
 
-// Import auth screens (to be created)
+// Import auth screens
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignUpScreen from "../screens/auth/SignUpScreen";
-// import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
+import ResetPasswordScreen from "../screens/auth/ResetPasswordScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 
 export type AuthStackParamList = {
   Login: undefined;
   SignUp: undefined;
   ForgotPassword: undefined;
+  ResetPassword: { token?: string } | undefined;
 };
 
 const Stack = createStackNavigator<AuthStackParamList>();
@@ -39,11 +41,16 @@ export default function AuthNavigator() {
         component={withScreenContainer(SignUpScreen)}
         options={{ headerShown: false }}
       />
-      {/* <Stack.Screen 
-        name="ForgotPassword" 
-        component={ForgotPasswordScreen}
-        options={{ title: 'Reset Password' }}
-      /> */}
+      <Stack.Screen
+        name="ForgotPassword"
+        component={withScreenContainer(ForgotPasswordScreen)}
+        options={{ headerShown: true, title: "Reset Password" }}
+      />
+      <Stack.Screen
+        name="ResetPassword"
+        component={withScreenContainer(ResetPasswordScreen)}
+        options={{ headerShown: true, title: "Reset Password" }}
+      />
     </Stack.Navigator>
   );
 }

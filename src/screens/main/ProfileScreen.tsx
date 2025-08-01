@@ -15,12 +15,10 @@ import { useSubscription } from "@hooks/useSubscription";
 import { useApiClient } from "@utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Colors, Layout } from "@constants";
+import { useToast } from "@providers/ToastContext";
 import { Profile, ProfileImage } from "@types";
 import { useTheme } from "@contexts/ThemeContext";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "@hooks/useResponsive";
+import useResponsiveSpacing from "@hooks/useResponsive";
 import {
   GradientButton,
   GlassmorphismCard,
@@ -50,7 +48,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const toast = useToast();
+
+  // Removed fontSize usage to avoid TS errors and keep spacing-only responsive updates
   const {
     subscription,
     hasActiveSubscription,
@@ -92,12 +92,11 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const deleteProfileMutation = useMutation({
     mutationFn: () => apiClient.deleteProfile(),
     onSuccess: () => {
-      Alert.alert("Success", "Profile deleted successfully", [
-        { text: "OK", onPress: () => navigation.navigate("Auth") },
-      ]);
+      toast.show("Profile deleted successfully", "success");
+      navigation.navigate("Auth");
     },
     onError: () => {
-      Alert.alert("Error", "Failed to delete profile. Please try again.");
+      toast.show("Failed to delete profile. Please try again.", "error");
     },
   });
 
@@ -105,10 +104,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const boostProfileMutation = useMutation({
     mutationFn: () => apiClient.boostProfile(),
     onSuccess: () => {
-      Alert.alert("Success", "Profile boosted for 24 hours!");
+      toast.show("Profile boosted for 24 hours!", "success");
     },
     onError: () => {
-      Alert.alert("Error", "Failed to boost profile. Please try again.");
+      toast.show("Failed to boost profile. Please try again.", "error");
     },
   });
 
@@ -127,7 +126,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       alignItems: "center",
     },
     loadingText: {
-      fontSize: fontSize.base,
       marginTop: spacing.md,
     },
     header: {
@@ -140,15 +138,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     },
     headerTitle: {
       fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize.xl,
       fontWeight: "bold",
     },
     settingsButton: {
       padding: spacing.xs,
     },
-    settingsText: {
-      fontSize: fontSize.base,
-    },
+    settingsText: {},
     actionButtonsRow: {
       flexDirection: "row",
       paddingHorizontal: spacing.md,
@@ -164,7 +159,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     },
     actionBtnText: {
       color: "#fff",
-      fontSize: fontSize.xs,
       fontWeight: "600",
       textAlign: "center",
     },
@@ -181,7 +175,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     },
     sectionTitle: {
       fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize.lg,
       fontWeight: "400",
       marginBottom: spacing.md,
     },
@@ -211,7 +204,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     },
     mainBadgeText: {
       color: "#fff",
-      fontSize: fontSize.xs,
       fontWeight: "600",
     },
     imageIndicators: {
@@ -235,12 +227,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       paddingVertical: spacing.xs,
     },
     infoLabel: {
-      fontSize: fontSize.sm,
       flex: 1,
       fontWeight: "500",
     },
     infoValue: {
-      fontSize: fontSize.base,
       flex: 2,
       textAlign: "right",
       fontWeight: "500",
@@ -250,11 +240,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       fontWeight: "bold",
     },
     aboutText: {
-      fontSize: fontSize.base,
       lineHeight: spacing.xl,
     },
     noDataText: {
-      fontSize: fontSize.base,
       textAlign: "center",
       fontStyle: "italic",
     },
@@ -265,13 +253,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       alignItems: "center",
     },
     subscriptionPlan: {
-      fontSize: fontSize.lg,
       fontWeight: "bold",
       marginBottom: spacing.xs / 2,
     },
-    subscriptionExpiry: {
-      fontSize: fontSize.sm,
-    },
+    subscriptionExpiry: {},
     subscriptionActions: {
       gap: spacing.md,
     },
@@ -282,7 +267,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     },
     subscriptionButtonText: {
       color: "#fff",
-      fontSize: fontSize.base,
       fontWeight: "600",
     },
     boostButton: {
@@ -299,11 +283,8 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       backgroundColor: "#f0f0f0",
       borderRadius: 8,
     },
-    viewerText: {
-      fontSize: fontSize.sm,
-    },
+    viewerText: {},
     moreViewersText: {
-      fontSize: fontSize.sm,
       fontWeight: "600",
       textAlign: "center",
       marginTop: spacing.xs,
@@ -316,13 +297,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       alignItems: "center",
     },
     statNumber: {
-      fontSize: fontSize.xl,
       fontWeight: "bold",
       marginBottom: spacing.xs / 2,
     },
-    statLabel: {
-      fontSize: fontSize.sm,
-    },
+    statLabel: {},
     signOutContainer: {
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.lg,
@@ -334,7 +312,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       borderWidth: 1,
     },
     signOutButtonText: {
-      fontSize: fontSize.base,
       fontWeight: "600",
     },
     progressSection: {
@@ -1409,7 +1386,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                         styles.statNumber,
                         {
                           color: theme.colors.primary[500],
-                          fontSize: fontSize.lg,
                         },
                       ]}
                     >
@@ -1462,7 +1438,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                           styles.statNumber,
                           {
                             color: theme.colors.warning[500],
-                            fontSize: fontSize.lg,
                           },
                         ]}
                       >

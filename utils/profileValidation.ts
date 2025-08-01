@@ -30,6 +30,7 @@ export const ValidationMessages = {
     maxLength: "City must not exceed 50 characters",
   },
   country: {
+    required: "Country is required",
     maxLength: "Country must not exceed 10 characters",
   },
   ukCity: {
@@ -60,6 +61,7 @@ export const ValidationMessages = {
   annualIncome: {
     required: "Annual income is required",
     min: "Income must be a positive number",
+    max: "Income must not exceed £1,000,000",
   },
   aboutMe: {
     required: "About me is required",
@@ -68,7 +70,7 @@ export const ValidationMessages = {
   },
   phoneNumber: {
     required: "Phone number is required",
-    invalid: "Please enter a valid UK phone number",
+    invalid: "Please enter a valid international phone number",
   },
   partnerPreferenceAgeMin: {
     min: "Minimum age must be at least 18",
@@ -85,8 +87,10 @@ export const ValidationMessages = {
 // Validation regex patterns
 const PATTERNS = {
   fullName: /^[a-zA-Z\s\-']+$/,
-  internationalPhone: /^[+]?\d{7,15}$/,
-  internationalPhoneWithSpaces: /^[+]?[\d\s-]{7,20}$/,
+  // E.164 core format: + and 1-15 digits, no spaces, must not start with 0 after +
+  e164: /^\+?[1-9]\d{1,14}$/,
+  // Allow user input with spaces/hyphens during typing; will be normalized before validation
+  e164Loose: /^\+?[1-9][\d\s-]{6,14}$/,
   ukPostcode: /^[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}$/i,
 };
 
@@ -132,7 +136,8 @@ export const validators = {
   },
 
   country: (value: string | undefined): string | null => {
-    if (value && value.length > 10) return ValidationMessages.country.maxLength;
+    if (!value?.trim()) return ValidationMessages.country.required;
+    if (value.length > 10) return ValidationMessages.country.maxLength;
     return null;
   },
 
@@ -181,6 +186,8 @@ export const validators = {
     if (value === undefined || value === null)
       return ValidationMessages.annualIncome.required;
     if (value < 0) return ValidationMessages.annualIncome.min;
+    // Optional upper cap to prevent unrealistic values
+    if (value > 10000000) return "Income must not exceed 10,000,000";
     return null;
   },
 
@@ -193,11 +200,13 @@ export const validators = {
 
   phoneNumber: (value: string | undefined): string | null => {
     if (!value?.trim()) return ValidationMessages.phoneNumber.required;
-    const cleanPhone = value.replace(/[\s-]/g, "");
-    if (
-      !PATTERNS.internationalPhone.test(cleanPhone) &&
-      !PATTERNS.internationalPhoneWithSpaces.test(value)
-    ) {
+    // Normalize: remove spaces/hyphens for validation
+    const normalized = value.replace(/[\s-]/g, "");
+    // Accept either strict E.164 or permissive input that normalizes to E.164
+    const valid =
+      PATTERNS.e164.test(normalized) ||
+      (PATTERNS.e164Loose.test(value) && PATTERNS.e164.test(normalized));
+    if (!valid) {
       return ValidationMessages.phoneNumber.invalid;
     }
     return null;
@@ -265,9 +274,9 @@ export function validateCreateProfile(
     }
   });
 
-  // Validate optional fields if provided
-  if (data.country) {
-    const error = validators.country(data.country);
+  // Country now required in onboarding
+  {
+    const error = validators.country(data.country as any);
     if (error) errors.country = error;
   }
 
@@ -304,10 +313,28 @@ export function validateUpdateProfile(
     }
   });
 
+  // Country is required on update as well - validate even if empty/undefined
+  {
+    const error = validators.country((data.country as any) ?? "");
+    if (error) errors.country = error;
+  }
+
+  // Country is required in updates as per product decision
+  if (data.country === undefined || data.country === "") {
+    const countryError = validators.country((data.country as unknown as string) ?? "");
+    if (countryError) errors.country = countryError;
+  }
+
   // Full name is required even for updates
   if (data.fullName !== undefined) {
     const fullNameError = validators.fullName(data.fullName);
     if (fullNameError) errors.fullName = fullNameError;
+  }
+
+  // Country is required on update as well
+  {
+    const countryError = validators.country(data.country as any);
+    if (countryError) errors.country = countryError;
   }
 
   // Special handling for partner preferences
@@ -353,14 +380,18 @@ export function isProfileComplete(
 
 // Format phone number for display
 export function formatPhoneNumber(phone: string): string {
-  const cleaned = phone.replace(/\D/g, "");
-  if (phone.startsWith("+")) {
-    return `+${cleaned}`;
-  }
-  return cleaned;
+  // Pretty minimal normalization for display: keep leading +, insert single spaces between groups of 3-4 for readability
+  const hasPlus = phone.trim().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
+  const core = hasPlus ? `+${digits}` : digits;
+  // Do not enforce specific country grouping; return compact E.164 display
+  return core;
 }
 
 // Clean phone number for storage
 export function cleanPhoneNumber(phone: string): string {
-  return phone.replace(/[\s-]/g, "");
+  // Produce E.164-compatible compact representation for transport/storage
+  const hasPlus = phone.trim().startsWith("+");
+  const digits = phone.replace(/\D/g, "");
+  return hasPlus ? `+${digits}` : digits;
 }

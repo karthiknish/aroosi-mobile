@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { signInWithGoogle } from "@services/googleAuth";
-import { Colors } from "@constants/Colors";
+import { Colors, Layout } from "@constants";
 
 interface SocialAuthButtonsProps {
   onGoogleSuccess?: () => void;
@@ -21,7 +21,7 @@ export default function SocialAuthButtons({
   onGoogleError,
 }: SocialAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
-  const { signInWithGoogle: authSignInWithGoogle } = useAuth();
+  const auth = useAuth();
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -29,8 +29,14 @@ export default function SocialAuthButtons({
       const result = await signInWithGoogle();
 
       if (result.success && result.idToken) {
-        // Send the Google ID token to your backend
-        const authResult = await authSignInWithGoogle(result.idToken);
+        // Send the Google ID token to your backend (if available in auth context)
+        if (!auth || typeof auth !== "object" || !("signInWithGoogle" in auth) || typeof (auth as any).signInWithGoogle !== "function") {
+          const errorMessage = "Google authentication is not available right now";
+          onGoogleError?.(errorMessage);
+          Alert.alert("Authentication Error", errorMessage);
+          return;
+        }
+        const authResult = await (auth as any).signInWithGoogle(result.idToken);
 
         if (authResult.success) {
           onGoogleSuccess?.();
@@ -45,9 +51,12 @@ export default function SocialAuthButtons({
         onGoogleError?.(errorMessage);
         Alert.alert("Authentication Error", errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google sign-in error:", error);
-      const errorMessage = "An unexpected error occurred during Google sign-in";
+      const errorMessage =
+        typeof error?.message === "string"
+          ? error.message
+          : "An unexpected error occurred during Google sign-in";
       onGoogleError?.(errorMessage);
       Alert.alert("Authentication Error", errorMessage);
     } finally {
@@ -78,15 +87,15 @@ export default function SocialAuthButtons({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    marginTop: 20,
+    marginTop: Layout.spacing.lg,
   },
   button: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    paddingVertical: Layout.spacing.md,
+    paddingHorizontal: Layout.spacing.lg,
+    borderRadius: Layout.radius.md,
     borderWidth: 1,
     borderColor: Colors.border.primary,
     backgroundColor: Colors.background.secondary,
@@ -97,8 +106,8 @@ const styles = StyleSheet.create({
     borderColor: "#4285F4",
   },
   buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.semibold,
     color: Colors.text.primary,
   },
   googleButtonText: {

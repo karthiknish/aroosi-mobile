@@ -27,110 +27,28 @@ import {
   formatHeight,
   cmToFeetInches,
   feetInchesToCm,
-} from "@types/profile";
+} from "../../../types/profile";
 import {
   validateUpdateProfile,
   formatPhoneNumber,
   cleanPhoneNumber,
 } from "@utils/profileValidation";
 import { Colors, Layout } from "@constants";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "@hooks/useResponsive";
+import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveTypography from "@hooks/useResponsive";
+import { useToast } from "@providers/ToastContext";
 import ImageUpload from "@components/profile/ImageUpload";
 import { COUNTRIES } from "@constants/countries";
 import SearchableSelect from "@components/SearchableSelect";
-import { MOTHER_TONGUES, ETHNICITIES } from "@constants/options";
+import {
+  MOTHER_TONGUE_OPTIONS,
+  RELIGION_OPTIONS,
+  ETHNICITY_OPTIONS,
+} from "../../../constants/languages";
 
 interface EditProfileScreenProps {
   navigation: any;
 }
-
-const GLOBAL_CITIES = [
-  "London",
-  "Manchester",
-  "Birmingham",
-  "Leeds",
-  "Glasgow",
-  "Sheffield",
-  "Bradford",
-  "Liverpool",
-  "Edinburgh",
-  "Bristol",
-  "Cardiff",
-  "Leicester",
-  "Wakefield",
-  "Coventry",
-  "Nottingham",
-  "Newcastle",
-  "Brighton",
-  "Hull",
-  "Plymouth",
-  "Stoke-on-Trent",
-  "Wolverhampton",
-  "Derby",
-  "Swansea",
-  "Southampton", // UK cities
-  "New York",
-  "Los Angeles",
-  "Chicago",
-  "Houston",
-  "Phoenix",
-  "Philadelphia",
-  "San Antonio",
-  "San Diego",
-  "Dallas",
-  "San Jose",
-  "Austin",
-  "Jacksonville",
-  "Fort Worth",
-  "Columbus",
-  "Charlotte",
-  "San Francisco",
-  "Indianapolis",
-  "Seattle",
-  "Denver",
-  "Washington",
-  "Boston", // US cities
-  "Toronto",
-  "Montreal",
-  "Vancouver",
-  "Calgary",
-  "Edmonton",
-  "Ottawa",
-  "Winnipeg",
-  "Quebec City", // Canadian cities
-  "Sydney",
-  "Melbourne",
-  "Brisbane",
-  "Perth",
-  "Adelaide",
-  "Gold Coast",
-  "Newcastle",
-  "Canberra", // Australian cities
-  "Kabul",
-  "Kandahar",
-  "Herat",
-  "Mazar-i-Sharif",
-  "Jalalabad",
-  "Kunduz",
-  "Ghazni",
-  "Balkh", // Afghan cities
-  "Dubai",
-  "Abu Dhabi",
-  "Sharjah",
-  "Al Ain",
-  "Ajman",
-  "Ras Al Khaimah",
-  "Fujairah", // UAE cities
-  "Doha",
-  "Al Rayyan",
-  "Al Wakrah",
-  "Al Khor",
-  "Umm Salal", // Qatar cities
-  "Other",
-];
 
 export default function EditProfileScreen({
   navigation,
@@ -139,8 +57,7 @@ export default function EditProfileScreen({
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
-
+  const toast = useToast();
   const [formData, setFormData] = useState<Partial<UpdateProfileData>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [heightFeet, setHeightFeet] = useState(5);
@@ -164,12 +81,11 @@ export default function EditProfileScreen({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
-      Alert.alert("Success", "Your profile has been updated successfully!", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
+      toast.show("Your profile has been updated successfully!", "success");
+      navigation.goBack();
     },
-    onError: (error) => {
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+    onError: () => {
+      toast.show("Failed to update profile. Please try again.", "error");
     },
   });
 
@@ -244,7 +160,7 @@ export default function EditProfileScreen({
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      Alert.alert("Validation Error", "Please fix the errors in the form.");
+      toast.show("Please fix the highlighted errors in the form.", "error");
       return;
     }
 
@@ -271,7 +187,12 @@ export default function EditProfileScreen({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+        ]}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.cancelButton}>Cancel</Text>
         </TouchableOpacity>
@@ -288,34 +209,46 @@ export default function EditProfileScreen({
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingHorizontal: spacing.lg }]}>
         {/* Basic Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Basic Information</Text>
+        <View style={[styles.section, { marginBottom: spacing.lg }]}>
+          <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>
+            Basic Information
+          </Text>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Full Name *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Full Name *
+            </Text>
             <TextInput
-              style={[styles.input, errors.fullName && styles.inputError]}
+              style={[
+                styles.input,
+                {
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                },
+                errors.fullName && styles.inputError,
+              ]}
               value={formData.fullName || ""}
               onChangeText={(text) => handleInputChange("fullName", text)}
               placeholder="Enter your full name"
               maxLength={100}
             />
             {errors.fullName && (
-              <Text style={styles.errorText}>{errors.fullName}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.fullName}
+              </Text>
             )}
           </View>
 
           {formData.religion !== undefined && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Religion</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.religion || ""}
-                onChangeText={(text) => handleInputChange("religion", text)}
-                placeholder="e.g., Hindu, Muslim, Christian, etc."
-                maxLength={50}
+            <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+              <SearchableSelect
+                label="Religion"
+                options={["muslim", "hindu", "sikh"]}
+                selectedValue={formData.religion || ""}
+                placeholder="Select religion"
+                onValueChange={(v) => handleInputChange("religion", v)}
               />
             </View>
           )}
@@ -323,7 +256,7 @@ export default function EditProfileScreen({
           {formData.motherTongue !== undefined && (
             <SearchableSelect
               label="Mother Tongue"
-              options={MOTHER_TONGUES}
+              options={MOTHER_TONGUE_OPTIONS}
               selectedValue={formData.motherTongue || ""}
               placeholder="Select mother tongue"
               onValueChange={(v) => handleInputChange("motherTongue", v)}
@@ -333,24 +266,30 @@ export default function EditProfileScreen({
           {formData.ethnicity !== undefined && (
             <SearchableSelect
               label="Ethnicity"
-              options={ETHNICITIES}
+              options={ETHNICITY_OPTIONS}
               selectedValue={formData.ethnicity || ""}
               placeholder="Select ethnicity"
               onValueChange={(v) => handleInputChange("ethnicity", v)}
             />
           )}
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Date of Birth *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Date of Birth *
+            </Text>
             <TouchableOpacity
-              style={[styles.input, styles.dateInput]}
+              style={[
+                styles.input,
+                styles.dateInput,
+                { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+              ]}
               onPress={() => setShowDatePicker(true)}
             >
               <Text
                 style={
                   formData.dateOfBirth
-                    ? styles.dateText
-                    : styles.placeholderText
+                    ? [styles.dateText]
+                    : [styles.placeholderText]
                 }
               >
                 {formData.dateOfBirth
@@ -361,13 +300,22 @@ export default function EditProfileScreen({
               </Text>
             </TouchableOpacity>
             {errors.dateOfBirth && (
-              <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.dateOfBirth}
+              </Text>
             )}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Gender *</Text>
-            <View style={styles.pickerContainer}>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Gender *
+            </Text>
+            <View
+              style={[
+                styles.pickerContainer,
+                { borderRadius: Layout.radius.md },
+              ]}
+            >
               <Picker
                 selectedValue={formData.gender}
                 onValueChange={(value) => handleInputChange("gender", value)}
@@ -380,13 +328,22 @@ export default function EditProfileScreen({
               </Picker>
             </View>
             {errors.gender && (
-              <Text style={styles.errorText}>{errors.gender}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.gender}
+              </Text>
             )}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Looking For *</Text>
-            <View style={styles.pickerContainer}>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Looking For *
+            </Text>
+            <View
+              style={[
+                styles.pickerContainer,
+                { borderRadius: Layout.radius.md },
+              ]}
+            >
               <Picker
                 selectedValue={formData.preferredGender}
                 onValueChange={(value) =>
@@ -401,24 +358,41 @@ export default function EditProfileScreen({
               </Picker>
             </View>
             {errors.preferredGender && (
-              <Text style={styles.errorText}>{errors.preferredGender}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.preferredGender}
+              </Text>
             )}
           </View>
         </View>
 
         {/* Location */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
+        <View style={[styles.section, { marginBottom: spacing.lg }]}>
+          <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>
+            Location
+          </Text>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>City *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              City *
+            </Text>
             <TextInput
-              style={[styles.input, errors.city && styles.inputError]}
+              style={[
+                styles.input,
+                {
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                },
+                errors.city && styles.inputError,
+              ]}
               value={formData.city || ""}
               onChangeText={(text) => handleInputChange("city", text)}
               placeholder="Enter city"
             />
-            {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
+            {errors.city && (
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.city}
+              </Text>
+            )}
           </View>
 
           <SearchableSelect
@@ -429,18 +403,25 @@ export default function EditProfileScreen({
             onValueChange={(value) => handleInputChange("country", value)}
             containerStyle={{ marginBottom: spacing.md }}
           />
+          {errors.country && (
+            <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+              {errors.country}
+            </Text>
+          )}
         </View>
 
         {/* Physical Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Physical Details</Text>
+        <View style={[styles.section, { marginBottom: spacing.lg }]}>
+          <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>
+            Physical Details
+          </Text>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
               Height * -{" "}
               {formatHeight(feetInchesToCm(heightFeet, heightInches))}
             </Text>
-            <View style={styles.heightSliders}>
+            <View style={[styles.heightSliders, { gap: spacing.md }]}>
               <View style={styles.sliderGroup}>
                 <Text style={styles.sliderLabel}>Feet</Text>
                 <View style={styles.pickerContainer}>
@@ -450,7 +431,11 @@ export default function EditProfileScreen({
                     style={styles.picker}
                   >
                     {[4, 5, 6].map((feet) => (
-                      <Picker.Item label={`${feet} ft`} value={feet} />
+                      <Picker.Item
+                        key={feet}
+                        label={`${feet} ft`}
+                        value={feet}
+                      />
                     ))}
                   </Picker>
                 </View>
@@ -464,20 +449,29 @@ export default function EditProfileScreen({
                     style={styles.picker}
                   >
                     {Array.from({ length: 12 }, (_, i) => (
-                      <Picker.Item label={`${i} in`} value={i} />
+                      <Picker.Item key={i} label={`${i} in`} value={i} />
                     ))}
                   </Picker>
                 </View>
               </View>
             </View>
             {errors.height && (
-              <Text style={styles.errorText}>{errors.height}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.height}
+              </Text>
             )}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Marital Status *</Text>
-            <View style={styles.pickerContainer}>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Marital Status *
+            </Text>
+            <View
+              style={[
+                styles.pickerContainer,
+                { borderRadius: Layout.radius.md },
+              ]}
+            >
               <Picker
                 selectedValue={formData.maritalStatus}
                 onValueChange={(value) =>
@@ -492,47 +486,82 @@ export default function EditProfileScreen({
               </Picker>
             </View>
             {errors.maritalStatus && (
-              <Text style={styles.errorText}>{errors.maritalStatus}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.maritalStatus}
+              </Text>
             )}
           </View>
         </View>
 
         {/* Professional Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Professional Details</Text>
+        <View style={[styles.section, { marginBottom: spacing.lg }]}>
+          <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>
+            Professional Details
+          </Text>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Education *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Education *
+            </Text>
             <TextInput
-              style={[styles.input, errors.education && styles.inputError]}
+              style={[
+                styles.input,
+                {
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                },
+                errors.education && styles.inputError,
+              ]}
               value={formData.education || ""}
               onChangeText={(text) => handleInputChange("education", text)}
               placeholder="e.g., Bachelor's in Computer Science"
               maxLength={100}
             />
             {errors.education && (
-              <Text style={styles.errorText}>{errors.education}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.education}
+              </Text>
             )}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Occupation *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Occupation *
+            </Text>
             <TextInput
-              style={[styles.input, errors.occupation && styles.inputError]}
+              style={[
+                styles.input,
+                {
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                },
+                errors.occupation && styles.inputError,
+              ]}
               value={formData.occupation || ""}
               onChangeText={(text) => handleInputChange("occupation", text)}
               placeholder="e.g., Software Engineer"
               maxLength={100}
             />
             {errors.occupation && (
-              <Text style={styles.errorText}>{errors.occupation}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.occupation}
+              </Text>
             )}
           </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Annual Income (£) *</Text>
+          <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+            <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+              Annual Income (£) *
+            </Text>
             <TextInput
-              style={[styles.input, errors.annualIncome && styles.inputError]}
+              style={[
+                styles.input,
+                {
+                  paddingHorizontal: spacing.md,
+                  paddingVertical: spacing.sm,
+                },
+                errors.annualIncome && styles.inputError,
+              ]}
               value={formData.annualIncome?.toString() || ""}
               onChangeText={(text) =>
                 handleInputChange("annualIncome", parseInt(text) || undefined)
@@ -541,20 +570,33 @@ export default function EditProfileScreen({
               keyboardType="numeric"
             />
             {errors.annualIncome && (
-              <Text style={styles.errorText}>{errors.annualIncome}</Text>
+              <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                {errors.annualIncome}
+              </Text>
             )}
           </View>
         </View>
 
         {/* Contact Information */}
         {formData.phoneNumber !== undefined && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact Information</Text>
+          <View style={[styles.section, { marginBottom: spacing.lg }]}>
+            <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>
+              Contact Information
+            </Text>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Phone Number *</Text>
+            <View style={[styles.formGroup, { marginBottom: spacing.md }]}>
+              <Text style={[styles.label, { marginBottom: spacing.sm }]}>
+                Phone Number *
+              </Text>
               <TextInput
-                style={[styles.input, errors.phoneNumber && styles.inputError]}
+                style={[
+                  styles.input,
+                  {
+                    paddingHorizontal: spacing.md,
+                    paddingVertical: spacing.sm,
+                  },
+                  errors.phoneNumber && styles.inputError,
+                ]}
                 value={
                   formData.phoneNumber
                     ? formatPhoneNumber(formData.phoneNumber)
@@ -566,7 +608,9 @@ export default function EditProfileScreen({
                 maxLength={20}
               />
               {errors.phoneNumber && (
-                <Text style={styles.errorText}>{errors.phoneNumber}</Text>
+                <Text style={[styles.errorText, { marginTop: spacing.xs }]}>
+                  {errors.phoneNumber}
+                </Text>
               )}
             </View>
           </View>
@@ -580,13 +624,12 @@ export default function EditProfileScreen({
 
             {formData.religion !== undefined && (
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Religion</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.religion || ""}
-                  onChangeText={(text) => handleInputChange("religion", text)}
-                  placeholder="e.g., Hindu, Muslim, Christian, etc."
-                  maxLength={50}
+                <SearchableSelect
+                  label="Religion"
+                  options={["muslim", "hindu", "sikh"]}
+                  selectedValue={formData.religion || ""}
+                  placeholder="Select religion"
+                  onValueChange={(v) => handleInputChange("religion", v)}
                 />
               </View>
             )}
@@ -921,7 +964,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: Layout.spacing.lg,
   },
   section: {
     marginTop: Layout.spacing.lg,

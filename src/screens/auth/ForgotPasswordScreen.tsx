@@ -1,25 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
-import { useNavigation } from "@react-navigation/native";
+import { Colors, Layout } from "@constants";
+import useResponsiveSpacing from "@hooks/useResponsive";
+import { GradientBackground } from "@/components/ui/GradientComponents";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
-import { Colors } from "@constants/Colors";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "@hooks/useResponsive";
-import ScreenContainer from "@components/common/ScreenContainer";
+import { useNavigation } from "@react-navigation/native";
+import { useToast } from "@providers/ToastContext";
 
 type ForgotPasswordScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -27,402 +25,155 @@ type ForgotPasswordScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const auth = useAuth();
+  const { requestPasswordReset } = useAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const fontSize = Layout.typography.fontSize;
+  const toast = useToast();
 
-  const onSendResetEmail = async () => {
-    if (!email.trim()) {
-      Alert.alert("Error", "Please enter your email address");
-      return;
+  const [email, setEmail] = useState("");
+  const [fieldError, setFieldError] = useState<string>("");
+
+  const onSubmit = async () => {
+    const emailTrimmed = email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    let error = "";
+    if (!emailTrimmed) {
+      error = "Email is required";
+    } else if (!emailRegex.test(emailTrimmed)) {
+      error = "Please enter a valid email address";
     }
+    setFieldError(error);
+    if (error) return;
 
-    setLoading(true);
     try {
-      // Call custom password reset API
-      const response = await fetch(
-        `${
-          process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api"
-        }/auth/forgot-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setEmailSent(true);
-        Alert.alert(
-          "Email Sent",
-          "Check your email for instructions to reset your password."
+      const res = await requestPasswordReset(emailTrimmed);
+      if (res.success) {
+        toast.show(
+          "If an account exists for this email, you'll receive a password reset link shortly.",
+          "success"
         );
+        navigation.goBack();
       } else {
-        Alert.alert("Error", data.error || "Failed to send reset email");
+        toast.show(res.error || "Unable to request password reset", "error");
       }
-    } catch (err: any) {
-      Alert.alert("Error", "Failed to send reset email");
-    }
-    setLoading(false);
-  };
-
-  const onVerifyAndReset = async (code: string, newPassword: string) => {
-    if (!code || !newPassword) {
-      Alert.alert(
-        "Error",
-        "Please enter both verification code and new password"
+    } catch (e) {
+      toast.show(
+        "An unexpected error occurred while requesting reset",
+        "error"
       );
-      return;
     }
-
-    setLoading(true);
-    try {
-      // Call custom password reset verification API
-      const response = await fetch(
-        `${
-          process.env.EXPO_PUBLIC_API_URL || "https://www.aroosi.app/api"
-        }/auth/reset-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            code,
-            newPassword,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        navigation.navigate("Login");
-        Alert.alert("Success", "Password reset successfully!");
-      } else {
-        Alert.alert("Error", data.error || "Failed to reset password");
-      }
-    } catch (err: any) {
-      Alert.alert("Error", "Failed to reset password");
-    }
-    setLoading(false);
   };
 
   const styles = StyleSheet.create({
-    container: {
+    container: { flex: 1 },
+    safeArea: { flex: 1 },
+    scroll: { flex: 1 },
+    scrollContent: { flexGrow: 1 },
+    inner: {
       flex: 1,
-      backgroundColor: Colors.background.primary,
-    },
-    contentStyle: {
-      flexGrow: 1,
-    },
-    keyboardAvoidingView: {
-      flex: 1,
-    },
-    scrollContent: {
-      flexGrow: 1,
       justifyContent: "center",
-      padding: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      paddingTop: spacing.xl * 2,
     },
-    header: {
-      marginBottom: spacing.xl * 2,
-      alignItems: "center",
-    },
+    header: { marginBottom: spacing.xl * 2 },
     title: {
-      fontSize: fontSize.xl,
-      fontWeight: "bold",
+      fontFamily: Layout.typography.fontFamily.serif,
+      fontSize: fontSize["2xl"],
       color: Colors.text.primary,
       marginBottom: spacing.xs,
     },
-    subtitle: {
-      fontSize: fontSize.base,
-      color: Colors.text.secondary,
-      textAlign: "center",
-      lineHeight: spacing.lg + 2,
-    },
-    form: {
-      width: "100%",
-    },
-    inputContainer: {
-      marginBottom: spacing.lg,
-    },
+    subtitle: { fontSize: fontSize.base, color: Colors.text.secondary },
+    form: { width: "100%" },
+    inputContainer: { marginBottom: spacing.lg },
     label: {
-      fontSize: fontSize.base,
-      fontWeight: "600",
+      fontSize: fontSize.sm,
       color: Colors.text.primary,
       marginBottom: spacing.xs,
-    },
-    input: {
-      borderWidth: 1,
-      borderColor: Colors.border.primary,
-      borderRadius: 8,
-      padding: spacing.md,
-      fontSize: fontSize.base,
-      backgroundColor: Colors.background.secondary,
-      color: Colors.text.primary,
-    },
-    button: {
-      backgroundColor: Colors.primary[500],
-      borderRadius: 8,
-      padding: spacing.md,
-      alignItems: "center",
-      marginTop: spacing.lg,
-    },
-    buttonDisabled: {
-      backgroundColor: Colors.neutral[300],
-    },
-    buttonText: {
-      color: Colors.text.inverse,
-      fontSize: fontSize.base,
-      fontWeight: "600",
-    },
-    backButton: {
-      alignItems: "center",
-      marginTop: spacing.lg,
-    },
-    backButtonText: {
-      color: Colors.primary[500],
-      fontSize: fontSize.base,
       fontWeight: "500",
     },
-  });
-
-  if (emailSent) {
-    return (
-      <ResetPasswordForm
-        onVerifyAndReset={onVerifyAndReset}
-        loading={loading}
-      />
-    );
-  }
-
-  return (
-    <ScreenContainer
-      containerStyle={styles.container}
-      contentStyle={styles.contentStyle}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>
-              Enter your email address and we'll send you instructions to reset
-              your password.
-            </Text>
-          </View>
-
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Email Address</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your email"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={onSendResetEmail}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Sending..." : "Send Reset Email"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.goBack()}
-            >
-              <Text style={styles.backButtonText}>Back to Login</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
-  );
-}
-
-interface ResetPasswordFormProps {
-  onVerifyAndReset: (code: string, newPassword: string) => void;
-  loading: boolean;
-}
-
-function ResetPasswordForm({ onVerifyAndReset, loading }: ResetPasswordFormProps) {
-  const [code, setCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
-
-  const handleSubmit = () => {
-    if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-    
-    if (newPassword.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters long');
-      return;
-    }
-
-    onVerifyAndReset(code, newPassword);
-  };
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: Colors.background.primary,
-    },
-    keyboardAvoidingView: {
-      flex: 1,
-    },
-    scrollContent: {
-      flexGrow: 1,
-      justifyContent: 'center',
-      padding: spacing.lg,
-    },
-    header: {
-      marginBottom: spacing.xl * 2,
-      alignItems: 'center',
-    },
-    title: {
-      fontSize: fontSize.xl,
-      fontWeight: 'bold',
-      color: Colors.text.primary,
-      marginBottom: spacing.xs,
-    },
-    subtitle: {
-      fontSize: fontSize.base,
-      color: Colors.text.secondary,
-      textAlign: 'center',
-      lineHeight: spacing.lg + 2,
-    },
-    form: {
-      width: '100%',
-    },
-    inputContainer: {
-      marginBottom: spacing.lg,
-    },
-    label: {
-      fontSize: fontSize.base,
-      fontWeight: '600',
-      color: Colors.text.primary,
-      marginBottom: spacing.xs,
-    },
     input: {
       borderWidth: 1,
       borderColor: Colors.border.primary,
       borderRadius: 8,
       padding: spacing.md,
       fontSize: fontSize.base,
-      backgroundColor: Colors.background.secondary,
       color: Colors.text.primary,
+      backgroundColor: "white",
     },
+    inputError: { borderColor: Colors.error[500] },
     button: {
       backgroundColor: Colors.primary[500],
       borderRadius: 8,
       padding: spacing.md,
-      alignItems: 'center',
+      alignItems: "center",
       marginTop: spacing.lg,
-    },
-    buttonDisabled: {
-      backgroundColor: Colors.neutral[300],
     },
     buttonText: {
       color: Colors.text.inverse,
       fontSize: fontSize.base,
-      fontWeight: '600',
+      fontWeight: "600",
+    },
+    errorText: {
+      color: Colors.error[500],
+      fontSize: fontSize.sm,
+      marginTop: spacing.xs,
     },
   });
 
   return (
-    <ScreenContainer
-      containerStyle={styles.container}
-      contentStyle={styles.scrollContent}
+    <GradientBackground
+      colors={Colors.gradient.secondary as any}
+      style={{ flex: 1 }}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Reset Password</Text>
-            <Text style={styles.subtitle}>
-              Enter the verification code from your email and your new password.
-            </Text>
-          </View>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.inner}>
+              <View style={styles.header}>
+                <Text style={styles.title}>Forgot Password</Text>
+                <Text style={styles.subtitle}>
+                  Enter your email address and we'll send you a reset link.
+                </Text>
+              </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Verification Code</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter verification code"
-                value={code}
-                onChangeText={setCode}
-                keyboardType="number-pad"
-                autoCapitalize="none"
-                editable={!loading}
-              />
+              <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Email</Text>
+                  <TextInput
+                    style={[styles.input, !!fieldError && styles.inputError]}
+                    placeholder="Enter your email"
+                    placeholderTextColor={Colors.text.secondary}
+                    value={email}
+                    onChangeText={(v) => {
+                      setEmail(v);
+                      if (fieldError) setFieldError("");
+                    }}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  {!!fieldError && (
+                    <Text style={styles.errorText}>{fieldError}</Text>
+                  )}
+                </View>
+
+                <TouchableOpacity style={styles.button} onPress={onSubmit}>
+                  <Text style={styles.buttonText}>Send Reset Link</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>New Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter new password"
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                editable={!loading}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoCapitalize="none"
-                editable={!loading}
-              />
-            </View>
-
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Resetting..." : "Reset Password"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }

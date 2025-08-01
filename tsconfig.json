@@ -21,7 +21,8 @@
       "@utils/*": ["./utils/*"],
       "@utils": ["./utils/index.ts"],
       "@types/*": ["./types/*"],
-      "@types": ["./types/index.ts"]
+      "@types": ["./types/index.ts"],
+      "@providers/*": ["./providers/*"]
     },
     "skipLibCheck": true
   }

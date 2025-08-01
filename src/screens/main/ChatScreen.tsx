@@ -18,10 +18,7 @@ import LoadingState from "../../../components/ui/LoadingState";
 import EmptyState from "../../../components/ui/EmptyState";
 import * as Haptics from "expo-haptics";
 // import ScreenContainer from "@components/common/ScreenContainer";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+import useResponsiveSpacing from "../../../hooks/useResponsive";
 
 // Import our new messaging system
 import { useConversationMessaging } from "../../../hooks/useOfflineMessaging";
@@ -67,7 +64,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const fontSize = Layout.typography.fontSize;
 
   // Use our new unified messaging system
   const {
@@ -120,10 +117,10 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       // Validate content first
       if (type === "text") {
         // Simple text validation
-        if (content.length > 1000) {
+        if (content.length > 500) {
           Alert.alert(
             "Message Too Long",
-            "Messages must be under 1000 characters"
+            "Messages must be under 500 characters"
           );
           return;
         }
@@ -628,9 +625,13 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 multiline
                 maxLength={500}
                 onSubmitEditing={() => {
-                  if (inputText.trim()) {
-                    handleSendMessage(inputText);
+                  const trimmed = inputText.trim();
+                  if (!trimmed) return;
+                  if (trimmed.length > 500) {
+                    Alert.alert("Message too long", "Messages are limited to 500 characters.");
+                    return;
                   }
+                  handleSendMessage(trimmed);
                 }}
                 returnKeyType="send"
               />
@@ -643,10 +644,14 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                     : styles.sendButtonInactive,
                 ]}
                 onPress={() => {
-                  if (inputText.trim()) {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    handleSendMessage(inputText);
+                  const trimmed = inputText.trim();
+                  if (!trimmed) return;
+                  if (trimmed.length > 500) {
+                    Alert.alert("Message too long", "Messages are limited to 500 characters.");
+                    return;
                   }
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleSendMessage(trimmed);
                 }}
                 disabled={!inputText.trim() || !canSend}
               >

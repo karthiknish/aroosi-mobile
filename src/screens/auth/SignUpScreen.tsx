@@ -5,21 +5,20 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  ScrollView,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useAuth } from "@contexts/AuthContext";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
 import { Colors, Layout } from "@constants";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "@hooks/useResponsive";
+import useResponsiveSpacing from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
+import { useToast } from "@providers/ToastContext";
 
 type SignUpScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -27,101 +26,107 @@ type SignUpScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function SignUpScreen() {
-  const { signUp, verifyOTP, isLoading: authLoading } = useAuth();
+  const { signUp, isLoading: authLoading } = useAuth();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const fontSize = Layout.typography.fontSize;
+  const toast = useToast();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [pendingVerification, setPendingVerification] = useState(false);
-  const [code, setCode] = useState("");
+  // OTP flow removed to match web session-cookie flow
   const [loading, setLoading] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
+  // Inline field error state
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const onSignUpPress = async () => {
-    if (
-      !emailAddress ||
-      !password ||
-      !confirmPassword ||
-      !firstName ||
-      !lastName
-    ) {
-      Alert.alert("Error", "Please fill in all fields");
-      return;
+    // Reset field errors
+    const errors: Record<string, string> = {};
+
+    // Basic required fields
+    if (!firstName.trim()) errors.firstName = "First name is required";
+    if (!lastName.trim()) errors.lastName = "Last name is required";
+
+    // Email format validation (client-side)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedEmail = emailAddress.trim().toLowerCase();
+    if (!normalizedEmail) {
+      errors.emailAddress = "Email is required";
+    } else if (!emailRegex.test(normalizedEmail)) {
+      errors.emailAddress = "Please enter a valid email address";
+    }
+
+    if (!password) {
+      errors.password = "Password is required";
+    } else if (password.length < 8) {
+      errors.password = "Password must be at least 8 characters";
+    }
+
+    if (!confirmPassword) {
+      errors.confirmPassword = "Confirm your password";
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
     }
 
     if (!termsAccepted) {
-      Alert.alert(
-        "Error",
-        "Please accept the Terms of Service and Privacy Policy"
-      );
-      return;
+      errors.terms = "You must accept the Terms of Service and Privacy Policy";
     }
 
-    if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
-      return;
-    }
+    setFieldErrors(errors);
 
-    if (password.length < 8) {
-      Alert.alert("Error", "Password must be at least 8 characters");
+    if (Object.keys(errors).length > 0) {
+      // Inline errors are rendered below inputs
       return;
     }
 
     setLoading(true);
     try {
-      const result = await signUp(emailAddress, password, firstName, lastName);
+      const result = await signUp(
+        normalizedEmail,
+        password,
+        firstName.trim(),
+        lastName.trim()
+      );
 
       if (result.success) {
-        setPendingVerification(true);
-        Alert.alert("Success", "Please check your email for verification code");
+        // Session cookie set by server; navigation handled by RootNavigator via useAuth()
+        toast?.show?.("Account created. Welcome to Aroosi!", "success");
       } else {
-        Alert.alert("Sign Up Failed", result.error || "An error occurred");
+        toast?.show?.(result.error || "Sign up failed", "error");
       }
     } catch (err: any) {
       console.error("Sign up error:", err);
-      Alert.alert("Sign Up Failed", "An unexpected error occurred");
+      toast?.show?.("An unexpected error occurred during sign up", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const onPressVerify = async () => {
-    if (!code) {
-      Alert.alert("Error", "Please enter the verification code");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await verifyOTP(emailAddress, code);
-
-      if (!result.success) {
-        Alert.alert(
-          "Verification Failed",
-          result.error || "Invalid verification code"
-        );
-      }
-      // Navigation will be handled by the auth context
-    } catch (err: any) {
-      console.error("Verification error:", err);
-      Alert.alert("Verification Failed", "An unexpected error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // OTP verification removed
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
     },
+    safeArea: {
+      flex: 1,
+    },
+    scroll: {
+      flex: 1,
+    },
     scrollContent: {
+      flexGrow: 1,
+    },
+    inner: {
+      flex: 1,
       justifyContent: "center",
-      padding: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
       paddingTop: spacing.xl * 2,
     },
     header: {
@@ -172,6 +177,14 @@ export default function SignUpScreen() {
       color: Colors.text.inverse,
       fontSize: fontSize.base,
       fontWeight: "600",
+    },
+    errorText: {
+      color: Colors.error[500],
+      fontSize: fontSize.sm,
+      marginTop: spacing.xs,
+    },
+    inputError: {
+      borderColor: Colors.error[500],
     },
     termsContainer: {
       flexDirection: "row",
@@ -239,13 +252,17 @@ export default function SignUpScreen() {
       colors={Colors.gradient.secondary as any}
       style={{ flex: 1 }}
     >
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <View style={styles.scrollContent}>
-          {!pendingVerification ? (
-            <>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.inner}>
               <View style={styles.header}>
                 <Text style={styles.title}>Create Account</Text>
                 <Text style={styles.subtitle}>
@@ -257,79 +274,126 @@ export default function SignUpScreen() {
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>First Name</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.firstName && styles.inputError]}
                     placeholder="Enter your first name"
                     placeholderTextColor={Colors.text.secondary}
                     value={firstName}
-                    onChangeText={setFirstName}
+                    onChangeText={(t) => {
+                      setFirstName(t);
+                      if (fieldErrors.firstName) {
+                        setFieldErrors((e) => ({ ...e, firstName: "" }));
+                      }
+                    }}
                     autoCapitalize="words"
                     editable={!loading}
                   />
+                  {!!fieldErrors.firstName && (
+                    <Text style={styles.errorText}>{fieldErrors.firstName}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Last Name</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.lastName && styles.inputError]}
                     placeholder="Enter your last name"
                     placeholderTextColor={Colors.text.secondary}
                     value={lastName}
-                    onChangeText={setLastName}
+                    onChangeText={(t) => {
+                      setLastName(t);
+                      if (fieldErrors.lastName) {
+                        setFieldErrors((e) => ({ ...e, lastName: "" }));
+                      }
+                    }}
                     autoCapitalize="words"
                     editable={!loading}
                   />
+                  {!!fieldErrors.lastName && (
+                    <Text style={styles.errorText}>{fieldErrors.lastName}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Email</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.emailAddress && styles.inputError]}
                     placeholder="Enter your email"
                     placeholderTextColor={Colors.text.secondary}
                     value={emailAddress}
-                    onChangeText={setEmailAddress}
+                    onChangeText={(t) => {
+                      setEmailAddress(t);
+                      if (fieldErrors.emailAddress) {
+                        setFieldErrors((e) => ({ ...e, emailAddress: "" }));
+                      }
+                    }}
                     autoCapitalize="none"
                     keyboardType="email-address"
                     editable={!loading}
                   />
+                  {!!fieldErrors.emailAddress && (
+                    <Text style={styles.errorText}>{fieldErrors.emailAddress}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Password</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.password && styles.inputError]}
                     placeholder="Create a password"
                     placeholderTextColor={Colors.text.secondary}
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={(t) => {
+                      setPassword(t);
+                      if (fieldErrors.password) {
+                        setFieldErrors((e) => ({ ...e, password: "" }));
+                      }
+                    }}
                     secureTextEntry
                     editable={!loading}
                   />
+                  {!!fieldErrors.password && (
+                    <Text style={styles.errorText}>{fieldErrors.password}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Confirm Password</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      fieldErrors.confirmPassword && styles.inputError,
+                    ]}
                     placeholder="Confirm your password"
                     placeholderTextColor={Colors.text.secondary}
                     value={confirmPassword}
-                    onChangeText={setConfirmPassword}
+                    onChangeText={(t) => {
+                      setConfirmPassword(t);
+                      if (fieldErrors.confirmPassword) {
+                        setFieldErrors((e) => ({ ...e, confirmPassword: "" }));
+                      }
+                    }}
                     secureTextEntry
                     editable={!loading}
                   />
+                  {!!fieldErrors.confirmPassword && (
+                    <Text style={styles.errorText}>
+                      {fieldErrors.confirmPassword}
+                    </Text>
+                  )}
                 </View>
 
                 <TouchableOpacity
                   style={styles.termsContainer}
-                  onPress={() => setTermsAccepted(!termsAccepted)}
+                  onPress={() => {
+                    setTermsAccepted(!termsAccepted);
+                    if (fieldErrors.terms) {
+                      setFieldErrors((e) => ({ ...e, terms: "" }));
+                    }
+                  }}
                   disabled={loading}
                 >
                   <View
-                    style={[
-                      styles.checkbox,
-                      termsAccepted && styles.checkboxChecked,
-                    ]}
+                    style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}
                   >
                     {termsAccepted && <Text style={styles.checkmark}>✓</Text>}
                   </View>
@@ -339,6 +403,11 @@ export default function SignUpScreen() {
                     <Text style={styles.termsLink}>Privacy Policy</Text>
                   </Text>
                 </TouchableOpacity>
+                {!!fieldErrors.terms && (
+                  <Text style={[styles.errorText, { marginTop: -spacing.sm }]}>
+                    {fieldErrors.terms}
+                  </Text>
+                )}
 
                 <TouchableOpacity
                   style={[styles.button, loading && styles.buttonDisabled]}
@@ -375,44 +444,10 @@ export default function SignUpScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.header}>
-                <Text style={styles.title}>Verify Email</Text>
-                <Text style={styles.subtitle}>
-                  We've sent a verification code to {emailAddress}
-                </Text>
-              </View>
-
-              <View style={styles.form}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Verification Code</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter verification code"
-                    placeholderTextColor={Colors.text.secondary}
-                    value={code}
-                    onChangeText={setCode}
-                    keyboardType="number-pad"
-                    editable={!loading}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
-                  onPress={onPressVerify}
-                  disabled={loading}
-                >
-                  <Text style={styles.buttonText}>
-                    {loading ? "Verifying..." : "Verify Email"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </KeyboardAvoidingView>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </GradientBackground>
   );
 }
