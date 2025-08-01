@@ -6,7 +6,6 @@ import {
   Modal,
   StyleSheet,
   Platform,
-  Alert,
   ActionSheetIOS,
   Dimensions,
 } from "react-native";
@@ -16,6 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, Colors, Layout } from "../../constants";
 import PlatformButton from "./PlatformButton";
+import { useToast } from "../../providers/ToastContext";
 
 interface PlatformPhotoPickerProps {
   onImageSelected: (uri: string) => void;
@@ -45,6 +45,7 @@ export default function PlatformPhotoPicker({
   title = "Select Photo",
 }: PlatformPhotoPickerProps) {
   const [showModal, setShowModal] = useState(false);
+  const toast = useToast();
 
   const requestPermissions = async () => {
     const { status: cameraStatus } =
@@ -62,10 +63,7 @@ export default function PlatformPhotoPicker({
     try {
       const permissions = await requestPermissions();
       if (!permissions.camera) {
-        Alert.alert(
-          "Permission Required",
-          "Camera permission is required to take photos."
-        );
+        toast.show("Camera permission is required to take photos.", "error");
         return;
       }
 
@@ -80,7 +78,7 @@ export default function PlatformPhotoPicker({
         onImageSelected(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to open camera");
+      toast.show("Failed to open camera", "error");
     }
     setShowModal(false);
   };
@@ -89,10 +87,7 @@ export default function PlatformPhotoPicker({
     try {
       const permissions = await requestPermissions();
       if (!permissions.media) {
-        Alert.alert(
-          "Permission Required",
-          "Media library permission is required to select photos."
-        );
+        toast.show("Media library permission is required to select photos.", "error");
         return;
       }
 
@@ -109,7 +104,7 @@ export default function PlatformPhotoPicker({
         onImageSelected(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to open gallery");
+      toast.show("Failed to open gallery", "error");
     }
     setShowModal(false);
   };

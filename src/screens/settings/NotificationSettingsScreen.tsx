@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
-  Alert,
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -26,6 +25,7 @@ import {
 import { Colors } from "../../../constants/Colors";
 import { Layout } from "../../../constants/Layout";
 import ScreenContainer from "@components/common/ScreenContainer";
+import { useToast } from "@providers/ToastContext";
 
 const STORAGE_KEY = "notification_preferences";
 
@@ -79,6 +79,8 @@ export default function NotificationSettingsScreen() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(
     defaultNotificationPreferences
   );
+  const toast = useToast();
+
   const [loading, setLoading] = useState(true);
   const [systemPermissionStatus, setSystemPermissionStatus] =
     useState<NotificationPermissionStatus>("undetermined");
@@ -123,9 +125,10 @@ export default function NotificationSettingsScreen() {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newPreferences));
       setPreferences(newPreferences);
+      toast.show("Notification preferences saved", "success");
     } catch (error) {
       console.error("Error saving notification preferences:", error);
-      Alert.alert("Error", "Failed to save notification preferences");
+      toast.show("Failed to save notification preferences", "error");
     }
   };
 
@@ -151,18 +154,9 @@ export default function NotificationSettingsScreen() {
         // Need to request system permission first
         const granted = await requestPermission();
         if (!granted) {
-          Alert.alert(
-            "Permission Required",
-            "Please enable notifications in your device settings to receive Aroosi notifications.",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Open Settings",
-                onPress: () =>
-                  NotificationPermissionsManager.showSettingsAlert(),
-              },
-            ]
-          );
+          // Guide user with toast and open settings
+          toast.show("Please enable notifications in system settings", "info");
+          NotificationPermissionsManager.showSettingsAlert();
           return;
         }
       }
@@ -181,6 +175,9 @@ export default function NotificationSettingsScreen() {
       // Register for push notifications if not already registered
       if (!isRegistered) {
         await registerForPushNotifications();
+        toast.show("Push notifications enabled", "success");
+      } else {
+        toast.show("Notifications enabled", "success");
       }
     } else {
       // User wants to disable all notifications
@@ -198,6 +195,7 @@ export default function NotificationSettingsScreen() {
 
       // Optionally unregister from push notifications
       // await unregisterFromPushNotifications();
+      toast.show("Notifications disabled", "info");
     }
   };
 
@@ -212,32 +210,16 @@ export default function NotificationSettingsScreen() {
     savePreferences(newPreferences);
   };
 
-  /**
-   * Test notification functionality
-   */
-  const testNotifications = async (): Promise<void> => {
-    if (systemPermissionStatus !== "granted") {
-      Alert.alert("Permission Required", "Please enable notifications first");
-      return;
-    }
-
-    try {
-      await NotificationHandler.createTestNotification("new_match");
-      Alert.alert("Test Sent", "Check your notifications!");
-    } catch (error) {
-      Alert.alert("Error", "Failed to send test notification");
-    }
-  };
 
   /**
    * Clear all notifications and badge
    */
   const clearAllNotifications = async (): Promise<void> => {
     try {
-      await NotificationHandler.clearAllNotifications();
-      Alert.alert("Cleared", "All notifications have been cleared");
+      await NotificationHandler.cancelAllNotifications();
+      toast.show("All notifications cleared", "success");
     } catch (error) {
-      Alert.alert("Error", "Failed to clear notifications");
+      toast.show("Failed to clear notifications", "error");
     }
   };
 
@@ -398,7 +380,7 @@ export default function NotificationSettingsScreen() {
       {/* Sound & Vibration Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sound & Vibration</Text>
-
+ 
         <SettingsRow
           title="Sound"
           description="Play sound for notifications"
@@ -406,7 +388,7 @@ export default function NotificationSettingsScreen() {
           onToggle={(value) => handleNotificationTypeToggle("sound", value)}
           disabled={!notificationsEnabled}
         />
-
+ 
         <SettingsRow
           title="Vibration"
           description="Vibrate for notifications"
@@ -415,29 +397,11 @@ export default function NotificationSettingsScreen() {
           disabled={!notificationsEnabled}
         />
       </View>
-
-      {/* Testing Section */}
+ 
+      {/* Notification Management */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Testing & Management</Text>
-
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            !notificationsEnabled && styles.disabledButton,
-          ]}
-          onPress={testNotifications}
-          disabled={!notificationsEnabled}
-        >
-          <Text
-            style={[
-              styles.actionButtonText,
-              !notificationsEnabled && styles.disabledText,
-            ]}
-          >
-            Send Test Notification
-          </Text>
-        </TouchableOpacity>
-
+        <Text style={styles.sectionTitle}>Notification Management</Text>
+ 
         <TouchableOpacity
           style={styles.actionButton}
           onPress={clearAllNotifications}

@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Alert,
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
@@ -14,6 +13,8 @@ import { launchImageLibrary, MediaType, ImagePickerResponse } from 'react-native
 import { useImageUpload, validateImage } from '../../hooks/useImageUpload';
 import { ProfileImage, IMAGE_VALIDATION } from '../../types/image';
 import { Colors, Layout } from '../../constants';
+import { useToast } from '../../providers/ToastContext';
+import ConfirmModal from '../../components/ui/ConfirmModal';
 
 interface ImageUploadProps {
   title?: string;
@@ -44,6 +45,9 @@ export default function ImageUpload({
   } = useImageUpload();
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const toast = useToast();
 
   // Notify parent component of image changes
   React.useEffect(() => {
@@ -52,11 +56,7 @@ export default function ImageUpload({
 
   const handleImagePicker = () => {
     if (images.length >= maxImages) {
-      Alert.alert(
-        'Maximum Images Reached',
-        `You can only upload up to ${maxImages} images.`,
-        [{ text: 'OK' }]
-      );
+      toast.show(`You can only upload up to ${maxImages} images.`, 'info');
       return;
     }
 
@@ -85,7 +85,7 @@ export default function ImageUpload({
       // Validate image
       const validationError = validateImage(imageResult);
       if (validationError) {
-        Alert.alert('Invalid Image', validationError);
+        toast.show(validationError, 'error');
         return;
       }
 
@@ -97,22 +97,26 @@ export default function ImageUpload({
   };
 
   const handleDeleteImage = (imageId: string) => {
-    Alert.alert(
-      'Delete Image',
-      'Are you sure you want to delete this image?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteImage(imageId).catch((error) => {
-              // Error handling is done in the hook
-            });
-          },
-        },
-      ]
-    );
+    setPendingDeleteId(imageId);
+    setConfirmVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    try {
+      await deleteImage(pendingDeleteId);
+      toast.show('Image deleted.', 'success');
+    } catch (e) {
+      // Hook handles error toast/alerts if any
+    } finally {
+      setConfirmVisible(false);
+      setPendingDeleteId(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setConfirmVisible(false);
+    setPendingDeleteId(null);
   };
 
   const renderImageItem = (image: ProfileImage, index: number) => (
@@ -300,7 +304,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: Layout.typography.fontSize.base,
     fontWeight: 'bold',
     lineHeight: 16,
   },
@@ -332,7 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.secondary,
   },
   addButtonIcon: {
-    fontSize: 32,
+    fontSize: Layout.typography.fontSize["2xl"],
     color: Colors.primary[500],
     marginBottom: Layout.spacing.xs,
   },

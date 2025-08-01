@@ -30,7 +30,7 @@ import {
   feetInchesToCm,
   ProfileFor,
 } from "../../../types/profile";
-
+import { useToast } from "@providers/ToastContext";
 import { COUNTRIES } from "@constants/countries";
 import {
   validateCreateProfile,
@@ -41,7 +41,11 @@ import { Colors, Layout } from "@constants";
 import LocalImageUpload from "@components/profile/LocalImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
-import { MOTHER_TONGUE_OPTIONS, RELIGION_OPTIONS, ETHNICITY_OPTIONS } from "../../../constants/languages";
+import {
+  MOTHER_TONGUE_OPTIONS,
+  RELIGION_OPTIONS,
+  ETHNICITY_OPTIONS,
+} from "../../../constants/languages";
 
 interface ProfileSetupScreenProps {
   navigation: any;
@@ -76,9 +80,10 @@ export default function ProfileSetupScreen({
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Create profile mutation
+  const toast = useToast();
+
   const createProfileMutation = useMutation({
     mutationFn: async (profileData: CreateProfileData) => {
-      // Include local image IDs for later upload after authentication
       const profileDataWithImages = {
         ...profileData,
         profileImageIds: formData.localImageIds || [],
@@ -86,22 +91,16 @@ export default function ProfileSetupScreen({
       return apiClient.createProfile(profileDataWithImages);
     },
     onSuccess: () => {
-      // After successful profile creation, local images will be handled
-      // by the authentication flow when user logs in
       if (formData.localImageIds && formData.localImageIds.length > 0) {
         console.log(
           "Profile created with local images, will upload after authentication"
         );
       }
-
-      Alert.alert(
-        "Profile Created!",
-        "Your profile has been created successfully. You can now start browsing.",
-        [{ text: "OK", onPress: () => navigation.navigate("Main") }]
-      );
+      toast.show("Your profile has been created successfully.", "success");
+      navigation.navigate("Main");
     },
-    onError: (error) => {
-      Alert.alert("Error", "Failed to create profile. Please try again.");
+    onError: () => {
+      toast.show("Failed to create profile. Please try again.", "error");
     },
   });
 
@@ -176,7 +175,7 @@ export default function ProfileSetupScreen({
     setErrors(validationErrors);
 
     if (Object.keys(validationErrors).length > 0) {
-      Alert.alert("Validation Error", "Please complete all required fields.");
+      toast.show("Please complete all required fields.", "error");
       return;
     }
 

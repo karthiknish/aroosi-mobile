@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import {
   initConnection,
@@ -44,7 +44,7 @@ import {
 const PLATFORM: AppPlatform = Platform.OS === "ios" ? "ios" : "android";
 
 export const useInAppPurchase = (): UsePurchaseReturn => {
-  const { userId, getToken } = useAuth();
+  const { userId, token } = useAuth() as any;
   const apiClient = useApiClient();
 
   // State
@@ -259,11 +259,8 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
             }));
           }
 
-          Alert.alert(
-            "Purchase Successful",
-            "Your subscription has been activated successfully!",
-            [{ text: "OK" }]
-          );
+          // Previously used Alert to notify success. Replace with non-blocking log or integrate toast in UI layer.
+          console.log("Purchase Successful: Subscription activated successfully");
         } else {
           // Purchase validation failed
           setState((prev) => ({
@@ -275,11 +272,8 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
             },
           }));
 
-          Alert.alert(
-            "Purchase Failed",
-            "There was an issue validating your purchase. Please contact support.",
-            [{ text: "OK" }]
-          );
+          // Previously used Alert to notify validation failure. Replace with non-blocking log or integrate toast in UI layer.
+          console.log("Purchase Failed: Issue validating purchase. Please contact support.");
         }
       } catch (error) {
         console.error("Error handling purchase update:", error);
@@ -306,9 +300,9 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
       error: purchaseError,
     }));
 
-    // Show user-friendly error message
+    // Previously used Alert to show user-facing error; avoid direct UI here.
     if (purchaseError.type !== "UserCancel") {
-      Alert.alert("Purchase Error", purchaseError.message, [{ text: "OK" }]);
+      console.log("Purchase Error:", purchaseError.message);
     }
   }, []);
 
@@ -400,7 +394,6 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
           };
         }
 
-        const token = await getToken();
         if (!token) {
           return {
             success: false,
@@ -433,8 +426,7 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         };
 
         const response = await apiClient.validatePurchase(
-          validationRequest,
-          token
+          validationRequest
         );
 
         const data = response.data as unknown;
@@ -463,7 +455,7 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         };
       }
     },
-    [userId, getToken, apiClient]
+    [userId, token, apiClient]
   );
 
   // Get current subscription status
@@ -474,7 +466,6 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
           return { isActive: false, plan: "free" };
         }
 
-        const token = await getToken();
         if (!token) {
           return { isActive: false, plan: "free" };
         }
@@ -494,16 +485,14 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         console.error("Error getting subscription status:", error);
         return { isActive: false, plan: "free" };
       }
-    }, [userId, getToken, apiClient]);
+    }, [userId, token, apiClient]);
 
   // Cancel subscription
   const cancelSubscription = useCallback(async (): Promise<boolean> => {
     try {
       if (!userId) return false;
 
-      const token = await getToken();
-      if (!token) return false;
-
+      // Cookie-session based auth: proceed without bearer token
       const response = await apiClient.cancelSubscription();
 
       if (response.success) {
@@ -525,7 +514,7 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
       console.error("Error canceling subscription:", error);
       return false;
     }
-  }, [userId, getToken, apiClient]);
+  }, [userId, token, apiClient]);
 
   // Utility functions
   const isProductOwned = useCallback(

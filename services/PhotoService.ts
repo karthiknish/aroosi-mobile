@@ -1,11 +1,12 @@
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { Alert, Image } from "react-native";
+import { Image } from "react-native";
 import { enhancedApiClient } from "../utils/enhancedApiClient";
 import { ProfileImage } from "../types/image";
 import { errorHandler, AppError } from "../utils/errorHandling";
 import { networkManager } from "../utils/NetworkManager";
 import { offlineImageQueue } from "../utils/OfflineImageQueue";
+// Removed util toast usage. Services remain UI-agnostic; UI surfaces messages via ToastContext.
 
 export interface PhotoUploadResult {
   success: boolean;
@@ -48,11 +49,7 @@ export class PhotoService {
       const cameraPermission =
         await ImagePicker.requestCameraPermissionsAsync();
       if (cameraPermission.status !== "granted") {
-        Alert.alert(
-          "Camera Permission Required",
-          "Please allow camera access to take photos for your profile.",
-          [{ text: "OK" }]
-        );
+        // UI should surface a toast; service returns false to signal denial
         return false;
       }
 
@@ -60,11 +57,7 @@ export class PhotoService {
       const mediaPermission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (mediaPermission.status !== "granted") {
-        Alert.alert(
-          "Photo Library Permission Required",
-          "Please allow photo library access to select photos for your profile.",
-          [{ text: "OK" }]
-        );
+        // UI should surface a toast; service returns false to signal denial
         return false;
       }
 
@@ -79,19 +72,9 @@ export class PhotoService {
    * Show photo selection options (camera or library)
    */
   showPhotoOptions(): Promise<ImagePicker.ImagePickerResult | null> {
-    return new Promise((resolve) => {
-      Alert.alert("Add Photo", "Choose how you want to add your photo", [
-        { text: "Cancel", style: "cancel", onPress: () => resolve(null) },
-        {
-          text: "Take Photo",
-          onPress: () => this.openCamera().then(resolve),
-        },
-        {
-          text: "Choose from Library",
-          onPress: () => this.openImageLibrary().then(resolve),
-        },
-      ]);
-    });
+    // Non-blocking UX preferred; if callers expect a chooser, they should present UI.
+    // For backward compatibility, open image library by default.
+    return this.openImageLibrary();
   }
 
   /**
@@ -113,7 +96,7 @@ export class PhotoService {
       return result;
     } catch (error) {
       console.error("Error opening camera:", error);
-      Alert.alert("Error", "Failed to open camera. Please try again.");
+      // UI should surface a toast based on returned null
       return null;
     }
   }
@@ -137,7 +120,7 @@ export class PhotoService {
       return result;
     } catch (error) {
       console.error("Error opening image library:", error);
-      Alert.alert("Error", "Failed to open photo library. Please try again.");
+      // UI should surface a toast based on returned null
       return null;
     }
   }
@@ -224,7 +207,7 @@ export class PhotoService {
       };
     } catch (error) {
       console.error("Error processing image:", error);
-      Alert.alert("Error", "Failed to process image. Please try again.");
+      // UI should surface a toast based on returned null
       return null;
     }
   }
@@ -396,10 +379,7 @@ export class PhotoService {
         (width, height) => {
           // Check minimum dimensions
           if (width < 200 || height < 200) {
-            Alert.alert(
-              "Image Too Small",
-              "Please select an image that is at least 200x200 pixels."
-            );
+            // UI should surface a toast via caller; we only return validation result
             resolve(false);
             return;
           }
@@ -408,10 +388,7 @@ export class PhotoService {
         },
         (error) => {
           console.error("Error getting image size:", error);
-          Alert.alert(
-            "Error",
-            "Invalid image file. Please select a different photo."
-          );
+          // UI should surface a toast via caller; we only return validation result
           resolve(false);
         }
       );

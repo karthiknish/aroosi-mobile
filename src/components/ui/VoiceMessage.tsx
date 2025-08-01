@@ -4,8 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
-  Alert,
+  Dimensions
 } from "react-native";
 import {
   createAudioPlayer,
@@ -25,8 +24,8 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { Colors } from "@constants/Colors";
-
+import { Colors, fontSize } from "@constants";
+import { useToast } from "@providers/ToastContext";
 const { width: screenWidth } = Dimensions.get("window");
 
 interface VoiceMessageProps {
@@ -56,6 +55,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   onPause,
   style,
 }) => {
+  const toast = useToast();
   const [player, setPlayer] = useState<AudioPlayer | null>(null);
   const status = useAudioPlayerStatus(player);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -89,7 +89,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       setPlayer(newPlayer);
     } catch (error) {
       console.error("Error loading audio:", error);
-      Alert.alert("Error", "Failed to load audio message");
+      const toast = useToast();
+      toast.show("Failed to load audio message", "error");
     } finally {
       setIsLoading(false);
     }
@@ -240,6 +241,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   maxDuration = 60000, // 60 seconds
   style,
 }) => {
+  const toast = useToast();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -262,10 +264,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (permissionGranted) return true;
     const status = await AudioModule.requestRecordingPermissionsAsync();
     if (!status.granted) {
-      Alert.alert(
-        "Permission required",
-        "Please grant microphone permission to record voice messages."
-      );
+      toast.show("Microphone permission is required to record voice messages.", "error");
       return false;
     }
     setPermissionGranted(true);
@@ -317,7 +316,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (err) {
       console.error("Failed to start recording", err);
-      Alert.alert("Error", "Failed to start recording");
+      toast.show("Failed to start recording", "error");
     }
   };
 
@@ -500,7 +499,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   durationText: {
-    fontSize: 12,
+    fontSize: fontSize.xs,
     fontWeight: "500",
   },
   recorderContainer: {
@@ -523,7 +522,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: Colors.background.primary,
-    fontSize: 16,
+    fontSize: fontSize.base,
     fontWeight: "600",
   },
   recordingIndicator: {
@@ -562,7 +561,7 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     color: Colors.background.primary,
-    fontSize: 16,
+    fontSize: fontSize.base,
   },
   startRecordButton: {
     width: 50,
@@ -573,11 +572,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   startRecordButtonText: {
-    fontSize: 20,
+    fontSize: fontSize.lg,
   },
   recordingDuration: {
     marginTop: 8,
-    fontSize: 14,
+    fontSize: fontSize.sm,
     color: Colors.text.secondary,
     fontWeight: "500",
   },

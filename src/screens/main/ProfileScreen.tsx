@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   Dimensions,
   ActivityIndicator,
 } from "react-native";
@@ -18,7 +17,9 @@ import { Colors, Layout } from "@constants";
 import { useToast } from "@providers/ToastContext";
 import { Profile, ProfileImage } from "@types";
 import { useTheme } from "@contexts/ThemeContext";
-import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@hooks/useResponsive";
 import {
   GradientButton,
   GlassmorphismCard,
@@ -35,6 +36,7 @@ import {
 } from "@/components/ui/AnimatedComponents";
 import * as Haptics from "expo-haptics";
 import ScreenContainer from "@components/common/ScreenContainer";
+import ConfirmModal from "@components/ui/ConfirmModal";
 
 const { width } = Dimensions.get("window");
 
@@ -48,7 +50,10 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const toast = useToast();
+  const [showBoostConfirm, setShowBoostConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Removed fontSize usage to avoid TS errors and keep spacing-only responsive updates
   const {
@@ -343,54 +348,25 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   const handleBoostProfile = () => {
     if (!hasActiveSubscription) {
-      Alert.alert(
-        "Premium Required",
-        "Profile boost is available for premium members only.",
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Upgrade", onPress: handleViewSubscription },
-        ]
+      // Replace premium gating alert with navigation to subscription and a toast
+      toast.show(
+        "Boost is a premium feature. Please upgrade your plan.",
+        "info"
       );
+      handleViewSubscription();
       return;
     }
-
-    Alert.alert(
-      "Boost Profile",
-      "Boost your profile for 24 hours to get more visibility?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Boost", onPress: () => boostProfileMutation.mutate() },
-      ]
-    );
+    setShowBoostConfirm(true);
   };
 
   const handleDeleteProfile = () => {
-    Alert.alert(
-      "Delete Profile",
-      "This action cannot be undone. Are you sure you want to delete your profile?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteProfileMutation.mutate(),
-        },
-      ]
-    );
+    setShowDeleteConfirm(true);
   };
 
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          // Sign out logic will be handled by Clerk
-          navigation.navigate("Auth");
-        },
-      },
-    ]);
+    setShowSignOutConfirm(true);
   };
 
   const calculateAge = (dateOfBirth: string) => {
@@ -447,6 +423,49 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       containerStyle={{ backgroundColor: theme.colors.background.primary }}
       contentStyle={styles.contentStyle}
     >
+      {/* Confirm Modals */}
+      <ConfirmModal
+        visible={showBoostConfirm}
+        title="Boost Profile"
+        message="Boost your profile for 24 hours to get more visibility."
+        confirmLabel="Boost"
+        cancelLabel="Cancel"
+        destructive={false}
+        onCancel={() => setShowBoostConfirm(false)}
+        onConfirm={() => {
+          setShowBoostConfirm(false);
+          boostProfileMutation.mutate();
+        }}
+      />
+      <ConfirmModal
+        visible={showDeleteConfirm}
+        title="Delete Profile"
+        message="This action cannot be undone. Are you sure you want to delete your profile?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          deleteProfileMutation.mutate();
+        }}
+      />
+
+      {/* Sign Out Confirm */}
+      <ConfirmModal
+        visible={showSignOutConfirm}
+        title="Sign Out"
+        message="Are you sure you want to sign out?"
+        confirmLabel="Sign Out"
+        cancelLabel="Cancel"
+        destructive
+        onCancel={() => setShowSignOutConfirm(false)}
+        onConfirm={() => {
+          setShowSignOutConfirm(false);
+          navigation.navigate("Auth");
+        }}
+      />
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View

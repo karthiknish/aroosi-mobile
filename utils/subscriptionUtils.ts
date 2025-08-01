@@ -1,4 +1,4 @@
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
 import { inAppPurchaseManager } from "./inAppPurchases";
 import { useApiClient } from "./api";
 
@@ -94,18 +94,37 @@ export function getSubscriptionStoreName(): string {
 }
 
 /**
- * Show platform-specific subscription management instructions
+ * Return platform-specific subscription management instructions (UI-agnostic)
  */
-export function showSubscriptionManagementInstructions(): void {
+export function getSubscriptionManagementInstructions(): {
+  title: string;
+  message: string;
+  storeName: string;
+} {
   const storeName = getSubscriptionStoreName();
-  const instructions =
+  const message =
     Platform.OS === "ios"
       ? `To manage your subscription:\n\n1. Open Settings on your device\n2. Tap your name at the top\n3. Tap "Subscriptions"\n4. Find "Aroosi" and tap it\n5. Make changes as needed`
       : `To manage your subscription:\n\n1. Open Google Play Store\n2. Tap Menu → Subscriptions\n3. Find "Aroosi" and tap it\n4. Make changes as needed`;
+  return {
+    title: `Manage Subscription - ${storeName}`,
+    message,
+    storeName,
+  };
+}
 
-  Alert.alert(`Manage Subscription - ${storeName}`, instructions, [
-    { text: "OK" },
-  ]);
+/**
+ * Deprecated: use getSubscriptionManagementInstructions() and show toast/modal in UI
+ */
+export function showSubscriptionManagementInstructions(): {
+  title: string;
+  message: string;
+  storeName: string;
+} {
+  console.warn(
+    "showSubscriptionManagementInstructions is deprecated. Use getSubscriptionManagementInstructions() and render UI in the component layer."
+  );
+  return getSubscriptionManagementInstructions();
 }
 
 /**

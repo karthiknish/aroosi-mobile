@@ -1,9 +1,10 @@
 // Responsive hooks
-export { 
-  useResponsive, 
-  useResponsiveValue, 
-  useResponsiveSpacing, 
-  useResponsiveTypography 
+export {
+  useResponsive,
+  useResponsiveValue,
+  useResponsiveSpacing,
+  useResponsiveTypography,
+  useBreakpoint
 } from './useResponsive';
 
 // Theme hooks

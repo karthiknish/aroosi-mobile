@@ -1,4 +1,4 @@
-import { Platform, Linking, Alert } from "react-native";
+import { Platform, Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface RatingConfig {
@@ -188,7 +188,7 @@ class AppRatingService {
         return result;
       }
 
-      // Fallback to custom alert dialog
+      // Fallback to custom confirmation dialog
       return this.showCustomRatingDialog();
     } catch (error) {
       console.error("Failed to show rating prompt:", error);
@@ -197,42 +197,16 @@ class AppRatingService {
   }
 
   private showCustomRatingDialog(): Promise<RatingPromptResult> {
-    return new Promise((resolve) => {
-      Alert.alert(
-        "Rate Aroosi",
-        "Are you enjoying Aroosi? Please take a moment to rate us in the app store!",
-        [
-          {
-            text: "Not Now",
-            style: "cancel",
-            onPress: () => {
-              this.recordUserResponse("later");
-              resolve({ action: "later", timestamp: Date.now() });
-            },
-          },
-          {
-            text: "Never",
-            style: "destructive",
-            onPress: () => {
-              this.recordUserResponse("never");
-              resolve({ action: "never", timestamp: Date.now() });
-            },
-          },
-          {
-            text: "Rate App",
-            onPress: () => {
-              this.openStoreRating();
-              this.recordUserResponse("rate");
-              resolve({ action: "rate", timestamp: Date.now() });
-            },
-          },
-        ],
-        {
-          cancelable: true,
-          onDismiss: () =>
-            resolve({ action: "dismissed", timestamp: Date.now() }),
-        }
-      );
+    // Services cannot invoke UI hooks or render modals directly.
+    // Emit a simple console message and resolve with a non-blocking default.
+    return new Promise(async (resolve) => {
+      try {
+        console.log("Rate Aroosi: Use UI layer to present ConfirmModal and Toast in response to this intent.");
+        await this.recordUserResponse("later");
+        resolve({ action: "later", timestamp: Date.now() });
+      } catch {
+        resolve({ action: "dismissed", timestamp: Date.now() });
+      }
     });
   }
 

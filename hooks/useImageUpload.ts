@@ -8,7 +8,6 @@ import {
   IMAGE_VALIDATION,
   ImagePickerResult,
 } from "../types/image";
-import { Alert } from "react-native";
 import { ApiResponse } from "../types/profile";
 
 export interface UseImageUploadReturn {
@@ -145,7 +144,7 @@ export function useImageUpload(): UseImageUploadReturn {
     },
     onError: (error: any) => {
       setUploadProgress(0);
-      Alert.alert("Upload Error", error?.message || String(error));
+      console.error("Upload Error:", error?.message || String(error));
     },
   });
 
@@ -174,7 +173,7 @@ export function useImageUpload(): UseImageUploadReturn {
       queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
     },
     onError: (error: any) => {
-      Alert.alert("Delete Error", error?.message || String(error));
+      console.error("Delete Error:", error?.message || String(error));
     },
   });
 
@@ -203,7 +202,7 @@ export function useImageUpload(): UseImageUploadReturn {
       queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
     },
     onError: (error: any) => {
-      Alert.alert("Reorder Error", error?.message || String(error));
+      console.error("Reorder Error:", error?.message || String(error));
     },
   });
 

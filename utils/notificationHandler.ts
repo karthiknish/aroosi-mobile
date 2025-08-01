@@ -60,7 +60,10 @@ export class NotificationHandler {
           shouldShowAlert: true,
           shouldPlaySound: true,
           shouldSetBadge: true,
-        }),
+          // Added for SDKs requiring explicit banner/list flags
+          shouldShowBanner: true as any,
+          shouldShowList: true as any,
+        } as any),
       });
 
       this.isInitialized = true;
@@ -134,6 +137,24 @@ export class NotificationHandler {
   }
 }
 
+export namespace NotificationHandler {
+  // Backwards-compatible facade for legacy imports expecting NotificationHandler.clearAll()
+  export async function clearAll(): Promise<void> {
+    // Cancel all scheduled notifications and clear delivered notifications and badge
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      await Notifications.dismissAllNotificationsAsync?.();
+    } catch (e) {
+      console.warn("Failed to cancel/dismiss notifications:", e);
+    }
+    try {
+      await Notifications.setBadgeCountAsync(0);
+    } catch {
+      // ignore if platform doesn't support badges
+    }
+  }
+}
+
 export class NotificationManager {
   private static instance: NotificationManager;
   private token: string | null = null;
@@ -161,7 +182,10 @@ export class NotificationManager {
             shouldShowAlert: shouldShow,
             shouldPlaySound: shouldShow && this.preferences.sound,
             shouldSetBadge: true,
-          };
+            // Added for SDKs requiring explicit banner/list flags
+            shouldShowBanner: shouldShow as any,
+            shouldShowList: shouldShow as any,
+          } as any;
         },
       });
 
@@ -249,8 +273,11 @@ export class NotificationManager {
           data: data.data || {},
           sound: this.preferences.sound ? "default" : undefined,
         },
-        trigger: delay > 0 ? { seconds: delay } : null,
-      });
+        trigger:
+          delay > 0
+            ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delay }
+            : null,
+      } as any);
     } catch (error) {
       console.error("Failed to schedule local notification:", error);
     }
@@ -341,7 +368,7 @@ export class NotificationManager {
   private async handleNotificationReceived(
     notification: Notifications.Notification
   ): Promise<void> {
-    const data = notification.request.content.data as NotificationData;
+    const data = notification.request.content.data as unknown as NotificationData;
 
     // Update badge count for messages
     if (data.type === "message") {
@@ -353,7 +380,7 @@ export class NotificationManager {
   private handleNotificationTapped(
     response: Notifications.NotificationResponse
   ): void {
-    const data = response.notification.request.content.data as NotificationData;
+    const data = response.notification.request.content.data as unknown as NotificationData;
 
     // Navigate based on notification type
     NotificationHandler.handleDeepLink(data);
@@ -362,7 +389,7 @@ export class NotificationManager {
   private async shouldShowNotification(
     notification: Notifications.Notification
   ): Promise<boolean> {
-    const data = notification.request.content.data as NotificationData;
+    const data = notification.request.content.data as unknown as NotificationData;
 
     // Check if notification type is enabled
     if (!this.shouldAllowNotification(data.type)) {

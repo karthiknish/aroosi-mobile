@@ -13,7 +13,7 @@ import UsageDashboard from "@components/subscription/UsageDashboard";
 import UpgradeConfirmationModal from "@components/subscription/UpgradeConfirmationModal";
 import { Colors, Layout } from "../../../constants";
 import { SubscriptionPlan, PlanFeature } from "../../../types/subscription";
-
+import { useToast } from "@providers/ToastContext";
 interface SubscriptionScreenProps {
   navigation: any;
 }
@@ -96,6 +96,7 @@ export default function SubscriptionScreen({
   } = useSubscription();
 
   const currentTier = subscription?.tier || "free";
+  const toast = useToast();
 
   const handlePurchase = async (tier: string) => {
     const targetPlan = SUBSCRIPTION_PLANS.find((plan) => plan.tier === tier);
@@ -114,17 +115,15 @@ export default function SubscriptionScreen({
       const success = await purchaseSubscription(tier);
 
       if (success) {
-        Alert.alert(
-          "Success!",
-          "Your subscription has been activated. Enjoy your premium features!",
-          [{ text: "OK" }]
+        toast.show(
+          "Your subscription has been activated. Enjoy premium features!",
+          "success"
         );
         setSelectedPlan(null);
       } else {
-        Alert.alert(
-          "Purchase Failed",
+        toast.show(
           "There was an issue processing your purchase. Please try again.",
-          [{ text: "OK" }]
+          "error"
         );
       }
     } catch (error: any) {
@@ -132,7 +131,7 @@ export default function SubscriptionScreen({
         typeof error?.message === "string"
           ? error.message
           : "Something went wrong. Please try again later.";
-      Alert.alert("Error", message, [{ text: "OK" }]);
+      toast.show(message, "error");
     } finally {
       setPurchasing(null);
     }
@@ -146,17 +145,16 @@ export default function SubscriptionScreen({
         setShowUpgradeModal(false);
         setUpgradeTarget(null);
         setSelectedPlan(null);
+        toast.show("Your plan has been upgraded.", "success");
       }
       return success;
     } catch (error: any) {
       console.error("Upgrade error:", error);
-      Alert.alert(
-        "Upgrade Error",
+      const message =
         typeof error?.message === "string"
           ? error.message
-          : "An unexpected error occurred while upgrading.",
-        [{ text: "OK" }]
-      );
+          : "An unexpected error occurred while upgrading.";
+      toast.show(message, "error");
       return false;
     } finally {
       setPurchasing(null);
@@ -175,10 +173,14 @@ export default function SubscriptionScreen({
           onPress: async () => {
             const success = await cancelSubscription();
             if (success) {
-              Alert.alert(
-                "Subscription Cancelled",
-                "Your subscription has been cancelled. You will continue to have access until the end of your current billing period.",
-                [{ text: "OK" }]
+              toast.show(
+                "Your subscription has been cancelled. You'll retain access until the end of the current period.",
+                "success"
+              );
+            } else {
+              toast.show(
+                "Unable to cancel subscription. Please try again.",
+                "error"
               );
             }
           },
@@ -191,26 +193,16 @@ export default function SubscriptionScreen({
     try {
       const success = await restorePurchases();
       if (success) {
-        Alert.alert(
-          "Purchases Restored",
-          "Your previous purchases have been restored.",
-          [{ text: "OK" }]
-        );
+        toast.show("Your previous purchases have been restored.", "success");
       } else {
-        Alert.alert(
-          "No Purchases Found",
-          "No previous purchases were found to restore.",
-          [{ text: "OK" }]
-        );
+        toast.show("No previous purchases were found to restore.", "info");
       }
     } catch (error: any) {
-      Alert.alert(
-        "Restore Error",
+      const message =
         typeof error?.message === "string"
           ? error.message
-          : "We couldn't restore purchases at this time.",
-        [{ text: "OK" }]
-      );
+          : "We couldn't restore purchases at this time.";
+      toast.show(message, "error");
     }
   };
 
@@ -332,7 +324,8 @@ export default function SubscriptionScreen({
             )}
           </TouchableOpacity>
           <Text style={styles.purchaseHelpText}>
-            You can cancel anytime from Settings. Your plan will auto-renew each month.
+            You can cancel anytime from Settings. Your plan will auto-renew each
+            month.
           </Text>
         </View>
       )}

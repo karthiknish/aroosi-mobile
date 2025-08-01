@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import {
   FeatureLimits,
   FeatureUsage,
@@ -25,11 +24,14 @@ export interface FeatureGateResult {
   upgradeRequired?: boolean;
   showUpgradePrompt?: boolean;
 }
-
+ 
 export interface FeatureGateOptions {
+  // Deprecated: UI should handle toasts/modals at call sites
   showAlert?: boolean;
   customMessage?: string;
   onUpgradePrompt?: () => void;
+  // New: allow callers to receive a UI message to toast
+  onDisallowedMessage?: (title: string, message: string, upgrade: boolean) => void;
 }
 
 class FeatureGateManager {
@@ -49,11 +51,17 @@ class FeatureGateManager {
       usage,
       limits
     );
-
-    if (!result.allowed && options.showAlert) {
-      this.showFeatureGateAlert(action, result, options);
+ 
+    // No direct UI side-effects in utils; pass message via callback if provided
+    if (!result.allowed && options.onDisallowedMessage) {
+      const { title, message } = this.composeDisallowedMessage(
+        action,
+        result,
+        options.customMessage
+      );
+      options.onDisallowedMessage(title, message, !!result.upgradeRequired);
     }
-
+ 
     return result;
   }
 
@@ -220,31 +228,17 @@ class FeatureGateManager {
   }
 
   /**
-   * Show feature gate alert to user
+   * Compose UI message details for disallowed access
    */
-  private showFeatureGateAlert(
+  private composeDisallowedMessage(
     action: FeatureAction,
     result: FeatureGateResult,
-    options: FeatureGateOptions
-  ): void {
+    customMessage?: string
+  ): { title: string; message: string } {
     const message =
-      options.customMessage || result.reason || "This feature is not available";
-
-    const buttons = [{ text: "OK", style: "default" as const }];
-
-    if (result.showUpgradePrompt && options.onUpgradePrompt) {
-      buttons.push({
-        text: "Upgrade",
-        style: "default" as const,
-      });
-    }
-
-    Alert.alert(this.getFeatureTitle(action), message, buttons);
-    // If upgrade prompt was shown, call the handler after alert (workaround)
-    if (result.showUpgradePrompt && options.onUpgradePrompt) {
-      // This will be called after the alert is dismissed, not on button press
-      setTimeout(() => options.onUpgradePrompt?.(), 500);
-    }
+      customMessage || result.reason || "This feature is not available";
+    const title = this.getFeatureTitle(action);
+    return { title, message };
   }
 
   /**

@@ -17,7 +17,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 
 type LoginScreenNavigationProp = StackNavigationProp<
@@ -29,7 +29,7 @@ export default function LoginScreen() {
   const { signIn, isLoading: authLoading } = useAuth();
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
-  const fontSize = Layout.typography.fontSize;
+  const { fontSize } = useResponsiveTypography();
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");

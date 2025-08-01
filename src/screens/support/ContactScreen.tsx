@@ -5,16 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   Linking,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Layout } from "../../../constants";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+import { Colors, Layout } from "@constants";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import ContactForm from "@components/contact/ContactForm";
 import ScreenContainer from "@components/common/ScreenContainer";
+import { useToast } from "@providers/ToastContext";
 
 interface ContactScreenProps {
   navigation: any;
@@ -23,6 +20,7 @@ interface ContactScreenProps {
 export default function ContactScreen({ navigation }: ContactScreenProps) {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
+  const toast = useToast();
 
   const handleSubmitSuccess = () => {
     // Navigate back or to a success screen
@@ -43,20 +41,12 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
         if (supported) {
           return Linking.openURL(url);
         } else {
-          Alert.alert(
-            "Email Not Available",
-            `Please send an email to: ${email}`,
-            [{ text: "OK" }]
-          );
+          toast.show(`Email app not available. Please email: ${email}`, "info");
         }
       })
       .catch((err) => {
         console.error("Error opening email:", err);
-        Alert.alert(
-          "Email Not Available",
-          `Please send an email to: ${email}`,
-          [{ text: "OK" }]
-        );
+        toast.show(`Email app not available. Please email: ${email}`, "error");
       });
   };
 
@@ -122,13 +112,13 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       borderColor: Colors.border.primary,
     },
     alternativeTitle: {
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
       fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.sm,
     },
     alternativeText: {
-      fontSize: fontSize.sm,
+      fontSize: Layout.typography.fontSize.sm,
       color: Colors.text.secondary,
       lineHeight: 20,
       marginBottom: spacing.md,
@@ -142,7 +132,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       gap: spacing.sm,
     },
     contactMethodText: {
-      fontSize: fontSize.sm,
+      fontSize: Layout.typography.fontSize.sm,
       color: Colors.text.primary,
       flex: 1,
     },
@@ -155,7 +145,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       marginTop: spacing.md,
     },
     responseTimeText: {
-      fontSize: fontSize.xs,
+      fontSize: Layout.typography.fontSize.xs,
       color: Colors.success[700],
       textAlign: "center",
       fontWeight: "500",

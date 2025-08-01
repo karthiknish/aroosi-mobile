@@ -25,7 +25,7 @@ import { useConversationMessaging } from "../../../hooks/useOfflineMessaging";
 import { useSubscription } from "../../../hooks/useSubscription";
 import { Message } from "../../../types/message";
 import { OfflineMessageStatus } from "../../../components/messaging/OfflineMessageStatus";
-
+import { useToast } from "@providers/ToastContext";
 // Import voice messaging components
 import { VoiceMessageDisplay } from "../../../components/messaging/VoiceMessage";
 import { VoiceRecorder } from "../../../components/messaging/VoiceRecorder";
@@ -65,7 +65,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [isTyping, setIsTyping] = useState(false);
   const { spacing } = useResponsiveSpacing();
   const fontSize = Layout.typography.fontSize;
-
+  const toast = useToast();
   // Use our new unified messaging system
   const {
     messages,
@@ -176,7 +176,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       }
     } catch (error) {
       console.error("Failed to send message:", error);
-      Alert.alert("Error", "Failed to send message. Please try again.");
+      if (toast) {
+        toast.show("Failed to send message. Please try again.", "error");
+      }
     }
   };
 
@@ -628,7 +630,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                   const trimmed = inputText.trim();
                   if (!trimmed) return;
                   if (trimmed.length > 500) {
-                    Alert.alert("Message too long", "Messages are limited to 500 characters.");
+                    if (toast) {
+                      toast.show(
+                        "Messages are limited to 500 characters.",
+                        "info"
+                      );
+                    }
                     return;
                   }
                   handleSendMessage(trimmed);
@@ -647,7 +654,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                   const trimmed = inputText.trim();
                   if (!trimmed) return;
                   if (trimmed.length > 500) {
-                    Alert.alert("Message too long", "Messages are limited to 500 characters.");
+                    if (toast) {
+                      toast.show(
+                        "Messages are limited to 500 characters.",
+                        "info"
+                      );
+                    }
                     return;
                   }
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

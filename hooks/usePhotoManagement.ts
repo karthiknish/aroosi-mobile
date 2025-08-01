@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { Alert } from "react-native";
 import { useEnhancedApiClient } from "../utils/enhancedApiClient";
 import { photoService, PhotoUploadResult } from "../services/PhotoService";
 import { ProfileImage } from "../types/image";
 import { useAuth } from "../contexts/AuthContext";
+import { useToast } from "../providers/ToastContext";
+import { fontSize } from "../constants";
 
 export interface UsePhotoManagementResult {
   // Data
@@ -36,6 +37,7 @@ const MAX_PHOTOS = 5;
 export function usePhotoManagement(): UsePhotoManagementResult {
   const apiClient = useEnhancedApiClient();
   const { user } = useAuth();
+  const toast = useToast();
   const [images, setImages] = useState<ProfileImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -60,6 +62,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
       }
     } catch (error) {
       console.error("Error loading images:", error);
+      toast.show("Failed to load images.", "error");
     } finally {
       setLoading(false);
     }
@@ -68,12 +71,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
   // Add a new photo
   const addPhoto = useCallback(async (): Promise<boolean> => {
     if (uploading || images.length >= MAX_PHOTOS) {
-      if (images.length >= MAX_PHOTOS) {
-        Alert.alert(
-          "Photo Limit Reached",
-          `You can only have up to ${MAX_PHOTOS} photos. Please delete a photo first.`
-        );
-      }
+      toast.show(`You can only upload up to ${MAX_PHOTOS} photos.`, "info");
       return false;
     }
 
@@ -83,19 +81,16 @@ export function usePhotoManagement(): UsePhotoManagementResult {
       const result: PhotoUploadResult = await photoService.addPhoto(user?.id);
 
       if (result.success && result.imageId) {
-        // Reload images to get the updated list
         await loadImages();
+        toast.show("Photo added.", "success");
         return true;
       } else {
-        Alert.alert(
-          "Upload Failed",
-          result.error || "Failed to upload photo. Please try again."
-        );
+        toast.show("Failed to add photo.", "error");
         return false;
       }
     } catch (error) {
       console.error("Error adding photo:", error);
-      Alert.alert("Error", "Failed to add photo. Please try again.");
+      toast.show("An error occurred while adding photo.", "error");
       return false;
     } finally {
       setUploading(false);
@@ -107,54 +102,28 @@ export function usePhotoManagement(): UsePhotoManagementResult {
     async (imageId: string): Promise<boolean> => {
       if (deleting) return false;
 
-      return new Promise((resolve) => {
-        Alert.alert(
-          "Delete Photo",
-          "Are you sure you want to delete this photo?",
-          [
-            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-            {
-              text: "Delete",
-              style: "destructive",
-              onPress: async () => {
-                try {
-                  setDeleting(imageId);
+      try {
+        setDeleting(imageId);
+        const response = await apiClient.deleteProfileImage({
+          userId: user?.id || "",
+          imageId,
+        });
 
-                  const response = await apiClient.deleteProfileImage({
-                    userId: user?.id || "",
-                    imageId,
-                  });
-
-                  if (response.success) {
-                    // Remove from local state
-                    setImages((prev) =>
-                      prev.filter((img) => img.id !== imageId)
-                    );
-                    resolve(true);
-                  } else {
-                    Alert.alert(
-                      "Error",
-                      typeof response.error === "string"
-                        ? response.error
-                        : "Failed to delete photo"
-                    );
-                    resolve(false);
-                  }
-                } catch (error) {
-                  console.error("Error deleting photo:", error);
-                  Alert.alert(
-                    "Error",
-                    "Failed to delete photo. Please try again."
-                  );
-                  resolve(false);
-                } finally {
-                  setDeleting(null);
-                }
-              },
-            },
-          ]
-        );
-      });
+        if (response.success) {
+          setImages((prev) => prev.filter((img) => img.id !== imageId));
+          toast.show("Photo deleted.", "success");
+          return true;
+        } else {
+          toast.show("Failed to delete photo.", "error");
+          return false;
+        }
+      } catch (error) {
+        console.error("Error deleting photo:", error);
+        toast.show("An error occurred while deleting photo.", "error");
+        return false;
+      } finally {
+        setDeleting(null);
+      }
     },
     [deleting, apiClient]
   );
@@ -179,22 +148,16 @@ export function usePhotoManagement(): UsePhotoManagementResult {
         const response = await apiClient.updateImageOrder(imageIds);
 
         if (!response.success) {
-          // Revert on failure
           await loadImages();
-          Alert.alert(
-            "Error",
-            typeof response.error === "string"
-              ? response.error
-              : "Failed to reorder photos"
-          );
+          toast.show("Failed to reorder photos.", "error");
           return false;
         }
 
         return true;
       } catch (error) {
         console.error("Error reordering photos:", error);
-        await loadImages(); // Revert on error
-        Alert.alert("Error", "Failed to reorder photos. Please try again.");
+        await loadImages();
+        toast.show("An error occurred while reordering.", "error");
         return false;
       } finally {
         setReordering(false);
@@ -210,26 +173,21 @@ export function usePhotoManagement(): UsePhotoManagementResult {
         const response = await apiClient.setMainProfileImage(imageId);
 
         if (response.success) {
-          // Update local state
           setImages((prev) =>
             prev.map((img) => ({
               ...img,
               isMain: img.id === imageId,
             }))
           );
+          toast.show("Set as main photo.", "success");
           return true;
         } else {
-          Alert.alert(
-            "Error",
-            typeof response.error === "string"
-              ? response.error
-              : "Failed to set main photo"
-          );
+          toast.show("Failed to set main photo.", "error");
           return false;
         }
       } catch (error) {
         console.error("Error setting main photo:", error);
-        Alert.alert("Error", "Failed to set main photo. Please try again.");
+        toast.show("An error occurred while setting main photo.", "error");
         return false;
       }
     },
@@ -241,60 +199,33 @@ export function usePhotoManagement(): UsePhotoManagementResult {
     async (imageIds: string[]): Promise<boolean> => {
       if (deleting || imageIds.length === 0) return false;
 
-      return new Promise((resolve) => {
-        Alert.alert(
-          "Delete Photos",
-          `Are you sure you want to delete ${imageIds.length} photo(s)?`,
-          [
-            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-            {
-              text: "Delete",
-              style: "destructive",
-              onPress: async () => {
-                try {
-                  setDeleting("batch");
+      try {
+        if (imageIds.length === 0) return false;
+        setDeleting("batch");
 
-                  // Use batch operation if available, otherwise delete individually
-                  const operations = imageIds.map((imageId) => ({
-                    type: "delete",
-                    imageId,
-                    userId: user?.id || "",
-                  }));
+        const operations = imageIds.map((imageId) => ({
+          type: "delete",
+          imageId,
+          userId: user?.id || "",
+        }));
 
-                  const response = await apiClient.batchProfileImageOperations(
-                    operations
-                  );
+        const response = await apiClient.batchProfileImageOperations(operations);
 
-                  if (response.success) {
-                    // Remove from local state
-                    setImages((prev) =>
-                      prev.filter((img) => !imageIds.includes(img.id))
-                    );
-                    resolve(true);
-                  } else {
-                    Alert.alert(
-                      "Error",
-                      typeof response.error === "string"
-                        ? response.error
-                        : "Failed to delete photos"
-                    );
-                    resolve(false);
-                  }
-                } catch (error) {
-                  console.error("Error batch deleting photos:", error);
-                  Alert.alert(
-                    "Error",
-                    "Failed to delete photos. Please try again."
-                  );
-                  resolve(false);
-                } finally {
-                  setDeleting(null);
-                }
-              },
-            },
-          ]
-        );
-      });
+        if (response.success) {
+          setImages((prev) => prev.filter((img) => !imageIds.includes(img.id)));
+          toast.show("Selected photos deleted.", "success");
+          return true;
+        } else {
+          toast.show("Batch delete failed.", "error");
+          return false;
+        }
+      } catch (error) {
+        console.error("Error batch deleting photos:", error);
+        toast.show("An error occurred while deleting photos.", "error");
+        return false;
+      } finally {
+        setDeleting(null);
+      }
     },
     [deleting, apiClient, user?.id]
   );
@@ -308,10 +239,6 @@ export function usePhotoManagement(): UsePhotoManagementResult {
 
         if (blob.size > 5 * 1024 * 1024) {
           // 5MB limit
-          Alert.alert(
-            "File Too Large",
-            "Please select an image smaller than 5MB."
-          );
           return false;
         }
 

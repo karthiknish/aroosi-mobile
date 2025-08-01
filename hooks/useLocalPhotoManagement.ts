@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ImageType } from "../types/image";
 import { IMAGE_VALIDATION } from "../types/image";
@@ -45,7 +44,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
 
         // For local validation, we'll use basic checks
         if (!imageUri) {
-          Alert.alert("Invalid Image", "Please select a valid image.");
           return false;
         }
 
@@ -54,10 +52,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
         const allowedExtensions = ["jpg", "jpeg", "png", "webp"];
 
         if (!extension || !allowedExtensions.includes(extension)) {
-          Alert.alert(
-            "Invalid Format",
-            "Please select an image in JPG, PNG, or WebP format."
-          );
           return false;
         }
 
@@ -73,10 +67,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
   // Add a new photo locally
   const addPhoto = useCallback(async (): Promise<boolean> => {
     if (images.length >= MAX_PHOTOS) {
-      Alert.alert(
-        "Photo Limit Reached",
-        `You can only have up to ${MAX_PHOTOS} photos. Please delete a photo first.`
-      );
       return false;
     }
 
@@ -87,10 +77,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Please allow access to your photos to upload images."
-        );
         return false;
       }
 
@@ -129,7 +115,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
       return false;
     } catch (error) {
       console.error("Error adding photo:", error);
-      Alert.alert("Error", "Failed to add photo. Please try again.");
       return false;
     } finally {
       setUploading(false);
@@ -138,42 +123,19 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
 
   // Delete a photo locally
   const deletePhoto = useCallback(async (imageId: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      Alert.alert(
-        "Delete Photo",
-        "Are you sure you want to delete this photo?",
-        [
-          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
-          {
-            text: "Delete",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                setImages((prev) => {
-                  const newImages = prev.filter((img) => img.id !== imageId);
-                  // If we deleted the main photo and there are still photos, set a new main
-                  if (
-                    newImages.length > 0 &&
-                    !newImages.some((img) => img.isMain)
-                  ) {
-                    newImages[0].isMain = true;
-                  }
-                  return newImages;
-                });
-                resolve(true);
-              } catch (error) {
-                console.error("Error deleting photo:", error);
-                Alert.alert(
-                  "Error",
-                  "Failed to delete photo. Please try again."
-                );
-                resolve(false);
-              }
-            },
-          },
-        ]
-      );
-    });
+    try {
+      setImages((prev) => {
+        const newImages = prev.filter((img) => img.id !== imageId);
+        if (newImages.length > 0 && !newImages.some((img) => img.isMain)) {
+          newImages[0].isMain = true;
+        }
+        return newImages;
+      });
+      return true;
+    } catch (error) {
+      console.error("Error deleting photo:", error);
+      return false;
+    }
   }, []);
 
   // Reorder photos locally
@@ -184,7 +146,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
         return true;
       } catch (error) {
         console.error("Error reordering photos:", error);
-        Alert.alert("Error", "Failed to reorder photos. Please try again.");
         return false;
       }
     },
@@ -204,7 +165,6 @@ export function useLocalPhotoManagement(): UseLocalPhotoManagementResult {
         return true;
       } catch (error) {
         console.error("Error setting main photo:", error);
-        Alert.alert("Error", "Failed to set main photo. Please try again.");
         return false;
       }
     },

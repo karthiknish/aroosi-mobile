@@ -4,11 +4,11 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { signInWithGoogle } from "@services/googleAuth";
+import { useToast } from "@providers/ToastContext";
 import { Colors, Layout } from "@constants";
 
 interface SocialAuthButtonsProps {
@@ -22,6 +22,7 @@ export default function SocialAuthButtons({
 }: SocialAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const auth = useAuth();
+  const toast = useToast();
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
@@ -30,10 +31,16 @@ export default function SocialAuthButtons({
 
       if (result.success && result.idToken) {
         // Send the Google ID token to your backend (if available in auth context)
-        if (!auth || typeof auth !== "object" || !("signInWithGoogle" in auth) || typeof (auth as any).signInWithGoogle !== "function") {
-          const errorMessage = "Google authentication is not available right now";
+        if (
+          !auth ||
+          typeof auth !== "object" ||
+          !("signInWithGoogle" in auth) ||
+          typeof (auth as any).signInWithGoogle !== "function"
+        ) {
+          const errorMessage =
+            "Google authentication is not available right now";
           onGoogleError?.(errorMessage);
-          Alert.alert("Authentication Error", errorMessage);
+          toast.show(errorMessage, "error");
           return;
         }
         const authResult = await (auth as any).signInWithGoogle(result.idToken);
@@ -42,14 +49,16 @@ export default function SocialAuthButtons({
           onGoogleSuccess?.();
         } else {
           const errorMessage =
-            authResult.error || "Google authentication failed";
+            (authResult as any)?.error || "Google authentication failed";
           onGoogleError?.(errorMessage);
-          Alert.alert("Authentication Error", errorMessage);
+          toast.show(errorMessage, "error");
         }
       } else {
-        const errorMessage = result.error || "Google authentication failed";
+        // result is discriminated only by result.success flag; when false, use generic message if specific not present
+        const fallbackMessage = "Google authentication failed";
+        const errorMessage = (result as any)?.error ?? fallbackMessage;
         onGoogleError?.(errorMessage);
-        Alert.alert("Authentication Error", errorMessage);
+        toast.show(errorMessage, "error");
       }
     } catch (error: any) {
       console.error("Google sign-in error:", error);
@@ -58,7 +67,7 @@ export default function SocialAuthButtons({
           ? error.message
           : "An unexpected error occurred during Google sign-in";
       onGoogleError?.(errorMessage);
-      Alert.alert("Authentication Error", errorMessage);
+      toast.show(errorMessage, "error");
     } finally {
       setIsGoogleLoading(false);
     }

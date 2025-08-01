@@ -4,18 +4,15 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Switch,
 } from "react-native";
 import { useAuth } from "../../../contexts/AuthContext";
 import { useState } from "react";
 import { Colors, Layout } from "../../../constants";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "../../../hooks/useResponsive";
+import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveTypography from "@hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
-
+import { useToast } from "@providers/ToastContext";
 interface SettingsScreenProps {
   navigation: any;
 }
@@ -34,64 +31,31 @@ interface SettingItem {
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const { signOut, user } = useAuth();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const rt = useResponsiveTypography();
+  const font = (n: number) => (rt?.scale?.font ? rt.scale.font(n) : n);
 
   // Local state for toggles
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
-
+  const toast = useToast();
   const handleSignOut = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await signOut();
-            navigation.navigate("Auth");
-          } catch (error) {
-            Alert.alert("Error", "Failed to sign out. Please try again.");
-          }
-        },
-      },
-    ]);
+    // Immediate sign-out flow with toast feedback; replace with ConfirmModal if desired
+    const doSignOut = async () => {
+      try {
+        await signOut();
+        navigation.navigate("Auth");
+      } catch (error) {
+        toast.show("Failed to sign out. Please try again.", "error");
+      }
+    };
+    doSignOut();
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. All your data will be permanently deleted.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete Account",
-          style: "destructive",
-          onPress: () => {
-            Alert.alert(
-              "Final Confirmation",
-              "Are you absolutely sure you want to delete your account? This cannot be undone.",
-              [
-                { text: "Cancel", style: "cancel" },
-                {
-                  text: "Yes, Delete",
-                  style: "destructive",
-                  onPress: () => {
-                    // TODO: Implement account deletion
-                    Alert.alert(
-                      "Info",
-                      "Account deletion feature will be implemented soon."
-                    );
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    // Not implemented yet; provide non-blocking feedback
+    toast.show("Account deletion is not implemented in this build.", "info");
   };
 
   const settingSections = [
@@ -182,7 +146,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Read our terms and conditions",
           type: "action" as const,
           onPress: () => {
-            Alert.alert("Info", "Terms of Service will open in browser.");
+            toast.show("Opening Terms of Service in browser…", "info");
           },
         },
         {
@@ -190,7 +154,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Learn how we protect your data",
           type: "action" as const,
           onPress: () => {
-            Alert.alert("Info", "Privacy Policy will open in browser.");
+            toast.show("Opening Privacy Policy in browser…", "info");
           },
         },
       ],
@@ -236,11 +200,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       padding: spacing.xs,
     },
     backButtonText: {
-      fontSize: fontSize.base,
+      fontSize: font(16),
       color: Colors.primary[500],
     },
     headerTitle: {
-      fontSize: fontSize.lg,
+      fontSize: font(18),
       fontWeight: "bold",
       color: Colors.text.primary,
     },
@@ -264,19 +228,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     userInitial: {
       fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize["2xl"],
+      fontSize: font(24),
       fontWeight: "bold",
       color: Colors.text.inverse,
     },
     userName: {
       fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize.lg,
+      fontSize: font(18),
       fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xs / 2,
     },
     userEmail: {
-      fontSize: fontSize.sm,
+      fontSize: font(14),
       color: Colors.text.secondary,
     },
     section: {
@@ -284,7 +248,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     sectionTitle: {
       fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize.base,
+      fontSize: font(16),
       fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.xs,
@@ -311,7 +275,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       flex: 1,
     },
     settingTitle: {
-      fontSize: fontSize.base,
+      fontSize: font(16),
       color: Colors.text.primary,
       marginBottom: 2,
     },
@@ -319,11 +283,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       color: Colors.error[500],
     },
     settingSubtitle: {
-      fontSize: fontSize.sm,
+      fontSize: font(14),
       color: Colors.text.secondary,
     },
     chevron: {
-      fontSize: fontSize.lg,
+      fontSize: font(18),
       color: Colors.neutral[400],
       marginLeft: spacing.xs,
     },
@@ -332,7 +296,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       alignItems: "center",
     },
     versionText: {
-      fontSize: fontSize.sm,
+      fontSize: font(14),
       color: Colors.text.secondary,
     },
   });

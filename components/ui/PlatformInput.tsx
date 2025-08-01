@@ -13,6 +13,7 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, Colors, Layout } from "../../constants";
+import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
 
 interface PlatformInputProps extends TextInputProps {
   label?: string;
@@ -84,9 +85,14 @@ export default function PlatformInput({
     inputRef.current?.focus();
   };
 
+  const { spacing } = useResponsiveSpacing();
+  const rt = useResponsiveTypography();
+  const font = (n: keyof typeof Layout.typography.fontSize) =>
+    (rt as any)?.fontSize?.[n] ?? Layout.typography.fontSize[n];
+
   const getContainerStyle = () => {
     return {
-      marginBottom: Layout.spacing.md,
+      marginBottom: spacing.md ?? Layout.spacing.md,
     };
   };
 
@@ -97,7 +103,7 @@ export default function PlatformInput({
       backgroundColor: PlatformDesign.colors.surface,
       borderWidth: PlatformDesign.input.borderWidth,
       borderRadius: PlatformDesign.radius.button,
-      paddingHorizontal: Layout.spacing.md,
+      paddingHorizontal: spacing.md ?? Layout.spacing.md,
       minHeight: PlatformDesign.input.height,
     };
 
@@ -145,20 +151,17 @@ export default function PlatformInput({
   const getLabelStyle = () => {
     if (!floatingLabel) {
       return {
-        fontSize: Layout.typography.fontSize.sm,
+        fontSize: font('sm'),
         fontWeight: PlatformDesign.typography.fontWeight.medium,
         color: Colors.text.primary,
-        marginBottom: Layout.spacing.sm,
+        marginBottom: spacing.sm ?? Layout.spacing.sm,
       };
     }
 
     // Floating label animation
-    const fontSize = animatedValue.interpolate({
+    const labelFontSize = animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: [
-        Layout.typography.fontSize.base,
-        Layout.typography.fontSize.sm,
-      ],
+      outputRange: [font('base'), font('sm')],
     });
 
     const translateY = animatedValue.interpolate({
@@ -168,7 +171,7 @@ export default function PlatformInput({
 
     const translateX = animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: [Layout.spacing.md, Layout.spacing.sm],
+      outputRange: [spacing.md ?? Layout.spacing.md, spacing.sm ?? Layout.spacing.sm],
     });
 
     return {
@@ -176,8 +179,8 @@ export default function PlatformInput({
       left: 0,
       zIndex: 1,
       backgroundColor: PlatformDesign.colors.surface,
-      paddingHorizontal: Layout.spacing.xs,
-      fontSize,
+      paddingHorizontal: spacing.xs ?? Layout.spacing.xs,
+      fontSize: labelFontSize as any,
       fontWeight: PlatformDesign.typography.fontWeight.medium,
       color: isFocused ? Colors.primary[500] : Colors.text.secondary,
       transform: [{ translateX }, { translateY }],
@@ -191,7 +194,7 @@ export default function PlatformInput({
         name={leftIcon as any}
         size={20}
         color={isFocused ? Colors.primary[500] : Colors.neutral[400]}
-        style={{ marginRight: Layout.spacing.sm }}
+        style={{ marginRight: spacing.sm ?? Layout.spacing.sm }}
       />
     );
   };

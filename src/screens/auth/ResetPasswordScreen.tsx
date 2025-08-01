@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useAuth } from "@contexts/AuthContext";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
@@ -31,7 +31,7 @@ export default function ResetPasswordScreen() {
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute<ResetPasswordRouteProp>();
   const { spacing } = useResponsiveSpacing();
-  const fontSize = Layout.typography.fontSize;
+  const { fontSize } = useResponsiveTypography();
   const toast = useToast();
 
   // Prefill token if provided via route params (deep link or manual push)

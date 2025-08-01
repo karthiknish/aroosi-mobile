@@ -16,7 +16,7 @@ import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 import { useToast } from "@providers/ToastContext";
 
@@ -29,7 +29,7 @@ export default function SignUpScreen() {
   const { signUp, isLoading: authLoading } = useAuth();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
-  const fontSize = Layout.typography.fontSize;
+  const { fontSize } = useResponsiveTypography();
   const toast = useToast();
 
   const [emailAddress, setEmailAddress] = useState("");
@@ -163,6 +163,9 @@ export default function SignUpScreen() {
       color: Colors.text.primary,
       backgroundColor: "white",
     },
+    inputError: {
+      borderColor: Colors.error[500],
+    },
     button: {
       backgroundColor: Colors.primary[500],
       borderRadius: 8,
@@ -182,9 +185,6 @@ export default function SignUpScreen() {
       color: Colors.error[500],
       fontSize: fontSize.sm,
       marginTop: spacing.xs,
-    },
-    inputError: {
-      borderColor: Colors.error[500],
     },
     termsContainer: {
       flexDirection: "row",

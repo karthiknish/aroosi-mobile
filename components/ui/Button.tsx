@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   
-  // Sizes
+  // Sizes (kept for backward compatibility but prefer hook-driven getResponsiveButtonStyle)
   sm: {
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
   },
   
-  // Text sizes
+  // Text sizes (kept but hook mapping is preferred via getResponsiveTextStyle)
   smText: {
     fontSize: Layout.typography.fontSize.sm,
     lineHeight: Layout.typography.lineHeight.sm,

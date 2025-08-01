@@ -1,6 +1,8 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useOfflineMessagingHealth } from "../../hooks/useOfflineMessaging";
+import { useToast } from "../../contexts/ToastContext";
+import { Layout } from "@constants";
 
 interface OfflineMessageStatusProps {
   style?: any;
@@ -15,6 +17,8 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
   showDetails = false,
 }) => {
   const { healthStatus, availableActions, stats } = useOfflineMessagingHealth();
+  const toast = useToast();
+  const [expanded, setExpanded] = useState<boolean>(showDetails);
 
   const getStatusColor = () => {
     switch (healthStatus.status) {
@@ -45,27 +49,34 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
   const handleActionPress = async (action: any) => {
     try {
       await action.action();
-      Alert.alert("Success", `${action.label} completed successfully`);
-    } catch (error) {
-      Alert.alert("Error", `Failed to ${action.label.toLowerCase()}: ${error}`);
+      // Use a conservative toast API: .add or .notify; avoid .show which may not exist in typing
+      const msg = `${action.label} completed successfully`;
+      // @ts-ignore
+      if (typeof (toast as any)?.add === "function") {
+        // @ts-ignore
+        (toast as any).add({ message: msg, type: "success" });
+      // @ts-ignore
+      } else if (typeof (toast as any)?.notify === "function") {
+        // @ts-ignore
+        (toast as any).notify({ message: msg, type: "success" });
+      }
+    } catch (error: any) {
+      const errMsg = typeof error === "string" ? error : error?.message || "Unknown error";
+      const msg = `Failed to ${action.label.toLowerCase()}: ${errMsg}`;
+      // @ts-ignore
+      if (typeof (toast as any)?.add === "function") {
+        // @ts-ignore
+        (toast as any).add({ message: msg, type: "danger" });
+      // @ts-ignore
+      } else if (typeof (toast as any)?.notify === "function") {
+        // @ts-ignore
+        (toast as any).notify({ message: msg, type: "danger" });
+      }
     }
   };
 
-  const showDetailsAlert = () => {
-    const details = [
-      `Status: ${healthStatus.status}`,
-      `Online: ${stats.isOnline ? "Yes" : "No"}`,
-      `Failed Messages: ${stats.failedMessages}`,
-      `Optimistic Messages: ${stats.optimisticMessages}`,
-      `Sync In Progress: ${stats.syncInProgress ? "Yes" : "No"}`,
-    ];
-
-    if (stats.lastSyncTime > 0) {
-      const lastSync = new Date(stats.lastSyncTime).toLocaleTimeString();
-      details.push(`Last Sync: ${lastSync}`);
-    }
-
-    Alert.alert("Message Status Details", details.join("\n"));
+  const toggleDetails = () => {
+    setExpanded((v) => !v);
   };
 
   if (healthStatus.status === "healthy" && !showDetails) {
@@ -76,12 +87,12 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
     <View style={[styles.container, style]}>
       <TouchableOpacity
         style={[styles.statusBar, { backgroundColor: getStatusColor() }]}
-        onPress={showDetailsAlert}
+        onPress={toggleDetails}
         activeOpacity={0.7}
       >
         <Text style={styles.statusIcon}>{getStatusIcon()}</Text>
         <Text style={styles.statusText}>{healthStatus.message}</Text>
-        {showDetails && <Text style={styles.detailsText}>Tap for details</Text>}
+        <Text style={styles.detailsText}>{expanded ? "Hide details" : "Tap for details"}</Text>
       </TouchableOpacity>
 
       {availableActions.length > 0 && (
@@ -98,13 +109,24 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
         </View>
       )}
 
-      {showDetails && healthStatus.details.length > 0 && (
+      {expanded && (
         <View style={styles.detailsContainer}>
-          {healthStatus.details.map((detail, index) => (
-            <Text key={index} style={styles.detailItem}>
-              • {detail}
+          <Text style={styles.detailItem}>• Status: {healthStatus.status}</Text>
+          <Text style={styles.detailItem}>• Online: {stats.isOnline ? "Yes" : "No"}</Text>
+          <Text style={styles.detailItem}>• Failed Messages: {stats.failedMessages}</Text>
+          <Text style={styles.detailItem}>• Optimistic Messages: {stats.optimisticMessages}</Text>
+          <Text style={styles.detailItem}>• Sync In Progress: {stats.syncInProgress ? "Yes" : "No"}</Text>
+          {stats.lastSyncTime > 0 && (
+            <Text style={styles.detailItem}>
+              • Last Sync: {new Date(stats.lastSyncTime).toLocaleTimeString()}
             </Text>
-          ))}
+          )}
+          {healthStatus.details.length > 0 &&
+            healthStatus.details.map((detail, index) => (
+              <Text key={index} style={styles.detailItem}>
+                • {detail}
+              </Text>
+            ))}
         </View>
       )}
     </View>
@@ -124,19 +146,19 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   statusIcon: {
-    fontSize: 16,
+    fontSize: Layout.typography.fontSize.base,
     color: "white",
     fontWeight: "bold",
     marginRight: 8,
   },
   statusText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: Layout.typography.fontSize.sm,
     color: "white",
     fontWeight: "500",
   },
   detailsText: {
-    fontSize: 12,
+    fontSize: Layout.typography.fontSize.xs,
     color: "rgba(255, 255, 255, 0.8)",
     fontStyle: "italic",
   },
@@ -154,7 +176,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: "white",
-    fontSize: 12,
+    fontSize: Layout.typography.fontSize.xs,
     fontWeight: "500",
     textAlign: "center",
   },
@@ -163,7 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.05)",
   },
   detailItem: {
-    fontSize: 12,
+    fontSize: Layout.typography.fontSize.xs,
     color: "#666",
     marginBottom: 2,
   },

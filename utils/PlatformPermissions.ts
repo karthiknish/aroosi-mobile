@@ -1,4 +1,4 @@
-import { Platform, Alert, Linking } from "react-native";
+import { Platform, Linking } from "react-native";
 
 export enum PermissionType {
   Camera = "camera",
@@ -25,6 +25,28 @@ export interface PermissionResult {
 
 class PlatformPermissions {
   private static permissionModules: any = {};
+  // Optional UI handler hooks to keep this utility UI-agnostic
+  private static rationaleHandler?: (args: {
+    type: PermissionType;
+    rationale: { title: string; message: string; buttonPositive?: string; buttonNegative?: string };
+    proceed: () => Promise<PermissionResult>;
+    cancel: () => PermissionResult;
+  }) => void;
+
+  private static openSettingsHandler?: () => void;
+
+  static setRationaleHandler(handler: (args: {
+    type: PermissionType;
+    rationale: { title: string; message: string; buttonPositive?: string; buttonNegative?: string };
+    proceed: () => Promise<PermissionResult>;
+    cancel: () => PermissionResult;
+  }) => void) {
+    PlatformPermissions.rationaleHandler = handler;
+  }
+
+  static setOpenSettingsHandler(handler: () => void) {
+    PlatformPermissions.openSettingsHandler = handler;
+  }
 
   private static async getPermissionModule(type: PermissionType) {
     try {
@@ -195,58 +217,56 @@ class PlatformPermissions {
       return currentStatus;
     }
 
-    // If we can't ask again, show settings alert
+    // If we can't ask again, suggest opening settings (no blocking alert)
     if (!currentStatus.canAskAgain) {
-      PlatformPermissions.showSettingsAlert(type, rationale);
+      if (PlatformPermissions.openSettingsHandler) {
+        PlatformPermissions.openSettingsHandler();
+      } else {
+        // fall back to opening settings directly
+        try {
+          Linking.openSettings();
+        } catch (e) {
+          console.warn("Failed to open settings:", e);
+        }
+      }
       return currentStatus;
     }
 
     // Show rationale on Android, iOS handles this automatically
     if (Platform.OS === "android") {
-      return new Promise((resolve) => {
-        Alert.alert(
-          rationale.title,
-          rationale.message,
-          [
-            {
-              text: rationale.buttonNegative || "Cancel",
-              style: "cancel",
-              onPress: () => resolve(currentStatus),
+      // If an app-level rationale UI handler is provided, delegate to it
+      if (PlatformPermissions.rationaleHandler) {
+        return new Promise((resolve) => {
+          const proceed = async () => {
+            const result = await PlatformPermissions.requestPermission(type);
+            return result;
+          };
+          const cancel = (): PermissionResult => currentStatus;
+          PlatformPermissions.rationaleHandler!({
+            type,
+            rationale,
+            proceed: async () => {
+              const r = await proceed();
+              resolve(r);
+              return r;
             },
-            {
-              text: rationale.buttonPositive || "Grant Permission",
-              onPress: async () => {
-                const result = await PlatformPermissions.requestPermission(
-                  type
-                );
-                resolve(result);
-              },
+            cancel: () => {
+              const r = cancel();
+              resolve(r);
+              return r;
             },
-          ],
-          { cancelable: false }
-        );
-      });
+          });
+        });
+      }
+      // Fallback: request directly without blocking alert
+      return PlatformPermissions.requestPermission(type);
     }
 
     // iOS - request directly
     return PlatformPermissions.requestPermission(type);
   }
 
-  private static showSettingsAlert(
-    type: PermissionType,
-    rationale: { title: string; message: string }
-  ) {
-    const permissionName = PlatformPermissions.getPermissionDisplayName(type);
-
-    Alert.alert(
-      `${permissionName} Permission Required`,
-      `${rationale.message}\n\nPlease enable ${permissionName} permission in Settings.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Open Settings", onPress: () => Linking.openSettings() },
-      ]
-    );
-  }
+  // Removed blocking alerts; open settings is handled via handler or direct Linking
 
   private static getPermissionDisplayName(type: PermissionType): string {
     switch (type) {

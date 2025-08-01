@@ -23,7 +23,6 @@ import {
   useResponsiveTypography,
 } from "@hooks/useResponsive";
 
-const { width: screenWidth } = Dimensions.get("window");
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -76,6 +75,8 @@ export const Toast: React.FC<ToastProps> = ({
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
 
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const config = toastConfig[type];
 
   const triggerHaptic = () => {
@@ -128,6 +129,54 @@ export const Toast: React.FC<ToastProps> = ({
     };
   });
 
+  // Inline styles derived from responsive tokens to avoid stale closures
+  const iconStyle = {
+    fontSize: fontSize.lg as number,
+    marginRight:
+      (typeof spacing?.sm === "number" ? spacing.sm : 8) +
+      (typeof spacing?.xs === "number" ? spacing.xs : 4),
+  };
+
+  const messageStyle = {
+    flex: 1,
+    fontSize: fontSize.base as number,
+    fontWeight: "500" as const,
+    color: Colors.background.primary,
+    lineHeight: (fontSize.base as number) * 1.4,
+  };
+
+  const actionButtonStyle = {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: (typeof spacing?.md === "number" ? spacing.md : 16),
+    paddingVertical: ((typeof spacing?.xs === "number" ? spacing.xs : 4) + 2),
+    borderRadius: (typeof spacing?.md === "number" ? spacing.md : 16),
+    marginLeft: (typeof spacing?.sm === "number" ? spacing.sm : 8),
+  };
+
+  const actionTextStyle = {
+    fontFamily: Layout.typography.fontFamily.sansSemiBold,
+    fontSize: fontSize.sm as number,
+    fontWeight: "600" as const,
+    color: Colors.background.primary,
+  };
+
+  const closeButtonStyle = {
+    width: (typeof spacing?.lg === "number" ? spacing.lg : 24),
+    height: (typeof spacing?.lg === "number" ? spacing.lg : 24),
+    borderRadius: (typeof spacing?.md === "number" ? spacing.md : 12),
+    backgroundColor: "rgba(255,255,255,0.2)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    marginLeft: (typeof spacing?.xs === "number" ? spacing.xs : 4),
+  };
+
+  const closeTextStyle = {
+    fontFamily: Layout.typography.fontFamily.sansSemiBold,
+    fontSize: fontSize.xs as number,
+    color: Colors.background.primary,
+    fontWeight: "600" as const,
+  };
+
   if (!visible) return null;
 
   return (
@@ -147,28 +196,28 @@ export const Toast: React.FC<ToastProps> = ({
         >
           <View style={styles.content}>
             <View style={styles.messageContainer}>
-              <Text style={styles.icon}>{config.icon}</Text>
-              <Text style={styles.message}>{message}</Text>
+              <Text style={iconStyle}>{config.icon}</Text>
+              <Text style={messageStyle}>{message}</Text>
             </View>
 
             {action && (
               <TouchableOpacity
-                style={styles.actionButton}
+                style={actionButtonStyle}
                 onPress={() => {
                   action.onPress();
                   hideToast();
                 }}
               >
-                <Text style={styles.actionText}>{action.label}</Text>
+                <Text style={actionTextStyle}>{action.label}</Text>
               </TouchableOpacity>
             )}
 
             <TouchableOpacity
-              style={styles.closeButton}
+              style={closeButtonStyle}
               onPress={hideToast}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.closeText}>✕</Text>
+              <Text style={closeTextStyle}>✕</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -304,42 +353,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  icon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
+  // Keep only static styles; responsive values are applied inline in the component
+  icon: {},
   message: {
     flex: 1,
-    fontSize: 16,
     fontWeight: "500",
     color: Colors.background.primary,
-    lineHeight: 22,
   },
   actionButton: {
     backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginLeft: 12,
   },
   actionText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: 14,
     fontWeight: "600",
     color: Colors.background.primary,
   },
   closeButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
   },
   closeText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: 12,
     color: Colors.background.primary,
     fontWeight: "600",
   },

@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Alert,
   SafeAreaView,
   Dimensions,
   ActivityIndicator,
@@ -18,9 +17,8 @@ import { useInterests } from "@hooks/useInterests";
 import { useSafety } from "@hooks/useSafety";
 import { useTheme } from "@contexts/ThemeContext";
 import SafetyActionSheet from "@components/safety/SafetyActionSheet";
-import { Colors } from "@constants";
-import {
-  useResponsiveSpacing,
+import { Colors, Layout } from "@constants";
+import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@hooks/useResponsive";
 import { useInterestStatus } from "@hooks/useInterests";
@@ -28,6 +26,8 @@ import { useBlockStatus } from "@hooks/useSafety";
 import { Profile } from "@types";
 import type { ReportReason } from "@types";
 import ScreenContainer from "@components/common/ScreenContainer";
+import { useToast } from "@providers/ToastContext";
+import ConfirmModal from "@components/ui/ConfirmModal";
 
 const { width } = Dimensions.get("window");
 
@@ -54,6 +54,8 @@ export default function ProfileDetailScreen({
   const { fontSize } = useResponsiveTypography();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSafetySheet, setShowSafetySheet] = useState(false);
+  const [confirmBlockVisible, setConfirmBlockVisible] = useState(false);
+  const toast = useToast();
 
   const { sendInterest, removeInterest } = useInterests();
 
@@ -80,14 +82,14 @@ export default function ProfileDetailScreen({
       padding: spacing.sm,
     },
     backText: {
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
       fontWeight: "500",
     },
     safetyButton: {
       padding: spacing.sm,
     },
     safetyText: {
-      fontSize: fontSize.xl,
+      fontSize: Layout.typography.fontSize.xl,
       fontWeight: "bold",
     },
     loadingContainer: {
@@ -97,7 +99,7 @@ export default function ProfileDetailScreen({
     },
     loadingText: {
       marginTop: spacing.md,
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
     },
     errorContainer: {
       flex: 1,
@@ -106,7 +108,7 @@ export default function ProfileDetailScreen({
       paddingHorizontal: spacing.xl,
     },
     errorText: {
-      fontSize: fontSize.lg,
+      fontSize: Layout.typography.fontSize.lg,
       textAlign: "center",
       marginBottom: spacing.lg,
     },
@@ -142,7 +144,7 @@ export default function ProfileDetailScreen({
       alignItems: "center",
     },
     noImageText: {
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
     },
     profileInfo: {
       padding: spacing.md,
@@ -153,7 +155,7 @@ export default function ProfileDetailScreen({
       borderRadius: spacing.xs * 3,
     },
     name: {
-      fontSize: fontSize["2xl"] + spacing.xs,
+      fontSize: Layout.typography.fontSize["2xl"] + spacing.xs,
       fontWeight: "bold",
       marginBottom: spacing.sm,
     },
@@ -161,17 +163,17 @@ export default function ProfileDetailScreen({
       gap: spacing.xs,
     },
     detail: {
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
       marginBottom: spacing.xs,
     },
     sectionTitle: {
-      fontSize: fontSize.xl,
+      fontSize: Layout.typography.fontSize.xl,
       fontWeight: "600",
       marginBottom: spacing.sm * 1.5,
     },
     sectionText: {
-      fontSize: fontSize.base,
-      lineHeight: fontSize.base * 1.5,
+      fontSize: Layout.typography.fontSize.base,
+      lineHeight: Layout.typography.fontSize.base * 1.5,
     },
     detailRow: {
       flexDirection: "row",
@@ -182,11 +184,11 @@ export default function ProfileDetailScreen({
       borderBottomColor: Colors.border.primary,
     },
     detailLabel: {
-      fontSize: fontSize.sm,
+      fontSize: Layout.typography.fontSize.sm,
       flex: 1,
     },
     detailValue: {
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
       fontWeight: "500",
       flex: 2,
       textAlign: "right",
@@ -209,7 +211,7 @@ export default function ProfileDetailScreen({
     },
     buttonText: {
       color: Colors.text.inverse,
-      fontSize: fontSize.base,
+      fontSize: Layout.typography.fontSize.base,
       fontWeight: "600",
     },
     contentStyle: {
@@ -256,9 +258,9 @@ export default function ProfileDetailScreen({
       queryClient.invalidateQueries({
         queryKey: ["interestStatus", currentUserId, profileId],
       });
-      Alert.alert("Success", "Interest sent successfully!");
+      toast.show("Interest sent successfully!", "success");
     } catch (error) {
-      Alert.alert("Error", "Failed to send interest. Please try again.");
+      toast.show("Failed to send interest. Please try again.", "error");
     }
   };
 
@@ -269,9 +271,9 @@ export default function ProfileDetailScreen({
       queryClient.invalidateQueries({
         queryKey: ["interestStatus", currentUserId, profileId],
       });
-      Alert.alert("Success", "Interest removed successfully!");
+      toast.show("Interest removed successfully!", "success");
     } catch (error) {
-      Alert.alert("Error", "Failed to remove interest. Please try again.");
+      toast.show("Failed to remove interest. Please try again.", "error");
     }
   };
 
@@ -283,43 +285,34 @@ export default function ProfileDetailScreen({
         reason: reason as ReportReason,
         description,
       });
-      Alert.alert(
-        "Success",
-        "User reported successfully. We will review this report."
+      toast.show(
+        "User reported successfully. We will review this report.",
+        "success"
       );
       setShowSafetySheet(false);
     } catch (error) {
-      Alert.alert("Error", "Failed to report user. Please try again.");
+      toast.show("Failed to report user. Please try again.", "error");
     }
   };
 
   const handleBlockUser = async () => {
     if (!profileId) return;
-    Alert.alert(
-      "Block User",
-      "Are you sure you want to block this user? They will not be able to contact you.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Block",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await blockUser.mutateAsync({ blockedUserId: profileId });
-              queryClient.invalidateQueries({
-                queryKey: ["blockStatus", profileId],
-              });
-              Alert.alert("Success", "User blocked successfully.");
-              setShowSafetySheet(false);
-              navigation.goBack();
-            } catch (error) {
-              Alert.alert("Error", "Failed to block user. Please try again.");
-            }
-          },
-        },
-      ]
-    );
+    setConfirmBlockVisible(true);
   };
+  const confirmBlock = async () => {
+    try {
+      await blockUser.mutateAsync({ blockedUserId: profileId });
+      queryClient.invalidateQueries({ queryKey: ["blockStatus", profileId] });
+      toast.show("User blocked successfully.", "success");
+      setShowSafetySheet(false);
+      setConfirmBlockVisible(false);
+      navigation.goBack();
+    } catch (error) {
+      toast.show("Failed to block user. Please try again.", "error");
+      setConfirmBlockVisible(false);
+    }
+  };
+  const cancelBlock = () => setConfirmBlockVisible(false);
 
   const calculateAge = (dateOfBirth: string) => {
     const today = new Date();
@@ -863,6 +856,16 @@ export default function ProfileDetailScreen({
         userId={profileId}
         userName={profile?.fullName || ""}
         isBlocked={blockStatus?.isBlocked}
+      />
+      <ConfirmModal
+        visible={confirmBlockVisible}
+        title="Block User"
+        message="Are you sure you want to block this user? They will not be able to contact you."
+        confirmLabel="Block"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={confirmBlock}
+        onCancel={cancelBlock}
       />
     </ScreenContainer>
   );

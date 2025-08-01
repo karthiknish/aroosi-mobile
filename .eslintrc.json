@@ -1,0 +1,56 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended"
+  ],
+  "plugins": ["@typescript-eslint", "react"],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "sourceType": "module",
+    "project": ["./tsconfig.json"]
+  },
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "react-native",
+            "importNames": ["Dimensions", "useWindowDimensions"],
+            "message": "Use hooks/useResponsive (useResponsiveSpacing/useResponsiveTypography/useBreakpoint) instead of raw Dimensions/useWindowDimensions."
+          }
+        ],
+        "patterns": []
+      }
+    ],
+    "no-restricted-syntax": [
+      "error",
+      {
+        "selector": "CallExpression[callee.object.name='StyleSheet'][callee.property.name='create'] ObjectExpression Property[key.name=/^(fontSize|lineHeight|padding(Top|Bottom|Left|Right)?|margin(Top|Bottom|Left|Right)?|borderRadius)$/] Literal[value.type='Literal'][value.raw=/^\\d+(\\.\\d+)?$/]",
+        "message": "Avoid hard-coded numeric sizes in StyleSheet. Use Layout tokens or responsive hooks (apply via inline styles where tokens are in scope)."
+      }
+    ],
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "react/prop-types": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.tsx", "**/*.ts"],
+      "rules": {}
+    }
+  ],
+  "env": {
+    "es6": true,
+    "browser": true,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  }
+}

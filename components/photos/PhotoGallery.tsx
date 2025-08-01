@@ -8,12 +8,13 @@ import {
   Modal,
   FlatList,
   Dimensions,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
 import { ProfileImage } from "../../types/image";
 import PlatformHaptics from "../../utils/PlatformHaptics";
+import { useToast } from "@providers/ToastContext";
+import ConfirmModal from "../ui/ConfirmModal";
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -209,6 +210,7 @@ export default function PhotoGallery({
   images,
   onAddPhoto,
   onDeletePhoto,
+  onReorderPhotos,
   onSetMainPhoto,
   uploading = false,
   deleting = null,
@@ -218,6 +220,13 @@ export default function PhotoGallery({
   showAddButton = true,
 }: PhotoGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<ProfileImage | null>(null);
+  const [confirmState, setConfirmState] = useState<{
+    visible: boolean;
+    action: "delete" | null;
+    targetImageId?: string;
+  }>({ visible: false, action: null });
+
+  const toast = useToast();
 
   const handlePhotoPress = (image: ProfileImage) => {
     setSelectedImage(image);
@@ -227,15 +236,34 @@ export default function PhotoGallery({
     if (canAddMore && onAddPhoto) {
       onAddPhoto();
     } else if (!canAddMore) {
-      Alert.alert(
-        "Photo Limit Reached",
-        `You can only have up to ${maxPhotos} photos.`
-      );
+      // ToastProvider signature: show(text, type?, durationMs?)
+      toast.show(`You can only have up to ${maxPhotos} photos.`, "info");
     }
   };
 
-  const handleDeletePhoto = (imageId: string) => {
-    onDeletePhoto?.(imageId);
+  const requestDeletePhoto = (imageId: string) => {
+    setConfirmState({ visible: true, action: "delete", targetImageId: imageId });
+  };
+
+  const confirmDelete = async () => {
+    if (confirmState.action === "delete" && confirmState.targetImageId) {
+      try {
+        await onDeletePhoto?.(confirmState.targetImageId);
+        toast.show("Photo deleted.", "success");
+      } catch (e: any) {
+        const msg =
+          typeof e?.message === "string" ? e.message : "Failed to delete photo.";
+        toast.show(msg, "error");
+      } finally {
+        setConfirmState({ visible: false, action: null, targetImageId: undefined });
+      }
+    } else {
+      setConfirmState({ visible: false, action: null, targetImageId: undefined });
+    }
+  };
+
+  const cancelConfirm = () => {
+    setConfirmState({ visible: false, action: null, targetImageId: undefined });
   };
 
   const handleSetMainPhoto = (imageId: string) => {
@@ -254,7 +282,7 @@ export default function PhotoGallery({
           image={image}
           isMain={image._id === mainImage?._id}
           onPress={() => handlePhotoPress(image)}
-          onDelete={() => handleDeletePhoto(image._id)}
+          onDelete={() => requestDeletePhoto(image._id)}
           onSetMain={() => handleSetMainPhoto(image._id)}
           uploading={uploading}
           deleting={deleting === image._id}
@@ -343,6 +371,18 @@ export default function PhotoGallery({
           </View>
         </View>
       </Modal>
+
+      {/* Confirmation Modal for destructive actions */}
+      <ConfirmModal
+        visible={confirmState.visible}
+        title="Delete Photo"
+        message="Are you sure you want to delete this photo?"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={confirmDelete}
+        onCancel={cancelConfirm}
+      />
     </View>
   );
 }

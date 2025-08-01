@@ -7,6 +7,7 @@ import {
   TouchableOpacityProps,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
+import { useResponsiveSpacing } from '../../hooks/useResponsive';
 
 interface CardProps extends TouchableOpacityProps {
   children: React.ReactNode;
@@ -24,10 +25,14 @@ export default function Card({
   style,
   ...touchableProps
 }: CardProps) {
+  const { spacing } = useResponsiveSpacing();
+  const paddingValue =
+    spacing?.[padding as keyof typeof spacing] ?? Layout.spacing[padding];
+
   const cardStyles = [
     styles.base,
     styles[variant],
-    { padding: Layout.spacing[padding] },
+    { padding: paddingValue },
     style,
   ];
 

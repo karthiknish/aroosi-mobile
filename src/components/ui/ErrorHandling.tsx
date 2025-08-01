@@ -4,16 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ViewStyle,
   StyleProp,
-  AlertButton,
+  Platform,
 } from "react-native";
 import { useTheme } from "@contexts/ThemeContext";
-import {
-  useResponsiveSpacing,
-  useResponsiveTypography,
-} from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -84,6 +80,7 @@ const DefaultErrorFallback: React.FC<{
 }> = ({ error, resetError }) => {
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
+  // Provide helpers using semantic sizes from the typography hook
   const { fontSize } = useResponsiveTypography();
 
   const styles = StyleSheet.create({
@@ -94,11 +91,11 @@ const DefaultErrorFallback: React.FC<{
       padding: spacing.xl,
     },
     errorIcon: {
-      fontSize: fontSize["4xl"],
+      fontSize: fontSize["3xl"],
       marginBottom: spacing.md,
     },
     errorTitle: {
-      fontSize: fontSize["2xl"],
+      fontSize: fontSize.lg,
       fontWeight: "600",
       textAlign: "center",
       marginBottom: spacing.sm + spacing.xs,
@@ -162,7 +159,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 }) => {
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const { fontSize: font2 } = useResponsiveTypography();
 
   const errorMessage =
     typeof error === "string"
@@ -180,13 +177,13 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       borderLeftColor: "#B45E5E",
     },
     errorDisplayTitle: {
-      fontSize: fontSize.lg,
+      fontSize: font2.lg,
       fontWeight: "600",
       marginBottom: spacing.sm,
     },
     errorDisplayMessage: {
-      fontSize: fontSize.sm,
-      lineHeight: fontSize.sm * 1.4,
+      fontSize: font2.sm,
+      lineHeight: font2.sm * 1.4,
       marginBottom: spacing.sm + spacing.xs,
     },
     errorActions: {
@@ -201,7 +198,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
     },
     errorActionText: {
       color: "#fff",
-      fontSize: fontSize.sm,
+      fontSize: font2.sm,
       fontWeight: "600",
       textAlign: "center",
     },
@@ -307,13 +304,41 @@ export const showErrorAlert = (
       ? error
       : error?.message || "An unexpected error occurred";
 
-  const buttons: AlertButton[] = [{ text: "OK", style: "default" }];
+  // Non-blocking toast feedback (no hooks here)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const toastUtil = require("@/utils/toast");
+    const titleLower = (title || "").toLowerCase();
+    const variant =
+      titleLower.includes("error")
+        ? "error"
+        : titleLower.includes("success")
+        ? "success"
+        : titleLower.includes("warning")
+        ? "warning"
+        : "info";
 
-  if (onRetry) {
-    buttons.unshift({ text: "Try Again", onPress: onRetry });
+    if (toastUtil?.showToast) {
+      toastUtil.showToast({ message, title, variant });
+    } else if (toastUtil?.Toast?.show) {
+      toastUtil.Toast.show({ message, title, variant });
+    } else if (toastUtil?.showErrorToast && variant === "error") {
+      toastUtil.showErrorToast(message, title);
+    } else if (toastUtil?.showSuccessToast && variant === "success") {
+      toastUtil.showSuccessToast(message, title);
+    } else if (toastUtil?.showWarningToast && variant === "warning") {
+      toastUtil.showWarningToast(message, title);
+    } else if (toastUtil?.showInfoToast) {
+      toastUtil.showInfoToast(message, title);
+    } else if (Platform.OS === "web") {
+      // Last-resort web fallback
+      console.error(`[${title}] ${message}`);
+    }
+  } catch {
+    if (Platform.OS === "web") {
+      console.error(`[${title}] ${message}`);
+    }
   }
-
-  Alert.alert(title, message, buttons);
 };
 
 // Network Error Component
@@ -322,7 +347,7 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
 }) => {
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const { fontSize: font3 } = useResponsiveTypography();
 
   const styles = StyleSheet.create({
     networkErrorContainer: {
@@ -332,20 +357,20 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
       padding: spacing.xl,
     },
     networkErrorIcon: {
-      fontSize: fontSize["4xl"],
+      fontSize: font3["3xl"],
       marginBottom: spacing.md,
       opacity: 0.6,
     },
     networkErrorTitle: {
-      fontSize: fontSize.xl,
+      fontSize: font3.lg,
       fontWeight: "600",
       textAlign: "center",
       marginBottom: spacing.sm,
     },
     networkErrorMessage: {
-      fontSize: fontSize.base,
+      fontSize: font3.base,
       textAlign: "center",
-      lineHeight: fontSize.base * 1.5,
+      lineHeight: font3.base * 1.5,
       marginBottom: spacing.lg,
     },
     retryButton: {
@@ -356,7 +381,7 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
     },
     retryButtonText: {
       color: "#fff",
-      fontSize: fontSize.base,
+      fontSize: font3.base,
       fontWeight: "600",
       textAlign: "center",
     },
@@ -402,7 +427,7 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
 export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({ errors }) => {
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
-  const { fontSize } = useResponsiveTypography();
+  const { fontSize: font4 } = useResponsiveTypography();
 
   if (errors.length === 0) return null;
 
@@ -415,13 +440,13 @@ export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({ errors 
       borderColor: "#B45E5E",
     },
     validationTitle: {
-      fontSize: fontSize.base,
+      fontSize: font4.base,
       fontWeight: "600",
       marginBottom: spacing.sm,
     },
     validationError: {
-      fontSize: fontSize.sm,
-      lineHeight: fontSize.sm * 1.4,
+      fontSize: font4.sm,
+      lineHeight: font4.sm * 1.4,
       marginBottom: spacing.xs,
     },
   });

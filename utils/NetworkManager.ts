@@ -1,5 +1,4 @@
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
-import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface NetworkState {
@@ -44,6 +43,7 @@ class NetworkManager {
   private requestQueue: QueuedRequest[] = [];
   private isProcessingQueue = false;
   private retryTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private networkIssueListeners: Array<(event: { type: 'queued' | 'processing_started' | 'processing_failed' | 'processing_completed'; meta?: any }) => void> = [];
 
   constructor() {
     this.initializeNetworkMonitoring();
@@ -218,6 +218,9 @@ class NetworkManager {
     this.sortQueue();
     await this.saveQueueToStorage();
 
+    // Notify UI layer that a request was queued due to offline
+    this.triggerNetworkIssue('queued', { id: requestId, url, priority });
+
     // Return a rejected promise that indicates the request was queued
     return Promise.reject(new Error('QUEUED_FOR_RETRY'));
   }
@@ -225,12 +228,13 @@ class NetworkManager {
   /**
    * Process queued requests when connection is restored
    */
-  private async processQueue() {
+  async processQueue() {
     if (this.isProcessingQueue || this.requestQueue.length === 0) {
       return;
     }
 
     this.isProcessingQueue = true;
+    this.triggerNetworkIssue('processing_started', { length: this.requestQueue.length });
 
     while (this.requestQueue.length > 0 && this.isOnline()) {
       const request = this.requestQueue.shift()!;
@@ -246,12 +250,16 @@ class NetworkManager {
           request.retryCount++;
           this.requestQueue.push(request);
           this.sortQueue();
+        } else {
+          // notify UI that a request permanently failed
+          this.triggerNetworkIssue('processing_failed', { id: request.id, url: request.url, error: String(error) });
         }
       }
     }
 
     await this.saveQueueToStorage();
     this.isProcessingQueue = false;
+    this.triggerNetworkIssue('processing_completed', { remaining: this.requestQueue.length });
   }
 
   /**
@@ -350,25 +358,31 @@ class NetworkManager {
   }
 
   /**
-   * Show network error dialog
+   * Deprecated: UI should be handled in the app layer
    */
   showNetworkErrorDialog() {
-    Alert.alert(
-      'Connection Problem',
-      'Unable to connect to the internet. Please check your connection and try again.',
-      [
-        { text: 'OK', style: 'default' },
-        { 
-          text: 'Retry', 
-          style: 'default',
-          onPress: () => {
-            if (this.isOnline()) {
-              this.processQueue();
-            }
-          }
-        },
-      ]
-    );
+    console.warn('NetworkManager.showNetworkErrorDialog is deprecated. Subscribe to onNetworkIssue and render UI in the component layer.');
+  }
+
+  /**
+   * Subscribe to network issue events
+   */
+  onNetworkIssue(listener: (event: { type: 'queued' | 'processing_started' | 'processing_failed' | 'processing_completed'; meta?: any }) => void): () => void {
+    this.networkIssueListeners.push(listener);
+    return () => {
+      const i = this.networkIssueListeners.indexOf(listener);
+      if (i > -1) this.networkIssueListeners.splice(i, 1);
+    };
+  }
+
+  private triggerNetworkIssue(type: 'queued' | 'processing_started' | 'processing_failed' | 'processing_completed', meta?: any) {
+    this.networkIssueListeners.forEach(l => {
+      try {
+        l({ type, meta });
+      } catch (e) {
+        console.error('NetworkManager listener error', e);
+      }
+    });
   }
 }
 
