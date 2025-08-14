@@ -7,7 +7,7 @@ import {
 } from "../services/messagingSecurityService";
 import { UserRelationship } from "../utils/messageValidation";
 import { ValidationResult } from "../types/messaging";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 
 interface UseMessagingSecurityOptions extends SecurityConfig {
   autoInitialize?: boolean;
@@ -52,7 +52,7 @@ export function useMessagingSecurity(
   });
 
   const [violations, setViolations] = useState<SecurityViolation[]>([]);
-  const { userId, token } = useAuth();
+  const { } = useClerkAuth();
   const securityServiceRef = useRef<MessagingSecurityService | null>(null);
 
   // Initialize security service

@@ -8,7 +8,7 @@ import {
 } from "../utils/messagingSync";
 import { useApiClient } from "../utils/api";
 import { useRealtimeMessaging } from "./useRealtimeMessaging";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 
 interface UseMessageSyncOptions {
   enableAutoSync?: boolean;
@@ -52,7 +52,7 @@ export function useMessageSync(options: UseMessageSyncOptions = {}) {
     connectionStatus: "disconnected",
   });
 
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const { service: realtimeService, isConnected } = useRealtimeMessaging();
 

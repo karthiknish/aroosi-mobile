@@ -10,7 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "@utils/api";
 import { useInterests } from "@hooks/useInterests";
@@ -46,7 +46,7 @@ export default function ProfileDetailScreen({
   navigation,
 }: ProfileDetailScreenProps) {
   const { profileId, userId: paramUserId } = route.params;
-  const { userId: currentUserId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const { theme } = useTheme();

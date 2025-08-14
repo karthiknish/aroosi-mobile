@@ -1,10 +1,10 @@
 /** @jsx React.createElement */
-import React, { useEffect, useRef, useState } from "react";
+/** @jsxFrag React.Fragment */
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
@@ -12,10 +12,10 @@ import {
   Alert,
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { Colors, Layout } from "../../../constants";
-import LoadingState from "../../../components/ui/LoadingState";
-import EmptyState from "../../../components/ui/EmptyState";
+import { FullScreenLoading } from "../../components/ui/LoadingStates";
+import { EmptyState } from "../../components/ui/EmptyStates";
 import * as Haptics from "expo-haptics";
 // import ScreenContainer from "@components/common/ScreenContainer";
 import useResponsiveSpacing from "../../../hooks/useResponsive";
@@ -25,14 +25,13 @@ import { useConversationMessaging } from "../../../hooks/useOfflineMessaging";
 import { useSubscription } from "../../../hooks/useSubscription";
 import { Message } from "../../../types/message";
 import { OfflineMessageStatus } from "../../../components/messaging/OfflineMessageStatus";
-import { useToast } from "@providers/ToastContext";
+import { useToast } from "../../../providers/ToastContext";
 // Import voice messaging components
 import { VoiceMessageDisplay } from "../../../components/messaging/VoiceMessage";
 import { VoiceRecorder } from "../../../components/messaging/VoiceRecorder";
 
 // Import real-time components
-import { TypingIndicator } from "../../../components/messaging/TypingIndicator";
-import { MessageStatusIndicator } from "../../../components/messaging/MessageStatusIndicator";
+// Typing indicator is shown via MessagesList footer
 import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
 
 // Import messaging features for subscription gating
@@ -40,6 +39,8 @@ import {
   useMessagingFeatures,
   useVoiceMessageLimits,
 } from "../../../hooks/useMessagingFeatures";
+import MessagesList from "../../../components/chat/MessagesList";
+import { useApiClient } from "../../../utils/api";
 
 interface ChatScreenProps {
   navigation: any;
@@ -58,8 +59,8 @@ type ChatScreenRoute = RouteProp<ChatRouteParams, "Chat">;
 export default function ChatScreen({ navigation }: ChatScreenProps) {
   const route = useRoute<ChatScreenRoute>();
   const { conversationId, partnerName, partnerId } = route.params;
-  const { userId } = useAuth();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const { } = useClerkAuth();
+  const scrollViewRef = useRef<any>(null);
   const [inputText, setInputText] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -79,6 +80,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     canSend,
   } = useConversationMessaging(conversationId);
 
+  const apiClient = useApiClient();
+  const [receiptMap, setReceiptMap] = useState<Record<string, any[]>>({});
+
   // Messaging features for subscription checks
   const { canSendVoiceMessage } = useMessagingFeatures();
   const { canSendVoice } = useVoiceMessageLimits();
@@ -89,21 +93,63 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     userId: userId || "",
   });
 
-  // Auto-scroll to bottom when new messages arrive
+  // Mark conversation as read when messages load
   useEffect(() => {
-    if (hasMessages) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    if (isInitialized && messages && messages.length > 0) {
+      apiClient.markConversationAsRead(conversationId).catch(() => undefined);
     }
-  }, [messages, hasMessages]);
+  }, [isInitialized, messages?.length]);
+
+  // Haptics for new message received (from others)
+  const lastMessageIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    if (last && last._id !== lastMessageIdRef.current) {
+      lastMessageIdRef.current = last._id;
+      // Trigger only for messages from partner
+      if (last.fromUserId !== userId) {
+        Haptics.selectionAsync();
+      }
+    }
+  }, [messages?.length]);
+
+  // Load delivery/read receipts to enhance status indicators
+  const loadReceipts = async () => {
+    try {
+      const res = await apiClient.getDeliveryReceipts(conversationId);
+      if (res.success && Array.isArray(res.data as any)) {
+        const map: Record<string, any[]> = {};
+        (res.data as any[]).forEach((r: any) => {
+          if (!r?.messageId) return;
+          if (!map[r.messageId]) map[r.messageId] = [];
+          map[r.messageId].push(r);
+        });
+        setReceiptMap(map);
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Load messages on mount
   useEffect(() => {
     if (isInitialized && conversationId) {
       loadMessages();
+      loadReceipts();
     }
   }, [isInitialized, conversationId, loadMessages]);
+
+  const displayMessages = useMemo(() => {
+    if (!messages || !messages.length) return messages as any;
+    return messages.map((m: any) => ({
+      ...m,
+      deliveryReceipts:
+        m.deliveryReceipts && m.deliveryReceipts.length > 0
+          ? m.deliveryReceipts
+          : receiptMap[m._id] || [],
+    }));
+  }, [messages, receiptMap]);
 
   const handleSendMessage = async (
     content: string,
@@ -168,6 +214,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       if (result.success) {
         setInputText("");
         setIsTyping(false);
+        // Haptics on successful send
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
         Alert.alert(
           "Send Failed",
@@ -226,92 +274,55 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     }
   };
 
-  const renderMessage = (message: any, index: number) => {
-    const isOwnMessage = (message.senderId || message.fromUserId) === userId;
+  const renderMessage = ({ item }: { item: any; index: number }) => {
+    const isOwnMessage = (item.senderId || item.fromUserId) === userId;
     const messageTime =
-      message.timestamp ||
-      message.createdAt ||
-      message._creationTime ||
-      Date.now();
-    const prevMessageTime =
-      index > 0
-        ? messages[index - 1]?.timestamp ||
-          messages[index - 1]?.createdAt ||
-          messages[index - 1]?._creationTime ||
-          0
-        : 0;
-    const showDate =
-      index === 0 ||
-      formatMessageDate(messageTime) !== formatMessageDate(prevMessageTime);
-
+      item.timestamp || item.createdAt || item._creationTime || Date.now();
     return (
-      <View key={message.id || message._id || index}>
-        {/* Date separator */}
-        {showDate && (
-          <View style={styles.dateSeparator}>
-            <Text style={styles.dateText}>
-              {formatMessageDate(messageTime)}
-            </Text>
-          </View>
-        )}
-
-        {/* Message bubble */}
+      <View
+        style={[
+          styles.messageContainer,
+          isOwnMessage
+            ? styles.ownMessageContainer
+            : styles.otherMessageContainer,
+        ]}
+      >
         <View
           style={[
-            styles.messageContainer,
-            isOwnMessage
-              ? styles.ownMessageContainer
-              : styles.otherMessageContainer,
+            styles.messageBubble,
+            isOwnMessage ? styles.ownMessageBubble : styles.otherMessageBubble,
           ]}
         >
-          <View
-            style={[
-              styles.messageBubble,
-              isOwnMessage
-                ? styles.ownMessageBubble
-                : styles.otherMessageBubble,
-            ]}
-          >
-            {message.type === "voice" ? (
-              <VoiceMessageDisplay
-                uri={message.audioUri}
-                storageId={message.audioStorageId}
-                duration={message.duration}
-                style={{ backgroundColor: "transparent" }}
-                small={false}
-              />
-            ) : (
-              <Text
-                style={[
-                  styles.messageText,
-                  isOwnMessage
-                    ? styles.ownMessageText
-                    : styles.otherMessageText,
-                ]}
-              >
-                {message.content || message.text || "Message"}
-              </Text>
-            )}
+          {item.type === "voice" ? (
+            <VoiceMessageDisplay
+              uri={item.audioUri}
+              storageId={item.audioStorageId}
+              duration={item.duration}
+              style={{ backgroundColor: "transparent" }}
+              small={false}
+            />
+          ) : (
+            <Text
+              style={[
+                styles.messageText,
+                isOwnMessage ? styles.ownMessageText : styles.otherMessageText,
+              ]}
+            >
+              {item.content || item.text || "Message"}
+            </Text>
+          )}
 
-            <View style={styles.messageFooter}>
-              <Text
-                style={[
-                  styles.messageTime,
-                  isOwnMessage
-                    ? styles.ownMessageTime
-                    : styles.otherMessageTime,
-                ]}
-              >
-                {formatMessageTime(messageTime)}
-              </Text>
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.messageTime,
+                isOwnMessage ? styles.ownMessageTime : styles.otherMessageTime,
+              ]}
+            >
+              {formatMessageTime(messageTime)}
+            </Text>
 
-              {/* Message status indicator for sent messages */}
-              <MessageStatusIndicator
-                status={message.status}
-                isOwnMessage={isOwnMessage}
-                readAt={message.readAt}
-              />
-            </View>
+            {/* Status ticks could be added here if needed to mirror web */}
           </View>
         </View>
       </View>
@@ -505,7 +516,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <LoadingState message="Loading conversation..." />
+        <FullScreenLoading message="Loading conversation..." />
       </View>
     );
   }
@@ -547,41 +558,34 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         </View>
 
         {/* Messages */}
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.messagesContainer}
-          contentContainerStyle={styles.messagesContent}
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={() =>
-            scrollViewRef.current?.scrollToEnd({ animated: false })
-          }
-        >
-          {error ? (
-            <EmptyState
-              title="Unable to load messages"
-              message="Please check your connection and try again."
-              actionText="Retry"
-              onAction={() => loadMessages()}
+        {error ? (
+          <EmptyState
+            title="Unable to load messages"
+            message="Please check your connection and try again."
+            actionText="Retry"
+            onActionPress={() => loadMessages()}
+          />
+        ) : (
+          <View style={styles.messagesContainer}>
+            <MessagesList
+              messages={displayMessages as any}
+              currentUserId={userId || ""}
+              typingVisible={typingIndicator.isAnyoneElseTyping}
+              typingText={typingIndicator.isAnyoneElseTyping ? "Typing..." : ""}
+              onFetchOlder={async () => {
+                const beforeTs = messages?.[0]?.createdAt;
+                if (beforeTs) await loadMessages({ before: beforeTs });
+              }}
+              hasMore={true}
+              loading={loading}
+              onRefresh={async () => {
+                await Promise.all([loadMessages(), loadReceipts()]);
+                await apiClient.markConversationAsRead(conversationId);
+              }}
+              refreshing={loading}
             />
-          ) : !hasMessages ? (
-            <EmptyState
-              title="Start the conversation"
-              message="Send a message to break the ice!"
-            />
-          ) : (
-            <>
-              {messages.map((message: Message, index: number) =>
-                renderMessage(message, index)
-              )}
-
-              {/* Typing indicator */}
-              <TypingIndicator
-                isVisible={typingIndicator.isAnyoneElseTyping}
-                userName={partnerName}
-              />
-            </>
-          )}
-        </ScrollView>
+          </View>
+        )}
 
         {/* Chat Input */}
         <View style={styles.chatInputContainer}>

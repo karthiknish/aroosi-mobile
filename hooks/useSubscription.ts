@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../utils/api";
 import { errorHandler, withErrorHandlingAsync } from "../utils/errorHandling";
@@ -43,7 +43,7 @@ export interface UseSubscriptionResult extends SubscriptionInfo {
 }
 
 export function useSubscription(): UseSubscriptionResult {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
 

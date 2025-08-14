@@ -13,7 +13,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useApiClient } from "@utils/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import {
   Profile,
   UpdateProfileData,
@@ -53,7 +53,7 @@ interface EditProfileScreenProps {
 export default function EditProfileScreen({
   navigation,
 }: EditProfileScreenProps) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const { spacing } = useResponsiveSpacing();

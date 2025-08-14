@@ -6,7 +6,7 @@ import {
   afterAll,
   beforeEach,
 } from "@jest/globals";
-import { AuthProvider } from "../../contexts/AuthContext";
+import { ClerkAuthProvider } from "../contexts/ClerkAuthContext"
 import { ApiClient } from "../../utils/api";
 import { RealtimeManager } from "../../utils/realtimeManager";
 import AsyncStorage from "@react-native-async-storage/async-storage";

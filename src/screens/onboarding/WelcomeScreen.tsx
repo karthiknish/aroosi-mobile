@@ -12,7 +12,7 @@ import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "@hooks/useResponsive";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface WelcomeScreenProps {
@@ -39,7 +39,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     isOnboardingComplete,
     isProfileLoading,
     signOut,
-  } = useAuth();
+  } = useClerkAuth();
 
   // Note: The RootNavigator handles the main navigation logic
   // This screen should only be shown when onboarding is needed

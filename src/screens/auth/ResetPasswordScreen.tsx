@@ -10,7 +10,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from "react-native";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "@contexts/ClerkAuthContext";
 import { Colors, Layout } from "@constants";
 import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
@@ -27,22 +27,28 @@ type ResetPasswordScreenNavigationProp = StackNavigationProp<
 type ResetPasswordRouteProp = RouteProp<AuthStackParamList, "ResetPassword">;
 
 export default function ResetPasswordScreen() {
-  const { resetPassword } = useAuth();
+  const { resetPassword } = useClerkAuth();
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute<ResetPasswordRouteProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const toast = useToast();
 
-  // Prefill token if provided via route params (deep link or manual push)
-  const [token, setToken] = useState<string>((route.params as any)?.token || "");
+  // Email-based reset per Convex-auth compatible API
+  const [email, setEmail] = useState<string>(
+    (route.params as any)?.email || ""
+  );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const onSubmit = async () => {
     const nextErrors: Record<string, string> = {};
-    if (!token.trim()) nextErrors.token = "Reset token is required";
+    const emailTrimmed = email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailTrimmed) nextErrors.email = "Email is required";
+    else if (!emailRegex.test(emailTrimmed))
+      nextErrors.email = "Please enter a valid email address";
     if (!password) {
       nextErrors.password = "Password is required";
     } else if (password.length < 8) {
@@ -57,7 +63,7 @@ export default function ResetPasswordScreen() {
     if (Object.keys(nextErrors).length > 0) return;
 
     try {
-      const res = await resetPassword(token.trim(), password);
+      const res = await resetPassword(emailTrimmed, password);
       if (res.success) {
         toast.show("Your password has been reset successfully.", "success");
         navigation.navigate("Login");
@@ -65,7 +71,10 @@ export default function ResetPasswordScreen() {
         toast.show(res.error || "Unable to reset password", "error");
       }
     } catch (e) {
-      toast.show("An unexpected error occurred while resetting password", "error");
+      toast.show(
+        "An unexpected error occurred while resetting password",
+        "error"
+      );
     }
   };
 
@@ -127,7 +136,10 @@ export default function ResetPasswordScreen() {
   });
 
   return (
-    <GradientBackground colors={Colors.gradient.secondary as any} style={{ flex: 1 }}>
+    <GradientBackground
+      colors={Colors.gradient.secondary as any}
+      style={{ flex: 1 }}
+    >
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.container}
@@ -141,24 +153,29 @@ export default function ResetPasswordScreen() {
             <View style={styles.inner}>
               <View style={styles.header}>
                 <Text style={styles.title}>Reset Password</Text>
-                <Text style={styles.subtitle}>Enter your reset token and new password.</Text>
+                <Text style={styles.subtitle}>
+                  Enter your account email and new password.
+                </Text>
               </View>
 
               <View style={styles.form}>
                 <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Reset Token</Text>
+                  <Text style={styles.label}>Email</Text>
                   <TextInput
-                    style={[styles.input, errors.token && styles.inputError]}
-                    placeholder="Paste your reset token"
+                    style={[styles.input, errors.email && styles.inputError]}
+                    placeholder="Enter your email"
                     placeholderTextColor={Colors.text.secondary}
-                    value={token}
+                    value={email}
                     onChangeText={(v) => {
-                      setToken(v);
-                      if (errors.token) setErrors((e) => ({ ...e, token: "" }));
+                      setEmail(v);
+                      if (errors.email) setErrors((e) => ({ ...e, email: "" }));
                     }}
                     autoCapitalize="none"
+                    keyboardType="email-address"
                   />
-                  {!!errors.token && <Text style={styles.errorText}>{errors.token}</Text>}
+                  {!!errors.email && (
+                    <Text style={styles.errorText}>{errors.email}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
@@ -170,28 +187,37 @@ export default function ResetPasswordScreen() {
                     value={password}
                     onChangeText={(v) => {
                       setPassword(v);
-                      if (errors.password) setErrors((e) => ({ ...e, password: "" }));
+                      if (errors.password)
+                        setErrors((e) => ({ ...e, password: "" }));
                     }}
                     secureTextEntry
                   />
-                  {!!errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+                  {!!errors.password && (
+                    <Text style={styles.errorText}>{errors.password}</Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Confirm Password</Text>
                   <TextInput
-                    style={[styles.input, errors.confirmPassword && styles.inputError]}
+                    style={[
+                      styles.input,
+                      errors.confirmPassword && styles.inputError,
+                    ]}
                     placeholder="Confirm new password"
                     placeholderTextColor={Colors.text.secondary}
                     value={confirmPassword}
                     onChangeText={(v) => {
                       setConfirmPassword(v);
-                      if (errors.confirmPassword) setErrors((e) => ({ ...e, confirmPassword: "" }));
+                      if (errors.confirmPassword)
+                        setErrors((e) => ({ ...e, confirmPassword: "" }));
                     }}
                     secureTextEntry
                   />
                   {!!errors.confirmPassword && (
-                    <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                    <Text style={styles.errorText}>
+                      {errors.confirmPassword}
+                    </Text>
                   )}
                 </View>
 

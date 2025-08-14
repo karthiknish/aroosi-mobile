@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useApiClient } from "../utils/api";
 import { Interest } from "../types/interest";
 
@@ -39,7 +39,7 @@ export interface UseInterestsResult {
 }
 
 export function useInterests(): UseInterestsResult {
-  const { user } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
 
   const [sentInterests, setSentInterests] = useState<Interest[]>([]);
@@ -221,7 +221,7 @@ export function useInterests(): UseInterestsResult {
 
 // Hook for checking interest status between two users
 export function useInterestStatus(otherUserId?: string) {
-  const { user } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);

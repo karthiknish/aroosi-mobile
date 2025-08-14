@@ -9,7 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useSubscription } from "@hooks/useSubscription";
 import { useApiClient } from "@utils/api";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -45,7 +45,7 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { theme } = useTheme();

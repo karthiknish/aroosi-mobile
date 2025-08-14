@@ -5,7 +5,7 @@
 
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { NavigationContainerRef } from '@react-navigation/native';
-import { useAuth } from '../../contexts/AuthContext';
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 // import { useOneSignal } from '../../hooks/useOneSignal'; // Temporarily disabled
 import { NotificationHandler } from '../../utils/notificationHandler';
 import { NotificationPermissionsManager } from '../../utils/notificationPermissions';
@@ -31,7 +31,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
   navigationRef,
 }) => {
-  const { isAuthenticated, userId } = useAuth();
+  const { } = useClerkAuth();
 
   // Temporary mock for OneSignal until we fix the integration
   const oneSignalData = {

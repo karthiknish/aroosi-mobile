@@ -7,7 +7,7 @@ import {
   DeliveryReceipt,
   RealtimeEventHandlers,
 } from "../services/RealtimeMessagingService";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { WEBSOCKET_CONFIG } from "../utils/websocketConfig";
 
 interface UseRealtimeMessagingOptions {
@@ -25,7 +25,7 @@ interface UseRealtimeMessagingOptions {
 export function useRealtimeMessaging(
   options: UseRealtimeMessagingOptions = {}
 ) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<Error | null>(null);

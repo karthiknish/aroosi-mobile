@@ -5,10 +5,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
-import { MessageStatus } from '../../types/message';
+import type { Message } from "../../types/message";
+
+type StatusLike = NonNullable<Message["status"]> | "sending";
 
 interface MessageStatusIndicatorProps {
-  status: MessageStatus;
+  status: StatusLike;
   size?: number;
   showLabel?: boolean;
 }
@@ -20,32 +22,34 @@ export default function MessageStatusIndicator({
 }: MessageStatusIndicatorProps) {
   const getStatusIcon = () => {
     switch (status) {
-      case 'sending':
-        return 'time-outline';
-      case 'sent':
-        return 'checkmark';
-      case 'delivered':
-        return 'checkmark-done';
-      case 'read':
-        return 'checkmark-done';
-      case 'failed':
-        return 'alert-circle';
+      case "pending":
+      case "sending":
+        return "time-outline";
+      case "sent":
+        return "checkmark";
+      case "delivered":
+        return "checkmark-done";
+      case "read":
+        return "checkmark-done";
+      case "failed":
+        return "alert-circle";
       default:
-        return 'time-outline';
+        return "time-outline";
     }
   };
 
   const getStatusColor = () => {
     switch (status) {
-      case 'sending':
+      case "pending":
+      case "sending":
         return Colors.text.tertiary;
-      case 'sent':
+      case "sent":
         return Colors.text.secondary;
-      case 'delivered':
+      case "delivered":
         return Colors.text.secondary;
-      case 'read':
+      case "read":
         return Colors.primary[500];
-      case 'failed':
+      case "failed":
         return Colors.error[500];
       default:
         return Colors.text.tertiary;
@@ -54,15 +58,16 @@ export default function MessageStatusIndicator({
 
   const getStatusOpacity = () => {
     switch (status) {
-      case 'sending':
+      case "pending":
+      case "sending":
         return 0.5;
-      case 'sent':
+      case "sent":
         return 0.7;
-      case 'delivered':
+      case "delivered":
         return 0.8;
-      case 'read':
+      case "read":
         return 1;
-      case 'failed':
+      case "failed":
         return 1;
       default:
         return 0.5;

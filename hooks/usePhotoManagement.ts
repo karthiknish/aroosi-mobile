@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useEnhancedApiClient } from "../utils/enhancedApiClient";
 import { photoService, PhotoUploadResult } from "../services/PhotoService";
 import { ProfileImage } from "../types/image";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useToast } from "../providers/ToastContext";
 import { fontSize } from "../constants";
 
@@ -36,7 +36,7 @@ const MAX_PHOTOS = 5;
 
 export function usePhotoManagement(): UsePhotoManagementResult {
   const apiClient = useEnhancedApiClient();
-  const { user } = useAuth();
+  const { } = useClerkAuth();
   const toast = useToast();
   const [images, setImages] = useState<ProfileImage[]>([]);
   const [loading, setLoading] = useState(false);

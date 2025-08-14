@@ -1,4 +1,7 @@
 import React from "react";
+import { useEffect, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { useApiClient } from "../../utils/api";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createStackNavigator } from "@react-navigation/stack";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,6 +26,7 @@ import SubscriptionScreen from "../screens/main/SubscriptionScreen";
 import EditProfileScreen from "../screens/main/EditProfileScreen";
 import SearchScreen from "../screens/main/SearchScreen";
 import MatchesScreen from "../screens/main/MatchesScreen";
+import InterestsScreen from "@src/screens/main/InterestsScreen";
 import ConversationListScreen from "../screens/main/ConversationListScreen";
 import ChatScreen from "../screens/main/ChatScreen";
 import SettingsScreen from "../screens/settings/SettingsScreen";
@@ -71,6 +75,8 @@ const PlaceholderScreen = ({ name }: { name: string }) => (
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const ProfileStack = createStackNavigator<ProfileStackParamList>();
 const ChatStack = createStackNavigator<ChatStackParamList>();
+const MatchesStack =
+  createStackNavigator<import("./types").MatchesStackParamList>();
 
 function ProfileStackNavigator() {
   return (
@@ -116,6 +122,38 @@ function ProfileStackNavigator() {
 }
 
 function ChatStackNavigator() {
+  const navigation = useNavigation();
+  const apiClient = useApiClient();
+  const [unreadTotal, setUnreadTotal] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    let canceled = false;
+    const loadUnread = async () => {
+      const res = await apiClient.getConversations();
+      if (!res.success) return;
+      const list = Array.isArray((res.data as any)?.conversations)
+        ? (res.data as any).conversations
+        : (res.data as any);
+      if (!Array.isArray(list)) return;
+      const total = list.reduce(
+        (sum: number, conv: any) => sum + (conv.unreadCount || 0),
+        0
+      );
+      if (!canceled) {
+        setUnreadTotal(total);
+        navigation.setOptions({
+          tabBarBadge: total > 0 ? (total > 99 ? "99+" : total) : undefined,
+        });
+      }
+    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 30000);
+    return () => {
+      canceled = true;
+      clearInterval(interval);
+    };
+  }, [apiClient, navigation]);
+
   return (
     <ChatStack.Navigator
       id={undefined}
@@ -135,6 +173,29 @@ function ChatStackNavigator() {
         options={getScreenTransition("Chat")}
       />
     </ChatStack.Navigator>
+  );
+}
+
+function MatchesStackNavigator() {
+  return (
+    <MatchesStack.Navigator
+      id={undefined}
+      screenOptions={{
+        headerShown: false,
+        ...getScreenTransition("default"),
+      }}
+    >
+      <MatchesStack.Screen
+        name="MatchesMain"
+        component={SC(MatchesScreen)}
+        options={getScreenTransition("MatchesMain")}
+      />
+      <MatchesStack.Screen
+        name="Interests"
+        component={SC(InterestsScreen)}
+        options={getScreenTransition("Interests")}
+      />
+    </MatchesStack.Navigator>
   );
 }
 
@@ -179,7 +240,7 @@ export default function MainNavigator() {
       />
       <Tab.Screen
         name="Matches"
-        component={SC(MatchesScreen)}
+        component={MatchesStackNavigator}
         options={{ title: "Matches" }}
       />
       <Tab.Screen

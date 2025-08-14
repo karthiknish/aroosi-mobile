@@ -13,9 +13,14 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import { useApiClient } from "@utils/api";
+import { useApiClient } from "../../../utils/api";
+
+// Validated UI components (web-parity)
+import { ValidatedInput } from "../../components/ui/ValidatedInput";
+import { ValidatedSelect } from "../../components/ui/ValidatedSelect";
+import { ErrorSummary } from "../../components/ui/ErrorSummary";
 import { useMutation } from "@tanstack/react-query";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import {
   CreateProfileData,
   GENDER_OPTIONS,
@@ -30,14 +35,14 @@ import {
   feetInchesToCm,
   ProfileFor,
 } from "../../../types/profile";
-import { useToast } from "@providers/ToastContext";
+import { useToast } from "../../../providers/ToastContext";
 import { COUNTRIES } from "@constants/countries";
 import {
   validateCreateProfile,
   formatPhoneNumber,
   cleanPhoneNumber,
-} from "@utils/profileValidation";
-import { Colors, Layout } from "@constants";
+} from "../../../utils/profileValidation";
+import { Colors, Layout } from "../../../constants";
 import LocalImageUpload from "@components/profile/LocalImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
@@ -50,6 +55,10 @@ import {
 interface ProfileSetupScreenProps {
   navigation: any;
 }
+
+// Helper: map { value,label }[] to string[] of labels for ValidatedSelect
+const toLabelArray = (arr: Array<{ label: string }>): string[] =>
+  arr.map((o) => o.label);
 
 const STEPS = [
   { id: 1, title: "Basic Info", subtitle: "Tell us about yourself" },
@@ -65,7 +74,7 @@ const STEPS = [
 export default function ProfileSetupScreen({
   navigation,
 }: ProfileSetupScreenProps) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -97,10 +106,25 @@ export default function ProfileSetupScreen({
         );
       }
       toast.show("Your profile has been created successfully.", "success");
+      refreshProfile?.();
       navigation.navigate("Main");
     },
     onError: () => {
       toast.show("Failed to create profile. Please try again.", "error");
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (updates: Partial<CreateProfileData>) => {
+      return apiClient.updateProfile(updates);
+    },
+    onSuccess: () => {
+      toast.show("Your profile has been updated.", "success");
+      refreshProfile?.();
+      navigation.navigate("Main");
+    },
+    onError: () => {
+      toast.show("Failed to update profile. Please try again.", "error");
     },
   });
 
@@ -185,7 +209,11 @@ export default function ProfileSetupScreen({
       profileData.phoneNumber = cleanPhoneNumber(profileData.phoneNumber);
     }
 
-    createProfileMutation.mutate(profileData);
+    if (existingProfile) {
+      updateProfileMutation.mutate(profileData);
+    } else {
+      createProfileMutation.mutate(profileData);
+    }
   };
 
   const renderProgressBar = () => (
@@ -227,214 +255,245 @@ export default function ProfileSetupScreen({
     }
   };
 
-  const renderBasicInfoStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Basic Information</Text>
-      <Text style={styles.stepSubtitle}>Let's start with the basics</Text>
+  const renderBasicInfoStep = () => {
+    // Map option objects to label arrays for ValidatedSelect
+    const religionOptions = toLabelArray(RELIGION_OPTIONS as any);
+    const motherTongueOptions = toLabelArray(MOTHER_TONGUE_OPTIONS as any);
+    const genderOptions = (GENDER_OPTIONS as any[]).map((o) => o.label);
+    const preferredGenderOptions = (PREFERRED_GENDER_OPTIONS as any[]).map(
+      (o) => o.label
+    );
 
-      <View style={styles.formGroup}>
-        <SearchableSelect
-          label="Religion"
-          options={RELIGION_OPTIONS}
-          selectedValue={formData.religion || ""}
-          placeholder="Select religion"
-          onValueChange={(v) => handleInputChange("religion", v)}
-        />
-      </View>
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Basic Information</Text>
+        <Text style={styles.stepSubtitle}>Let's start with the basics</Text>
 
-      <View style={styles.formGroup}>
-        <SearchableSelect
-          label="Mother Tongue"
-          options={MOTHER_TONGUE_OPTIONS}
-          selectedValue={formData.motherTongue || ""}
-          placeholder="Select mother tongue"
-          onValueChange={(v) => handleInputChange("motherTongue", v)}
-        />
-      </View>
+        <ErrorSummary errors={errors} />
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Ethnicity</Text>
-        <TextInput
-          style={styles.input}
-          value={formData.ethnicity || ""}
-          onChangeText={(text) => handleInputChange("ethnicity", text)}
-          placeholder="e.g., British Asian, Indian, Pakistani, etc."
-          maxLength={50}
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Date of Birth *</Text>
-        <TouchableOpacity
-          style={[styles.input, styles.dateInput]}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text
-            style={
-              formData.dateOfBirth ? styles.dateText : styles.placeholderText
-            }
-          >
-            {formData.dateOfBirth
-              ? `${formData.dateOfBirth} (Age: ${calculateAge(
-                  formData.dateOfBirth
-                )})`
-              : "Select date of birth"}
-          </Text>
-        </TouchableOpacity>
-        {errors.dateOfBirth && (
-          <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
-        )}
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Gender *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.gender}
-            onValueChange={(value) => handleInputChange("gender", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select gender" value="" />
-            {GENDER_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Religion"
+            field="religion"
+            options={religionOptions}
+            value={formData.religion || ""}
+            onValueChange={(v) => handleInputChange("religion", v)}
+            placeholder="Select religion"
+          />
         </View>
-        {errors.gender && <Text style={styles.errorText}>{errors.gender}</Text>}
-      </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Looking For *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.preferredGender}
-            onValueChange={(value) =>
-              handleInputChange("preferredGender", value)
-            }
-            style={styles.picker}
-          >
-            <Picker.Item label="Select preference" value="" />
-            {PREFERRED_GENDER_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Mother Tongue"
+            field="motherTongue"
+            options={motherTongueOptions}
+            value={formData.motherTongue || ""}
+            onValueChange={(v) => handleInputChange("motherTongue", v)}
+            placeholder="Select mother tongue"
+          />
         </View>
-        {errors.preferredGender && (
-          <Text style={styles.errorText}>{errors.preferredGender}</Text>
-        )}
+
+        <View style={styles.formGroup}>
+          <ValidatedInput
+            label="Ethnicity"
+            field="ethnicity"
+            value={formData.ethnicity || ""}
+            onValueChange={(text) => handleInputChange("ethnicity", text)}
+            placeholder="e.g., British Asian, Indian, Pakistani, etc."
+            maxLength={50}
+            error={errors.ethnicity}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Date of Birth *</Text>
+          <TouchableOpacity
+            style={[
+              styles.input,
+              styles.dateInput,
+              errors.dateOfBirth ? styles.inputError : null,
+            ]}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text
+              style={
+                formData.dateOfBirth ? styles.dateText : styles.placeholderText
+              }
+            >
+              {formData.dateOfBirth
+                ? `${formData.dateOfBirth} (Age: ${calculateAge(
+                    formData.dateOfBirth
+                  )})`
+                : "Select date of birth"}
+            </Text>
+          </TouchableOpacity>
+          {errors.dateOfBirth && (
+            <Text style={styles.errorText}>{errors.dateOfBirth}</Text>
+          )}
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Gender"
+            field="gender"
+            required
+            options={genderOptions}
+            value={formData.gender || ""}
+            onValueChange={(label) => {
+              // map back from label to value using GENDER_OPTIONS
+              const found = (GENDER_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("gender", found ? found.value : "");
+            }}
+            placeholder="Select gender"
+            error={errors.gender}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Looking For"
+            field="preferredGender"
+            required
+            options={preferredGenderOptions}
+            value={formData.preferredGender || ""}
+            onValueChange={(label) => {
+              const found = (PREFERRED_GENDER_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("preferredGender", found ? found.value : "");
+            }}
+            placeholder="Select preference"
+            error={errors.preferredGender}
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
-  const renderLocationStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Location</Text>
-      <Text style={styles.stepSubtitle}>Where are you based?</Text>
+  const renderLocationStep = () => {
+    const countryOptions = (COUNTRIES as any[]).map((c) => c.name ?? c); // support string or {name}
 
-      <View style={styles.formGroup}>
-        <SearchableSelect
-          label="Country *"
-          options={COUNTRIES}
-          selectedValue={formData.country || ""}
-          placeholder="Select country"
-          onValueChange={(value) => handleInputChange("country", value)}
-        />
-        {errors.country && (
-          <Text style={[styles.errorText, { marginTop: Layout.spacing.xs }]}>
-            {errors.country}
-          </Text>
-        )}
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Location</Text>
+        <Text style={styles.stepSubtitle}>Where are you based?</Text>
+
+        <ErrorSummary errors={errors} />
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Country"
+            field="country"
+            required
+            options={countryOptions}
+            value={formData.country || ""}
+            onValueChange={(label) => {
+              // try to map back to code/name object; otherwise store label
+              const found = (COUNTRIES as any[]).find(
+                (c) => (c.name ?? c) === label
+              );
+              handleInputChange("country", found?.name ?? label);
+            }}
+            placeholder="Select country"
+            error={errors.country}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedInput
+            label="City"
+            field="city"
+            required
+            value={formData.city || ""}
+            onValueChange={(text) => handleInputChange("city", text)}
+            placeholder="Enter city"
+            error={errors.city}
+          />
+        </View>
       </View>
+    );
+  };
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>City *</Text>
-        <TextInput
-          style={[styles.input, errors.city && styles.inputError]}
-          value={formData.city || ""}
-          onChangeText={(text) => handleInputChange("city", text)}
-          placeholder="Enter city"
-        />
-        {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
-      </View>
-    </View>
-  );
+  const renderPhysicalDetailsStep = () => {
+    const maritalStatusOptions = (MARITAL_STATUS_OPTIONS as any[]).map(
+      (o) => o.label
+    );
 
-  const renderPhysicalDetailsStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Physical Details</Text>
-      <Text style={styles.stepSubtitle}>
-        Tell us about your physical attributes
-      </Text>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>
-          Height * - {formatHeight(feetInchesToCm(heightFeet, heightInches))}
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Physical Details</Text>
+        <Text style={styles.stepSubtitle}>
+          Tell us about your physical attributes
         </Text>
-        <View style={styles.heightSliders}>
-          <View style={styles.sliderGroup}>
-            <Text style={styles.sliderLabel}>Feet</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={heightFeet}
-                onValueChange={setHeightFeet}
-                style={styles.picker}
-              >
-                {[4, 5, 6].map((feet) => (
-                  <Picker.Item key={feet} label={`${feet} ft`} value={feet} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-          <View style={styles.sliderGroup}>
-            <Text style={styles.sliderLabel}>Inches</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={heightInches}
-                onValueChange={setHeightInches}
-                style={styles.picker}
-              >
-                {Array.from({ length: 12 }, (_, i) => (
-                  <Picker.Item key={i} label={`${i} in`} value={i} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
-        {errors.height && <Text style={styles.errorText}>{errors.height}</Text>}
-      </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Marital Status *</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.maritalStatus}
-            onValueChange={(value) => handleInputChange("maritalStatus", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select status" value="" />
-            {MARITAL_STATUS_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
+        <ErrorSummary errors={errors} />
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>
+            Height * - {formatHeight(feetInchesToCm(heightFeet, heightInches))}
+          </Text>
+          <View style={styles.heightSliders}>
+            <View style={styles.sliderGroup}>
+              <Text style={styles.sliderLabel}>Feet</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={heightFeet}
+                  onValueChange={setHeightFeet}
+                  style={styles.picker}
+                >
+                  {[4, 5, 6].map((feet) => (
+                    <Picker.Item key={feet} label={`${feet} ft`} value={feet} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            <View style={styles.sliderGroup}>
+              <Text style={styles.sliderLabel}>Inches</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={heightInches}
+                  onValueChange={setHeightInches}
+                  style={styles.picker}
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <Picker.Item key={i} label={`${i} in`} value={i} />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+          </View>
+          {errors.height && (
+            <Text style={styles.errorText}>{errors.height}</Text>
+          )}
         </View>
-        {errors.maritalStatus && (
-          <Text style={styles.errorText}>{errors.maritalStatus}</Text>
-        )}
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Marital Status"
+            field="maritalStatus"
+            required
+            options={maritalStatusOptions}
+            value={
+              // map stored value back to label for display
+              (MARITAL_STATUS_OPTIONS as any[]).find(
+                (o) => o.value === formData.maritalStatus
+              )?.label || ""
+            }
+            onValueChange={(label) => {
+              const found = (MARITAL_STATUS_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("maritalStatus", found ? found.value : "");
+            }}
+            placeholder="Select status"
+            error={errors.maritalStatus}
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderProfessionalStep = () => (
     <View style={styles.stepContainer}>
@@ -443,107 +502,137 @@ export default function ProfileSetupScreen({
         Your career and education background
       </Text>
 
+      <ErrorSummary errors={errors} />
+
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Education *</Text>
-        <TextInput
-          style={[styles.input, errors.education && styles.inputError]}
+        <ValidatedInput
+          label="Education"
+          field="education"
+          required
           value={formData.education || ""}
-          onChangeText={(text) => handleInputChange("education", text)}
+          onValueChange={(text) => handleInputChange("education", text)}
           placeholder="e.g., Bachelor's in Computer Science"
           maxLength={100}
+          error={errors.education}
         />
-        {errors.education && (
-          <Text style={styles.errorText}>{errors.education}</Text>
-        )}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Occupation *</Text>
-        <TextInput
-          style={[styles.input, errors.occupation && styles.inputError]}
+        <ValidatedInput
+          label="Occupation"
+          field="occupation"
+          required
           value={formData.occupation || ""}
-          onChangeText={(text) => handleInputChange("occupation", text)}
+          onValueChange={(text) => handleInputChange("occupation", text)}
           placeholder="e.g., Software Engineer"
           maxLength={100}
+          error={errors.occupation}
         />
-        {errors.occupation && (
-          <Text style={styles.errorText}>{errors.occupation}</Text>
-        )}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Annual Income (£) *</Text>
-        <TextInput
-          style={[styles.input, errors.annualIncome && styles.inputError]}
+        <ValidatedInput
+          label="Annual Income (£)"
+          field="annualIncome"
+          required
           value={formData.annualIncome?.toString() || ""}
-          onChangeText={(text) =>
+          onValueChange={(text) =>
             handleInputChange("annualIncome", parseInt(text) || undefined)
           }
           placeholder="e.g., 50000"
           keyboardType="numeric"
+          error={errors.annualIncome}
         />
-        {errors.annualIncome && (
-          <Text style={styles.errorText}>{errors.annualIncome}</Text>
-        )}
       </View>
     </View>
   );
 
-  const renderCulturalStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Cultural Background</Text>
-      <Text style={styles.stepSubtitle}>
-        Share your cultural identity (optional)
-      </Text>
+  const renderCulturalStep = () => {
+    const motherTongueOptions = toLabelArray(MOTHER_TONGUE_OPTIONS as any);
+    const ethnicityOptions = toLabelArray(ETHNICITY_OPTIONS as any);
+    const religionOptions = toLabelArray(RELIGION_OPTIONS as any);
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cultural Background</Text>
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Cultural Background</Text>
+        <Text style={styles.stepSubtitle}>
+          Share your cultural identity (optional)
+        </Text>
 
-        <SearchableSelect
-          label="Mother Tongue"
-          options={MOTHER_TONGUE_OPTIONS}
-          selectedValue={formData.motherTongue || ""}
-          placeholder="Select mother tongue"
-          onValueChange={(v) => handleInputChange("motherTongue", v)}
-        />
+        <ErrorSummary errors={errors} />
 
-        <SearchableSelect
-          label="Ethnicity"
-          options={ETHNICITY_OPTIONS}
-          selectedValue={formData.ethnicity || ""}
-          placeholder="Select ethnicity"
-          onValueChange={(v) => handleInputChange("ethnicity", v)}
-        />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Cultural Background</Text>
 
-        {/* Additional language field removed to align with CreateProfileData */}
-      </View>
+          <ValidatedSelect
+            label="Mother Tongue"
+            field="motherTongue"
+            options={motherTongueOptions}
+            value={
+              (MOTHER_TONGUE_OPTIONS as any[]).find(
+                (o) => o.value === formData.motherTongue
+              )?.label ||
+              formData.motherTongue ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (MOTHER_TONGUE_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("motherTongue", found ? found.value : label);
+            }}
+            placeholder="Select mother tongue"
+          />
 
-      <View style={styles.formGroup}>
-        <SearchableSelect
-          label="Religion"
-          options={RELIGION_OPTIONS}
-          selectedValue={formData.religion || ""}
-          placeholder="Select religion"
-          onValueChange={(v) => handleInputChange("religion", v)}
-        />
-      </View>
+          <ValidatedSelect
+            label="Ethnicity"
+            field="ethnicity"
+            options={ethnicityOptions}
+            value={formData.ethnicity || ""}
+            onValueChange={(label) => handleInputChange("ethnicity", label)}
+            placeholder="Select ethnicity"
+          />
+        </View>
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Profile For</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.profileFor || "self"}
-            onValueChange={(value) => handleInputChange("profileFor", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Self" value="self" />
-            <Picker.Item label="Friend" value="friend" />
-            <Picker.Item label="Family Member" value="family" />
-          </Picker>
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Religion"
+            field="religion"
+            options={religionOptions}
+            value={
+              (RELIGION_OPTIONS as any[]).find(
+                (o) => o.value === formData.religion
+              )?.label ||
+              formData.religion ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (RELIGION_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("religion", found ? found.value : label);
+            }}
+            placeholder="Select religion"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={styles.label}>Profile For</Text>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={formData.profileFor || "self"}
+              onValueChange={(value) => handleInputChange("profileFor", value)}
+              style={styles.picker}
+            >
+              <Picker.Item label="Self" value="self" />
+              <Picker.Item label="Friend" value="friend" />
+              <Picker.Item label="Family Member" value="family" />
+            </Picker>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderAboutMeStep = () => (
     <View style={styles.stepContainer}>
@@ -552,173 +641,190 @@ export default function ProfileSetupScreen({
         Tell potential matches about yourself
       </Text>
 
+      <ErrorSummary errors={errors} />
+
       <View style={styles.formGroup}>
-        <Text style={styles.label}>
-          About Me * ({(formData.aboutMe || "").length}/2000)
-        </Text>
-        <TextInput
-          style={[styles.textArea, errors.aboutMe && styles.inputError]}
+        <ValidatedInput
+          label={`About Me (${(formData.aboutMe || "").length}/2000)`}
+          field="aboutMe"
+          required
           value={formData.aboutMe || ""}
-          onChangeText={(text) => handleInputChange("aboutMe", text)}
+          onValueChange={(text) => handleInputChange("aboutMe", text)}
           placeholder="Tell us about yourself, your values, interests, and what you're looking for in a partner..."
           multiline
           numberOfLines={6}
           maxLength={2000}
-          textAlignVertical="top"
+          error={errors.aboutMe}
         />
-        {errors.aboutMe && (
-          <Text style={styles.errorText}>{errors.aboutMe}</Text>
-        )}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Phone Number *</Text>
-        <TextInput
-          style={[styles.input, errors.phoneNumber && styles.inputError]}
+        <ValidatedInput
+          label="Phone Number"
+          field="phoneNumber"
+          required
           value={
             formData.phoneNumber ? formatPhoneNumber(formData.phoneNumber) : ""
           }
-          onChangeText={(text) => handleInputChange("phoneNumber", text)}
+          onValueChange={(text) => handleInputChange("phoneNumber", text)}
           placeholder="e.g., 07123 456 789"
           keyboardType="phone-pad"
           maxLength={20}
+          error={errors.phoneNumber}
         />
-        {errors.phoneNumber && (
-          <Text style={styles.errorText}>{errors.phoneNumber}</Text>
-        )}
       </View>
     </View>
   );
 
-  const renderLifestyleStep = () => (
-    <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Lifestyle Preferences</Text>
-      <Text style={styles.stepSubtitle}>
-        Share your lifestyle choices (optional)
-      </Text>
+  const renderLifestyleStep = () => {
+    const dietOptions = (DIET_OPTIONS as any[]).map((o) => o.label);
+    const smokingOptions = (SMOKING_DRINKING_OPTIONS as any[]).map(
+      (o) => o.label
+    );
+    const drinkingOptions = (SMOKING_DRINKING_OPTIONS as any[]).map(
+      (o) => o.label
+    );
+    const physicalStatusOptions = (PHYSICAL_STATUS_OPTIONS as any[]).map(
+      (o) => o.label
+    );
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Diet</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.diet}
-            onValueChange={(value) => handleInputChange("diet", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select diet" value="" />
-            {DIET_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Smoking</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.smoking}
-            onValueChange={(value) => handleInputChange("smoking", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select option" value="" />
-            {SMOKING_DRINKING_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Drinking</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.drinking}
-            onValueChange={(value) => handleInputChange("drinking", value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select option" value="" />
-            {SMOKING_DRINKING_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Physical Status</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={formData.physicalStatus}
-            onValueChange={(value) =>
-              handleInputChange("physicalStatus", value)
-            }
-            style={styles.picker}
-          >
-            <Picker.Item label="Select status" value="" />
-            {PHYSICAL_STATUS_OPTIONS.map((option) => (
-              <Picker.Item
-                key={option.value}
-                label={option.label}
-                value={option.value}
-              />
-            ))}
-          </Picker>
-        </View>
-      </View>
-
-      <View style={styles.partnerPreferences}>
-        <Text style={styles.sectionTitle}>
-          Partner Age Preferences (Optional)
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Lifestyle Preferences</Text>
+        <Text style={styles.stepSubtitle}>
+          Share your lifestyle choices (optional)
         </Text>
-        <View style={styles.ageRange}>
-          <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-            <Text style={styles.label}>Min Age</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.partnerPreferenceAgeMin?.toString() || ""}
-              onChangeText={(text) =>
-                handleInputChange(
-                  "partnerPreferenceAgeMin",
-                  parseInt(text) || undefined
-                )
-              }
-              placeholder="18"
-              keyboardType="numeric"
-            />
-          </View>
 
-          <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text style={styles.label}>Max Age</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.partnerPreferenceAgeMax?.toString() || ""}
-              onChangeText={(text) =>
-                handleInputChange(
-                  "partnerPreferenceAgeMax",
-                  parseInt(text) || undefined
-                )
-              }
-              placeholder="120"
-              keyboardType="numeric"
-            />
+        <ErrorSummary errors={errors} />
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Diet"
+            field="diet"
+            options={dietOptions}
+            value={
+              (DIET_OPTIONS as any[]).find((o) => o.value === formData.diet)
+                ?.label ||
+              formData.diet ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (DIET_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("diet", found ? found.value : label);
+            }}
+            placeholder="Select diet"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Smoking"
+            field="smoking"
+            options={smokingOptions}
+            value={
+              (SMOKING_DRINKING_OPTIONS as any[]).find(
+                (o) => o.value === formData.smoking
+              )?.label ||
+              formData.smoking ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (SMOKING_DRINKING_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("smoking", found ? found.value : label);
+            }}
+            placeholder="Select option"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Drinking"
+            field="drinking"
+            options={drinkingOptions}
+            value={
+              (SMOKING_DRINKING_OPTIONS as any[]).find(
+                (o) => o.value === formData.drinking
+              )?.label ||
+              formData.drinking ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (SMOKING_DRINKING_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("drinking", found ? found.value : label);
+            }}
+            placeholder="Select option"
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <ValidatedSelect
+            label="Physical Status"
+            field="physicalStatus"
+            options={physicalStatusOptions}
+            value={
+              (PHYSICAL_STATUS_OPTIONS as any[]).find(
+                (o) => o.value === formData.physicalStatus
+              )?.label ||
+              formData.physicalStatus ||
+              ""
+            }
+            onValueChange={(label) => {
+              const found = (PHYSICAL_STATUS_OPTIONS as any[]).find(
+                (o) => o.label === label
+              );
+              handleInputChange("physicalStatus", found ? found.value : label);
+            }}
+            placeholder="Select status"
+          />
+        </View>
+
+        <View style={styles.partnerPreferences}>
+          <Text style={styles.sectionTitle}>
+            Partner Age Preferences (Optional)
+          </Text>
+          <View style={styles.ageRange}>
+            <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+              <ValidatedInput
+                label="Min Age"
+                field="partnerPreferenceAgeMin"
+                value={formData.partnerPreferenceAgeMin?.toString() || ""}
+                onValueChange={(text) =>
+                  handleInputChange(
+                    "partnerPreferenceAgeMin",
+                    parseInt(text) || undefined
+                  )
+                }
+                placeholder="18"
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+              <ValidatedInput
+                label="Max Age"
+                field="partnerPreferenceAgeMax"
+                value={formData.partnerPreferenceAgeMax?.toString() || ""}
+                onValueChange={(text) =>
+                  handleInputChange(
+                    "partnerPreferenceAgeMax",
+                    parseInt(text) || undefined
+                  )
+                }
+                placeholder="120"
+                keyboardType="numeric"
+              />
+            </View>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderPhotosStep = () => (
     <View style={styles.stepContainer}>

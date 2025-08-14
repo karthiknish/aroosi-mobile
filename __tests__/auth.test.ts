@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, jest } from "@jest/globals";
-import { AuthProvider } from "../contexts/AuthContext";
+import { ClerkAuthProvider } from "../contexts/ClerkAuthContext"
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 

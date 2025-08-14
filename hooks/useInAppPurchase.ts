@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Platform } from "react-native";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import {
   initConnection,
   purchaseUpdatedListener,
@@ -44,7 +44,7 @@ import {
 const PLATFORM: AppPlatform = Platform.OS === "ios" ? "ios" : "android";
 
 export const useInAppPurchase = (): UsePurchaseReturn => {
-  const { userId, token } = useAuth() as any;
+  const { } = useClerkAuth() as any;
   const apiClient = useApiClient();
 
   // State

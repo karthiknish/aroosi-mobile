@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useEnhancedApiClient } from '../utils/enhancedApiClient';
 import { Contact, ContactFormData, ContactFormErrors, ContactSubmissionResult } from '../types/contact';
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 
 export function useContact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<ContactFormErrors>({});
   const apiClient = useEnhancedApiClient();
-  const { user } = useAuth();
+  const { user } = useClerkAuth();
 
   const validateForm = (data: ContactFormData): ContactFormErrors => {
     const newErrors: ContactFormErrors = {};

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { RealtimeManager, RealtimeEvent } from "../utils/realtimeManager";
 import { API_BASE_URL } from "../utils/api";
 
@@ -18,7 +18,7 @@ export function useRealtime({
   onTypingIndicator,
   onProfileView,
 }: UseRealtimeOptions = {}) {
-  const { token, user } = useAuth();
+  const { } = useClerkAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [events, setEvents] = useState<RealtimeEvent[]>([]);

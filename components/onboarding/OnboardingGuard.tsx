@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { useAuth } from "../../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { LoadingState } from '../error';
 
@@ -15,7 +15,7 @@ export default function OnboardingGuard({
   requireOnboarding = true,
   redirectTo = '/onboarding'
 }: OnboardingGuardProps) {
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
+  const { } = useClerkAuth();
   const { shouldShow, isLoading: onboardingLoading } = useOnboarding();
   const router = useRouter();
 

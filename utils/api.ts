@@ -25,22 +25,12 @@ if (!API_BASE_URL) {
 
 class ApiClient {
   private baseUrl: string;
-  private getToken: (() => Promise<string | null>) | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
 
-  setAuthProvider(getToken: () => Promise<string | null>) {
-    this.getToken = getToken;
-  }
-
-  private async getAuthHeaders() {
-    const token = await this.getToken?.();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }
-
-  // Public wrapper used by enhancedApiClient as shared transport
+  // Public wrapper used by other modules as shared transport
   public async transportRequest<T = any>(
     endpoint: string,
     options: {
@@ -68,38 +58,25 @@ class ApiClient {
 
     try {
       const url = `${this.baseUrl}${endpoint}`;
-      const authHeaders = await this.getAuthHeaders();
 
       const response = await fetch(url, {
         ...options,
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders,
-          ...options.headers,
+          ...(options.headers || {}),
         },
       });
 
-      // Handle token expiration
-      if (response.status === 401) {
-        // Try to refresh token if available
-        const newToken = await this.refreshTokenIfNeeded();
-        if (newToken && retryCount < maxRetries) {
-          // Retry with new token
-          return this.request(endpoint, options, retryCount + 1);
-        }
-      }
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        // Standardized error response format matching web application
         return {
           success: false,
           error: {
             code: this.getErrorCode(response.status, data),
-            message: data.error || data.message || `HTTP ${response.status}`,
-            details: data.details || null,
+            message: data?.error || data?.message || `HTTP ${response.status}`,
+            details: data?.details || null,
           },
         };
       }
@@ -109,7 +86,6 @@ class ApiClient {
         data,
       };
     } catch (error) {
-      // Retry on network errors
       if (retryCount < maxRetries && this.isRetryableError(error)) {
         await this.delay(retryDelay);
         return this.request(endpoint, options, retryCount + 1);
@@ -161,11 +137,7 @@ class ApiClient {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  private async refreshTokenIfNeeded(): Promise<string | null> {
-    // This would integrate with the auth system's token refresh mechanism
-    // For now, return null - this will be implemented when token refresh is added
-    return null;
-  }
+  // Removed token refresh; relying solely on cookie-based session via credentials: "include"
 
   // Profile APIs
   async getProfile(): Promise<ApiResponse<Profile>> {
@@ -256,7 +228,7 @@ class ApiClient {
 
     // Additional filters
     if (filters.gender && filters.gender !== "any")
-      params.append("gender", filters.gender);
+      params.append("preferredGender", filters.gender);
     if (filters.maritalStatus && filters.maritalStatus.length > 0) {
       filters.maritalStatus.forEach((status) =>
         params.append("maritalStatus", status)
@@ -595,7 +567,9 @@ class ApiClient {
   }
 
   // Message normalization for backward compatibility
-  private normalizeMessage(rawMessage: any): import("../types/message").Message {
+  private normalizeMessage(
+    rawMessage: any
+  ): import("../types/message").Message {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,
@@ -1008,17 +982,20 @@ class ApiClient {
 
 export const apiClient = new ApiClient(API_BASE_URL);
 
-// Hook to initialize API client with auth
+// Export a shared named transport request for other modules
+export function request<T = any>(
+  endpoint: string,
+  options: {
+    method?: "GET" | "POST" | "PUT" | "DELETE";
+    headers?: Record<string, string>;
+    body?: any;
+    signal?: AbortSignal;
+  } = {}
+) {
+  return apiClient.transportRequest<T>(endpoint, options);
+}
+
+// Retain hook for parity; now simply returns the singleton client
 export function useApiClient() {
-  // Import here to avoid circular dependency
-  const { useAuth } = require("../contexts/AuthContext");
-  const { getToken } = useAuth();
-
-  // Initialize auth provider once
-  if (!apiClient["authInitialized"]) {
-    apiClient.setAuthProvider(getToken);
-    apiClient["authInitialized"] = true;
-  }
-
   return apiClient;
 }

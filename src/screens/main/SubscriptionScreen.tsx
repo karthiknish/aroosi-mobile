@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,182 +6,171 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Linking,
+  Platform,
 } from "react-native";
-import { useSubscription } from "../../../hooks/useSubscription";
+import { useQueryClient } from "@tanstack/react-query";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import SubscriptionCard from "@components/subscription/SubscriptionCard";
-import UsageDashboard from "@components/subscription/UsageDashboard";
+// UsageDashboard is optional and not wired in this API-based flow
 import UpgradeConfirmationModal from "@components/subscription/UpgradeConfirmationModal";
+import PaywallModal from "@components/subscription/PaywallModal";
 import { Colors, Layout } from "../../../constants";
-import { SubscriptionPlan, PlanFeature } from "../../../types/subscription";
 import { useToast } from "@providers/ToastContext";
+import {
+  getPlans,
+  createCheckoutSession,
+} from "../../../services/subscriptions";
+import type {
+  SubscriptionPlan,
+  SubscriptionTier,
+} from "../../../types/subscription";
+
+// Helper to coerce backend ids to SubscriptionTier safely
+const asTier = (id: string): SubscriptionTier =>
+  id === "free" || id === "premium" || id === "premiumPlus"
+    ? (id as SubscriptionTier)
+    : ("free" as SubscriptionTier);
+
 interface SubscriptionScreenProps {
   navigation: any;
 }
 
-const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
-  {
-    id: "free",
-    tier: "free",
-    name: "Free",
-    description: "Basic features to get started",
-    price: 0,
-    currency: "GBP",
-    duration: "monthly",
-    features: [
-      "5 messages per month",
-      "3 interests per month",
-      "View up to 10 profiles per day",
-      "20 searches per month",
-      "Basic search filters",
-    ],
-  },
-  {
-    id: "premium",
-    tier: "premium",
-    name: "Premium",
-    description: "Enhanced features for better connections",
-    price: 14.99,
-    currency: "GBP",
-    duration: "monthly",
-    features: [
-      "Unlimited messaging",
-      "Unlimited interests",
-      "Advanced search filters",
-      "See who viewed your profile",
-      "Read receipts",
-      "1 profile boost per month",
-    ],
-  },
-  {
-    id: "premiumPlus",
-    tier: "premiumPlus",
-    name: "Premium+",
-    description: "Maximum features for serious dating",
-    price: 39.99,
-    currency: "GBP",
-    duration: "monthly",
-    popularBadge: true,
-    features: [
-      "Everything in Premium",
-      "See who liked you",
-      "Incognito browsing",
-      "Priority customer support",
-      "Unlimited profile boosts",
-      "Advanced matching algorithm",
-    ],
-  },
-];
+/**
+ * Plans will now be loaded from the backend via cookie-auth endpoints
+ * using getPlans(). This removes the hard-coded mobile plan list.
+ */
 
 export default function SubscriptionScreen({
   navigation,
 }: SubscriptionScreenProps) {
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(
-    null
-  );
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeTarget, setUpgradeTarget] = useState<SubscriptionPlan | null>(
-    null
-  );
-  const {
-    subscription,
-    usage,
-    hasActiveSubscription,
-    isTrialActive,
-    daysUntilExpiry,
-    loading,
-    purchaseSubscription,
-    cancelSubscription,
-    restorePurchases,
-  } = useSubscription();
+  const [upgradeTargetId, setUpgradeTargetId] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [plans, setPlans] = useState<
+    Array<{
+      id: string;
+      name: string;
+      price: number;
+      features?: string[];
+      popular?: boolean;
+    }>
+  >([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
 
-  const currentTier = subscription?.tier || "free";
+  // Source of truth for subscription status comes from profile in AuthContext
+  const { } = useClerkAuth();
+  const queryClient = useQueryClient();
   const toast = useToast();
 
-  const handlePurchase = async (tier: string) => {
-    const targetPlan = SUBSCRIPTION_PLANS.find((plan) => plan.tier === tier);
-    if (!targetPlan) return;
+  const profile = user?.profile as any | null;
+  const currentTier: string = profile?.subscriptionPlan ?? "free";
+  const subscriptionExpiresAt: number | undefined =
+    profile?.subscriptionExpiresAt;
+  const now = Date.now();
+  const hasActiveSubscription =
+    !!subscriptionExpiresAt && subscriptionExpiresAt > now;
+  const daysUntilExpiry = hasActiveSubscription
+    ? Math.max(
+        0,
+        Math.ceil((subscriptionExpiresAt - now) / (1000 * 60 * 60 * 24))
+      )
+    : 0;
 
-    // If user has an active subscription, show upgrade confirmation
-    if (hasActiveSubscription && subscription?.tier !== tier) {
-      setUpgradeTarget(targetPlan);
+  // Load plans from API
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingPlans(true);
+        const p = await getPlans();
+        if (mounted) {
+          setPlans(p);
+        }
+      } catch (e: any) {
+        toast.show("Unable to load plans. Please try again.", "error");
+      } finally {
+        mounted = false;
+        setLoadingPlans(false);
+      }
+    })();
+  }, [toast]);
+
+  const startCheckout = useCallback(
+    async (planId: string): Promise<boolean> => {
+      try {
+        setPurchasing(planId);
+        const platform = (Platform?.OS === "ios" ? "ios" : "android") as
+          | "ios"
+          | "android";
+        const { url } = await createCheckoutSession(planId, platform);
+        if (url) {
+          await Linking.openURL(url);
+        } else {
+          toast.show("Checkout link unavailable. Try again.", "error");
+          return false;
+        }
+        // On return, refresh session/profile and queries
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+        return true;
+      } catch (error: any) {
+        const message =
+          typeof error?.message === "string"
+            ? error.message
+            : "Something went wrong. Please try again later.";
+        toast.show(message, "error");
+        return false;
+      } finally {
+        setPurchasing(null);
+      }
+    },
+    [toast, refreshUser, queryClient]
+  );
+
+  const handlePurchase = async (planId: string) => {
+    // If user has an active subscription and selected a different plan, confirm upgrade
+    if (hasActiveSubscription && currentTier && currentTier !== planId) {
+      setUpgradeTargetId(planId);
       setShowUpgradeModal(true);
       return;
     }
-
-    // Direct purchase for new subscriptions
-    try {
-      setPurchasing(tier);
-      const success = await purchaseSubscription(tier);
-
-      if (success) {
-        toast.show(
-          "Your subscription has been activated. Enjoy premium features!",
-          "success"
-        );
-        setSelectedPlan(null);
-      } else {
-        toast.show(
-          "There was an issue processing your purchase. Please try again.",
-          "error"
-        );
-      }
-    } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "Something went wrong. Please try again later.";
-      toast.show(message, "error");
-    } finally {
-      setPurchasing(null);
-    }
+    await startCheckout(planId);
   };
 
   const handleUpgradeConfirm = async (planId: string): Promise<boolean> => {
-    try {
-      setPurchasing(planId);
-      const success = await purchaseSubscription(planId);
-      if (success) {
-        setShowUpgradeModal(false);
-        setUpgradeTarget(null);
-        setSelectedPlan(null);
-        toast.show("Your plan has been upgraded.", "success");
-      }
-      return success;
-    } catch (error: any) {
-      console.error("Upgrade error:", error);
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "An unexpected error occurred while upgrading.";
-      toast.show(message, "error");
-      return false;
-    } finally {
-      setPurchasing(null);
+    const ok = await startCheckout(planId);
+    if (ok) {
+      setShowUpgradeModal(false);
+      setUpgradeTargetId(null);
+      setSelectedPlanId(null);
+      toast.show("Your plan has been upgraded.", "success");
     }
+    return ok;
   };
 
   const handleCancelSubscription = () => {
+    // Cancellation flow depends on provider; for Stripe Checkout billing, direct users to web portal
     Alert.alert(
       "Cancel Subscription",
-      "Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your current billing period.",
+      "Subscription management is handled on our billing portal. Open the portal to manage or cancel your plan?",
       [
         { text: "Keep Subscription", style: "cancel" },
         {
-          text: "Cancel",
-          style: "destructive",
+          text: "Open Portal",
+          style: "default",
           onPress: async () => {
-            const success = await cancelSubscription();
-            if (success) {
+            try {
+              // Optionally: GET /api/subscriptions/portal -> { url }
+              // For now, guide user:
               toast.show(
-                "Your subscription has been cancelled. You'll retain access until the end of the current period.",
-                "success"
+                "Please manage your subscription on the billing portal.",
+                "info"
               );
-            } else {
-              toast.show(
-                "Unable to cancel subscription. Please try again.",
-                "error"
-              );
+            } catch {
+              toast.show("Could not open billing portal.", "error");
             }
           },
         },
@@ -190,59 +179,14 @@ export default function SubscriptionScreen({
   };
 
   const handleRestorePurchases = async () => {
-    try {
-      const success = await restorePurchases();
-      if (success) {
-        toast.show("Your previous purchases have been restored.", "success");
-      } else {
-        toast.show("No previous purchases were found to restore.", "info");
-      }
-    } catch (error: any) {
-      const message =
-        typeof error?.message === "string"
-          ? error.message
-          : "We couldn't restore purchases at this time.";
-      toast.show(message, "error");
-    }
+    // For web checkout (Stripe), restore happens via session/profile refresh
+    await refreshUser();
+    toast.show("Subscription status refreshed.", "success");
   };
 
-  const renderFeatureRow = (feature: PlanFeature) => (
-    <View key={feature.title} style={styles.featureRow}>
-      <Text style={styles.featureTitle}>{feature.title}</Text>
-      <View style={styles.featureChecks}>
-        <View style={styles.checkContainer}>
-          {feature.free ? (
-            <Text style={styles.checkMark}>✓</Text>
-          ) : (
-            <Text style={styles.checkMark}>—</Text>
-          )}
-        </View>
-        <View style={styles.checkContainer}>
-          {feature.premium ? (
-            <Text style={styles.checkMark}>✓</Text>
-          ) : (
-            <Text style={styles.checkMark}>—</Text>
-          )}
-        </View>
-        <View style={styles.checkContainer}>
-          {feature.premiumPlus ? (
-            <Text style={styles.checkMark}>✓</Text>
-          ) : (
-            <Text style={styles.checkMark}>—</Text>
-          )}
-        </View>
-      </View>
-    </View>
-  );
+  // Removed legacy feature table renderer; plans are rendered via SubscriptionCard
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary[500]} />
-        <Text style={styles.loadingText}>Loading subscription details...</Text>
-      </View>
-    );
-  }
+  // No separate loading path; current status can render with available profile data
 
   return (
     <>
@@ -264,7 +208,7 @@ export default function SubscriptionScreen({
         {hasActiveSubscription ? (
           <View>
             <Text style={styles.statusActive}>
-              {subscription?.tier?.toUpperCase()} Active
+              {(currentTier || "free").toUpperCase()} Active
             </Text>
             {daysUntilExpiry > 0 && (
               <Text style={styles.statusExpiry}>
@@ -272,54 +216,60 @@ export default function SubscriptionScreen({
               </Text>
             )}
           </View>
-        ) : isTrialActive ? (
-          <View>
-            <Text style={styles.statusTrial}>Trial Active</Text>
-            <Text style={styles.statusExpiry}>
-              {daysUntilExpiry} days remaining
-            </Text>
-          </View>
         ) : (
           <Text style={styles.statusFree}>Free Plan</Text>
         )}
       </View>
 
-      {/* Usage Dashboard */}
-      {usage && (
-        <View style={styles.usageSection}>
-          <UsageDashboard onUpgradePress={() => {}} />
-        </View>
-      )}
+      {/* Usage Dashboard (optional). Integrate when usage data source is available */}
 
       {/* Subscription Plans */}
       <View style={styles.plansSection}>
         <Text style={styles.plansTitle}>Choose Your Plan</Text>
-        {SUBSCRIPTION_PLANS.map((plan) => (
-          <SubscriptionCard
-            key={plan.id}
-            plan={plan}
-            isSelected={selectedPlan?.id === plan.id}
-            isCurrentPlan={currentTier === plan.tier}
-            onSelect={setSelectedPlan}
-            disabled={purchasing !== null}
-          />
-        ))}
+        {loadingPlans ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary[500]} />
+            <Text style={styles.loadingText}>Loading plans...</Text>
+          </View>
+        ) : (
+          plans.map((plan) => (
+            <SubscriptionCard
+              key={plan.id}
+              plan={
+                {
+                  id: plan.id,
+                  tier: plan.id,
+                  name: plan.name,
+                  description: "",
+                  price: (plan.price ?? 0) / 100,
+                  currency: "GBP",
+                  duration: "monthly",
+                  features: plan.features ?? [],
+                  popularBadge: !!plan.popular,
+                } as any
+              }
+              isSelected={selectedPlanId === plan.id}
+              isCurrentPlan={currentTier === plan.id}
+              onSelect={(p) => setSelectedPlanId(p.id)}
+              disabled={purchasing !== null}
+            />
+          ))
+        )}
       </View>
 
       {/* Purchase Button */}
-      {selectedPlan && selectedPlan.tier !== currentTier && (
+      {selectedPlanId && selectedPlanId !== currentTier && (
         <View style={styles.purchaseSection}>
           <TouchableOpacity
             style={styles.purchaseButton}
-            onPress={() => handlePurchase(selectedPlan.tier)}
+            onPress={() => handlePurchase(selectedPlanId)}
             disabled={purchasing !== null}
           >
-            {purchasing === selectedPlan.tier ? (
+            {purchasing === selectedPlanId ? (
               <ActivityIndicator color={Colors.background.primary} />
             ) : (
               <Text style={styles.purchaseButtonText}>
-                Subscribe to {selectedPlan.name} - £
-                {selectedPlan.price.toFixed(2)}/month
+                Continue to Checkout
               </Text>
             )}
           </TouchableOpacity>
@@ -342,9 +292,22 @@ export default function SubscriptionScreen({
         {hasActiveSubscription && (
           <TouchableOpacity
             style={styles.cancelButton}
-            onPress={handleCancelSubscription}
+            onPress={async () => {
+              try {
+                const { getBillingPortalUrl } = await import("../../../services/subscriptions");
+                const { url } = await getBillingPortalUrl();
+                if (url) {
+                  await Linking.openURL(url);
+                } else {
+                  // fallback
+                  handleCancelSubscription();
+                }
+              } catch (e) {
+                handleCancelSubscription();
+              }
+            }}
           >
-            <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+            <Text style={styles.cancelButtonText}>Manage/Cancel</Text>
           </TouchableOpacity>
         )}
 
@@ -359,44 +322,60 @@ export default function SubscriptionScreen({
       {/* Terms */}
       <View style={styles.termsSection}>
         <Text style={styles.termsText}>
-          Subscriptions auto-renew until cancelled. You can cancel anytime in
-          your account settings.
+          Subscriptions auto-renew until cancelled. Manage your plan in the
+          billing portal.
         </Text>
       </View>
 
       {/* Upgrade Confirmation Modal */}
-      {upgradeTarget && (
+      {upgradeTargetId && (
         <UpgradeConfirmationModal
           visible={showUpgradeModal}
           onClose={() => {
             setShowUpgradeModal(false);
-            setUpgradeTarget(null);
+            setUpgradeTargetId(null);
+            setSelectedPlanId(null);
           }}
           currentPlan={
-            subscription
-              ? {
-                  id: subscription.tier,
-                  tier: subscription.tier,
+            currentTier
+              ? ({
+                  id: asTier(currentTier),
+                  tier: asTier(currentTier),
                   name:
-                    subscription.tier === "premium"
+                    currentTier === "premium"
                       ? "Premium"
-                      : subscription.tier === "premiumPlus"
+                      : currentTier === "premiumPlus"
                       ? "Premium Plus"
                       : "Free",
                   price:
-                    subscription.tier === "premium"
+                    currentTier === "premium"
                       ? 14.99
-                      : subscription.tier === "premiumPlus"
+                      : currentTier === "premiumPlus"
                       ? 39.99
                       : 0,
                   currency: "GBP",
                   duration: "monthly",
                   description: "",
                   features: [] as string[],
-                }
+                } as SubscriptionPlan)
               : null
           }
-          targetPlan={upgradeTarget}
+          targetPlan={
+            {
+              id: asTier(upgradeTargetId),
+              tier: asTier(upgradeTargetId),
+              name:
+                plans.find((p) => p.id === upgradeTargetId)?.name ||
+                upgradeTargetId,
+              description: "",
+              price:
+                (plans.find((p) => p.id === upgradeTargetId)?.price ?? 0) / 100,
+              currency: "GBP",
+              duration: "monthly",
+              features:
+                plans.find((p) => p.id === upgradeTargetId)?.features ?? [],
+            } as SubscriptionPlan
+          }
           onConfirm={handleUpgradeConfirm}
         />
       )}

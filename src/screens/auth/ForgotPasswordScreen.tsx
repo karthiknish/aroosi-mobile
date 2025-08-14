@@ -10,7 +10,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from "react-native";
-import { useAuth } from "@contexts/AuthContext";
+import { useClerkAuth } from "@contexts/ClerkAuthContext";
 import { Colors, Layout } from "@constants";
 import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
@@ -25,7 +25,7 @@ type ForgotPasswordScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function ForgotPasswordScreen() {
-  const { requestPasswordReset } = useAuth();
+  const { requestPasswordReset } = useClerkAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();

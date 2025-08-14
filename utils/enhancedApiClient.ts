@@ -1,4 +1,4 @@
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { ApiResponse } from "../types/profile";
 import { networkManager } from "./NetworkManager";
 import { AppError, errorHandler } from "./errorHandling";

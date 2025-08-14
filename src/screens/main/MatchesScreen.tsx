@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,35 +8,45 @@ import {
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { Colors, Layout } from "../../../constants";
 import { useTheme } from "../../../contexts/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
-} from "@/components/ui/LoadingStates";
-import { NoMatches, NoInterests } from "@/components/ui/EmptyStates";
-import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
+} from "../../components/ui/LoadingStates";
+import { NoMatches, NoInterests } from "../../components/ui/EmptyStates";
+import {
+  ErrorBoundary,
+  ApiErrorDisplay,
+} from "../../components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
   SlideInView,
   AnimatedButton,
   StaggeredList,
-} from "@/components/ui/AnimatedComponents";
+} from "../../components/ui/AnimatedComponents";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { Profile } from "../../../types/profile";
+import { useToast } from "../../../providers/ToastContext";
+import { useInterests } from "../../../hooks/useInterests";
 
 interface MatchesScreenProps {
   navigation: any;
 }
 
 // Local types for matches and interests
-interface Match extends Profile {
-  conversationId?: string;
+type UIMatch = {
+  userId: string;
+  fullName?: string | null;
+  profileImageUrls?: string[] | null;
+  conversationId: string;
   matchedAt?: number;
   lastActivity?: number;
-}
+  unreadCount?: number;
+};
 
 interface Interest {
   _id: string;
@@ -46,21 +56,46 @@ interface Interest {
 }
 
 export default function MatchesScreen({ navigation }: MatchesScreenProps) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const { theme } = useTheme();
   const apiClient = useApiClient();
   const [refreshing, setRefreshing] = useState(false);
+  const toast = useToast();
+
+  const { sentInterests, sendInterest, sending, isMutualInterest } = useInterests();
+  const hasSentInterestTo = useMemo(
+    () => (otherUserId: string) => sentInterests.some((i: any) => i.toUserId === otherUserId),
+    [sentInterests]
+  );
 
   const {
     data: matches,
     isLoading: matchesLoading,
     error: matchesError,
     refetch: refetchMatches,
-  } = useQuery<Match[]>({
+  } = useQuery<UIMatch[]>({
     queryKey: ["matches"],
     queryFn: async () => {
-      const response = await apiClient.getMatches();
-      return response.success ? (response.data as Match[]) : [];
+      const response = await apiClient.getConversations();
+      if (!response.success) return [];
+      // server returns { conversations, total }
+      const payload: any = response.data;
+      const conversations: any[] = payload?.conversations || payload || [];
+      const uiMatches: UIMatch[] = conversations.map((c: any) => {
+        const other = (c.participants || []).find(
+          (p: any) => p?.userId !== userId
+        );
+        return {
+          userId: other?.userId || "",
+          fullName: other?.firstName || other?.fullName || other?.userId || "",
+          profileImageUrls: other?.profileImageUrls || [],
+          conversationId: c.conversationId || c._id || c.id,
+          matchedAt: c.createdAt,
+          lastActivity: c.lastActivity || c.lastMessageAt,
+          unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
+        };
+      });
+      return uiMatches;
     },
     enabled: !!userId,
     retry: 2,
@@ -90,7 +125,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     setRefreshing(false);
   };
 
-  const handleMatchPress = (match: Match) => {
+  const handleMatchPress = (match: UIMatch) => {
     navigation.navigate("Chat", {
       screen: "Chat",
       params: {
@@ -116,8 +151,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     );
   };
 
-  const renderMatch = (match: Match, index: number) => (
-    <FadeInView key={match._id} delay={index * 100}>
+  const renderMatch = (match: UIMatch, index: number) => (
+    <FadeInView key={`${match.conversationId}-${index}`} delay={index * 100}>
       <AnimatedButton
         style={[
           styles.matchCard,
@@ -157,10 +192,12 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                 { color: theme.colors.text.secondary },
               ]}
             >
-              {match.lastActivity ? "Recent activity" : "Say hello!"}
+              {Number.isFinite(match.lastActivity)
+                ? "Recent activity"
+                : "Say hello!"}
             </Text>
           </SlideInView>
-          {match.matchedAt && (
+          {Number.isFinite(match.matchedAt) && (
             <SlideInView direction="left" delay={200 + index * 50}>
               <Text
                 style={[
@@ -168,7 +205,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                   { color: theme.colors.text.tertiary },
                 ]}
               >
-                Matched {new Date(match.matchedAt).toLocaleDateString()}
+                Matched{" "}
+                {new Date(match.matchedAt as number).toLocaleDateString()}
               </Text>
             </SlideInView>
           )}
@@ -176,14 +214,68 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
         <ScaleInView delay={250 + index * 50} fromScale={0.5}>
           <View style={styles.matchActions}>
-            <View
-              style={[
-                styles.unreadBadge,
-                { backgroundColor: theme.colors.primary[50] },
-              ]}
-            >
-              <Text style={styles.unreadText}>💬</Text>
-            </View>
+            {match.unreadCount && match.unreadCount > 0 ? (
+              <View
+                style={[
+                  styles.unreadBadge,
+                  {
+                    backgroundColor: theme.colors.error[500],
+                  },
+                ]}
+              >
+                <Text style={[styles.unreadText, { color: "#fff" }]}>
+                  {match.unreadCount > 99 ? "99+" : String(match.unreadCount)}
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.unreadBadge,
+                  { backgroundColor: theme.colors.neutral[200] },
+                ]}
+              >
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={18}
+                  color={theme.colors.text.secondary}
+                />
+              </View>
+            )}
+
+            {/* Express interest quick action */}
+            {!isMutualInterest(match.userId) && (
+              <TouchableOpacity
+                disabled={sending || hasSentInterestTo(match.userId)}
+                onPress={async () => {
+                  const ok = await sendInterest(match.userId);
+                  if (ok) {
+                    toast?.show?.("Interest sent", "success");
+                  } else {
+                    toast?.show?.("Could not send interest", "error");
+                  }
+                }}
+                style={[
+                  styles.interestQuickBtn,
+                  {
+                    borderColor: theme.colors.border.primary,
+                    backgroundColor: hasSentInterestTo(match.userId)
+                      ? theme.colors.primary[50]
+                      : theme.colors.background.primary,
+                    opacity: sending ? 0.6 : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={hasSentInterestTo(match.userId) ? "heart" : "heart-outline"}
+                  size={18}
+                  color={
+                    hasSentInterestTo(match.userId)
+                      ? theme.colors.primary[600]
+                      : theme.colors.text.secondary
+                  }
+                />
+              </TouchableOpacity>
+            )}
           </View>
         </ScaleInView>
       </AnimatedButton>
@@ -207,7 +299,9 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             {interest.fromProfile?.fullName || "Someone"} sent you an interest
           </Text>
           <Text style={styles.interestTime}>
-            {new Date(interest.createdAt).toLocaleDateString()}
+            {interest.createdAt
+              ? new Date(interest.createdAt).toLocaleDateString()
+              : ""}
           </Text>
           <Text
             style={[
@@ -338,11 +432,11 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
           {matchesError ? (
             <ApiErrorDisplay error={matchesError} onRetry={refetchMatches} />
-          ) : !matches || (matches as Match[]).length === 0 ? (
+          ) : !matches || (matches as UIMatch[]).length === 0 ? (
             <NoMatches onActionPress={() => navigation.navigate("Search")} />
           ) : (
             <View style={styles.matchesList}>
-              {(matches as Match[]).map((match: Match, index: number) =>
+              {(matches as UIMatch[]).map((match: UIMatch, index: number) =>
                 renderMatch(match, index)
               )}
             </View>
@@ -455,6 +549,15 @@ const styles = StyleSheet.create({
   },
   unreadText: {
     fontSize: Layout.typography.fontSize.base,
+  },
+  interestQuickBtn: {
+    marginTop: Layout.spacing.sm,
+    width: 36,
+    height: 36,
+    borderRadius: Layout.radius.full,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   interestCard: {
     backgroundColor: Colors.background.primary,

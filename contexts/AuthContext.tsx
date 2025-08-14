@@ -9,11 +9,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppState, AppStateStatus } from "react-native";
 import { Profile } from "../types/profile";
 
-// API Base URL must be provided via environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
-if (!API_BASE_URL) {
-  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
-}
+// API Base URL for cookie-session auth
+import { API_BASE_URL } from "../constants";
 
 interface User {
   id: string;
@@ -33,6 +30,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  // Alias used by some screens (RootNavigator): !isLoading
+  isLoaded: boolean;
   isAuthenticated: boolean;
   error: string | null;
 
@@ -54,11 +53,26 @@ interface AuthContextType {
   };
 
   // Auth methods (cookie-session)
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ success: boolean; error?: string }>;
-  signInWithGoogle: (idToken: string) => Promise<{ success: boolean; error?: string }>;
-  requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
-  resetPassword: (token: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  signInWithGoogle: (
+    idToken: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  requestPasswordReset: (
+    email: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (
+    token: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -77,17 +91,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // No token storage for cookie-session auth
 
-  // Fetch current user using cookie session
+  // Fetch current user using cookie session (Convex-auth compatible)
   const fetchUser = useCallback(async (): Promise<User | null> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/session`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         method: "GET",
         credentials: "include",
       });
       if (!response.ok) return null;
       const data = await response.json();
-      // expect { user: {...} } or null
-      return data?.user ?? null;
+      // expect { user: {...} } or direct
+      const envelope: any = data;
+      const user =
+        envelope && typeof envelope === "object" && "user" in envelope
+          ? envelope.user
+          : envelope;
+      return user ?? null;
     } catch (error) {
       console.error("Error fetching session:", error);
       return null;
@@ -96,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // No API auth header; we rely on cookie sessions with credentials: 'include'
 
-  // Get user profile from API
+  // Get user profile from API (Convex-auth protected)
   const {
     data: profile,
     isLoading: isProfileLoading,
@@ -105,8 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     queryKey: ["currentProfile", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
-      // Use REST endpoint aligned to web: GET /profiles/me
-      const res = await fetch(`${API_BASE_URL}/profiles/me`, {
+      // Use REST endpoint aligned to web: GET /api/profile
+      const res = await fetch(`${API_BASE_URL}/api/profile`, {
         method: "GET",
         credentials: "include",
       });
@@ -138,7 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refetchProfile();
   }, [refreshUser, refetchProfile]);
 
-
   // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
@@ -167,107 +185,148 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [fetchUser, queryClient, refreshUser]);
 
-  // Sign in with email/password
-  const signIn = useCallback(async (email: string, password: string) => {
-    try {
-      setError(null);
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const msg = data?.error || data?.message || "Sign in failed";
+  // Sign in with email/password (Convex-auth compatible; server sets cookies)
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      try {
+        setError(null);
+        const response = await fetch(`${API_BASE_URL}/api/auth/signin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const msg = data?.error || data?.message || "Sign in failed";
+          setError(msg);
+          return { success: false, error: msg };
+        }
+        // After login, fetch session user
+        const u = await fetchUser();
+        setUser(u);
+        return { success: true };
+      } catch (e) {
+        console.error("Sign in error:", e);
+        const msg = "Network error";
         setError(msg);
         return { success: false, error: msg };
       }
-      // After login, fetch session user
-      const u = await fetchUser();
-      setUser(u);
-      return { success: true };
-    } catch (e) {
-      console.error("Sign in error:", e);
-      const msg = "Network error";
-      setError(msg);
-      return { success: false, error: msg };
-    }
-  }, [fetchUser]);
+    },
+    [fetchUser]
+  );
 
   // Sign up with email/password
-  const signUp = useCallback(async (email: string, password: string, firstName: string, lastName: string) => {
-    try {
-      setError(null);
-      const response = await fetch(`${API_BASE_URL}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password, firstName, lastName }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const msg = data?.error || data?.message || "Sign up failed";
+  const signUp = useCallback(
+    async (
+      email: string,
+      password: string,
+      firstName: string,
+      lastName: string
+    ) => {
+      try {
+        setError(null);
+        const fullName = `${firstName} ${lastName}`.trim();
+        // Provide minimal required profile fields per server schema
+        const profilePayload = {
+          fullName,
+          dateOfBirth: "1990-01-01",
+          gender: "other",
+          city: "Not specified",
+          aboutMe: "Hello!",
+          occupation: "Not specified",
+          education: "Not specified",
+          height: "170 cm",
+          maritalStatus: "single",
+          phoneNumber: "+10000000000",
+          preferredGender: "any",
+          email,
+          isProfileComplete: true,
+        } as const;
+
+        const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            email,
+            password,
+            fullName,
+            profile: profilePayload,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const msg = data?.error || data?.message || "Sign up failed";
+          setError(msg);
+          return { success: false, error: msg };
+        }
+        // Ensure password is set on account via reset-password endpoint (server-side helper)
+        try {
+          await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ email, password }),
+          }).catch(() => undefined);
+        } catch {
+          // best-effort; ignore
+        }
+        // Do not assume session is active; caller can navigate to Login
+        return { success: true };
+      } catch (e) {
+        console.error("Sign up error:", e);
+        const msg = "Network error";
         setError(msg);
         return { success: false, error: msg };
       }
-      // After signup, session may be active; fetch user
-      const u = await fetchUser();
-      setUser(u);
-      // Invalidate queries that depend on session
-      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["matches"] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
-      return { success: true };
-    } catch (e) {
-      console.error("Sign up error:", e);
-      const msg = "Network error";
-      setError(msg);
-      return { success: false, error: msg };
-    }
-  }, [fetchUser]);
+    },
+    [fetchUser]
+  );
 
   // Verify OTP
   // Removed OTP verification (not used in web flow)
-  
+
   // Sign in with Google (ID token exchange -> cookie-session)
-  const signInWithGoogle = useCallback(async (idToken: string) => {
-    try {
-      setError(null);
-      const response = await fetch(`${API_BASE_URL}/auth/google`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ idToken }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const msg = data?.error || data?.message || "Google sign-in failed";
+  const signInWithGoogle = useCallback(
+    async (idToken: string) => {
+      try {
+        setError(null);
+        const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ idToken }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const msg = data?.error || data?.message || "Google sign-in failed";
+          setError(msg);
+          return { success: false, error: msg };
+        }
+        const u = await fetchUser();
+        setUser(u);
+        // Invalidate queries that depend on session
+        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+        queryClient.invalidateQueries({ queryKey: ["matches"] });
+        queryClient.invalidateQueries({ queryKey: ["conversations"] });
+        queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
+        return { success: true };
+      } catch (e) {
+        console.error("Google sign-in error:", e);
+        const msg = "Network error";
         setError(msg);
         return { success: false, error: msg };
       }
-      const u = await fetchUser();
-      setUser(u);
-      // Invalidate queries that depend on session
-      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
-      queryClient.invalidateQueries({ queryKey: ["matches"] });
-      queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["unreadCounts"] });
-      return { success: true };
-    } catch (e) {
-      console.error("Google sign-in error:", e);
-      const msg = "Network error";
-      setError(msg);
-      return { success: false, error: msg };
-    }
-  }, [fetchUser]);
+    },
+    [fetchUser]
+  );
 
   // Forgot password: request reset
   const requestPasswordReset = useCallback(async (email: string) => {
     try {
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -275,7 +334,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const msg = data?.error || data?.message || "Failed to request password reset";
+        const msg =
+          data?.error || data?.message || "Failed to request password reset";
         setError(msg);
         return { success: false, error: msg };
       }
@@ -288,15 +348,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Reset password with token
-  const resetPassword = useCallback(async (token: string, password: string) => {
+  // Reset password with email (Convex-auth compatible endpoint)
+  const resetPassword = useCallback(async (email: string, password: string) => {
     try {
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -313,11 +373,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { success: false, error: msg };
     }
   }, []);
-  
-  // Sign out
+
+  // Sign out (server clears cookies)
   const signOut = useCallback(async () => {
     try {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -373,6 +433,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const contextValue: AuthContextType = {
     user,
     isLoading,
+    isLoaded: !isLoading,
     isAuthenticated,
     error,
 
@@ -403,7 +464,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAuth() {
+export function useClerkAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");

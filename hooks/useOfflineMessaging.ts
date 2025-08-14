@@ -9,7 +9,7 @@ import {
 import { MessagingAPI } from "../types/messaging";
 import { Message } from "../types/message";
 import { useApiClient } from "../utils/api";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 
 interface UseOfflineMessagingOptions {
   enableOfflineQueue?: boolean;
@@ -53,7 +53,7 @@ export function useOfflineMessaging(options: UseOfflineMessagingOptions = {}) {
     syncInProgress: false,
   });
 
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const serviceRef = useRef<OfflineMessagingService | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Switch,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useState } from "react";
 import { Colors, Layout } from "../../../constants";
 import useResponsiveSpacing from "@hooks/useResponsive";
@@ -29,7 +29,7 @@ interface SettingItem {
 }
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
-  const { signOut, user } = useAuth();
+  const { } = useClerkAuth();
   const { spacing } = useResponsiveSpacing();
   const rt = useResponsiveTypography();
   const font = (n: number) => (rt?.scale?.font ? rt.scale.font(n) : n);

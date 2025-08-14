@@ -1,12 +1,12 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
-import { useAuth } from "../../contexts/AuthContext";
+import { useClerkAuth } from "../../contexts/ClerkAuthContext";
 
 // Import navigators
 import AuthNavigator from "./AuthNavigator";
 import MainNavigator from "./MainNavigator";
 import OnboardingNavigator from "./OnboardingNavigator";
-import { Profile } from "../../types";
+// import { Profile } from "../../types"; // unused
 // Import screens that can be accessed globally
 import ProfileDetailScreen from "../screens/main/ProfileDetailScreen";
 import StartupScreen from "../screens/StartupScreen";
@@ -21,17 +21,27 @@ import { Colors } from "../../constants/Colors";
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const {
-    userId,
-    isLoaded,
-    profile,
-    isProfileLoading,
-    hasProfile,
-    isOnboardingComplete,
-  } = useAuth();
+  const { userId, isLoaded, profile, isLoading, isOnboardingComplete } =
+    useClerkAuth();
 
-  // Show startup splash until user presses Get Started
+  // Show startup splash until user presses Get Started (unauthenticated only)
   const [showStartup, setShowStartup] = React.useState(true);
+
+  React.useEffect(() => {
+    // Auto-dismiss startup once authenticated so we can route to Onboarding/Main
+    if (isLoaded && userId) {
+      setShowStartup(false);
+    }
+    // Optionally re-show on logout
+    if (isLoaded && !userId) {
+      setShowStartup(true);
+    }
+  }, [isLoaded, userId]);
+
+  const isAuthenticated = !!userId;
+
+  const hasProfile = !!profile;
+  const isProfileLoading = !!userId && isLoading && !profile;
 
   // Debug navigation state
   console.log("🧭 Navigation state:", {
@@ -52,11 +62,16 @@ export default function RootNavigator() {
     );
   }
 
-  if (showStartup) {
+  if (!isAuthenticated && showStartup) {
     return <StartupScreen onGetStarted={() => setShowStartup(false)} />;
   }
 
-  const isAuthenticated = !!userId;
+  // Force remount navigator when switching between auth/onboarding/main
+  const navState: "auth" | "onboarding" | "main" = !isAuthenticated
+    ? "auth"
+    : !hasProfile || !isOnboardingComplete
+    ? "onboarding"
+    : "main";
 
   if (!isAuthenticated) {
     console.log("🔐 Showing Auth screens");
@@ -72,7 +87,11 @@ export default function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      id={undefined}
+      key={navState}
+      screenOptions={{ headerShown: false }}
+    >
       {!isAuthenticated ? (
         <Stack.Screen name="Auth" component={AuthNavigator} />
       ) : !hasProfile || !isOnboardingComplete ? (

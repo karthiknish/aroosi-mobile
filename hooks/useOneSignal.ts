@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 // import { OneSignal } from "react-native-onesignal"; // Temporarily disabled due to syntax error
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useApiClient } from "../utils/api";
 import {
   PushRegistration,
@@ -32,7 +32,7 @@ interface UseOneSignalReturn {
 }
 
 export const useOneSignal = (): UseOneSignalReturn => {
-  const { userId, getToken } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const [isInitialized, setIsInitialized] = useState(false);
   const [playerId, setPlayerId] = useState<string | null>(null);

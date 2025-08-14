@@ -1,31 +1,38 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Animated,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Layout } from '../../constants';
-import { useAudioPlayback } from '../../hooks/useAudioPlayback';
-import { Message } from '../../types/message';
-import MessageStatusIndicator from './MessageStatusIndicator';
-import PlatformHaptics from '../../utils/PlatformHaptics';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Colors, Layout } from "../../constants";
+import { useAudioPlayback } from "../../hooks/useAudioPlayback";
+import { Message } from "../../types/message";
+import MessageStatusIndicator from "./MessageStatusIndicator";
+import PlatformHaptics from "../../utils/PlatformHaptics";
 
 interface VoiceMessageProps {
   message: Message;
   isOwnMessage: boolean;
   showStatus?: boolean;
+  // Web-parity props: when provided, override message.voiceWaveform/voiceDuration
+  peaks?: number[];
+  durationSeconds?: number;
 }
 
 export default function VoiceMessage({
   message,
   isOwnMessage,
   showStatus = false,
+  peaks,
+  durationSeconds,
 }: VoiceMessageProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const waveformAnim = new Animated.Value(0);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const isScrubbingRef = useRef(false);
 
   const {
     playbackState,
@@ -72,8 +79,7 @@ export default function VoiceMessage({
   }, [playbackState.isPlaying, waveformAnim]);
 
   const handlePlayPause = async () => {
-    await PlatformHaptics.light();
-    
+    await PlatformHaptics.selection();
     if (playbackState.isPlaying) {
       await pause();
     } else {
@@ -96,19 +102,62 @@ export default function VoiceMessage({
   };
 
   const renderWaveform = () => {
-    const waveform = message.voiceWaveform || generateDefaultWaveform();
+    // Prefer provided peaks (normalized 0..1) from server; fallback to message.voiceWaveform; else generate defaults
+    const normalizedPeaks =
+      Array.isArray(peaks) && peaks.length
+        ? peaks.map((p) => {
+            if (typeof p !== "number" || !isFinite(p)) return 0;
+            return p < 0 ? 0 : p > 1 ? 1 : p;
+          })
+        : undefined;
+
+    const waveform =
+      (normalizedPeaks && normalizedPeaks.length
+        ? normalizedPeaks.map((p) => 4 + p * 16) // map 0..1 -> 4..20 height bars
+        : message.voiceWaveform) || generateDefaultWaveform();
+
     const progress = getProgress();
 
     return (
-      <View style={styles.waveformContainer}>
+      <View
+        style={styles.waveformContainer}
+        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={async (e) => {
+          isScrubbingRef.current = true;
+          await PlatformHaptics.selection();
+          if (containerWidth > 0) {
+            const x = e.nativeEvent.locationX;
+            const pct = Math.max(0, Math.min(1, x / containerWidth));
+            await handleSeek(pct);
+          }
+        }}
+        onResponderMove={async (e) => {
+          if (!isScrubbingRef.current || containerWidth <= 0) return;
+          const x = e.nativeEvent.locationX;
+          const pct = Math.max(0, Math.min(1, x / containerWidth));
+          await handleSeek(pct);
+        }}
+        onResponderRelease={async (e) => {
+          if (containerWidth > 0) {
+            const x = e.nativeEvent.locationX;
+            const pct = Math.max(0, Math.min(1, x / containerWidth));
+            await handleSeek(pct);
+          }
+          isScrubbingRef.current = false;
+          await PlatformHaptics.selection();
+        }}
+      >
         {waveform.map((height, index) => {
           const isActive = index / waveform.length <= progress;
-          const animatedHeight = isActive && playbackState.isPlaying
-            ? waveformAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [height, height * 1.5],
-              })
-            : height;
+          const animatedHeight =
+            isActive && playbackState.isPlaying
+              ? waveformAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [height, height * 1.5],
+                })
+              : height;
 
           return (
             <TouchableOpacity
@@ -122,7 +171,9 @@ export default function VoiceMessage({
                   {
                     height: animatedHeight,
                     backgroundColor: isActive
-                      ? (isOwnMessage ? Colors.background.primary : Colors.primary[500])
+                      ? isOwnMessage
+                        ? Colors.background.primary
+                        : Colors.primary[500]
                       : Colors.neutral[300],
                   },
                 ]}
@@ -130,15 +181,54 @@ export default function VoiceMessage({
             </TouchableOpacity>
           );
         })}
+
+        {/* Scrub handle indicator */}
+        <View
+          pointerEvents="none"
+          style={[
+            styles.scrubHandle,
+            {
+              left: `${Math.max(0, Math.min(100, progress * 100))}%`,
+              backgroundColor: isOwnMessage
+                ? Colors.background.primary
+                : Colors.primary[500],
+            },
+          ]}
+        />
       </View>
     );
   };
 
+  const effectiveStatus = ():
+    | "pending"
+    | "sending"
+    | "sent"
+    | "delivered"
+    | "read"
+    | "failed" => {
+    if (!isOwnMessage) return (message.status as any) || "sent";
+    if (message.readAt) return "read";
+    const receipts = Array.isArray(message.deliveryReceipts)
+      ? message.deliveryReceipts
+      : [];
+    if (receipts.some((r: any) => r?.status === "read")) return "read";
+    if (receipts.some((r: any) => r?.status === "delivered"))
+      return "delivered";
+    if (message.status === "failed") return "failed";
+    if (message.status === "sending" || message.status === "pending")
+      return message.status as any;
+    if (message.status === "delivered" || message.status === "read")
+      return message.status as any;
+    return "sent";
+  };
+
   return (
-    <View style={[
-      styles.container,
-      isOwnMessage ? styles.ownMessage : styles.otherMessage,
-    ]}>
+    <View
+      style={[
+        styles.container,
+        isOwnMessage ? styles.ownMessage : styles.otherMessage,
+      ]}
+    >
       <View style={styles.content}>
         {/* Play/Pause Button */}
         <TouchableOpacity
@@ -150,16 +240,20 @@ export default function VoiceMessage({
           disabled={!isInitialized || playbackState.isLoading}
         >
           {playbackState.isLoading ? (
-            <Ionicons 
-              name="hourglass" 
-              size={20} 
-              color={isOwnMessage ? Colors.primary[500] : Colors.background.primary} 
+            <Ionicons
+              name="hourglass"
+              size={20}
+              color={
+                isOwnMessage ? Colors.primary[500] : Colors.background.primary
+              }
             />
           ) : (
             <Ionicons
-              name={playbackState.isPlaying ? 'pause' : 'play'}
+              name={playbackState.isPlaying ? "pause" : "play"}
               size={20}
-              color={isOwnMessage ? Colors.primary[500] : Colors.background.primary}
+              color={
+                isOwnMessage ? Colors.primary[500] : Colors.background.primary
+              }
             />
           )}
         </TouchableOpacity>
@@ -167,22 +261,31 @@ export default function VoiceMessage({
         {/* Waveform and Duration */}
         <View style={styles.audioInfo}>
           {renderWaveform()}
-          
+
           <View style={styles.durationContainer}>
-            <Text style={[
-              styles.duration,
-              isOwnMessage ? styles.ownText : styles.otherText,
-            ]}>
-              {playbackState.isPlaying 
+            <Text
+              style={[
+                styles.duration,
+                isOwnMessage ? styles.ownText : styles.otherText,
+              ]}
+            >
+              {playbackState.isPlaying
                 ? getFormattedTime(playbackState.position)
+                : // Prefer provided durationSeconds; fallback to playbackState.duration; finally message.voiceDuration
+                typeof durationSeconds === "number" && durationSeconds > 0
+                ? getFormattedTime(durationSeconds * 1000)
                 : formatDuration(playbackState.duration)}
             </Text>
-            
+
             {playbackState.duration > 0 && (
-              <Text style={[
-                styles.totalDuration,
-                isOwnMessage ? styles.ownTextSecondary : styles.otherTextSecondary,
-              ]}>
+              <Text
+                style={[
+                  styles.totalDuration,
+                  isOwnMessage
+                    ? styles.ownTextSecondary
+                    : styles.otherTextSecondary,
+                ]}
+              >
                 / {formatDuration(playbackState.duration)}
               </Text>
             )}
@@ -192,16 +295,14 @@ export default function VoiceMessage({
         {/* Status Indicator */}
         {showStatus && isOwnMessage && (
           <View style={styles.statusContainer}>
-            <MessageStatusIndicator status={message.status} size={14} />
+            <MessageStatusIndicator status={effectiveStatus()} size={14} />
           </View>
         )}
       </View>
 
       {/* Error State */}
       {playbackState.error && (
-        <Text style={styles.errorText}>
-          Failed to load voice message
-        </Text>
+        <Text style={styles.errorText}>Failed to load voice message</Text>
       )}
     </View>
   );
@@ -210,34 +311,35 @@ export default function VoiceMessage({
 // Generate default waveform if not provided
 function generateDefaultWaveform(): number[] {
   const bars = 20;
-  return Array.from({ length: bars }, () => 
-    4 + Math.random() * 16 // Heights between 4-20
+  return Array.from(
+    { length: bars },
+    () => 4 + Math.random() * 16 // Heights between 4-20
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    maxWidth: '80%',
+    maxWidth: "80%",
     marginVertical: Layout.spacing.xs,
   },
 
   ownMessage: {
-    alignSelf: 'flex-end',
+    alignSelf: "flex-end",
     backgroundColor: Colors.primary[500],
     borderRadius: Layout.radius.lg,
     borderBottomRightRadius: Layout.radius.sm,
   },
 
   otherMessage: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     backgroundColor: Colors.neutral[100],
     borderRadius: Layout.radius.lg,
     borderBottomLeftRadius: Layout.radius.sm,
   },
 
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: Layout.spacing.md,
     gap: Layout.spacing.sm,
   },
@@ -246,8 +348,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   ownPlayButton: {
@@ -264,16 +366,16 @@ const styles = StyleSheet.create({
   },
 
   waveformContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 2,
     height: 24,
   },
 
   waveformBarContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: Layout.spacing.xs,
   },
 
@@ -283,15 +385,24 @@ const styles = StyleSheet.create({
     minHeight: 4,
   },
 
+  scrubHandle: {
+    position: "absolute",
+    top: -4,
+    bottom: -4,
+    width: 2,
+    borderRadius: 1,
+    opacity: 0.7,
+  },
+
   durationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   duration: {
     fontSize: Layout.typography.fontSize.sm,
     fontWeight: Layout.typography.fontWeight.medium,
-    fontVariant: ['tabular-nums'],
+    fontVariant: ["tabular-nums"],
   },
 
   totalDuration: {
@@ -323,7 +434,7 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: Layout.typography.fontSize.xs,
     color: Colors.error[500],
-    fontStyle: 'italic',
+    fontStyle: "italic",
     marginTop: Layout.spacing.xs,
     marginHorizontal: Layout.spacing.md,
   },

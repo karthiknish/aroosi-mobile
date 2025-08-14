@@ -6,22 +6,21 @@ module.exports = function (api) {
       [
         "module-resolver",
         {
-          root: ["./"],
+          root: ["."],
           alias: {
-            "@providers": "./providers",
-            "@contexts": "./contexts",
             "@components": "./components",
-            "@constants": "./constants",
-            "@hooks": "./hooks",
+            "@hooks": "./src/hooks",
             "@services": "./services",
-            "@utils": "./utils",
-            "@types": "./types",
+            "@contexts": "./contexts",
+            "@constants": "./constants",
             "@src": "./src",
+            "@utils": "./src/utils"
           },
-          extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
-        },
+          extensions: [".js", ".jsx", ".ts", ".tsx", ".json"]
+        }
       ],
-      "react-native-reanimated/plugin",
-    ],
+      // Reanimated must be listed last
+      "react-native-reanimated/plugin"
+    ]
   };
 };

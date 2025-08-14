@@ -6,15 +6,18 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { useAuth } from "../../../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "../../../utils/api";
 import { Colors, Layout } from "../../../constants";
 import { useTheme } from "../../../contexts/ThemeContext";
-import { ChatListSkeleton } from "@/components/ui/LoadingStates";
-import { NoMessages } from "@/components/ui/EmptyStates";
-import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
-import { Conversation } from "../../../types/message";
+import { ChatListSkeleton } from "../../components/ui/LoadingStates";
+import { NoMessages } from "../../components/ui/EmptyStates";
+import {
+  ErrorBoundary,
+  ApiErrorDisplay,
+} from "../../components/ui/ErrorHandling";
+import { Conversation } from "../../../types/profile";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ConversationListScreenProps {
@@ -24,10 +27,16 @@ interface ConversationListScreenProps {
 export default function ConversationListScreen({
   navigation,
 }: ConversationListScreenProps) {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const { theme } = useTheme();
   const apiClient = useApiClient();
   const [refreshing, setRefreshing] = useState(false);
+
+  type NormalizedConversation = Conversation & {
+    id?: string;
+    unreadCount?: number;
+    lastActivity?: number;
+  };
 
   const {
     data: conversations,
@@ -38,10 +47,10 @@ export default function ConversationListScreen({
     queryKey: ["conversations"],
     queryFn: async () => {
       const response = await apiClient.getConversations();
-      return response.success
-        ? (response.data as { conversations: Conversation[] }).conversations ||
-            response.data
-        : [];
+      if (!response.success) return [] as NormalizedConversation[];
+      const raw =
+        (response.data as any)?.conversations ?? (response.data as any);
+      return (Array.isArray(raw) ? raw : []) as NormalizedConversation[];
     },
     enabled: !!userId,
     retry: 2,
@@ -51,9 +60,10 @@ export default function ConversationListScreen({
 
   // Unread counts are now included in conversations response
   const unreadCounts =
-    (conversations as Conversation[])?.reduce(
-      (acc: Record<string, number>, conv: Conversation) => {
-        acc[conv._id || conv.id] = conv.unreadCount || 0;
+    (conversations as NormalizedConversation[])?.reduce(
+      (acc: Record<string, number>, conv: NormalizedConversation) => {
+        const cid = (conv as any)._id || (conv as any).id;
+        acc[cid] = (conv as any).unreadCount || 0;
         return acc;
       },
       {}
@@ -65,14 +75,14 @@ export default function ConversationListScreen({
     setRefreshing(false);
   };
 
-  const handleConversationPress = (conversation: Conversation) => {
+  const handleConversationPress = (conversation: NormalizedConversation) => {
     // Since participants is string[], find the participant that is not the current user
     const otherParticipantId = conversation.participants?.find(
       (p) => p !== userId
     );
 
     navigation.navigate("Chat", {
-      conversationId: conversation._id || conversation.id,
+      conversationId: (conversation as any)._id || (conversation as any).id,
       partnerName: otherParticipantId || "Unknown",
       partnerId: otherParticipantId,
     });
@@ -97,12 +107,12 @@ export default function ConversationListScreen({
     }
   };
 
-  const renderConversation = (conversation: Conversation) => {
+  const renderConversation = (conversation: NormalizedConversation) => {
     const otherParticipantId = conversation.participants?.find(
       (p) => p !== userId
     );
 
-    const unreadCount = conversation.unreadCount || 0;
+    const unreadCount = (conversation as any).unreadCount || 0;
     const hasUnread = unreadCount > 0;
 
     const lastMessage = conversation.lastMessage;
@@ -113,7 +123,7 @@ export default function ConversationListScreen({
 
     return (
       <TouchableOpacity
-        key={conversation._id || conversation.id}
+        key={(conversation as any)._id || (conversation as any).id}
         style={[
           styles.conversationCard,
           hasUnread && styles.unreadConversationCard,
@@ -126,7 +136,7 @@ export default function ConversationListScreen({
               {otherParticipantId?.charAt(0) || "?"}
             </Text>
           </View>
-          {hasUnread && <View style={styles.onlineIndicator} />}
+          {hasUnread && <View style={styles.unreadDot} />}
         </View>
 
         <View style={styles.conversationInfo}>
@@ -143,9 +153,10 @@ export default function ConversationListScreen({
             {lastMessage && (
               <Text style={styles.lastMessageTime}>
                 {formatLastMessageTime(
-                  lastMessage.timestamp ||
-                    lastMessage.createdAt ||
-                    lastMessage._creationTime
+                  (lastMessage.timestamp ??
+                    lastMessage.createdAt ??
+                    lastMessage._creationTime ??
+                    Date.now()) as number
                 )}
               </Text>
             )}
@@ -255,11 +266,14 @@ export default function ConversationListScreen({
         {/* Conversations List */}
         {error ? (
           <ApiErrorDisplay error={error} onRetry={refetch} />
-        ) : !conversations || (conversations as Conversation[]).length === 0 ? (
+        ) : !conversations ||
+          (conversations as NormalizedConversation[]).length === 0 ? (
           <NoMessages onActionPress={() => navigation.navigate("Search")} />
         ) : (
           <View style={styles.conversationsList}>
-            {(conversations as Conversation[]).map(renderConversation)}
+            {(conversations as NormalizedConversation[]).map(
+              renderConversation
+            )}
           </View>
         )}
       </ScreenContainer>
@@ -309,7 +323,7 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border.primary,
   },
   unreadConversationCard: {
-    backgroundColor: Colors.primary[25],
+    backgroundColor: Colors.primary[50],
   },
   avatarContainer: {
     position: "relative",
@@ -336,6 +350,17 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: Layout.radius.full,
     backgroundColor: Colors.success[500],
+    borderWidth: 2,
+    borderColor: Colors.background.primary,
+  },
+  unreadDot: {
+    position: "absolute",
+    bottom: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.primary[500],
     borderWidth: 2,
     borderColor: Colors.background.primary,
   },

@@ -40,10 +40,8 @@ export default function ChatInput({
 
   const inputRef = useRef<TextInput>(null);
 
-  const { startTyping, stopTyping } = useTypingIndicator(
-    conversationId,
-    currentUserId
-  );
+  // useTypingIndicator expects an options object
+  const { startTyping, stopTyping } = useTypingIndicator({ conversationId, userId: currentUserId });
 
   const canSend = message.trim().length > 0 && !disabled;
 
@@ -172,10 +170,16 @@ export default function ChatInput({
           <View style={styles.actionButtons}>
             {canSend ? (
               <TouchableOpacity
-                style={[styles.actionButton, styles.sendButton]}
+                style={[
+                  styles.actionButton,
+                  styles.sendButton,
+                  disabled && styles.actionButtonDisabled,
+                ]}
                 onPress={handleSend}
                 disabled={disabled}
+                activeOpacity={0.8}
               >
+                {/* Web parity: gradient-like feel via layered backgrounds and shadow */}
                 <Ionicons
                   name="send"
                   size={20}
@@ -184,10 +188,15 @@ export default function ChatInput({
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.actionButton, styles.voiceButton]}
+                style={[
+                  styles.actionButton,
+                  styles.voiceButton,
+                  disabled && styles.actionButtonDisabled,
+                ]}
                 onPress={handleVoicePress}
                 disabled={disabled}
                 delayLongPress={200}
+                activeOpacity={0.8}
               >
                 <Ionicons name="mic" size={20} color={Colors.primary[500]} />
               </TouchableOpacity>
@@ -195,7 +204,7 @@ export default function ChatInput({
           </View>
         </View>
 
-        {/* Input Helpers */}
+        {/* Error/Helpers */}
         {disabled && (
           <View style={styles.disabledOverlay}>
             <Text style={styles.disabledText}>
@@ -203,6 +212,15 @@ export default function ChatInput({
             </Text>
           </View>
         )}
+
+        {/* Error banner slot (web parity) - container can pass error via props later */}
+        {/* Example usage: render when parent provides error text */}
+        {/* <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>{errorText}</Text>
+          <TouchableOpacity onPress={onRetry} style={styles.errorRetryBtn}>
+            <Text style={styles.errorRetryText}>Retry</Text>
+          </TouchableOpacity>
+        </View> */}
       </View>
 
       {/* Voice Recorder Overlay */}
@@ -294,7 +312,13 @@ const styles = StyleSheet.create({
   },
 
   sendButton: {
+    // Web parity: elevate and mimic gradient via shadow + primary base
     backgroundColor: Colors.primary[500],
+    shadowColor: Colors.primary[500],
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
   },
 
   voiceButton: {
@@ -319,5 +343,42 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.sm,
     color: Colors.text.secondary,
     textAlign: "center",
+  },
+
+  // New: common disabled state for action buttons
+  actionButtonDisabled: {
+    opacity: 0.6,
+  },
+
+  // New: error banner styles (for web parity)
+  errorBanner: {
+    marginTop: Layout.spacing.sm,
+    marginHorizontal: Layout.spacing.sm,
+    paddingVertical: Layout.spacing.sm,
+    paddingHorizontal: Layout.spacing.md,
+    backgroundColor: Colors.error[50] || "rgba(220, 38, 38, 0.1)",
+    borderWidth: 1,
+    borderColor: Colors.error[200] || "rgba(220,38,38,0.3)",
+    borderRadius: Layout.radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Layout.spacing.sm,
+  },
+  errorBannerText: {
+    flex: 1,
+    color: Colors.error[600] || "#b91c1c",
+    fontSize: Layout.typography.fontSize.xs,
+  },
+  errorRetryBtn: {
+    paddingVertical: Layout.spacing.xs,
+    paddingHorizontal: Layout.spacing.sm,
+    borderRadius: Layout.radius.sm,
+    backgroundColor: Colors.error[100] || "rgba(220,38,38,0.15)",
+  },
+  errorRetryText: {
+    color: Colors.error[700] || "#991b1b",
+    fontSize: Layout.typography.fontSize.xs,
+    fontWeight: Layout.typography.fontWeight.medium,
   },
 });

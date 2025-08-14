@@ -6,10 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { useAuth } from "@contexts/AuthContext";
-import { signInWithGoogle } from "@services/googleAuth";
+import { useClerkAuth } from "@contexts/ClerkAuthContext";
 import { useToast } from "@providers/ToastContext";
 import { Colors, Layout } from "@constants";
+import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
 
 interface SocialAuthButtonsProps {
   onGoogleSuccess?: () => void;
@@ -21,42 +21,21 @@ export default function SocialAuthButtons({
   onGoogleError,
 }: SocialAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
-  const auth = useAuth();
+  const { signInWithGoogle } = useClerkAuth();
   const toast = useToast();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
+      // Use Clerk's OAuth flow directly
       const result = await signInWithGoogle();
 
-      if (result.success && result.idToken) {
-        // Send the Google ID token to your backend (if available in auth context)
-        if (
-          !auth ||
-          typeof auth !== "object" ||
-          !("signInWithGoogle" in auth) ||
-          typeof (auth as any).signInWithGoogle !== "function"
-        ) {
-          const errorMessage =
-            "Google authentication is not available right now";
-          onGoogleError?.(errorMessage);
-          toast.show(errorMessage, "error");
-          return;
-        }
-        const authResult = await (auth as any).signInWithGoogle(result.idToken);
-
-        if (authResult.success) {
-          onGoogleSuccess?.();
-        } else {
-          const errorMessage =
-            (authResult as any)?.error || "Google authentication failed";
-          onGoogleError?.(errorMessage);
-          toast.show(errorMessage, "error");
-        }
+      if (result.success) {
+        onGoogleSuccess?.();
       } else {
-        // result is discriminated only by result.success flag; when false, use generic message if specific not present
-        const fallbackMessage = "Google authentication failed";
-        const errorMessage = (result as any)?.error ?? fallbackMessage;
+        const errorMessage = result.error || "Google authentication failed";
         onGoogleError?.(errorMessage);
         toast.show(errorMessage, "error");
       }
@@ -72,6 +51,37 @@ export default function SocialAuthButtons({
       setIsGoogleLoading(false);
     }
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      width: "100%",
+      marginTop: spacing.lg,
+    },
+    button: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.lg,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      backgroundColor: Colors.background.secondary,
+      minHeight: 48,
+    },
+    googleButton: {
+      backgroundColor: "#4285F4",
+      borderColor: "#4285F4",
+    },
+    buttonText: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      color: Colors.text.primary,
+    },
+    googleButtonText: {
+      color: Colors.text.inverse,
+    },
+  });
 
   return (
     <View style={styles.container}>
@@ -92,34 +102,3 @@ export default function SocialAuthButtons({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    marginTop: Layout.spacing.lg,
-  },
-  button: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Layout.spacing.md,
-    paddingHorizontal: Layout.spacing.lg,
-    borderRadius: Layout.radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    backgroundColor: Colors.background.secondary,
-    minHeight: 48,
-  },
-  googleButton: {
-    backgroundColor: "#4285F4",
-    borderColor: "#4285F4",
-  },
-  buttonText: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-    color: Colors.text.primary,
-  },
-  googleButtonText: {
-    color: Colors.text.inverse,
-  },
-});

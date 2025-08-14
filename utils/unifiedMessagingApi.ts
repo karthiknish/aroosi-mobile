@@ -479,8 +479,8 @@ export const unifiedMessagingApi = new UnifiedMessagingAPI();
 // Hook for React components
 export function useUnifiedMessagingAPI() {
   // Import here to avoid circular dependency
-  const { useAuth } = require("../contexts/AuthContext");
-  const { getToken } = useAuth();
+  const { useClerkAuth } = require("../contexts/ClerkAuthContext");
+  const { getToken } = useClerkAuth();
 
   // Initialize auth provider once
   if (!unifiedMessagingApi["authInitialized"]) {

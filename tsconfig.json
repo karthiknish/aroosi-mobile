@@ -1,29 +1,24 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": false,
-    "jsx": "react-native",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
+    "target": "ES2020",
+    "module": "ES2020",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["jest", "react", "react-native"],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@components/*": ["./components/*"],
-      "@components": ["./components/index.ts"],
-      "@hooks/*": ["./hooks/*"],
-      "@constants/*": ["./constants/*"],
-      "@constants": ["./constants/index.ts"],
-      "@convex/*": ["./convex/*"],
-      "@contexts/*": ["./contexts/*"],
-      "@contexts": ["./contexts/index.ts"],
-      "@services/*": ["./services/*"],
-      "@services": ["./services/index.ts"],
-      "@utils/*": ["./utils/*"],
-      "@utils": ["./utils/index.ts"],
-      "@types/*": ["./types/*"],
-      "@types": ["./types/index.ts"],
-      "@providers/*": ["./providers/*"]
-    },
-    "skipLibCheck": true
-  }
+      "@components/*": ["components/*"],
+      "@hooks/*": ["src/hooks/*"],
+      "@services/*": ["services/*"],
+      "@contexts/*": ["contexts/*"],
+      "@constants/*": ["constants/*"],
+      "@src/*": ["src/*"],
+      "@utils/*": ["src/utils/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", "build"]
 }

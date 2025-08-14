@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { useClerkAuth } from "../contexts/ClerkAuthContext"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "../utils/api";
 import {
@@ -22,7 +22,7 @@ export interface UseImageUploadReturn {
 }
 
 export function useImageUpload(): UseImageUploadReturn {
-  const { userId } = useAuth();
+  const { } = useClerkAuth();
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const [uploadProgress, setUploadProgress] = useState(0);

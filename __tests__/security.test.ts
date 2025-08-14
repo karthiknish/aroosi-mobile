@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, jest } from "@jest/globals";
 import * as SecureStore from "expo-secure-store";
 import { ApiClient } from "../utils/api";
-import { AuthProvider } from "../contexts/AuthContext";
+import { ClerkAuthProvider } from "../contexts/ClerkAuthContext"
 import { sanitizeUserInput, validateInput } from "../utils/validation";
 
 // Mock dependencies
