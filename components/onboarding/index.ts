@@ -13,7 +13,7 @@ export type { OnboardingStep, OnboardingStepProps } from './OnboardingContainer'
 export type { FeatureTourStepData } from './FeatureTourStep';
 
 // Hooks and utilities
-export { useOnboarding } from '../../hooks/useOnboarding';
+export { useOnboarding } from "@/hooks/useOnboarding";
 export { onboardingManager } from '../../utils/onboardingManager';
 export type { 
   OnboardingProgress, 

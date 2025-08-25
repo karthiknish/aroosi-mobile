@@ -9,7 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { useTheme } from "@contexts/ThemeContext";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@/hooks/useResponsive";
 
 interface ErrorBoundaryState {
   hasError: boolean;

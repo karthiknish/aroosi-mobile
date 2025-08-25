@@ -12,8 +12,7 @@ import {
   VoiceDurationWarning,
 } from "./VoiceDurationIndicator";
 import { FeatureGateModal } from "./FeatureGateModal";
-import { useVoiceMessageLimits } from "../../hooks/useMessagingFeatures";
-import { useSubscription } from "../../hooks/useSubscription";
+import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 
 interface VoiceMessageToolbarProps {
   conversationId: string;
@@ -40,12 +39,12 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
 
   // Subscription and limits
-  const { subscriptionTier } = useSubscription();
   const {
     canSendVoice,
     maxDuration,
     getRemainingDuration,
     isNearDurationLimit,
+    subscriptionTier,
   } = useVoiceMessageLimits();
 
   // Animation values
@@ -222,7 +221,7 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
           setShowUpgradeModal(false);
         }}
         feature="voice"
-        currentTier={subscriptionTier}
+        currentTier={subscriptionTier as any}
         reason="Voice messages require a Premium subscription"
       />
     </View>

@@ -6,8 +6,7 @@ import {
   StyleSheet,
   Animated,
 } from "react-native";
-import { useDailyMessageLimit } from "../../hooks/useMessagingFeatures";
-import { SubscriptionTier } from "../../utils/messagingFeatures";
+import { useDailyMessageLimit } from "@/hooks/useMessagingFeatures";
 
 interface MessageLimitIndicatorProps {
   onUpgradePress?: () => void;

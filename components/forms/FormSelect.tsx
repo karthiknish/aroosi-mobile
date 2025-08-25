@@ -12,7 +12,7 @@ import { Colors } from "../../constants/Colors";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "../../hooks/useResponsive";
+} from "@/hooks/useResponsive";
 
 interface Option {
   value: string;

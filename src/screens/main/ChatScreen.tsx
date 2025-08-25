@@ -1,5 +1,3 @@
-/** @jsx React.createElement */
-/** @jsxFrag React.Fragment */
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
@@ -12,35 +10,38 @@ import {
   Alert,
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
-import { Colors, Layout } from "../../../constants";
-import { FullScreenLoading } from "../../components/ui/LoadingStates";
-import { EmptyState } from "../../components/ui/EmptyStates";
+import { useAuth } from "@contexts/AuthProvider";
+import { Colors, Layout } from "@constants";
+import { FullScreenLoading } from "@/components/ui/LoadingStates";
+import { EmptyState } from "@/components/ui/EmptyStates";
 import * as Haptics from "expo-haptics";
 // import ScreenContainer from "@components/common/ScreenContainer";
-import useResponsiveSpacing from "../../../hooks/useResponsive";
+import useResponsiveSpacing from "@/hooks/useResponsive";
 
 // Import our new messaging system
-import { useConversationMessaging } from "../../../hooks/useOfflineMessaging";
-import { useSubscription } from "../../../hooks/useSubscription";
-import { Message } from "../../../types/message";
-import { OfflineMessageStatus } from "../../../components/messaging/OfflineMessageStatus";
-import { useToast } from "../../../providers/ToastContext";
+import { useConversationMessaging } from "@/hooks/useOfflineMessaging";
+import { Message } from "@/types/message";
+import { OfflineMessageStatus } from "@components/messaging/OfflineMessageStatus";
+import { useToast } from "@/providers/ToastContext";
 // Import voice messaging components
-import { VoiceMessageDisplay } from "../../../components/messaging/VoiceMessage";
-import { VoiceRecorder } from "../../../components/messaging/VoiceRecorder";
+import { VoiceMessageDisplay } from "@components/messaging/VoiceMessage";
+import { VoiceRecorder } from "@components/messaging/VoiceRecorder";
 
 // Import real-time components
 // Typing indicator is shown via MessagesList footer
-import { useTypingIndicator } from "../../../hooks/useTypingIndicator";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useMessageSearch } from "@/hooks/useMessageSearch";
 
 // Import messaging features for subscription gating
 import {
   useMessagingFeatures,
   useVoiceMessageLimits,
-} from "../../../hooks/useMessagingFeatures";
-import MessagesList from "../../../components/chat/MessagesList";
-import { useApiClient } from "../../../utils/api";
+} from "@/hooks/useMessagingFeatures";
+import MessagesList from "@components/chat/MessagesList";
+import { useApiClient } from "@/utils/api";
+import { BottomSheet } from "@/components/ui/BottomSheet";
+// useSubscription imported above
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface ChatScreenProps {
   navigation: any;
@@ -59,11 +60,30 @@ type ChatScreenRoute = RouteProp<ChatRouteParams, "Chat">;
 export default function ChatScreen({ navigation }: ChatScreenProps) {
   const route = useRoute<ChatScreenRoute>();
   const { conversationId, partnerName, partnerId } = route.params;
-  const { } = useClerkAuth();
+  const { user } = useAuth();
+  const userId = user?.id;
   const scrollViewRef = useRef<any>(null);
   const [inputText, setInputText] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [replyContext, setReplyContext] = useState<{
+    messageId: string;
+    text?: string;
+    type: "text" | "voice" | "image";
+    fromUserId: string;
+  } | null>(null);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [actionMessage, setActionMessage] = useState<any | null>(null);
+  const [optimisticDeleted, setOptimisticDeleted] = useState<
+    Record<string, boolean>
+  >({});
+  const [optimisticEdits, setOptimisticEdits] = useState<
+    Record<string, string>
+  >({});
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const { spacing } = useResponsiveSpacing();
   const fontSize = Layout.typography.fontSize;
   const toast = useToast();
@@ -81,7 +101,18 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   } = useConversationMessaging(conversationId);
 
   const apiClient = useApiClient();
+  const { usage, subscription } = useSubscription();
   const [receiptMap, setReceiptMap] = useState<Record<string, any[]>>({});
+  const [reactionMap, setReactionMap] = useState<
+    Record<string, { emoji: string; count: number }[]>
+  >({});
+  const [rawReactionData, setRawReactionData] = useState<
+    Array<{ messageId: string; emoji: string; userId: string }>
+  >([]);
+  // Store raw reaction data for user-specific checks
+  const [rawReactions, setRawReactions] = useState<
+    Array<{ messageId: string; emoji: string; userId: string }>
+  >([]);
 
   // Messaging features for subscription checks
   const { canSendVoiceMessage } = useMessagingFeatures();
@@ -92,6 +123,37 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     conversationId,
     userId: userId || "",
   });
+
+  // Message search functionality
+  const messageSearch = useMessageSearch();
+
+  // Handle search functionality
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      messageSearch.search(query);
+      const results = messageSearch.results;
+      setSearchResults(results || []);
+    } catch (error) {
+      console.warn("Search failed:", error);
+      toast?.show(
+        "Search Failed: Unable to search messages. Please try again."
+      );
+    }
+  };
+
+  // Toggle search mode
+  const toggleSearchMode = () => {
+    setIsSearchMode(!isSearchMode);
+    if (isSearchMode) {
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  };
 
   // Mark conversation as read when messages load
   useEffect(() => {
@@ -132,24 +194,136 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     }
   };
 
+  const loadReactions = async () => {
+    try {
+      const res = await (apiClient as any).getReactions(conversationId);
+      if (res.success && Array.isArray((res.data as any)?.reactions)) {
+        const reactions = (res.data as any).reactions as Array<{
+          messageId: string;
+          emoji: string;
+          userId: string;
+        }>;
+
+        // Store raw reactions for user-specific checks
+        setRawReactionData(reactions);
+
+        // Process reactions for display
+        const map: Record<string, { emoji: string; count: number }[]> = {};
+        reactions.forEach((r: any) => {
+          const key = r.messageId;
+          if (!map[key]) map[key] = [];
+          const exists = map[key].find((x) => x.emoji === r.emoji);
+          if (exists) exists.count += 1;
+          else map[key].push({ emoji: r.emoji, count: 1 });
+        });
+        setReactionMap(map);
+      }
+    } catch {}
+  };
+
+  // Get reactions for a specific message with user info
+  const getReactionsForMessage = (messageId: string) => {
+    const messageReactions = rawReactionData.filter(
+      (r) => r.messageId === messageId
+    );
+    const groupedReactions: Record<
+      string,
+      { userIds: string[]; reactedByMe: boolean }
+    > = {};
+
+    messageReactions.forEach((reaction) => {
+      if (!groupedReactions[reaction.emoji]) {
+        groupedReactions[reaction.emoji] = { userIds: [], reactedByMe: false };
+      }
+      groupedReactions[reaction.emoji].userIds.push(reaction.userId);
+      if (reaction.userId === userId) {
+        groupedReactions[reaction.emoji].reactedByMe = true;
+      }
+    });
+
+    return Object.entries(groupedReactions).map(([emoji, data]) => ({
+      emoji,
+      count: data.userIds.length,
+      reactedByMe: data.reactedByMe,
+      userIds: data.userIds,
+    }));
+  };
+
+  // Enhanced reaction toggle handler
+  const handleToggleReaction = async (messageId: string, emoji: string) => {
+    try {
+      // Optimistic update
+      const currentReactions = rawReactions.filter(
+        (r) =>
+          !(
+            r.messageId === messageId &&
+            r.emoji === emoji &&
+            r.userId === userId
+          )
+      );
+      const hasReacted = rawReactions.some(
+        (r) =>
+          r.messageId === messageId && r.emoji === emoji && r.userId === userId
+      );
+
+      if (!hasReacted) {
+        // Add reaction optimistically
+        currentReactions.push({ messageId, emoji, userId: userId || "" });
+      }
+
+      setRawReactions(currentReactions);
+
+      // Update display map
+      const map: Record<string, { emoji: string; count: number }[]> = {};
+      currentReactions.forEach((r: any) => {
+        const key = r.messageId;
+        if (!map[key]) map[key] = [];
+        const exists = map[key].find((x) => x.emoji === r.emoji);
+        if (exists) exists.count += 1;
+        else map[key].push({ emoji: r.emoji, count: 1 });
+      });
+      setReactionMap(map);
+
+      // Call API
+      const res = await (apiClient as any).toggleReaction(messageId, emoji);
+      if (!res.success) {
+        // Revert on failure
+        loadReactions();
+      }
+    } catch (error) {
+      // Revert on error
+      loadReactions();
+    }
+  };
+
   // Load messages on mount
   useEffect(() => {
     if (isInitialized && conversationId) {
       loadMessages();
       loadReceipts();
+      loadReactions();
     }
   }, [isInitialized, conversationId, loadMessages]);
 
   const displayMessages = useMemo(() => {
     if (!messages || !messages.length) return messages as any;
-    return messages.map((m: any) => ({
-      ...m,
-      deliveryReceipts:
-        m.deliveryReceipts && m.deliveryReceipts.length > 0
-          ? m.deliveryReceipts
-          : receiptMap[m._id] || [],
-    }));
-  }, [messages, receiptMap]);
+    return messages.map((m: any) => {
+      const overlayDeleted = optimisticDeleted[m._id];
+      const overlayText = optimisticEdits[m._id];
+      return {
+        ...m,
+        deleted: overlayDeleted ? true : m.deleted,
+        text: typeof overlayText === "string" ? overlayText : m.text,
+        edited: typeof overlayText === "string" ? true : m.edited,
+        editedAt: typeof overlayText === "string" ? Date.now() : m.editedAt,
+        deliveryReceipts:
+          m.deliveryReceipts && m.deliveryReceipts.length > 0
+            ? m.deliveryReceipts
+            : receiptMap[m._id] || [],
+        reactions: reactionMap[m._id] || [],
+      };
+    });
+  }, [messages, receiptMap, reactionMap, optimisticDeleted, optimisticEdits]);
 
   const handleSendMessage = async (
     content: string,
@@ -209,11 +383,22 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         messageData.fileSize = metadata.fileSize;
       }
 
+      // Attach reply context if present
+      if (replyContext) {
+        messageData.replyTo = {
+          messageId: replyContext.messageId,
+          text: replyContext.text,
+          type: replyContext.type,
+          fromUserId: replyContext.fromUserId,
+        } as any;
+      }
+
       const result = await sendMessage(messageData);
 
       if (result.success) {
         setInputText("");
         setIsTyping(false);
+        if (replyContext) setReplyContext(null);
         // Haptics on successful send
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
@@ -228,6 +413,15 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         toast.show("Failed to send message. Please try again.", "error");
       }
     }
+  };
+
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    try {
+      const res = await (apiClient as any).toggleReaction(messageId, emoji);
+      if (res.success) {
+        await loadReactions();
+      }
+    } catch {}
   };
 
   const handleInputChange = (text: string) => {
@@ -274,8 +468,108 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     }
   };
 
+  // Edit/Delete/Reply handlers
+  const handleEditSubmit = async () => {
+    if (!editingMessageId) return;
+    const trimmed = inputText.trim();
+    if (!trimmed) return;
+    try {
+      // Optimistic overlay
+      setOptimisticEdits((prev) => ({ ...prev, [editingMessageId]: trimmed }));
+      setEditingMessageId(null);
+      setInputText("");
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const res = await apiClient.editMessage(editingMessageId, trimmed);
+      if (!res?.success) {
+        // Revert overlay on failure
+        setOptimisticEdits((prev) => {
+          const { [editingMessageId]: _omit, ...rest } = prev;
+          return rest;
+        });
+        if (toast) toast.show("Edit failed. Please try again.", "error");
+      } else {
+        // Refresh to sync server-calculated fields
+        loadMessages();
+      }
+    } catch (e) {
+      setOptimisticEdits((prev) => {
+        const { [editingMessageId!]: _omit, ...rest } = prev;
+        return rest;
+      });
+      if (toast) toast.show("Edit failed. Please try again.", "error");
+    }
+  };
+
+  const openMessageActions = (message: any) => {
+    setActionMessage(message);
+    setActionSheetVisible(true);
+    Haptics.selectionAsync();
+  };
+
+  const canEdit = (m: any) =>
+    m?.fromUserId === userId && m?.type === "text" && !m?.deleted;
+  const canDelete = (m: any) => m?.fromUserId === userId && !m?.deleted;
+
+  const handleReplyAction = () => {
+    if (!actionMessage) return;
+    setReplyContext({
+      messageId: actionMessage._id,
+      text: actionMessage.text,
+      type: actionMessage.type,
+      fromUserId: actionMessage.fromUserId,
+    });
+    setActionSheetVisible(false);
+  };
+
+  const handleEditAction = () => {
+    if (!actionMessage || !canEdit(actionMessage)) return;
+    setEditingMessageId(actionMessage._id);
+    setInputText(actionMessage.text || "");
+    setActionSheetVisible(false);
+  };
+
+  const handleDeleteAction = async () => {
+    if (!actionMessage || !canDelete(actionMessage)) return;
+    const targetId = actionMessage._id;
+    setActionSheetVisible(false);
+    Alert.alert(
+      "Delete message?",
+      "This will delete the message for everyone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setOptimisticDeleted((prev) => ({ ...prev, [targetId]: true }));
+              const res = await apiClient.deleteMessage(targetId);
+              if (!res?.success) {
+                setOptimisticDeleted((prev) => {
+                  const { [targetId]: _omit, ...rest } = prev;
+                  return rest;
+                });
+                if (toast)
+                  toast.show("Delete failed. Please try again.", "error");
+              } else {
+                loadMessages();
+              }
+            } catch (e) {
+              setOptimisticDeleted((prev) => {
+                const { [targetId]: _omit, ...rest } = prev;
+                return rest;
+              });
+              if (toast)
+                toast.show("Delete failed. Please try again.", "error");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const renderMessage = ({ item }: { item: any; index: number }) => {
-    const isOwnMessage = (item.senderId || item.fromUserId) === userId;
+    const isOwnMessage = item.fromUserId === userId;
     const messageTime =
       item.timestamp || item.createdAt || item._creationTime || Date.now();
     return (
@@ -511,6 +805,127 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     voiceButtonText: {
       fontSize: fontSize.lg,
     },
+    replyBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: Colors.neutral[100],
+      borderTopWidth: 1,
+      borderTopColor: Colors.border.primary,
+      gap: spacing.sm,
+    },
+    replyBannerBar: {
+      width: 3,
+      alignSelf: "stretch",
+      backgroundColor: Colors.primary[300],
+      borderRadius: 2,
+    },
+    replyBannerContent: {
+      flex: 1,
+    },
+    replyBannerTitle: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      marginBottom: 2,
+    },
+    replyBannerText: {
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+    },
+    replyBannerClose: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: Colors.background.primary,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    replyBannerCloseText: {
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+    },
+    actionsContainer: {
+      gap: spacing.sm,
+    },
+    actionItem: {
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: Layout.radius.lg,
+      backgroundColor: Colors.background.secondary,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+    },
+    actionLabel: {
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+    },
+    actionDisabled: {
+      opacity: 0.5,
+    },
+    actionDestructive: {
+      color: (Colors as any).error?.[600] || "#b00020",
+    },
+    // Search functionality styles
+    headerActions: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    actionButton: {
+      padding: spacing.sm,
+      borderRadius: Layout.radius.md,
+      backgroundColor: Colors.background.secondary,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+    },
+    actionButtonText: {
+      fontSize: fontSize.lg,
+    },
+    searchContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: Colors.background.primary,
+      borderBottomWidth: 1,
+      borderBottomColor: Colors.border.primary,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      gap: spacing.sm,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: fontSize.base,
+      color: Colors.text.primary,
+      backgroundColor: Colors.background.secondary,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+      borderRadius: Layout.radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    searchCloseButton: {
+      padding: spacing.sm,
+      borderRadius: Layout.radius.md,
+      backgroundColor: Colors.background.secondary,
+      borderWidth: 1,
+      borderColor: Colors.border.primary,
+    },
+    searchCloseText: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+    },
+    searchResultsEmpty: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingVertical: spacing.xl,
+    },
+    searchResultsEmptyText: {
+      fontSize: fontSize.base,
+      color: Colors.text.secondary,
+      textAlign: "center",
+    },
   });
 
   if (loading) {
@@ -546,16 +961,47 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             {isTyping && <Text style={styles.typingStatus}>Typing...</Text>}
           </View>
 
-          <TouchableOpacity
-            style={styles.profileButton}
-            onPress={() =>
-              partnerId &&
-              navigation.navigate("ProfileDetail", { profileId: partnerId })
-            }
-          >
-            <Text style={styles.profileButtonText}>👤</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={toggleSearchMode}
+            >
+              <Text style={styles.actionButtonText}>🔍</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.profileButton}
+              onPress={() =>
+                partnerId &&
+                navigation.navigate("ProfileDetail", { profileId: partnerId })
+              }
+            >
+              <Text style={styles.profileButtonText}>👤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Search Bar */}
+        {isSearchMode && (
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search messages..."
+              placeholderTextColor={Colors.text.secondary}
+              value={searchQuery}
+              onChangeText={(text) => {
+                setSearchQuery(text);
+                handleSearch(text);
+              }}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={styles.searchCloseButton}
+              onPress={toggleSearchMode}
+            >
+              <Text style={styles.searchCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Messages */}
         {error ? (
@@ -568,10 +1014,17 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         ) : (
           <View style={styles.messagesContainer}>
             <MessagesList
-              messages={displayMessages as any}
+              messages={
+                (isSearchMode && searchResults.length > 0
+                  ? searchResults
+                  : displayMessages) as any
+              }
               currentUserId={userId || ""}
               typingVisible={typingIndicator.isAnyoneElseTyping}
               typingText={typingIndicator.isAnyoneElseTyping ? "Typing..." : ""}
+              onLongPressMessage={openMessageActions}
+              onToggleReaction={handleToggleReaction}
+              getReactionsForMessage={getReactionsForMessage}
               onFetchOlder={async () => {
                 const beforeTs = messages?.[0]?.createdAt;
                 if (beforeTs) await loadMessages({ before: beforeTs });
@@ -583,7 +1036,63 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 await apiClient.markConversationAsRead(conversationId);
               }}
               refreshing={loading}
+              showUpgradeChip={
+                subscription?.plan === "free" &&
+                !!usage?.features?.find(
+                  (f: any) =>
+                    f.name === "messagesSent" && f.percentageUsed >= 80
+                )
+              }
+              upgradeChipText={(() => {
+                const f = usage?.features?.find(
+                  (x: any) => x.name === "messagesSent"
+                );
+                const pct = f?.percentageUsed ?? 0;
+                return pct >= 100
+                  ? "Limit reached — Upgrade for unlimited"
+                  : `You're at ${pct}% — Upgrade for unlimited`;
+              })()}
+              onPressUpgrade={() => navigation.navigate("Subscription")}
             />
+            {isSearchMode && searchResults.length === 0 && searchQuery && (
+              <View style={styles.searchResultsEmpty}>
+                <Text style={styles.searchResultsEmptyText}>
+                  No messages found for "{searchQuery}"
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Reply/Edit Banner */}
+        {(replyContext || editingMessageId) && (
+          <View style={styles.replyBanner}>
+            <View style={styles.replyBannerBar} />
+            <View style={styles.replyBannerContent}>
+              <Text style={styles.replyBannerTitle}>
+                {editingMessageId ? "Editing message" : "Replying to"}
+              </Text>
+              {!editingMessageId && (
+                <Text style={styles.replyBannerText} numberOfLines={1}>
+                  {replyContext?.type === "voice"
+                    ? "Voice message"
+                    : replyContext?.text || "(no text)"}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                if (editingMessageId) {
+                  setEditingMessageId(null);
+                  setInputText("");
+                } else {
+                  setReplyContext(null);
+                }
+              }}
+              style={styles.replyBannerClose}
+            >
+              <Text style={styles.replyBannerCloseText}>✕</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -625,7 +1134,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
               <TextInput
                 style={styles.chatInput}
-                placeholder="Type a message..."
+                placeholder={
+                  editingMessageId ? "Edit message..." : "Type a message..."
+                }
                 value={inputText}
                 onChangeText={handleInputChange}
                 multiline
@@ -642,7 +1153,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                     }
                     return;
                   }
-                  handleSendMessage(trimmed);
+                  if (editingMessageId) handleEditSubmit();
+                  else handleSendMessage(trimmed);
                 }}
                 returnKeyType="send"
               />
@@ -667,7 +1179,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                     return;
                   }
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  handleSendMessage(trimmed);
+                  if (editingMessageId) handleEditSubmit();
+                  else handleSendMessage(trimmed);
                 }}
                 disabled={!inputText.trim() || !canSend}
               >
@@ -678,6 +1191,45 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             </>
           )}
         </View>
+
+        {/* Action Sheet for message actions */}
+        <BottomSheet
+          isVisible={actionSheetVisible}
+          onClose={() => setActionSheetVisible(false)}
+          title="Message actions"
+          height={260}
+        >
+          <View style={styles.actionsContainer}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={handleReplyAction}
+            >
+              <Text style={styles.actionLabel}>↩︎ Reply</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionItem,
+                !canEdit(actionMessage) && styles.actionDisabled,
+              ]}
+              disabled={!canEdit(actionMessage)}
+              onPress={handleEditAction}
+            >
+              <Text style={styles.actionLabel}>✎ Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionItem,
+                !canDelete(actionMessage) && styles.actionDisabled,
+              ]}
+              disabled={!canDelete(actionMessage)}
+              onPress={handleDeleteAction}
+            >
+              <Text style={[styles.actionLabel, styles.actionDestructive]}>
+                🗑 Delete
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </BottomSheet>
       </KeyboardAvoidingView>
     </View>
   );

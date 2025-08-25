@@ -1,10 +1,9 @@
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
-import { Audio } from "expo-av";
 import { ApiResponse } from "../types/profile";
 import { MessagingAPI } from "../types/messaging";
-import { UnifiedResponseSystem } from "../utils/unifiedResponseSystem";
-import { uriToBlob } from "../utils/fileUtils";
+import { UnifiedResponseSystem } from "@utils/unifiedResponseSystem";
+import { uriToBlob } from "@utils/fileUtils";
 
 /**
  * Service for managing voice message storage and uploads
@@ -73,8 +72,7 @@ export class VoiceMessageStorage {
 
       const { uploadUrl, storageId } = uploadUrlResponse.data;
 
-      // Determine file size and mime type
-      const fileSize = metadata?.fileSize || fileInfo.size || 0;
+      // Determine mime type
       const mimeType = metadata?.mimeType || "audio/m4a";
 
       // Upload the file

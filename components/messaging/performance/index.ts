@@ -1,1 +1,0 @@
-export { PerformanceMonitor } from '../PerformanceMonitor';\nexport { SimplePerformanceMonitor } from '../SimplePerformanceMonitor';\nexport { default as PerformanceMonitorDefault } from '../PerformanceMonitor';\nexport { default as SimplePerformanceMonitorDefault } from '../SimplePerformanceMonitor';"

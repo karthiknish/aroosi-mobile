@@ -15,8 +15,8 @@ export { default as LoadingState } from "../ui/LoadingState";
 export { default as EmptyState } from "../ui/EmptyState";
 
 // Hooks
-export { useNetworkStatus } from "../../hooks/useNetworkStatus";
-export { useRetry } from "../../hooks/useRetry";
+export { useNetworkStatus } from "@/hooks/useNetworkStatus";
+export { useRetry } from "@/hooks/useRetry";
 
 // Utilities
 export {
@@ -26,10 +26,7 @@ export {
 } from "../../utils/errorHandling";
 export { networkManager } from "../../utils/NetworkManager";
 export { errorReporter } from "../../utils/ErrorReporter";
-export {
-  enhancedApiClient,
-  useEnhancedApiClient,
-} from "../../utils/enhancedApiClient";
+// Enhanced API client removed - use base apiClient from @utils/api instead
 
 // Types
 export type {
@@ -46,5 +43,5 @@ export type {
   ErrorReportData,
   ReportingConfig,
 } from "../../utils/ErrorReporter";
-export type { UseRetryResult } from "../../hooks/useRetry";
-export type { UseNetworkStatusResult } from "../../hooks/useNetworkStatus";
+export type { UseRetryResult } from "@/hooks/useRetry";
+export type { UseNetworkStatusResult } from "@/hooks/useNetworkStatus";

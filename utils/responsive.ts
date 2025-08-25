@@ -2,57 +2,51 @@ import { Dimensions, PixelRatio, Platform } from "react-native";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-// Standard screen dimensions (iPhone 14 Pro)
-const BASE_WIDTH = 393;
-const BASE_HEIGHT = 852;
+// Canonical base dimensions (align with useResponsive)
+const BASE_WIDTH = 375;
+const BASE_HEIGHT = 812;
 
-// Responsive scaling functions
+// Responsive scaling functions (aligned to src/hooks/useResponsive.ts)
 export const responsive = {
   // Width-based scaling
-  width: (size: number) => {
-    return (screenWidth / BASE_WIDTH) * size;
-  },
+  width: (size: number) => (screenWidth / BASE_WIDTH) * size,
 
   // Height-based scaling
-  height: (size: number) => {
-    return (screenHeight / BASE_HEIGHT) * size;
-  },
+  height: (size: number) => (screenHeight / BASE_HEIGHT) * size,
 
-  // Font scaling
+  // Font scaling with platform adjustment
   font: (size: number) => {
     const scale = screenWidth / BASE_WIDTH;
     const newSize = size * scale;
-
     if (Platform.OS === "ios") {
       return Math.round(PixelRatio.roundToNearestPixel(newSize));
-    } else {
-      return Math.round(PixelRatio.roundToNearestPixel(newSize)) - 2;
     }
+    return Math.round(PixelRatio.roundToNearestPixel(newSize)) - 1;
   },
 
-  // Padding/Margin scaling
+  // Padding/Margin scaling with clamp like the hook
   spacing: (size: number) => {
-    return Math.round((screenWidth / BASE_WIDTH) * size);
+    const s = Math.min(screenWidth / BASE_WIDTH, 1.2);
+    return Math.round(size * s);
   },
 
   // Border radius scaling
-  radius: (size: number) => {
-    return Math.round((screenWidth / BASE_WIDTH) * size);
-  },
+  radius: (size: number) => Math.round((screenWidth / BASE_WIDTH) * size),
 
-  // Icon size scaling
+  // Icon size scaling with mild cap similar to hook
   icon: (size: number) => {
-    return Math.round((screenWidth / BASE_WIDTH) * size);
+    const s = Math.min(screenWidth / BASE_WIDTH, 1.1);
+    return Math.round(size * s);
   },
 
-  // Button size scaling
+  // Button size scaling (kept but based on canonical width)
   button: {
     small: Math.round((screenWidth / BASE_WIDTH) * 32),
     medium: Math.round((screenWidth / BASE_WIDTH) * 44),
     large: Math.round((screenWidth / BASE_WIDTH) * 56),
   },
 
-  // Input field scaling
+  // Input field scaling (canonical base)
   input: {
     height: Math.round((screenWidth / BASE_WIDTH) * 48),
     borderRadius: Math.round((screenWidth / BASE_WIDTH) * 8),

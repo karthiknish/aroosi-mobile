@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { usePhotoManagement } from '../../hooks/usePhotoManagement';
+import { usePhotoManagement } from "@/hooks/usePhotoManagement";
 import { Colors } from '../../constants';
 
 /**

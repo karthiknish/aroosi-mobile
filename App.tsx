@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, Text } from "react-native";
+import { StyleSheet, View, ActivityIndicator } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   NavigationContainer,
@@ -8,12 +8,12 @@ import {
 } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { ClerkProvider } from '@clerk/clerk-expo';
 
 // Import navigation and providers
 import RootNavigator from "@/navigation/RootNavigator";
-import { NotificationProvider } from "@/providers/NotificationProvider";
-import { ClerkAuthProvider } from "./contexts";
+import EmailVerificationBanner from "./components/auth/EmailVerificationBanner";
+import { NotificationProvider } from "@src/providers/NotificationProvider";
+import { AuthProvider } from "./contexts";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "@providers/ToastContext";
 import { FontLoader } from "@components/FontLoader";
@@ -33,7 +33,7 @@ const queryClient = new QueryClient({
 
 export default function App() {
   const [isReady, setIsReady] = React.useState(false);
-  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const navigationRef = useRef<NavigationContainerRef<any>>({} as any);
 
   React.useEffect(() => {
     // Initialize offline queue for image uploads
@@ -51,49 +51,35 @@ export default function App() {
     );
   }
 
-  // Clerk publishable key - you'll need to set this in your environment
-  const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
-
-  if (!publishableKey) {
-    console.error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Configuration Error</Text>
-        <Text style={styles.subtitle}>Missing Clerk publishable key</Text>
-      </View>
-    );
-  }
-
   return (
-    <ClerkProvider publishableKey={publishableKey}>
-      <FontLoader>
-        <QueryClientProvider client={queryClient}>
-          <ThemeProvider>
-            <ClerkAuthProvider>
-              <ToastProvider>
-                <SafeAreaProvider>
-                  <LinearGradient
-                    colors={Colors.gradient.secondary as any}
-                    style={{ flex: 1 }}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <ErrorBoundary>
-                      <NavigationContainer ref={navigationRef}>
-                        <NotificationProvider navigationRef={navigationRef}>
-                          <StatusBar style="auto" />
-                          <RootNavigator />
-                        </NotificationProvider>
-                      </NavigationContainer>
-                    </ErrorBoundary>
-                  </LinearGradient>
-                </SafeAreaProvider>
-              </ToastProvider>
-            </ClerkAuthProvider>
-          </ThemeProvider>
-        </QueryClientProvider>
-      </FontLoader>
-    </ClerkProvider>
+    <FontLoader>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <SafeAreaProvider>
+                <LinearGradient
+                  colors={Colors.gradient.secondary as any}
+                  style={{ flex: 1 }}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <ErrorBoundary>
+                    <NavigationContainer ref={navigationRef}>
+                      <NotificationProvider navigationRef={navigationRef}>
+                        <StatusBar style="auto" />
+                        <EmailVerificationBanner />
+                        <RootNavigator />
+                      </NotificationProvider>
+                    </NavigationContainer>
+                  </ErrorBoundary>
+                </LinearGradient>
+              </SafeAreaProvider>
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </FontLoader>
   );
 }
 

@@ -1,7 +1,9 @@
 import { Platform } from "react-native";
+import * as Application from "expo-application";
+import Constants from "expo-constants";
 import PlatformPermissions, {
   PermissionType,
-} from "../utils/PlatformPermissions";
+} from "@utils/PlatformPermissions";
 
 export interface NotificationData {
   title: string;
@@ -72,6 +74,25 @@ class PushNotificationService {
     }
 
     try {
+      // Android 13+: Create at least one notification channel BEFORE prompting for permission or fetching tokens
+      if (Platform.OS === "android") {
+        try {
+          await this.notificationsModule.setNotificationChannelAsync(
+            "default",
+            {
+              name: "Default",
+              importance: this.notificationsModule.AndroidImportance.MAX,
+              vibrationPattern: [0, 250, 250, 250],
+              lightColor: "#FF231F7C",
+              enableVibrate: true,
+              showBadge: true,
+            }
+          );
+        } catch (e) {
+          console.warn("Failed to set Android notification channel:", e);
+        }
+      }
+
       // Request permissions
       const permissionResult =
         await PlatformPermissions.requestNotificationPermission();
@@ -97,8 +118,24 @@ class PushNotificationService {
     try {
       if (!this.notificationsModule) return null;
 
+      // Skip remote push token registration on Android when running inside Expo Go
+      if (
+        Platform.OS === "android" &&
+        (Application.applicationId === "host.exp.exponent" ||
+          Application.applicationId === "dev.expo.payments")
+      ) {
+        console.warn(
+          "expo-notifications: Android remote push is unavailable in Expo Go (SDK 53+). Use a development build."
+        );
+        return null;
+      }
+
+      const projectId =
+        process.env.EXPO_PUBLIC_PROJECT_ID ||
+        (Constants.expoConfig?.extra as any)?.eas?.projectId;
+
       const tokenData = await this.notificationsModule.getExpoPushTokenAsync({
-        projectId: process.env.EXPO_PUBLIC_PROJECT_ID,
+        projectId,
       });
 
       this.token = {

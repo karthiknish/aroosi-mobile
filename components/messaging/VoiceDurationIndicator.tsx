@@ -6,7 +6,7 @@ import {
   Animated,
   TouchableOpacity,
 } from "react-native";
-import { useVoiceMessageLimits } from "../../hooks/useMessagingFeatures";
+import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 
 interface VoiceDurationIndicatorProps {
   currentDuration: number;

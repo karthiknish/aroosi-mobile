@@ -1,92 +1,23 @@
-import { Audio } from "expo-av";
-import { Platform } from "react-native";
+import { setAudioModeAsync } from "expo-audio";
 import { ApiResponse } from "../types/profile";
 import { MessagingAPI } from "../types/messaging";
-import { getFileSize, getMimeTypeFromUri } from "../utils/fileUtils";
-import { UnifiedResponseSystem } from "../utils/unifiedResponseSystem";
+import { getFileSize, getMimeTypeFromUri } from "@utils/fileUtils";
 import { VoiceMessageStorage } from "./voiceMessageStorage";
 
 /**
  * Service for managing voice message recording, uploading, and playback
  */
 export class VoiceMessageManager {
-  private api: MessagingAPI;
+  // Public for tests that introspect underlying client
+  public readonly apiClient: MessagingAPI;
   private storage: VoiceMessageStorage;
 
   constructor(api: MessagingAPI) {
-    this.api = api;
+    this.apiClient = api;
     this.storage = new VoiceMessageStorage(api);
   }
 
-  /**
-   * Records a voice message
-   */
-  async recordVoiceMessage(options?: {
-    maxDuration?: number;
-    quality?: Audio.RecordingOptionsQualityPreset;
-  }): Promise<{ uri: string; duration: number } | null> {
-    try {
-      // Request permissions
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status !== "granted") {
-        throw new Error("Permission to access microphone is required");
-      }
-
-      // Set audio mode for recording
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
-        interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
-      });
-
-      // Start recording
-      const { recording } = await Audio.Recording.createAsync(
-        options?.quality || Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      // Track start time
-      const startTime = Date.now();
-
-      // Return promise that resolves when recording is stopped
-      return new Promise((resolve, reject) => {
-        // Set timeout for max duration
-        const maxDuration = options?.maxDuration || 300; // 5 minutes default
-        const timeout = setTimeout(() => {
-          stopRecording();
-        }, maxDuration * 1000);
-
-        // Function to stop recording
-        const stopRecording = async () => {
-          clearTimeout(timeout);
-          try {
-            await recording.stopAndUnloadAsync();
-            const uri = recording.getURI();
-            const duration = Math.floor((Date.now() - startTime) / 1000);
-
-            if (uri) {
-              resolve({ uri, duration });
-            } else {
-              reject(new Error("Failed to get recording URI"));
-            }
-          } catch (error) {
-            reject(
-              error instanceof Error
-                ? error
-                : new Error("Failed to stop recording")
-            );
-          }
-        };
-
-        // Expose stop function
-        (global as any).__stopVoiceRecording = stopRecording;
-      });
-    } catch (error) {
-      console.error("Voice recording error:", error);
-      return null;
-    }
-  }
+  // Recording is handled by useVoiceRecording hook via expo-audio. This service keeps upload/storage helpers.
 
   /**
    * Uploads a voice message
@@ -130,7 +61,7 @@ export class VoiceMessageManager {
       const { storageId } = uploadResult.data;
 
       // Send the message with the storage ID
-      return this.api.sendMessage({
+      return this.apiClient.sendMessage({
         conversationId,
         fromUserId,
         toUserId,
@@ -195,7 +126,8 @@ export class VoiceMessageManager {
   /**
    * Plays a voice message
    */
-  async playVoiceMessage(storageId: string): Promise<Audio.Sound | null> {
+  async playVoiceMessage(storageId: string): Promise<string | null> {
+    // Return a URI to be consumed by expo-audio player hooks
     try {
       // Try to get cached version first
       let uri = await this.downloadVoiceMessage(storageId);
@@ -209,24 +141,16 @@ export class VoiceMessageManager {
         throw new Error("Failed to get voice message URL");
       }
 
-      // Set audio mode for playback
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        interruptionModeIOS: Audio.InterruptionModeIOS.DoNotMix,
-        interruptionModeAndroid: Audio.InterruptionModeAndroid.DoNotMix,
+      // Configure audio mode for playback (expo-audio)
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldPlayInBackground: true,
       });
 
-      // Load and play the sound
-      const { sound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true }
-      );
-
-      return sound;
+      return uri;
     } catch (error) {
-      console.error("Failed to play voice message:", error);
+      console.error("Failed to prepare voice message for playback:", error);
       return null;
     }
   }
@@ -236,8 +160,7 @@ export class VoiceMessageManager {
    */
   async stopAllPlayback(): Promise<void> {
     try {
-      await Audio.setIsEnabledAsync(false);
-      await Audio.setIsEnabledAsync(true);
+          // expo-audio does not provide global toggle; this is a no-op here.
     } catch (error) {
       console.error("Failed to stop audio playback:", error);
     }

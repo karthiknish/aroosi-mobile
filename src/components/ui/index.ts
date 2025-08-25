@@ -47,10 +47,9 @@ export {
   CircularProgress,
   LinearProgress,
   StepProgress,
-  AnimatedCounter,
   LoadingDots,
   Pulse,
-} from './ProgressIndicators';
+} from "./ProgressIndicators";
 
 export {
   // Voice Components

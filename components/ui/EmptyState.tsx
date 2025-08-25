@@ -9,7 +9,10 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
-import { useResponsiveSpacing, useResponsiveTypography } from "../../hooks/useResponsive";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 export interface EmptyStateProps {
   icon?: string;

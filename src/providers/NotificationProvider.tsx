@@ -5,10 +5,10 @@
 
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { NavigationContainerRef } from '@react-navigation/native';
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 // import { useOneSignal } from '../../hooks/useOneSignal'; // Temporarily disabled
-import { NotificationHandler } from '../../utils/notificationHandler';
-import { NotificationPermissionsManager } from '../../utils/notificationPermissions';
+import { NotificationHandler } from "@utils/notificationHandler";
+import { NotificationPermissionsManager } from "@utils/notificationPermissions";
 
 interface NotificationContextType {
   isInitialized: boolean;
@@ -31,7 +31,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
   navigationRef,
 }) => {
-  const { } = useClerkAuth();
+  const { isAuthenticated, user } = useAuth();
+  const userId = user?.id;
 
   // Temporary mock for OneSignal until we fix the integration
   const oneSignalData = {
@@ -79,10 +80,10 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     try {
       // Initialize notification handler
       NotificationHandler.initialize();
-      
-      console.log('Notification system initialized');
+
+      console.log("Notification system initialized");
     } catch (error) {
-      console.error('Error initializing notification system:', error);
+      console.error("Error initializing notification system:", error);
     }
   };
 
@@ -91,26 +92,27 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignIn = async (): Promise<void> => {
     try {
-      console.log('User signed in, setting up notifications...');
-      
+      console.log("User signed in, setting up notifications...");
+
       // Optional: Show permission rationale if first time
-      const permissionStatus = await NotificationPermissionsManager.getPermissionStatus();
-      
-      if (permissionStatus === 'undetermined') {
+      const permissionStatus =
+        await NotificationPermissionsManager.getPermissionStatus();
+
+      if (permissionStatus === "undetermined") {
         // Show rationale and request permission
-        const shouldRequest = await NotificationPermissionsManager.showPermissionRationale();
+        const shouldRequest =
+          await NotificationPermissionsManager.showPermissionRationale();
         if (shouldRequest) {
           await oneSignalData.requestPermission();
         }
       }
-      
+
       // Set external user ID for targeting
       if (userId) {
         oneSignalData.setExternalUserId(userId);
       }
-      
     } catch (error) {
-      console.error('Error handling user sign in for notifications:', error);
+      console.error("Error handling user sign in for notifications:", error);
     }
   };
 
@@ -119,19 +121,18 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignOut = async (): Promise<void> => {
     try {
-      console.log('User signed out, cleaning up notifications...');
-      
+      console.log("User signed out, cleaning up notifications...");
+
       // Clear external user ID
       oneSignalData.clearExternalUserId();
-      
+
       // Optionally unregister from push notifications
       // await oneSignalData.unregisterFromPushNotifications();
-      
+
       // Clear notification badge
       await NotificationPermissionsManager.clearBadge();
-      
     } catch (error) {
-      console.error('Error handling user sign out for notifications:', error);
+      console.error("Error handling user sign out for notifications:", error);
     }
   };
 
@@ -142,7 +143,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     isRegistered: oneSignalData.isRegistered,
     requestPermission: oneSignalData.requestPermission,
     registerForPushNotifications: oneSignalData.registerForPushNotifications,
-    unregisterFromPushNotifications: oneSignalData.unregisterFromPushNotifications,
+    unregisterFromPushNotifications:
+      oneSignalData.unregisterFromPushNotifications,
   };
 
   return (

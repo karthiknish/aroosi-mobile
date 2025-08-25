@@ -71,23 +71,31 @@ jest.mock("react-native-permissions", () => ({
   check: jest.fn(() => Promise.resolve("granted")),
 }));
 
-// Mock WebSocket
-global.WebSocket = jest.fn().mockImplementation(() => ({
-  send: jest.fn(),
-  close: jest.fn(),
-  addEventListener: jest.fn(),
-  removeEventListener: jest.fn(),
-  readyState: 1, // OPEN
-  CONNECTING: 0,
-  OPEN: 1,
-  CLOSING: 2,
-  CLOSED: 3,
-}));
+// Mock WebSocket with static constants to satisfy TS structural typing
+class MockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+  readyState = MockWebSocket.OPEN;
+  onopen: ((ev: any) => any) | null = null;
+  onmessage: ((ev: any) => any) | null = null;
+  onerror: ((ev: any) => any) | null = null;
+  onclose: ((ev: any) => any) | null = null;
+  send = jest.fn();
+  close = jest.fn();
+  addEventListener = jest.fn();
+  removeEventListener = jest.fn();
+  constructor(url?: string, protocols?: string | string[]) {}
+}
+// Override global for test environment
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).WebSocket = MockWebSocket as unknown as typeof WebSocket;
 
 // Mock Blob for voice message testing
-global.Blob = jest.fn().mockImplementation((parts, options) => ({
+global.Blob = jest.fn().mockImplementation((parts: any[], options: any) => ({
   size: parts.reduce(
-    (acc, part) =>
+    (acc: number, part: any) =>
       acc + (typeof part === "string" ? part.length : part.byteLength || 0),
     0
   ),

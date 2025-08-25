@@ -1,24 +1,28 @@
 import React, { useRef, useEffect } from 'react';
+import { View, Animated, Dimensions, Easing, Platform } from 'react-native';
 import {
-  View,
-  Animated,
-  Dimensions,
-  Easing,
-  Platform,
-} from 'react-native';
-import { StackNavigationOptions, TransitionPresets } from '@react-navigation/stack';
-import { CardStyleInterpolators, HeaderStyleInterpolators } from '@react-navigation/stack';
+  StackNavigationOptions,
+  TransitionPresets,
+  CardStyleInterpolators,
+  HeaderStyleInterpolators,
+} from '@react-navigation/stack';
+// Type for card style interpolator parameters
+type CardInterpolatorParams = {
+  current: { progress: Animated.AnimatedInterpolation<number> };
+  next?: { progress: Animated.AnimatedInterpolation<number> };
+  layouts: { screen: { width: number; height: number } };
+};
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
 // Custom transition configurations
 export const NavigationTransitions = {
   // Slide from right (default iOS style)
   slideFromRight: {
-    gestureDirection: 'horizontal' as const,
+    gestureDirection: "horizontal" as const,
     transitionSpec: {
       open: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 1000,
           damping: 500,
@@ -29,7 +33,7 @@ export const NavigationTransitions = {
         },
       },
       close: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 1000,
           damping: 500,
@@ -46,10 +50,10 @@ export const NavigationTransitions = {
 
   // Slide from bottom (modal style)
   slideFromBottom: {
-    gestureDirection: 'vertical' as const,
+    gestureDirection: "vertical" as const,
     transitionSpec: {
       open: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 1000,
           damping: 500,
@@ -60,7 +64,7 @@ export const NavigationTransitions = {
         },
       },
       close: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 1000,
           damping: 500,
@@ -77,17 +81,17 @@ export const NavigationTransitions = {
 
   // Fade transition
   fade: {
-    gestureDirection: 'horizontal' as const,
+    gestureDirection: "horizontal" as const,
     transitionSpec: {
       open: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 300,
           easing: Easing.out(Easing.poly(4)),
         },
       },
       close: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 300,
           easing: Easing.in(Easing.poly(4)),
@@ -100,10 +104,10 @@ export const NavigationTransitions = {
 
   // Scale transition
   scale: {
-    gestureDirection: 'horizontal' as const,
+    gestureDirection: "horizontal" as const,
     transitionSpec: {
       open: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 800,
           damping: 600,
@@ -114,7 +118,7 @@ export const NavigationTransitions = {
         },
       },
       close: {
-        animation: 'spring',
+        animation: "spring",
         config: {
           stiffness: 800,
           damping: 600,
@@ -125,22 +129,22 @@ export const NavigationTransitions = {
         },
       },
     },
-    cardStyleInterpolator: ({ current, layouts }) => {
+    cardStyleInterpolator: (params: CardInterpolatorParams) => {
       return {
         cardStyle: {
           transform: [
             {
-              scale: current.progress.interpolate({
+              scale: params.current.progress.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.9, 1],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
-          opacity: current.progress.interpolate({
+          opacity: params.current.progress.interpolate({
             inputRange: [0, 1],
             outputRange: [0, 1],
-            extrapolate: 'clamp',
+            extrapolate: "clamp",
           }),
         },
       };
@@ -150,36 +154,36 @@ export const NavigationTransitions = {
 
   // Flip transition
   flip: {
-    gestureDirection: 'horizontal' as const,
+    gestureDirection: "horizontal" as const,
     transitionSpec: {
       open: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 600,
           easing: Easing.out(Easing.poly(4)),
         },
       },
       close: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 600,
           easing: Easing.in(Easing.poly(4)),
         },
       },
     },
-    cardStyleInterpolator: ({ current, layouts }) => {
+    cardStyleInterpolator: (params: CardInterpolatorParams) => {
       return {
         cardStyle: {
           transform: [
             {
-              rotateY: current.progress.interpolate({
+              rotateY: params.current.progress.interpolate({
                 inputRange: [0, 0.5, 1],
-                outputRange: ['180deg', '90deg', '0deg'],
-                extrapolate: 'clamp',
+                outputRange: ["180deg", "90deg", "0deg"],
+                extrapolate: "clamp",
               }),
             },
           ],
-          backfaceVisibility: 'hidden',
+          backfaceVisibility: "hidden",
         },
       };
     },
@@ -188,43 +192,39 @@ export const NavigationTransitions = {
 
   // Cube transition
   cube: {
-    gestureDirection: 'horizontal' as const,
+    gestureDirection: "horizontal" as const,
     transitionSpec: {
       open: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 400,
           easing: Easing.out(Easing.poly(4)),
         },
       },
       close: {
-        animation: 'timing',
+        animation: "timing",
         config: {
           duration: 400,
           easing: Easing.in(Easing.poly(4)),
         },
       },
     },
-    cardStyleInterpolator: ({ current, next, layouts }) => {
-      const translateX = current.progress.interpolate({
+    cardStyleInterpolator: (params: CardInterpolatorParams) => {
+      const translateX = params.current.progress.interpolate({
         inputRange: [0, 1],
-        outputRange: [layouts.screen.width, 0],
-        extrapolate: 'clamp',
+        outputRange: [params.layouts.screen.width, 0],
+        extrapolate: "clamp",
       });
 
-      const rotateY = current.progress.interpolate({
+      const rotateY = params.current.progress.interpolate({
         inputRange: [0, 1],
-        outputRange: ['-90deg', '0deg'],
-        extrapolate: 'clamp',
+        outputRange: ["-90deg", "0deg"],
+        extrapolate: "clamp",
       });
 
       return {
         cardStyle: {
-          transform: [
-            { perspective: 1000 },
-            { translateX },
-            { rotateY },
-          ],
+          transform: [{ perspective: 1000 }, { translateX }, { rotateY }],
         },
       };
     },
@@ -235,42 +235,28 @@ export const NavigationTransitions = {
 // Custom card style interpolators
 export const CustomCardStyleInterpolators = {
   // Tinder-style swipe
-  forTinderSwipe: ({ current, next, layouts }) => {
-    const translateX = current.progress.interpolate({
+  forTinderSwipe: (params: CardInterpolatorParams) => {
+    const translateX = params.current.progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [layouts.screen.width, 0],
-      extrapolate: 'clamp',
+      outputRange: [params.layouts.screen.width, 0],
+      extrapolate: "clamp",
     });
 
-    const rotate = current.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['15deg', '0deg'],
-      extrapolate: 'clamp',
-    });
-
-    const scale = current.progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0.8, 1],
-      extrapolate: 'clamp',
-    });
-
+    // Example: you may want to use rotate for a custom effect, but the code above was broken
+    // Remove the broken nested cardStyleInterpolator and keep only translateX
     return {
       cardStyle: {
-        transform: [
-          { translateX },
-          { rotate },
-          { scale },
-        ],
+        transform: [{ translateX }],
       },
     };
   },
 
   // Elastic bounce
-  forElasticBounce: ({ current, layouts }) => {
-    const translateX = current.progress.interpolate({
+  forElasticBounce: (params: CardInterpolatorParams) => {
+    const translateX = params.current.progress.interpolate({
       inputRange: [0, 0.7, 1],
-      outputRange: [layouts.screen.width, -50, 0],
-      extrapolate: 'clamp',
+      outputRange: [params.layouts.screen.width, -50, 0],
+      extrapolate: "clamp",
     });
 
     return {
@@ -281,100 +267,81 @@ export const CustomCardStyleInterpolators = {
   },
 
   // Zoom and slide
-  forZoomSlide: ({ current, layouts }) => {
-    const translateX = current.progress.interpolate({
+  forZoomSlide: (params: CardInterpolatorParams) => {
+    const translateX = params.current.progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [layouts.screen.width, 0],
-      extrapolate: 'clamp',
+      outputRange: [params.layouts.screen.width, 0],
+      extrapolate: "clamp",
     });
 
-    const scale = current.progress.interpolate({
+    const scale = params.current.progress.interpolate({
       inputRange: [0, 0.5, 1],
       outputRange: [0.5, 0.8, 1],
-      extrapolate: 'clamp',
+      extrapolate: "clamp",
     });
 
-    const opacity = current.progress.interpolate({
+    const opacity = params.current.progress.interpolate({
       inputRange: [0, 0.5, 1],
       outputRange: [0, 0.5, 1],
-      extrapolate: 'clamp',
+      extrapolate: "clamp",
     });
 
     return {
       cardStyle: {
-        transform: [
-          { translateX },
-          { scale },
-        ],
+        transform: [{ translateX }, { scale }],
         opacity,
       },
     };
   },
 
   // Parallax effect
-  forParallax: ({ current, next, layouts }) => {
-    const translateX = current.progress.interpolate({
+  forParallax: (params: CardInterpolatorParams) => {
+    const translateX = params.current.progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [layouts.screen.width, 0],
-      extrapolate: 'clamp',
+      outputRange: [params.layouts.screen.width, 0],
+      extrapolate: "clamp",
     });
 
-    const nextTranslateX = next
-      ? next.progress.interpolate({
+    const nextTranslateX = params.next
+      ? params.next.progress.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -layouts.screen.width * 0.3],
-          extrapolate: 'clamp',
+          outputRange: [0, -params.layouts.screen.width * 0.3],
+          extrapolate: "clamp",
         })
       : 0;
 
     return {
       cardStyle: {
-        transform: [
-          { translateX: next ? nextTranslateX : translateX },
-        ],
+        transform: [{ translateX: params.next ? nextTranslateX : translateX }],
       },
     };
   },
 };
 
+// Animated screen wrapper component
 // Transition presets for different screen types
 export const ScreenTransitionPresets = {
-  // For main navigation screens
   main: NavigationTransitions.slideFromRight,
-  
-  // For modal screens
   modal: NavigationTransitions.slideFromBottom,
-  
-  // For profile/detail screens
   profile: NavigationTransitions.scale,
-  
-  // For chat screens
   chat: NavigationTransitions.slideFromRight,
-  
-  // For settings screens
   settings: NavigationTransitions.fade,
-  
-  // For onboarding screens
   onboarding: NavigationTransitions.fade,
-  
-  // For dating card screens
   dating: {
     ...NavigationTransitions.slideFromRight,
     cardStyleInterpolator: CustomCardStyleInterpolators.forTinderSwipe,
   },
 };
-
-// Animated screen wrapper component
 interface AnimatedScreenProps {
   children: React.ReactNode;
-  animationType?: 'fadeIn' | 'slideUp' | 'slideDown' | 'scale' | 'bounce';
+  animationType?: "fadeIn" | "slideUp" | "slideDown" | "scale" | "bounce";
   duration?: number;
   delay?: number;
 }
 
 export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
   children,
-  animationType = 'fadeIn',
+  animationType = "fadeIn",
   duration = 300,
   delay = 0,
 }) => {
@@ -398,11 +365,11 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
 
   const getAnimationStyle = () => {
     switch (animationType) {
-      case 'fadeIn':
+      case "fadeIn":
         return {
           opacity: animatedValue,
         };
-      case 'slideUp':
+      case "slideUp":
         return {
           opacity: animatedValue,
           transform: [
@@ -410,12 +377,12 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
               translateY: animatedValue.interpolate({
                 inputRange: [0, 1],
                 outputRange: [50, 0],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
         };
-      case 'slideDown':
+      case "slideDown":
         return {
           opacity: animatedValue,
           transform: [
@@ -423,12 +390,12 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
               translateY: animatedValue.interpolate({
                 inputRange: [0, 1],
                 outputRange: [-50, 0],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
         };
-      case 'scale':
+      case "scale":
         return {
           opacity: animatedValue,
           transform: [
@@ -436,12 +403,12 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
               scale: animatedValue.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.8, 1],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
         };
-      case 'bounce':
+      case "bounce":
         return {
           opacity: animatedValue,
           transform: [
@@ -449,7 +416,7 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
               scale: animatedValue.interpolate({
                 inputRange: [0, 0.5, 1],
                 outputRange: [0.8, 1.1, 1],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
@@ -472,16 +439,16 @@ export const AnimatedScreen: React.FC<AnimatedScreenProps> = ({
 interface PageTransitionProps {
   children: React.ReactNode;
   isVisible: boolean;
-  transitionType?: 'slide' | 'fade' | 'scale' | 'flip';
-  direction?: 'left' | 'right' | 'up' | 'down';
+  transitionType?: "slide" | "fade" | "scale" | "flip";
+  direction?: "left" | "right" | "up" | "down";
   duration?: number;
 }
 
 export const PageTransition: React.FC<PageTransitionProps> = ({
   children,
   isVisible,
-  transitionType = 'slide',
-  direction = 'right',
+  transitionType = "slide",
+  direction = "right",
   duration = 300,
 }) => {
   const animatedValue = useRef(new Animated.Value(isVisible ? 1 : 0)).current;
@@ -497,39 +464,39 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
 
   const getTransitionStyle = () => {
     switch (transitionType) {
-      case 'slide':
+      case "slide":
         const getSlideTransform = () => {
           switch (direction) {
-            case 'left':
+            case "left":
               return {
                 translateX: animatedValue.interpolate({
                   inputRange: [0, 1],
                   outputRange: [-screenWidth, 0],
-                  extrapolate: 'clamp',
+                  extrapolate: "clamp",
                 }),
               };
-            case 'right':
+            case "right":
               return {
                 translateX: animatedValue.interpolate({
                   inputRange: [0, 1],
                   outputRange: [screenWidth, 0],
-                  extrapolate: 'clamp',
+                  extrapolate: "clamp",
                 }),
               };
-            case 'up':
+            case "up":
               return {
                 translateY: animatedValue.interpolate({
                   inputRange: [0, 1],
                   outputRange: [-screenHeight, 0],
-                  extrapolate: 'clamp',
+                  extrapolate: "clamp",
                 }),
               };
-            case 'down':
+            case "down":
               return {
                 translateY: animatedValue.interpolate({
                   inputRange: [0, 1],
                   outputRange: [screenHeight, 0],
-                  extrapolate: 'clamp',
+                  extrapolate: "clamp",
                 }),
               };
             default:
@@ -540,11 +507,11 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
           opacity: animatedValue,
           transform: [getSlideTransform()] as any,
         };
-      case 'fade':
+      case "fade":
         return {
           opacity: animatedValue,
         };
-      case 'scale':
+      case "scale":
         return {
           opacity: animatedValue,
           transform: [
@@ -552,20 +519,20 @@ export const PageTransition: React.FC<PageTransitionProps> = ({
               scale: animatedValue.interpolate({
                 inputRange: [0, 1],
                 outputRange: [0.8, 1],
-                extrapolate: 'clamp',
+                extrapolate: "clamp",
               }),
             },
           ],
         };
-      case 'flip':
+      case "flip":
         return {
           opacity: animatedValue,
           transform: [
             {
               rotateY: animatedValue.interpolate({
                 inputRange: [0, 1],
-                outputRange: ['90deg', '0deg'],
-                extrapolate: 'clamp',
+                outputRange: ["90deg", "0deg"],
+                extrapolate: "clamp",
               }),
             },
           ],

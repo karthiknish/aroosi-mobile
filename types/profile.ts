@@ -1,14 +1,14 @@
 // Profile type definitions matching web version exactly
 
 export type Gender = "male" | "female" | "other";
-export type PreferredGender = "male" | "female" | "other" | "any" | "";
-export type MaritalStatus = "single" | "divorced" | "widowed" | "annulled";
-export type Diet =
-  | "vegetarian"
-  | "non-vegetarian"
-  | "halal"
-  | "other"
-  | "";
+export type PreferredGender = "male" | "female" | "both" | "other"; // aligned with web; legacy 'any' mapped to 'both'
+export type MaritalStatus =
+  | "single"
+  | "divorced"
+  | "widowed"
+  | "annulled"
+  | "separated"; // include web 'separated'
+export type Diet = "vegetarian" | "non-vegetarian" | "halal" | "other" | "";
 export type SmokingDrinking = "no" | "occasionally" | "yes" | "";
 export type PhysicalStatus = "normal" | "differently-abled" | "other" | "";
 export type ProfileFor = "self" | "friend" | "family";
@@ -16,7 +16,9 @@ export type ProfileFor = "self" | "friend" | "family";
 import type { SubscriptionTier } from "./subscription";
 export type SubscriptionPlan = SubscriptionTier;
 
-export type Id<TableName extends string> = string;
+export type Id<TableName extends string = string> = string & {
+  readonly __brand?: TableName;
+};
 
 export interface Profile {
   _id: Id<"profiles">;
@@ -47,8 +49,7 @@ export interface Profile {
   preferredGender: PreferredGender;
   profileImageIds?: string[];
   profileImageUrls?: string[];
-  isProfileComplete: boolean;
-  isOnboardingComplete: boolean;
+  // isProfileComplete & isOnboardingComplete removed; derive completeness via schema validation.
   isApproved?: boolean;
 
   hideFromFreeUsers?: boolean;
@@ -106,13 +107,13 @@ export interface ProfileFormValues {
   partnerPreferenceCity: string[] | string;
   preferredGender: string;
   profileImageIds?: string[];
-  isProfileComplete?: boolean;
-  isOnboardingComplete?: boolean;
+  // removed legacy completeness flags
 
   banned?: boolean;
   createdAt?: number;
   updatedAt?: number;
   profileFor: "self" | "friend" | "family";
+  interests?: string[] | string;
   subscriptionPlan?: SubscriptionPlan;
   boostsRemaining?: number;
   motherTongue: string;
@@ -335,6 +336,7 @@ export interface CreateProfileData {
   profileFor?: ProfileFor;
   hideFromFreeUsers?: boolean;
   // Local image references for profile creation (before authentication)
+  interests?: string[] | string;
   localImageIds?: string[];
   // Image IDs for profile creation (after authentication)
   profileImageIds?: string[];
@@ -358,17 +360,17 @@ export const PREFERRED_GENDER_OPTIONS: {
 }[] = [
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
+  { value: "both", label: "Both" },
   { value: "other", label: "Other" },
-  { value: "any", label: "Any" },
 ];
 
-export const MARITAL_STATUS_OPTIONS: { value: MaritalStatus; label: string }[] =
-  [
-    { value: "single", label: "Single" },
-    { value: "divorced", label: "Divorced" },
-    { value: "widowed", label: "Widowed" },
-    { value: "annulled", label: "Annulled" },
-  ];
+export const MARITAL_STATUS_OPTIONS: { value: MaritalStatus; label: string }[] = [
+  { value: "single", label: "Single" },
+  { value: "divorced", label: "Divorced" },
+  { value: "widowed", label: "Widowed" },
+  { value: "annulled", label: "Annulled" }, // legacy mobile
+  { value: "separated", label: "Separated" }, // web
+];
 
 export const DIET_OPTIONS: { value: Diet; label: string }[] = [
   { value: "vegetarian", label: "Vegetarian" },

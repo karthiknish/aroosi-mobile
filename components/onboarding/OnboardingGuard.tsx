@@ -1,8 +1,8 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
-import { useOnboarding } from '../../hooks/useOnboarding';
-import { LoadingState } from '../error';
+import { useAuth } from "../../contexts/AuthProvider";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { LoadingState } from "../error";
 
 interface OnboardingGuardProps {
   children: React.ReactNode;
@@ -10,22 +10,22 @@ interface OnboardingGuardProps {
   redirectTo?: string;
 }
 
-export default function OnboardingGuard({ 
-  children, 
+export default function OnboardingGuard({
+  children,
   requireOnboarding = true,
-  redirectTo = '/onboarding'
+  redirectTo = "/onboarding",
 }: OnboardingGuardProps) {
-  const { } = useClerkAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth() as any;
   const { shouldShow, isLoading: onboardingLoading } = useOnboarding();
   const router = useRouter();
 
   // Wait for auth and onboarding to load
-  if (!authLoaded || onboardingLoading) {
+  if (authLoading || onboardingLoading) {
     return <LoadingState fullScreen message="Loading..." />;
   }
 
   // If user is not signed in, let the auth guard handle it
-  if (!isSignedIn) {
+  if (!isAuthenticated) {
     return <>{children}</>;
   }
 

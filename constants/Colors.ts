@@ -153,85 +153,76 @@ export const Colors = {
     800: "#1e40af",
     900: "#1e3a8a",
   },
-
-  // Clerk Auth colors (matching web app)
-  clerk: {
-    primary: "#BFA67A",
-    danger: "#d90012",
-  },
 };
 
 export const darkColors = {
   // Primary brand colors (same)
   primary: Colors.primary,
-  
+
   // Secondary brand colors (same)
   secondary: Colors.secondary,
-  
+
   // Accent colors (same)
   accent: Colors.accent,
-  
+
   // Dark neutral colors
   neutral: {
-    50: '#111827',
-    100: '#1f2937',
-    200: '#374151',
-    300: '#4b5563',
-    400: '#6b7280',
-    500: '#9ca3af',
-    600: '#d1d5db',
-    700: '#e5e7eb',
-    800: '#f3f4f6',
-    900: '#f9fafb',
+    50: "#111827",
+    100: "#1f2937",
+    200: "#374151",
+    300: "#4b5563",
+    400: "#6b7280",
+    500: "#9ca3af",
+    600: "#d1d5db",
+    700: "#e5e7eb",
+    800: "#f3f4f6",
+    900: "#f9fafb",
   },
-  
+
   // Gray colors (alias for neutral in dark mode)
   gray: {
-    50: '#111827',
-    100: '#1f2937',
-    200: '#374151',
-    300: '#4b5563',
-    400: '#6b7280',
-    500: '#9ca3af',
-    600: '#d1d5db',
-    700: '#e5e7eb',
-    800: '#f3f4f6',
-    900: '#f9fafb',
+    50: "#111827",
+    100: "#1f2937",
+    200: "#374151",
+    300: "#4b5563",
+    400: "#6b7280",
+    500: "#9ca3af",
+    600: "#d1d5db",
+    700: "#e5e7eb",
+    800: "#f3f4f6",
+    900: "#f9fafb",
   },
-  
+
   // Info colors (same)
   info: Colors.info,
-  
+
   // Success, warning, error (same)
   success: Colors.success,
   warning: Colors.warning,
   error: Colors.error,
-  
+
   // Dark background colors
   background: {
-    primary: '#111827',
-    secondary: '#1f2937',
-    tertiary: '#374151',
+    primary: "#111827",
+    secondary: "#1f2937",
+    tertiary: "#374151",
   },
-  
+
   // Dark text colors
   text: {
-    primary: '#f9fafb',
-    secondary: '#d1d5db',
-    tertiary: '#9ca3af',
-    inverse: '#111827',
+    primary: "#f9fafb",
+    secondary: "#d1d5db",
+    tertiary: "#9ca3af",
+    inverse: "#111827",
   },
-  
+
   // Dark border colors
   border: {
-    primary: '#374151',
-    secondary: '#4b5563',
-    focus: '#f04438',
+    primary: "#374151",
+    secondary: "#4b5563",
+    focus: "#f04438",
   },
-  
+
   // Gradient colors (same)
   gradient: Colors.gradient,
-  
-  // Clerk Auth colors (same)
-  clerk: Colors.clerk,
 };

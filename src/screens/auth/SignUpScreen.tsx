@@ -10,18 +10,18 @@ import {
   SafeAreaView,
   ScrollView,
 } from "react-native";
-import { useClerkAuth } from "@contexts/ClerkAuthContext";
+import { useAuth } from "@contexts/AuthProvider";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { AuthStackParamList } from "../../navigation/AuthNavigator";
+import { AuthStackParamList } from "@navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
-import { Colors, Layout } from "../../../constants";
+import { Colors, Layout } from "@constants";
 import useResponsiveSpacing, {
   useResponsiveTypography,
-} from "../../../hooks/useResponsive";
-import { GradientBackground } from "../../components/ui/GradientComponents";
-import { useToast } from "../../../providers/ToastContext";
-import { OtpInput } from "../../components/ui/OtpInput";
+} from "@/hooks/useResponsive";
+import { GradientBackground } from "@src/components/ui/GradientComponents";
+import { useToast } from "@providers/ToastContext";
+// Removed OtpInput – Firebase uses email link verification
 
 type SignUpScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -29,7 +29,15 @@ type SignUpScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function SignUpScreen() {
-  const { signUp, verifyEmailCode, resendEmailVerification, refreshUser } = useClerkAuth();
+  const {
+    signUp,
+    verifyEmailCode,
+    resendEmailVerification,
+    refreshUser,
+    user,
+    startEmailVerificationPolling,
+    needsEmailVerification,
+  } = useAuth();
   const navigation = useNavigation<SignUpScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -39,117 +47,77 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
   // Verification state
-  const [needsVerification, setNeedsVerification] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [signUpAttemptId, setSignUpAttemptId] = useState<string | null>(null);
-  const [secondsLeft, setSecondsLeft] = useState(60);
+  const [awaitingEmailVerification, setAwaitingEmailVerification] =
+    useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const countdownRef = useRef<NodeJS.Timeout | null>(null);
 
   // Inline field error state
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Start/resume countdown when verification is needed
+  // countdown for resend email
   useEffect(() => {
-    if (needsVerification) {
-      // Start/resume countdown
-      setSecondsLeft(60);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      countdownRef.current = setInterval(() => {
-        setSecondsLeft((s) => {
-          if (s <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    }
+    if (secondsLeft <= 0) return;
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
     return () => {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
-  }, [needsVerification]);
+  }, [secondsLeft]);
 
   const handleResend = async () => {
-    if (!signUpAttemptId || secondsLeft > 0) return;
+    if (!awaitingEmailVerification || secondsLeft > 0) return;
     setResendLoading(true);
     try {
-      const resp = await resendEmailVerification(signUpAttemptId);
+      const resp = await resendEmailVerification();
       if (!resp.success) {
-        toast?.show?.(resp.error || "Unable to resend code", "error");
+        toast?.show?.(resp.error || "Unable to resend email", "error");
         return;
       }
-      setVerificationCode("");
+      toast?.show?.("Verification email sent again", "info");
       setSecondsLeft(60);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-      countdownRef.current = setInterval(() => {
-        setSecondsLeft((s) => {
-          if (s <= 1) {
-            if (countdownRef.current) clearInterval(countdownRef.current);
-            return 0;
-          }
-          return s - 1;
-        });
-      }, 1000);
     } finally {
       setResendLoading(false);
     }
   };
 
   // Auto-submit when full 6-digit code entered
-  const autoSubmittingRef = useRef(false);
-  useEffect(() => {
-    const shouldAutoSubmit =
-      needsVerification &&
-      signUpAttemptId &&
-      verificationCode.length === 6 &&
-      !loading &&
-      !autoSubmittingRef.current;
-    if (!shouldAutoSubmit) return;
-    autoSubmittingRef.current = true;
-    const run = async () => {
-      setLoading(true);
-      try {
-        const result = await verifyEmailCode(verificationCode, signUpAttemptId);
-        if (!result.success)
-          throw new Error(result.error || "Failed to verify code");
-
+  // Poll for verification when user indicates they've verified
+  const handleIHaveVerified = async () => {
+    setLoading(true);
+    try {
+      const res = await verifyEmailCode();
+      if (res.success) {
+        toast?.show?.("Email verified! Let's finish your profile.", "success");
         await refreshUser();
-        
-        // After successful verification, navigate to onboarding
-        toast?.show?.(
-          "Account verified. Let's complete your profile.",
-          "success"
-        );
         navigation.reset({
           index: 0,
           routes: [
             { name: "Onboarding" as any, params: { screen: "ProfileSetup" } },
           ],
         });
-      } catch (err: any) {
-        const msg =
-          err?.message || "Invalid verification code. Please try again.";
-        toast?.show?.(msg, "error");
-        autoSubmittingRef.current = false; // allow retry
-        setLoading(false);
+      } else {
+        toast?.show?.(
+          res.error || "Still not verified. Try again shortly.",
+          "error"
+        );
       }
-    };
-    void run();
-  }, [
-    needsVerification,
-    signUpAttemptId,
-    verificationCode,
-    loading,
-    refreshUser,
-    toast,
-    navigation,
-    verifyEmailCode
-  ]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const onSignUpPress = async () => {
     // Reset field errors
@@ -168,7 +136,8 @@ export default function SignUpScreen() {
     if (!password) {
       errors.password = "Password is required";
     } else if (password.length < 12) {
-      errors.password = "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.";
+      errors.password =
+        "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.";
     } else {
       // Client-side quick check for character classes
       const hasLower = /[a-z]/.test(password);
@@ -176,7 +145,8 @@ export default function SignUpScreen() {
       const hasDigit = /\d/.test(password);
       const hasSymbol = /[^A-Za-z0-9]/.test(password);
       if (!(hasLower && hasUpper && hasDigit && hasSymbol)) {
-        errors.password = "Password must include uppercase, lowercase, number, and symbol.";
+        errors.password =
+          "Password must include uppercase, lowercase, number, and symbol.";
       }
     }
 
@@ -210,29 +180,26 @@ export default function SignUpScreen() {
     try {
       // Use email as fullName like web version does
       const fullName = normalizedEmail.split("@")[0];
-      const result = await signUp(
-        normalizedEmail,
-        password,
-        fullName
-      );
-
+      const result = await signUp(normalizedEmail, password, fullName);
       if (result.success) {
-        // After signup, send the user straight to onboarding to complete profile
-        toast?.show?.(
-          "Account created. Let's complete your profile.",
-          "success"
-        );
-        navigation.reset({
-          index: 0,
-          routes: [
-            { name: "Onboarding" as any, params: { screen: "ProfileSetup" } },
-          ],
-        });
-      } else if (result.needsVerification && result.signUpAttemptId) {
-        // Email verification required
-        setNeedsVerification(true);
-        setSignUpAttemptId(result.signUpAttemptId);
-        toast?.show?.("We've sent a verification code to your email.", "info");
+        if (result.emailVerified) {
+          toast?.show?.("Account created!", "success");
+          navigation.reset({
+            index: 0,
+            routes: [
+              { name: "Onboarding" as any, params: { screen: "ProfileSetup" } },
+            ],
+          });
+        } else {
+          setAwaitingEmailVerification(true);
+          toast?.show?.(
+            "Verification email sent. Please check your inbox.",
+            "info"
+          );
+          setSecondsLeft(60);
+          // Begin background polling for email verification status
+          startEmailVerificationPolling?.();
+        }
       } else {
         toast?.show?.(result.error || "Sign up failed", "error");
       }
@@ -244,38 +211,7 @@ export default function SignUpScreen() {
     }
   };
 
-  const onVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      toast?.show?.("Please enter the 6-digit code", "error");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await verifyEmailCode(verificationCode, signUpAttemptId!);
-      if (!result.success)
-        throw new Error(result.error || "Failed to verify code");
-
-      await refreshUser();
-      
-      // After successful verification, navigate to onboarding
-      toast?.show?.(
-        "Account verified. Let's complete your profile.",
-        "success"
-      );
-      navigation.reset({
-        index: 0,
-        routes: [
-          { name: "Onboarding" as any, params: { screen: "ProfileSetup" } },
-        ],
-      });
-    } catch (err: any) {
-      const errorMsg =
-        err?.message || "Invalid verification code. Please try again.";
-      toast?.show?.(errorMsg, "error");
-      setLoading(false);
-    }
-  };
+  // removed onVerifyCode as we use link verification
 
   const styles = StyleSheet.create({
     container: {
@@ -436,85 +372,60 @@ export default function SignUpScreen() {
             <View style={styles.inner}>
               <View style={styles.header}>
                 <Text style={styles.title}>
-                  {needsVerification ? "Check your email" : "Create Account"}
+                  {awaitingEmailVerification || needsEmailVerification
+                    ? "Check your email"
+                    : "Create Account"}
                 </Text>
                 <Text style={styles.subtitle}>
-                  {needsVerification
-                    ? `We sent a verification code to ${emailAddress}`
+                  {awaitingEmailVerification || needsEmailVerification
+                    ? `We sent a verification link to ${emailAddress}`
                     : "Join Aroosi to find your perfect match"}
                 </Text>
               </View>
 
               <View style={styles.form}>
-                {needsVerification ? (
-                  // Verification UI
+                {awaitingEmailVerification ? (
                   <View style={styles.verificationContainer}>
-                    <Text style={styles.verificationTitle}>Verification Code</Text>
-                    <Text style={styles.verificationSubtitle}>
-                      Enter the 6-digit code sent to your email
+                    <Text style={styles.verificationTitle}>
+                      Verify your email
                     </Text>
-                    
-                    <OtpInput
-                      value={verificationCode}
-                      onChange={(value) => {
-                        setVerificationCode(value);
-                        // Clear error when user starts typing
-                        if (fieldErrors.verificationCode) {
-                          setFieldErrors((e) => ({ ...e, verificationCode: "" }));
-                        }
-                        // Clear verificationCode error when user starts typing
-                        if (fieldErrors.verificationCode) {
-                          setFieldErrors((prev) => ({ ...prev, verificationCode: undefined }));
-                        }
-                      }}
-                      length={6}
-                      autoFocus
-                    />
-                    {fieldErrors.verificationCode ? (
-                      <Text style={styles.errorText}>
-                        {fieldErrors.verificationCode}
+                    <Text style={styles.verificationSubtitle}>
+                      Follow the link we sent to {emailAddress}. Once verified,
+                      tap below.
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.button, loading && styles.buttonDisabled]}
+                      onPress={handleIHaveVerified}
+                      disabled={loading}
+                    >
+                      <Text style={styles.buttonText}>
+                        {loading ? "Checking..." : "I have verified"}
                       </Text>
-                    ) : null}
-                    
+                    </TouchableOpacity>
                     <View style={styles.resendContainer}>
                       <Text style={styles.resendText}>
-                        {verificationCode.length === 6
-                          ? "Ready to verify"
-                          : "Enter the 6-digit code"}
+                        {secondsLeft > 0
+                          ? `Resend available in ${secondsLeft}s`
+                          : "Need a new email?"}
                       </Text>
                       <TouchableOpacity
+                        disabled={secondsLeft > 0 || resendLoading || loading}
                         onPress={handleResend}
-                        disabled={secondsLeft > 0 || resendLoading}
                       >
                         <Text style={styles.resendButton}>
                           {resendLoading
                             ? "Resending..."
                             : secondsLeft > 0
-                              ? `Resend in ${secondsLeft}s`
-                              : "Resend code"}
+                            ? "Waiting"
+                            : "Resend email"}
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    
-                    <TouchableOpacity
-                      style={[styles.button, (loading || verificationCode.length !== 6) && styles.buttonDisabled]}
-                      onPress={onVerifyCode}
-                      disabled={loading || verificationCode.length !== 6}
-                    >
-                      <Text style={styles.buttonText}>
-                        {loading ? "Verifying..." : "Verify Email"}
-                      </Text>
-                    </TouchableOpacity>
-                    
                     <TouchableOpacity
                       onPress={() => {
-                        setNeedsVerification(false);
-                        setVerificationCode("");
-                        setFieldErrors((prev) => ({
-                          ...prev,
-                          verificationCode: undefined,
-                        }));
+                        setAwaitingEmailVerification(false);
                       }}
+                      disabled={loading}
                     >
                       <Text style={styles.backButton}>Back to sign up</Text>
                     </TouchableOpacity>
@@ -569,7 +480,9 @@ export default function SignUpScreen() {
                         editable={!loading}
                       />
                       {!!fieldErrors.password && (
-                        <Text style={styles.errorText}>{fieldErrors.password}</Text>
+                        <Text style={styles.errorText}>
+                          {fieldErrors.password}
+                        </Text>
                       )}
                     </View>
 
@@ -586,7 +499,10 @@ export default function SignUpScreen() {
                         onChangeText={(t) => {
                           setConfirmPassword(t);
                           if (fieldErrors.confirmPassword) {
-                            setFieldErrors((e) => ({ ...e, confirmPassword: "" }));
+                            setFieldErrors((e) => ({
+                              ...e,
+                              confirmPassword: "",
+                            }));
                           }
                         }}
                         secureTextEntry

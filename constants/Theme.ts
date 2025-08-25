@@ -15,8 +15,15 @@ export interface Theme {
     input: object;
     text: {
       heading: object;
+      headingLarge: object;
+      headingMedium: object;
+      headingSmall: object;
       body: object;
+      bodyMedium: object;
+      bodySemiBold: object;
+      bodyBold: object;
       caption: object;
+      captionMedium: object;
     };
   };
 }

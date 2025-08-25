@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
-import { useAudioPlayback } from "../../hooks/useAudioPlayback";
+import { useAudioPlayback } from "@/hooks/useAudioPlayback";
 import { Message } from "../../types/message";
 import MessageStatusIndicator from "./MessageStatusIndicator";
 import PlatformHaptics from "../../utils/PlatformHaptics";
@@ -201,7 +201,6 @@ export default function VoiceMessage({
 
   const effectiveStatus = ():
     | "pending"
-    | "sending"
     | "sent"
     | "delivered"
     | "read"
@@ -215,8 +214,7 @@ export default function VoiceMessage({
     if (receipts.some((r: any) => r?.status === "delivered"))
       return "delivered";
     if (message.status === "failed") return "failed";
-    if (message.status === "sending" || message.status === "pending")
-      return message.status as any;
+    if (message.status === "pending") return message.status as any;
     if (message.status === "delivered" || message.status === "read")
       return message.status as any;
     return "sent";

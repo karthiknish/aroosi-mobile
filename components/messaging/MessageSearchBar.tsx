@@ -10,7 +10,7 @@ import {
   Animated,
   Keyboard,
 } from "react-native";
-import { useMessageSearch } from "../../hooks/useMessageSearch";
+import { useMessageSearch } from "@/hooks/useMessageSearch";
 import { SearchResult } from "../../utils/messageSearch";
 
 interface MessageSearchBarProps {
@@ -152,7 +152,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
           })}
         </Text>
       </View>
-      <View style={styles.resultScore}>
+      <View style={styles.resultScoreContainer}>
         <Text style={styles.scoreText}>{Math.round(item.score)}</Text>
       </View>
     </TouchableOpacity>
@@ -235,21 +235,28 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
           showResults && styles.resultsContainerVisible,
         ]}
       >
-        {showResults && (
-          <FlatList
-            data={data}
-            keyExtractor={(item, index) =>
-              isShowingSuggestions
-                ? `suggestion-${item}`
-                : `result-${(item as SearchResult).message._id}`
-            }
-            renderItem={isShowingSuggestions ? renderSuggestion : renderResult}
-            ListEmptyComponent={renderEmptyState}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            style={styles.resultsList}
-          />
-        )}
+        {showResults &&
+          (isShowingSuggestions ? (
+            <FlatList
+              data={data as string[]}
+              keyExtractor={(item) => `suggestion-${item}`}
+              renderItem={renderSuggestion}
+              ListEmptyComponent={renderEmptyState}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.resultsList}
+            />
+          ) : (
+            <FlatList
+              data={data as SearchResult[]}
+              keyExtractor={(item) => `result-${item.message._id}`}
+              renderItem={renderResult}
+              ListEmptyComponent={renderEmptyState}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.resultsList}
+            />
+          ))}
       </Animated.View>
     </View>
   );
@@ -415,6 +422,15 @@ const styles = StyleSheet.create({
   resultTime: {
     fontSize: 12,
     color: "#666",
+  },
+  resultScoreContainer: {
+    minWidth: 32,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: "#E6F0FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
   resultScore: {
     fontSize: 12,

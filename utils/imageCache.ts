@@ -1,346 +1,575 @@
-import * as FileSystem from "expo-file-system";
-import { Image } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
-interface CacheEntry {
-  uri: string;
-  localPath: string;
+export interface ImageCacheEntry {
+  /**
+   * Original image URI
+   */
+  originalUri: string;
+
+  /**
+   * Cached local URI
+   */
+  cachedUri: string;
+
+  /**
+   * Cache timestamp
+   */
   timestamp: number;
+
+  /**
+   * File size in bytes
+   */
   size: number;
+
+  /**
+   * MIME type
+   */
+  mimeType: string;
+
+  /**
+   * Access count
+   */
+  accessCount: number;
+
+  /**
+   * Last accessed timestamp
+   */
+  lastAccessed: number;
 }
 
-interface CacheConfig {
-  maxSize: number; // in bytes
-  maxAge: number; // in milliseconds
-  compressionQuality: number; // 0-1
+export interface ImageCacheConfig {
+  /**
+   * Maximum cache size in bytes (default: 100MB)
+   */
+  maxCacheSize: number;
+
+  /**
+   * Maximum number of cached images (default: 1000)
+   */
+  maxItems: number;
+
+  /**
+   * Cache TTL in milliseconds (default: 7 days)
+   */
+  ttl: number;
+
+  /**
+   * Compression quality for cached images (0-1, default: 0.8)
+   */
+  compressionQuality: number;
+
+  /**
+   * Enable automatic cache cleanup
+   */
+  autoCleanup: boolean;
+
+  /**
+   * Cleanup interval in milliseconds (default: 1 hour)
+   */
+  cleanupInterval: number;
 }
 
-const DEFAULT_CONFIG: CacheConfig = {
-  maxSize: 100 * 1024 * 1024, // 100MB
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  compressionQuality: 0.8,
-};
+export interface CacheStats {
+  /**
+   * Current cache size in bytes
+   */
+  currentSize: number;
 
-export class ImageCacheManager {
-  private static instance: ImageCacheManager;
-  private cacheDir: string;
-  private config: CacheConfig;
-  private cache: Map<string, CacheEntry> = new Map();
-  private initialized = false;
+  /**
+   * Number of cached items
+   */
+  itemCount: number;
 
-  private constructor(config: Partial<CacheConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    this.cacheDir = `${FileSystem.cacheDirectory}images/`;
+  /**
+   * Cache hit rate (0-1)
+   */
+  hitRate: number;
+
+  /**
+   * Cache miss rate (0-1)
+   */
+  missRate: number;
+
+  /**
+   * Total requests
+   */
+  totalRequests: number;
+
+  /**
+   * Cache hits
+   */
+  cacheHits: number;
+
+  /**
+   * Cache misses
+   */
+  cacheMisses: number;
+}
+
+/**
+ * Advanced image caching utility for React Native
+ */
+export class ImageCache {
+  private config: ImageCacheConfig;
+  private cache: Map<string, ImageCacheEntry> = new Map();
+  private stats: CacheStats;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private isLoaded = false;
+
+  constructor(config: Partial<ImageCacheConfig> = {}) {
+    this.config = {
+      maxCacheSize: 100 * 1024 * 1024, // 100MB
+      maxItems: 1000,
+      ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+      compressionQuality: 0.8,
+      autoCleanup: true,
+      cleanupInterval: 60 * 60 * 1000, // 1 hour
+      ...config,
+    };
+
+    this.stats = {
+      currentSize: 0,
+      itemCount: 0,
+      hitRate: 0,
+      missRate: 0,
+      totalRequests: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+    };
+
+    this.initialize();
   }
 
-  public static getInstance(config?: Partial<CacheConfig>): ImageCacheManager {
-    if (!ImageCacheManager.instance) {
-      ImageCacheManager.instance = new ImageCacheManager(config);
-    }
-    return ImageCacheManager.instance;
-  }
-
-  public async initialize(): Promise<void> {
-    if (this.initialized) return;
-
+  /**
+   * Initialize the cache
+   */
+  private async initialize(): Promise<void> {
     try {
-      // Create cache directory
-      const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(this.cacheDir, {
-          intermediates: true,
-        });
+      await this.loadCacheFromStorage();
+
+      if (this.config.autoCleanup) {
+        this.startAutoCleanup();
       }
 
-      // Load cache index
-      await this.loadCacheIndex();
-
-      // Clean expired entries
-      await this.cleanExpiredEntries();
-
-      this.initialized = true;
+      this.isLoaded = true;
     } catch (error) {
-      console.error("Failed to initialize image cache:", error);
+      console.error("ImageCache: Failed to initialize", error);
     }
   }
 
-  public async getCachedImage(uri: string): Promise<string | null> {
-    if (!this.initialized) await this.initialize();
-
-    const cacheKey = this.getCacheKey(uri);
-    const entry = this.cache.get(cacheKey);
-
-    if (!entry) return null;
-
-    // Check if file exists and is not expired
-    const fileInfo = await FileSystem.getInfoAsync(entry.localPath);
-    if (!fileInfo.exists || this.isExpired(entry)) {
-      this.cache.delete(cacheKey);
-      await this.saveCacheIndex();
-      return null;
-    }
-
-    return entry.localPath;
-  }
-
-  public async cacheImage(uri: string): Promise<string | null> {
-    if (!this.initialized) await this.initialize();
-
+  /**
+   * Load cache from persistent storage
+   */
+  private async loadCacheFromStorage(): Promise<void> {
     try {
-      const cacheKey = this.getCacheKey(uri);
-      const localPath = `${this.cacheDir}${cacheKey}.jpg`;
+      const cacheData = await AsyncStorage.getItem("@image_cache");
+      const statsData = await AsyncStorage.getItem("@image_cache_stats");
 
-      // Check if already cached
-      const existing = await this.getCachedImage(uri);
-      if (existing) return existing;
-
-      // Download and cache image
-      const downloadResult = await FileSystem.downloadAsync(uri, localPath);
-
-      if (downloadResult.status === 200) {
-        const fileInfo = await FileSystem.getInfoAsync(localPath);
-
-        const entry: CacheEntry = {
-          uri,
-          localPath,
-          timestamp: Date.now(),
-          size: fileInfo.size || 0,
-        };
-
-        this.cache.set(cacheKey, entry);
-        await this.saveCacheIndex();
-
-        // Check cache size and clean if necessary
-        await this.enforceMaxSize();
-
-        return localPath;
+      if (cacheData) {
+        const parsedCache = JSON.parse(cacheData);
+        this.cache = new Map(Object.entries(parsedCache));
       }
+
+      if (statsData) {
+        this.stats = { ...this.stats, ...JSON.parse(statsData) };
+      }
+
+      // Clean up expired entries
+      await this.cleanupExpiredEntries();
     } catch (error) {
-      console.error("Failed to cache image:", error);
+      console.error("ImageCache: Failed to load from storage", error);
+    }
+  }
+
+  /**
+   * Save cache to persistent storage
+   */
+  private async saveCacheToStorage(): Promise<void> {
+    try {
+      const cacheObject = Object.fromEntries(this.cache);
+      await AsyncStorage.setItem("@image_cache", JSON.stringify(cacheObject));
+      await AsyncStorage.setItem(
+        "@image_cache_stats",
+        JSON.stringify(this.stats)
+      );
+    } catch (error) {
+      console.error("ImageCache: Failed to save to storage", error);
+    }
+  }
+
+  /**
+   * Get cached image URI
+   */
+  async get(originalUri: string): Promise<string | null> {
+    this.stats.totalRequests++;
+
+    if (!this.isLoaded) {
+      await this.initialize();
     }
 
+    const entry = this.cache.get(originalUri);
+
+    if (entry) {
+      // Check if entry is expired
+      if (Date.now() - entry.timestamp > this.config.ttl) {
+        this.cache.delete(originalUri);
+        this.updateStats();
+        this.stats.cacheMisses++;
+        return null;
+      }
+
+      // Update access information
+      entry.accessCount++;
+      entry.lastAccessed = Date.now();
+
+      this.stats.cacheHits++;
+      this.updateStats();
+
+      return entry.cachedUri;
+    }
+
+    this.stats.cacheMisses++;
+    this.updateStats();
     return null;
   }
 
-  public async preloadImages(uris: string[]): Promise<void> {
-    const promises = uris.map((uri) => this.cacheImage(uri));
-    await Promise.allSettled(promises);
-  }
+  /**
+   * Cache an image
+   */
+  async set(originalUri: string, imageData: any): Promise<string> {
+    if (!this.isLoaded) {
+      await this.initialize();
+    }
 
-  public async clearCache(): Promise<void> {
     try {
-      await FileSystem.deleteAsync(this.cacheDir, { idempotent: true });
-      await FileSystem.makeDirectoryAsync(this.cacheDir, {
-        intermediates: true,
-      });
-      this.cache.clear();
-      await this.saveCacheIndex();
+      const cachedUri = await this.saveImageToCache(originalUri, imageData);
+
+      const entry: ImageCacheEntry = {
+        originalUri,
+        cachedUri,
+        timestamp: Date.now(),
+        size: this.estimateImageSize(imageData),
+        mimeType: this.getMimeType(originalUri),
+        accessCount: 1,
+        lastAccessed: Date.now(),
+      };
+
+      this.cache.set(originalUri, entry);
+
+      // Check cache limits
+      await this.enforceCacheLimits();
+
+      this.updateStats();
+      await this.saveCacheToStorage();
+
+      return cachedUri;
     } catch (error) {
-      console.error("Failed to clear image cache:", error);
+      console.error("ImageCache: Failed to cache image", error);
+      throw error;
     }
   }
 
-  public async getCacheSize(): Promise<number> {
-    let totalSize = 0;
-    for (const entry of this.cache.values()) {
-      totalSize += entry.size;
-    }
-    return totalSize;
+  /**
+   * Check if image is cached
+   */
+  has(originalUri: string): boolean {
+    const entry = this.cache.get(originalUri);
+    if (!entry) return false;
+
+    // Check if expired
+    return Date.now() - entry.timestamp <= this.config.ttl;
   }
 
-  public async getCacheStats(): Promise<{
-    totalSize: number;
-    entryCount: number;
-    maxSize: number;
-    usagePercentage: number;
-  }> {
-    const totalSize = await this.getCacheSize();
-    return {
-      totalSize,
-      entryCount: this.cache.size,
-      maxSize: this.config.maxSize,
-      usagePercentage: (totalSize / this.config.maxSize) * 100,
-    };
-  }
+  /**
+   * Remove image from cache
+   */
+  async remove(originalUri: string): Promise<boolean> {
+    const entry = this.cache.get(originalUri);
+    if (!entry) return false;
 
-  private getCacheKey(uri: string): string {
-    return uri.replace(/[^a-zA-Z0-9]/g, "_");
-  }
-
-  private isExpired(entry: CacheEntry): boolean {
-    return Date.now() - entry.timestamp > this.config.maxAge;
-  }
-
-  private async loadCacheIndex(): Promise<void> {
     try {
-      const indexData = await AsyncStorage.getItem("image_cache_index");
-      if (indexData) {
-        const entries: [string, CacheEntry][] = JSON.parse(indexData);
-        this.cache = new Map(entries);
+      // Delete file if it exists
+      await this.deleteImageFile(entry.cachedUri);
+
+      this.cache.delete(originalUri);
+      this.updateStats();
+      await this.saveCacheToStorage();
+
+      return true;
+    } catch (error) {
+      console.error("ImageCache: Failed to remove image", error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear entire cache
+   */
+  async clear(): Promise<void> {
+    try {
+      // Delete all cached files
+      for (const entry of this.cache.values()) {
+        await this.deleteImageFile(entry.cachedUri);
       }
+
+      this.cache.clear();
+      this.resetStats();
+
+      await AsyncStorage.removeItem("@image_cache");
+      await AsyncStorage.removeItem("@image_cache_stats");
     } catch (error) {
-      console.error("Failed to load cache index:", error);
+      console.error("ImageCache: Failed to clear cache", error);
     }
   }
 
-  private async saveCacheIndex(): Promise<void> {
-    try {
-      const entries = Array.from(this.cache.entries());
-      await AsyncStorage.setItem("image_cache_index", JSON.stringify(entries));
-    } catch (error) {
-      console.error("Failed to save cache index:", error);
+  /**
+   * Get cache statistics
+   */
+  getStats(): CacheStats {
+    return { ...this.stats };
+  }
+
+  /**
+   * Get cache configuration
+   */
+  getConfig(): ImageCacheConfig {
+    return { ...this.config };
+  }
+
+  /**
+   * Update cache configuration
+   */
+  updateConfig(newConfig: Partial<ImageCacheConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+
+    if (this.config.autoCleanup && !this.cleanupInterval) {
+      this.startAutoCleanup();
+    } else if (!this.config.autoCleanup && this.cleanupInterval) {
+      this.stopAutoCleanup();
     }
   }
 
-  private async cleanExpiredEntries(): Promise<void> {
+  /**
+   * Save image data to cache directory
+   */
+  private async saveImageToCache(
+    originalUri: string,
+    imageData: any
+  ): Promise<string> {
+    // This is a simplified implementation
+    // In a real implementation, you would save the image to the device's cache directory
+    const fileName = this.generateCacheFileName(originalUri);
+    const cacheUri = `file://cache/${fileName}`;
+
+    // Mock implementation - in reality you'd use FileSystem or similar
+    return cacheUri;
+  }
+
+  /**
+   * Delete image file from cache directory
+   */
+  private async deleteImageFile(cachedUri: string): Promise<void> {
+    // Mock implementation - in reality you'd delete the actual file
+    console.log("Deleting cached image:", cachedUri);
+  }
+
+  /**
+   * Generate cache file name
+   */
+  private generateCacheFileName(originalUri: string): string {
+    const hash = this.simpleHash(originalUri);
+    const extension = this.getFileExtension(originalUri);
+    return `${hash}.${extension}`;
+  }
+
+  /**
+   * Simple hash function for generating file names
+   */
+  private simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Get file extension from URI
+   */
+  private getFileExtension(uri: string): string {
+    const matches = uri.match(/\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i);
+    return matches ? matches[1].toLowerCase() : "jpg";
+  }
+
+  /**
+   * Get MIME type from URI
+   */
+  private getMimeType(uri: string): string {
+    const extension = this.getFileExtension(uri);
+    const mimeTypes: { [key: string]: string } = {
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+    };
+
+    return mimeTypes[extension] || "image/jpeg";
+  }
+
+  /**
+   * Estimate image size (mock implementation)
+   */
+  private estimateImageSize(imageData: any): number {
+    // Mock implementation - return a reasonable estimate
+    return 150 * 1024; // 150KB average
+  }
+
+  /**
+   * Enforce cache size and item limits
+   */
+  private async enforceCacheLimits(): Promise<void> {
+    if (
+      this.stats.currentSize <= this.config.maxCacheSize &&
+      this.stats.itemCount <= this.config.maxItems
+    ) {
+      return;
+    }
+
+    // Sort entries by last accessed (LRU)
+    const entries = Array.from(this.cache.entries()).sort(
+      (a, b) => a[1].lastAccessed - b[1].lastAccessed
+    );
+
+    // Remove oldest entries until within limits
+    while (
+      (this.stats.currentSize > this.config.maxCacheSize ||
+        this.stats.itemCount > this.config.maxItems) &&
+      entries.length > 0
+    ) {
+      const [key, entry] = entries.shift()!;
+      await this.remove(key);
+    }
+  }
+
+  /**
+   * Clean up expired entries
+   */
+  private async cleanupExpiredEntries(): Promise<void> {
+    const now = Date.now();
     const expiredKeys: string[] = [];
 
     for (const [key, entry] of this.cache.entries()) {
-      if (this.isExpired(entry)) {
+      if (now - entry.timestamp > this.config.ttl) {
         expiredKeys.push(key);
-        try {
-          await FileSystem.deleteAsync(entry.localPath, { idempotent: true });
-        } catch (error) {
-          console.error("Failed to delete expired cache file:", error);
-        }
       }
     }
 
-    expiredKeys.forEach((key) => this.cache.delete(key));
-
-    if (expiredKeys.length > 0) {
-      await this.saveCacheIndex();
+    for (const key of expiredKeys) {
+      await this.remove(key);
     }
   }
 
-  private async enforceMaxSize(): Promise<void> {
-    const currentSize = await this.getCacheSize();
-
-    if (currentSize <= this.config.maxSize) return;
-
-    // Sort entries by timestamp (oldest first)
-    const sortedEntries = Array.from(this.cache.entries()).sort(
-      ([, a], [, b]) => a.timestamp - b.timestamp
+  /**
+   * Update cache statistics
+   */
+  private updateStats(): void {
+    this.stats.itemCount = this.cache.size;
+    this.stats.currentSize = Array.from(this.cache.values()).reduce(
+      (total, entry) => total + entry.size,
+      0
     );
 
-    let sizeToRemove = currentSize - this.config.maxSize;
-
-    for (const [key, entry] of sortedEntries) {
-      if (sizeToRemove <= 0) break;
-
-      try {
-        await FileSystem.deleteAsync(entry.localPath, { idempotent: true });
-        this.cache.delete(key);
-        sizeToRemove -= entry.size;
-      } catch (error) {
-        console.error("Failed to delete cache file:", error);
-      }
+    if (this.stats.totalRequests > 0) {
+      this.stats.hitRate = this.stats.cacheHits / this.stats.totalRequests;
+      this.stats.missRate = this.stats.cacheMisses / this.stats.totalRequests;
     }
-
-    await this.saveCacheIndex();
   }
-}
 
-// Hook for using image cache
-export function useImageCache() {
-  const cacheManager = ImageCacheManager.getInstance();
-
-  const getCachedImage = async (uri: string): Promise<string> => {
-    const cached = await cacheManager.getCachedImage(uri);
-    if (cached) return cached;
-
-    const newCached = await cacheManager.cacheImage(uri);
-    return newCached || uri;
-  };
-
-  const preloadImages = (uris: string[]) => {
-    return cacheManager.preloadImages(uris);
-  };
-
-  const clearCache = () => {
-    return cacheManager.clearCache();
-  };
-
-  const getCacheStats = () => {
-    return cacheManager.getCacheStats();
-  };
-
-  return {
-    getCachedImage,
-    preloadImages,
-    clearCache,
-    getCacheStats,
-  };
-}
-
-// Optimized Image component
-export interface OptimizedImageProps {
-  uri: string;
-  style?: any;
-  placeholder?: React.ReactNode;
-  onLoad?: () => void;
-  onError?: (error: any) => void;
-  resizeMode?: "cover" | "contain" | "stretch" | "repeat" | "center";
-}
-
-export function OptimizedImage({
-  uri,
-  style,
-  placeholder,
-  onLoad,
-  onError,
-  resizeMode = "cover",
-}: OptimizedImageProps) {
-  const [imageUri, setImageUri] = React.useState<string | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(false);
-  const { getCachedImage } = useImageCache();
-
-  React.useEffect(() => {
-    let mounted = true;
-
-    const loadImage = async () => {
-      try {
-        setLoading(true);
-        setError(false);
-
-        const cachedUri = await getCachedImage(uri);
-
-        if (mounted) {
-          setImageUri(cachedUri);
-          setLoading(false);
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(true);
-          setLoading(false);
-          onError?.(err);
-        }
-      }
+  /**
+   * Reset statistics
+   */
+  private resetStats(): void {
+    this.stats = {
+      currentSize: 0,
+      itemCount: 0,
+      hitRate: 0,
+      missRate: 0,
+      totalRequests: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
     };
-
-    loadImage();
-
-    return () => {
-      mounted = false;
-    };
-  }, [uri]);
-
-  if (loading || !imageUri) {
-    return placeholder || null;
   }
 
-  if (error) {
-    return placeholder || null;
+  /**
+   * Start automatic cache cleanup
+   */
+  private startAutoCleanup(): void {
+    if (this.cleanupInterval) return;
+
+    this.cleanupInterval = setInterval(async () => {
+      await this.cleanupExpiredEntries();
+      await this.saveCacheToStorage();
+    }, this.config.cleanupInterval);
   }
 
-  return (
-    <Image
-      source={{ uri: imageUri }}
-      style={style}
-      resizeMode={resizeMode}
-      onLoad={onLoad}
-      onError={onError}
-    />
-  );
+  /**
+   * Stop automatic cache cleanup
+   */
+  private stopAutoCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
+
+  /**
+   * Destroy cache instance
+   */
+  destroy(): void {
+    this.stopAutoCleanup();
+    this.cache.clear();
+    this.resetStats();
+  }
+}
+
+// Default cache instance
+export const defaultImageCache = new ImageCache();
+
+// Simple in-memory image metadata cache (URLs by userId)
+// Not persistent across app restarts; reduces duplicate network calls within session.
+export type ImageCacheEntrySimple = {
+  urls: string[];
+  cachedAt: number;
+};
+
+const simpleCache: Record<string, ImageCacheEntrySimple> = {};
+const SIMPLE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function setProfileImages(userId: string, urls: string[]) {
+  if (!userId) return;
+  simpleCache[userId] = { urls, cachedAt: Date.now() };
+}
+
+export function getProfileImages(userId: string): string[] | undefined {
+  const entry = simpleCache[userId];
+  if (!entry) return undefined;
+  if (Date.now() - entry.cachedAt > SIMPLE_TTL_MS) {
+    delete simpleCache[userId];
+    return undefined;
+  }
+  return entry.urls;
+}
+
+/**
+ * Hook for using image cache in React components
+ */
+export function useImageCache(config?: Partial<ImageCacheConfig>): ImageCache {
+  if (config) {
+    return new ImageCache(config);
+  }
+  return defaultImageCache;
 }

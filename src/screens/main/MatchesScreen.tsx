@@ -1,37 +1,55 @@
-import React, { useMemo, useState } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  FlatList,
+  Image,
+  ListRenderItemInfo,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
-import { Colors, Layout } from "../../../constants";
-import { useTheme } from "../../../contexts/ThemeContext";
+import {
+  useQuery,
+  useInfiniteQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useApiClient } from "@/utils/api";
+import { useAuth } from "@contexts/AuthProvider";
+import { Colors, Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
-} from "../../components/ui/LoadingStates";
-import { NoMatches, NoInterests } from "../../components/ui/EmptyStates";
-import {
-  ErrorBoundary,
-  ApiErrorDisplay,
-} from "../../components/ui/ErrorHandling";
+  SkeletonLoading,
+} from "@/components/ui/LoadingStates";
+import { NoMatches, NoInterests } from "@/components/ui/EmptyStates";
+import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
   SlideInView,
   AnimatedButton,
   StaggeredList,
-} from "../../components/ui/AnimatedComponents";
+} from "@/components/ui/AnimatedComponents";
 import ScreenContainer from "@components/common/ScreenContainer";
-import { Profile } from "../../../types/profile";
-import { useToast } from "../../../providers/ToastContext";
-import { useInterests } from "../../../hooks/useInterests";
+import { Profile } from "@/types/profile";
+import { useToast } from "@/providers/ToastContext";
+import { useInterests } from "@/hooks/useInterests";
+import { formatTimeAgo } from "@/utils/formatting";
+import { useRealtime } from "@/hooks/useRealtime";
+// Use lightweight in-memory profile image cache (NOT the persistent advanced cache in project root)
+import { getProfileImages, setProfileImages } from "@/utils/imageCache";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { unifiedMessagingApi } from "@/utils/unifiedMessagingApi";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 interface MatchesScreenProps {
   navigation: any;
@@ -56,32 +74,43 @@ interface Interest {
 }
 
 export default function MatchesScreen({ navigation }: MatchesScreenProps) {
-  const { } = useClerkAuth();
+  const {
+    user,
+    needsEmailVerification,
+    resendEmailVerification,
+    verifyEmailCode,
+    startEmailVerificationPolling,
+    refreshUser,
+  } = useAuth() as any;
+  const userId = user?.id;
   const { theme } = useTheme();
   const apiClient = useApiClient();
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
+  const queryClient = useQueryClient();
+  // Long-press actions state
+  const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<UIMatch | null>(null);
 
-  const { sentInterests, sendInterest, sending, isMutualInterest } = useInterests();
+  const { sentInterests, sendInterest, sending, isMutualInterest } =
+    useInterests();
   const hasSentInterestTo = useMemo(
-    () => (otherUserId: string) => sentInterests.some((i: any) => i.toUserId === otherUserId),
+    () => (otherUserId: string) =>
+      sentInterests.some((i: any) => i.toUserId === otherUserId),
     [sentInterests]
   );
 
-  const {
-    data: matches,
-    isLoading: matchesLoading,
-    error: matchesError,
-    refetch: refetchMatches,
-  } = useQuery<UIMatch[]>({
-    queryKey: ["matches"],
-    queryFn: async () => {
-      const response = await apiClient.getConversations();
-      if (!response.success) return [];
-      // server returns { conversations, total }
+  const PAGE_SIZE = 20;
+  const fetchMatchesPage = useCallback(
+    async ({ pageParam = 0 }) => {
+      const response = await apiClient.getConversations(); // TODO: replace with paginated endpoint when backend supports
+      if (!response.success) return { items: [], nextPage: undefined };
       const payload: any = response.data;
       const conversations: any[] = payload?.conversations || payload || [];
-      const uiMatches: UIMatch[] = conversations.map((c: any) => {
+      const start = pageParam * PAGE_SIZE;
+      const slice = conversations.slice(start, start + PAGE_SIZE);
+      const uiMatches: UIMatch[] = slice.map((c: any) => {
         const other = (c.participants || []).find(
           (p: any) => p?.userId !== userId
         );
@@ -95,12 +124,200 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
         };
       });
-      return uiMatches;
+      // Filter archived
+      const filtered = uiMatches.filter(
+        (m) => !archivedIds.has(m.conversationId)
+      );
+      const nextPage =
+        start + PAGE_SIZE < conversations.length ? pageParam + 1 : undefined;
+      return { items: filtered, nextPage };
     },
+    [apiClient, userId, archivedIds]
+  );
+
+  const {
+    data: matchesPages,
+    isLoading: matchesLoading,
+    error: matchesError,
+    refetch: refetchMatches,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["matches"],
+    queryFn: fetchMatchesPage,
+    getNextPageParam: (lastPage: any) => lastPage.nextPage,
     enabled: !!userId,
+    staleTime: 1000 * 60 * 5,
     retry: 2,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    initialPageParam: 0,
   });
+
+  const matches = useMemo(
+    () => (matchesPages?.pages || []).flatMap((p: any) => p.items),
+    [matchesPages]
+  );
+
+  // ---------------- Prefetch Next Page Near List End ----------------
+  const PREFETCH_THRESHOLD = 6; // items from end to trigger
+  const lastPrefetchedPageRef = useRef<number | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 40 }).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: any[] }) => {
+      if (!hasNextPage || isFetchingNextPage) return;
+      if (!matches || !matches.length) return;
+      const maxVisibleIndex = viewableItems.reduce(
+        (max, vi) => (vi.index > max ? vi.index : max),
+        -1
+      );
+      if (maxVisibleIndex >= matches.length - PREFETCH_THRESHOLD) {
+        // Determine upcoming page we would fetch
+        const nextPage = (matchesPages?.pages || []).length; // zero-based pages loaded
+        if (lastPrefetchedPageRef.current !== nextPage) {
+          lastPrefetchedPageRef.current = nextPage;
+          fetchNextPage();
+        }
+      }
+    }
+  ).current;
+
+  // ---------------- Image Batch Fetch & Caching (debounced) ----------------
+  const pendingIdsRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<boolean>(false);
+  const processedIdsRef = useRef<Set<string>>(new Set()); // track already attempted
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const scheduleBatchFetch = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(async () => {
+      if (inFlightRef.current) return; // guard
+      const userIds = Array.from(pendingIdsRef.current);
+      pendingIdsRef.current.clear();
+      if (!userIds.length) return;
+      inFlightRef.current = true;
+
+      // Retry with exponential backoff
+      const maxRetries = 3;
+      let attempt = 0;
+      let success = false;
+      while (attempt < maxRetries && !success) {
+        try {
+          const response: any = await apiClient.getBatchProfileImages(userIds);
+          if (response?.success) {
+            const raw = response.data;
+            // Possible shapes: { userId: string[] }, [{ userId, urls|profileImageUrls|imageUrls }], { data: mapping }
+            let mapping: Record<string, string[]> = {};
+            if (raw && !Array.isArray(raw) && typeof raw === "object") {
+              // If nested data property (defensive)
+              const maybeData = (raw as any).data;
+              if (
+                maybeData &&
+                typeof maybeData === "object" &&
+                !Array.isArray(maybeData)
+              ) {
+                mapping = maybeData as Record<string, string[]>;
+              } else {
+                mapping = raw as Record<string, string[]>;
+              }
+            } else if (Array.isArray(raw)) {
+              raw.forEach((entry: any) => {
+                const id = entry.userId || entry.id || entry.profileId;
+                if (!id) return;
+                const urls =
+                  entry.urls || entry.profileImageUrls || entry.imageUrls || [];
+                if (Array.isArray(urls) && urls.length) mapping[id] = urls;
+              });
+            }
+            // Validate: ensure arrays
+            Object.entries(mapping).forEach(([uid, arr]) => {
+              if (!Array.isArray(arr)) delete mapping[uid];
+            });
+            // Store in cache
+            Object.entries(mapping).forEach(([uid, urls]) => {
+              if (urls && urls.length) setProfileImages(uid, urls);
+              processedIdsRef.current.add(uid);
+            });
+            success = true;
+          } else {
+            throw new Error(
+              response?.error?.message || "Batch profile images request failed"
+            );
+          }
+        } catch (err) {
+          attempt++;
+          if (attempt >= maxRetries) {
+            // Mark attempted to avoid tight loops; they will retry later via visibility triggers.
+            userIds.forEach((id) => processedIdsRef.current.add(id));
+            break;
+          }
+          // backoff
+          const delay = 300 * Math.pow(2, attempt - 1); // 300,600,1200
+          await new Promise((res) => setTimeout(res, delay));
+        }
+      }
+      inFlightRef.current = false;
+    }, 160); // debounce 160ms to batch quickly arriving IDs
+  }, [apiClient]);
+
+  // Collect userIds missing images (either no match.profileImageUrls or empty AND not in cache)
+  useEffect(() => {
+    if (!matches || !matches.length) return;
+    matches.forEach((m: UIMatch) => {
+      const hasUrls = m.profileImageUrls && m.profileImageUrls.length > 0;
+      const cached = getProfileImages(m.userId);
+      if (!hasUrls && !cached && !processedIdsRef.current.has(m.userId)) {
+        pendingIdsRef.current.add(m.userId);
+        {
+          needsEmailVerification && (
+            <TouchableOpacity
+              onPress={async () => {
+                const res = await resendEmailVerification();
+                if (res.success) startEmailVerificationPolling?.();
+              }}
+              style={{
+                marginLeft: "auto",
+                backgroundColor: theme.colors.warning[500],
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "600" }}>
+                Verify Email
+              </Text>
+            </TouchableOpacity>
+          );
+        }
+      }
+    });
+    if (pendingIdsRef.current.size) scheduleBatchFetch();
+  }, [matches, scheduleBatchFetch]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  // Load archived from storage at mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem("archivedConversations");
+        if (raw) setArchivedIds(new Set(JSON.parse(raw)));
+      } catch {}
+    })();
+  }, []);
+
+  const persistArchived = useCallback(async (ids: Set<string>) => {
+    try {
+      await AsyncStorage.setItem(
+        "archivedConversations",
+        JSON.stringify(Array.from(ids))
+      );
+    } catch {}
+  }, []);
 
   const {
     data: receivedInterests,
@@ -125,6 +342,21 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     setRefreshing(false);
   };
 
+  // Realtime updates: invalidate matches to refresh unread counts and new matches
+  useRealtime({
+    autoConnect: true,
+    onNewMessage: () =>
+      queryClient.invalidateQueries({ queryKey: ["matches"] }),
+    onNewMatch: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
+  });
+
+  // Prefetch next page if initial page small (heuristic)
+  useEffect(() => {
+    if (!matchesLoading && hasNextPage && matches.length < PAGE_SIZE) {
+      fetchNextPage();
+    }
+  }, [matchesLoading, hasNextPage, matches.length, fetchNextPage]);
+
   const handleMatchPress = (match: UIMatch) => {
     navigation.navigate("Chat", {
       screen: "Chat",
@@ -136,151 +368,196 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     });
   };
 
+  const handleMatchLongPress = (match: UIMatch) => {
+    setSelectedMatch(match);
+    setActionSheetVisible(true);
+  };
+
+  // Navigate to the sender's profile from an interest card
   const handleInterestPress = (interest: Interest) => {
-    navigation.navigate("ProfileDetail", { profileId: interest.fromUserId });
+    const profileId = interest?.fromUserId || interest?.fromProfile?.userId;
+    if (!profileId) return;
+    // Keep navigation style consistent with other screens
+    navigation.navigate("ProfileDetail", { profileId });
   };
 
-  const handleRespondToInterest = async (
-    interestId: string,
-    response: "accept" | "reject"
-  ) => {
-    // Auto-matching system - no manual response needed
-    console.warn(
-      "Auto-matching system: Manual interest responses are not needed. " +
-        "Matches are created automatically when mutual interest exists."
-    );
+  const archiveConversation = async (convId: string) => {
+    const next = new Set(archivedIds);
+    next.add(convId);
+    setArchivedIds(next);
+    await persistArchived(next);
+    queryClient.invalidateQueries({ queryKey: ["matches"] });
+    toast?.show?.("Conversation archived", "info");
   };
 
-  const renderMatch = (match: UIMatch, index: number) => (
-    <FadeInView key={`${match.conversationId}-${index}`} delay={index * 100}>
-      <AnimatedButton
-        style={[
-          styles.matchCard,
-          {
-            backgroundColor: theme.colors.background.primary,
-            borderColor: theme.colors.border.primary,
-          },
-        ]}
-        onPress={() => handleMatchPress(match)}
-        animationType="scale"
-      >
-        <ScaleInView delay={index * 50} fromScale={0.8}>
-          <View style={styles.matchImageContainer}>
-            <View
-              style={[
-                styles.matchImagePlaceholder,
-                { backgroundColor: theme.colors.neutral[100] },
-              ]}
-            >
-              <Text style={styles.matchImageText}>👤</Text>
+  const deleteConversation = async (convId: string) => {
+    const res = await unifiedMessagingApi.deleteConversation(convId);
+    if (res.success) {
+      toast?.show?.("Conversation deleted", "success");
+      const next = new Set(archivedIds);
+      if (next.delete(convId)) await persistArchived(next);
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+    } else {
+      toast?.show?.(res.error?.message || "Delete failed", "error");
+    }
+  };
+
+  const renderMatch = ({ item, index }: ListRenderItemInfo<UIMatch>) => {
+    const match = item;
+    return (
+      <FadeInView key={`${match.conversationId}-${index}`} delay={index * 60}>
+        <AnimatedButton
+          style={[
+            styles.matchCard,
+            {
+              backgroundColor: theme.colors.background.primary,
+              borderColor: theme.colors.border.primary,
+            },
+          ]}
+          onPress={() => handleMatchPress(match)}
+          onLongPress={() => handleMatchLongPress(match)}
+          animationType="scale"
+        >
+          <ScaleInView delay={index * 50} fromScale={0.8}>
+            <View style={styles.matchImageContainer}>
+              {(() => {
+                const cached = getProfileImages(match.userId);
+                const urls =
+                  match.profileImageUrls && match.profileImageUrls.length
+                    ? match.profileImageUrls
+                    : cached;
+                if (urls && urls.length) {
+                  return (
+                    <Image
+                      source={{ uri: urls[0] }}
+                      style={styles.matchAvatar}
+                      resizeMode="cover"
+                      onError={() => setProfileImages(match.userId, [])}
+                    />
+                  );
+                }
+                return (
+                  <View
+                    style={[
+                      styles.matchImagePlaceholder,
+                      { backgroundColor: theme.colors.neutral[100] },
+                    ]}
+                  >
+                    <Text style={styles.matchImageText}>👤</Text>
+                  </View>
+                );
+              })()}
             </View>
-          </View>
-        </ScaleInView>
+          </ScaleInView>
 
-        <View style={styles.matchInfo}>
-          <SlideInView direction="left" delay={100 + index * 50}>
-            <Text
-              style={[styles.matchName, { color: theme.colors.text.primary }]}
-            >
-              {match.fullName || "Unknown"}
-            </Text>
-          </SlideInView>
-          <SlideInView direction="left" delay={150 + index * 50}>
-            <Text
-              style={[
-                styles.matchStatus,
-                { color: theme.colors.text.secondary },
-              ]}
-            >
-              {Number.isFinite(match.lastActivity)
-                ? "Recent activity"
-                : "Say hello!"}
-            </Text>
-          </SlideInView>
-          {Number.isFinite(match.matchedAt) && (
-            <SlideInView direction="left" delay={200 + index * 50}>
+          <View style={styles.matchInfo}>
+            <SlideInView direction="left" delay={100 + index * 50}>
               <Text
-                style={[
-                  styles.matchTime,
-                  { color: theme.colors.text.tertiary },
-                ]}
+                style={[styles.matchName, { color: theme.colors.text.primary }]}
               >
-                Matched{" "}
-                {new Date(match.matchedAt as number).toLocaleDateString()}
+                {match.fullName || "Unknown"}
               </Text>
             </SlideInView>
-          )}
-        </View>
-
-        <ScaleInView delay={250 + index * 50} fromScale={0.5}>
-          <View style={styles.matchActions}>
-            {match.unreadCount && match.unreadCount > 0 ? (
-              <View
+            <SlideInView direction="left" delay={150 + index * 50}>
+              <Text
                 style={[
-                  styles.unreadBadge,
-                  {
-                    backgroundColor: theme.colors.error[500],
-                  },
+                  styles.matchStatus,
+                  { color: theme.colors.text.secondary },
                 ]}
               >
-                <Text style={[styles.unreadText, { color: "#fff" }]}>
-                  {match.unreadCount > 99 ? "99+" : String(match.unreadCount)}
+                {match.lastActivity
+                  ? formatTimeAgo(String(match.lastActivity))
+                  : "Say hello!"}
+              </Text>
+            </SlideInView>
+            {Number.isFinite(match.matchedAt) && (
+              <SlideInView direction="left" delay={200 + index * 50}>
+                <Text
+                  style={[
+                    styles.matchTime,
+                    { color: theme.colors.text.tertiary },
+                  ]}
+                >
+                  Matched {formatTimeAgo(String(match.matchedAt))}
                 </Text>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.unreadBadge,
-                  { backgroundColor: theme.colors.neutral[200] },
-                ]}
-              >
-                <Ionicons
-                  name="chatbubble-ellipses-outline"
-                  size={18}
-                  color={theme.colors.text.secondary}
-                />
-              </View>
-            )}
-
-            {/* Express interest quick action */}
-            {!isMutualInterest(match.userId) && (
-              <TouchableOpacity
-                disabled={sending || hasSentInterestTo(match.userId)}
-                onPress={async () => {
-                  const ok = await sendInterest(match.userId);
-                  if (ok) {
-                    toast?.show?.("Interest sent", "success");
-                  } else {
-                    toast?.show?.("Could not send interest", "error");
-                  }
-                }}
-                style={[
-                  styles.interestQuickBtn,
-                  {
-                    borderColor: theme.colors.border.primary,
-                    backgroundColor: hasSentInterestTo(match.userId)
-                      ? theme.colors.primary[50]
-                      : theme.colors.background.primary,
-                    opacity: sending ? 0.6 : 1,
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={hasSentInterestTo(match.userId) ? "heart" : "heart-outline"}
-                  size={18}
-                  color={
-                    hasSentInterestTo(match.userId)
-                      ? theme.colors.primary[600]
-                      : theme.colors.text.secondary
-                  }
-                />
-              </TouchableOpacity>
+              </SlideInView>
             )}
           </View>
-        </ScaleInView>
-      </AnimatedButton>
-    </FadeInView>
-  );
+
+          <ScaleInView delay={250 + index * 50} fromScale={0.5}>
+            <View style={styles.matchActions}>
+              {match.unreadCount && match.unreadCount > 0 ? (
+                <View
+                  style={[
+                    styles.unreadBadge,
+                    {
+                      backgroundColor: theme.colors.error[500],
+                    },
+                  ]}
+                >
+                  <Text style={[styles.unreadText, { color: "#fff" }]}>
+                    {match.unreadCount > 99 ? "99+" : String(match.unreadCount)}
+                  </Text>
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.unreadBadge,
+                    { backgroundColor: theme.colors.neutral[200] },
+                  ]}
+                >
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={18}
+                    color={theme.colors.text.secondary}
+                  />
+                </View>
+              )}
+
+              {/* Express interest quick action */}
+              {!isMutualInterest(match.userId) && (
+                <TouchableOpacity
+                  disabled={sending || hasSentInterestTo(match.userId)}
+                  onPress={async () => {
+                    const ok = await sendInterest(match.userId);
+                    if (ok) {
+                      toast?.show?.("Interest sent", "success");
+                    } else {
+                      toast?.show?.("Could not send interest", "error");
+                    }
+                  }}
+                  style={[
+                    styles.interestQuickBtn,
+                    {
+                      borderColor: theme.colors.border.primary,
+                      backgroundColor: hasSentInterestTo(match.userId)
+                        ? theme.colors.primary[50]
+                        : theme.colors.background.primary,
+                      opacity: sending ? 0.6 : 1,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      hasSentInterestTo(match.userId)
+                        ? "heart"
+                        : "heart-outline"
+                    }
+                    size={18}
+                    color={
+                      hasSentInterestTo(match.userId)
+                        ? theme.colors.primary[600]
+                        : theme.colors.text.secondary
+                    }
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </ScaleInView>
+        </AnimatedButton>
+      </FadeInView>
+    );
+  };
 
   const renderInterest = (interest: Interest) => (
     <View key={interest._id} style={styles.interestCard}>
@@ -289,9 +566,16 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         onPress={() => handleInterestPress(interest)}
       >
         <View style={styles.interestImageContainer}>
-          <View style={styles.interestImagePlaceholder}>
-            <Text style={styles.interestImageText}>👤</Text>
-          </View>
+          {interest.fromProfile?.profileImageUrls &&
+          interest.fromProfile.profileImageUrls.length > 0 ? (
+            <View style={styles.interestImagePlaceholder}>
+              <Text style={styles.interestImageText}>�</Text>
+            </View>
+          ) : (
+            <View style={styles.interestImagePlaceholder}>
+              <Text style={styles.interestImageText}>�👤</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.interestInfo}>
@@ -300,7 +584,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           </Text>
           <Text style={styles.interestTime}>
             {interest.createdAt
-              ? new Date(interest.createdAt).toLocaleDateString()
+              ? formatTimeAgo(String(interest.createdAt))
               : ""}
           </Text>
           <Text
@@ -338,7 +622,31 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             Matches
           </Text>
         </View>
-        <ProfileCardSkeleton count={3} />
+        <ProfileCardSkeleton count={2} />
+        <View style={{ paddingHorizontal: Layout.spacing.lg }}>
+          <SkeletonLoading
+            width="40%"
+            height={24}
+            style={{ marginBottom: 12 }}
+          />
+          {Array.from({ length: 2 }).map((_, i) => (
+            <View key={i} style={[styles.interestCard, { opacity: 0.5 }]}>
+              <View style={styles.interestProfile}>
+                <View style={styles.interestImageContainer}>
+                  <SkeletonLoading width={50} height={50} borderRadius={25} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <SkeletonLoading
+                    width="60%"
+                    height={16}
+                    style={{ marginBottom: 6 }}
+                  />
+                  <SkeletonLoading width="40%" height={12} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScreenContainer>
     );
   }
@@ -436,9 +744,35 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             <NoMatches onActionPress={() => navigation.navigate("Search")} />
           ) : (
             <View style={styles.matchesList}>
-              {(matches as UIMatch[]).map((match: UIMatch, index: number) =>
-                renderMatch(match, index)
-              )}
+              <FlatList
+                data={matches as UIMatch[]}
+                keyExtractor={(m: UIMatch, i: number) =>
+                  `${m.conversationId}-${i}`
+                }
+                renderItem={renderMatch}
+                // Enable scrolling to allow onEndReached + prefetch
+                scrollEnabled={true}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={viewabilityConfig}
+                onEndReachedThreshold={0.6}
+                onEndReached={() => {
+                  if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+                }}
+                ListFooterComponent={
+                  hasNextPage ? (
+                    <View
+                      style={{
+                        padding: Layout.spacing.md,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: theme.colors.primary[600] }}>
+                        {isFetchingNextPage ? "Loading…" : "Loading more…"}
+                      </Text>
+                    </View>
+                  ) : null
+                }
+              />
             </View>
           )}
         </View>
@@ -453,6 +787,45 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
               />
             </View>
           )}
+
+        {/* Actions Bottom Sheet */}
+        <BottomSheet
+          isVisible={actionSheetVisible}
+          onClose={() => setActionSheetVisible(false)}
+          title="Conversation actions"
+          height={220}
+        >
+          <View style={{ gap: Layout.spacing.sm }}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={async () => {
+                if (selectedMatch)
+                  await archiveConversation(selectedMatch.conversationId);
+                setActionSheetVisible(false);
+              }}
+            >
+              <Text style={styles.actionLabel}>Archive</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => setActionSheetVisible(false)}
+            >
+              <Text style={styles.actionLabel}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={async () => {
+                if (selectedMatch)
+                  await deleteConversation(selectedMatch.conversationId);
+                setActionSheetVisible(false);
+              }}
+            >
+              <Text style={[styles.actionLabel, styles.actionDestructive]}>
+                Delete
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </BottomSheet>
       </ScreenContainer>
     </ErrorBoundary>
   );
@@ -515,6 +888,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  matchAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: Layout.radius.full,
+    backgroundColor: Colors.neutral[100],
+  },
   matchImageText: {
     fontSize: Layout.typography.fontSize["2xl"],
   },
@@ -558,6 +937,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  actionItem: {
+    paddingVertical: Layout.spacing.md,
+    paddingHorizontal: Layout.spacing.md,
+    borderRadius: Layout.radius.lg,
+    backgroundColor: Colors.background.secondary,
+    borderWidth: 1,
+    borderColor: Colors.border.primary,
+    marginBottom: Layout.spacing.sm,
+  },
+  actionLabel: {
+    fontSize: Layout.typography.fontSize.base,
+    color: Colors.text.primary,
+  },
+  actionDestructive: {
+    color: (Colors as any).error?.[600] || "#b00020",
   },
   interestCard: {
     backgroundColor: Colors.background.primary,

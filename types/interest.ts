@@ -1,6 +1,6 @@
 // Interest type matching main aroosi project exactly
 export interface Interest {
-  _id: string; // Convex document ID
+  _id: string;
   fromUserId: string;
   toUserId: string;
   status: "pending" | "accepted" | "rejected"; // Only these 3 statuses exist

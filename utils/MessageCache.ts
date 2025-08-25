@@ -57,6 +57,13 @@ export class MessageCache {
   }
 
   /**
+   * Compatibility wrapper (older code/tests): getMessages
+   */
+  getMessages(conversationId: string): Message[] | null {
+    return this.get(conversationId);
+  }
+
+  /**
    * Set messages for a conversation
    */
   set(conversationId: string, messages: Message[]): void {
@@ -75,6 +82,13 @@ export class MessageCache {
 
     this.cache.set(conversationId, entry);
     this.conversationSizes.set(conversationId, messages.length);
+  }
+
+  /**
+   * Compatibility wrapper: setMessages
+   */
+  setMessages(conversationId: string, messages: Message[]): void {
+    this.set(conversationId, messages);
   }
 
   /**
@@ -109,6 +123,13 @@ export class MessageCache {
     mergedMessages.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
 
     this.set(conversationId, mergedMessages);
+  }
+
+  /**
+   * Compatibility wrapper for adding a single message (addMessage)
+   */
+  addMessage(conversationId: string, message: Message): void {
+    this.addMessages(conversationId, [message], false);
   }
 
   /**

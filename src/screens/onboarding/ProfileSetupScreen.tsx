@@ -13,14 +13,14 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import { useApiClient } from "../../../utils/api";
+import { useApiClient } from "@/utils/api";
 
 // Validated UI components (web-parity)
-import { ValidatedInput } from "../../components/ui/ValidatedInput";
-import { ValidatedSelect } from "../../components/ui/ValidatedSelect";
-import { ErrorSummary } from "../../components/ui/ErrorSummary";
+import { ValidatedInput } from "@/components/ui/ValidatedInput";
+import { ValidatedSelect } from "@/components/ui/ValidatedSelect";
+import { ErrorSummary } from "@/components/ui/ErrorSummary";
 import { useMutation } from "@tanstack/react-query";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 import {
   CreateProfileData,
   GENDER_OPTIONS,
@@ -34,18 +34,26 @@ import {
   cmToFeetInches,
   feetInchesToCm,
   ProfileFor,
-} from "../../../types/profile";
-import { useToast } from "../../../providers/ToastContext";
-import { COUNTRIES } from "@constants/countries";
+} from "@/types/profile";
 import {
-  validateCreateProfile,
-  formatPhoneNumber,
-  cleanPhoneNumber,
-} from "../../../utils/profileValidation";
-import { Colors, Layout } from "../../../constants";
-import LocalImageUpload from "@components/profile/LocalImageUpload";
+  STEP_VALIDATION_REQUIREMENTS,
+  ONBOARDING_STEPS,
+  normalizePreferredGender,
+  normalizeMaritalStatus,
+} from "@/constants/onboarding";
+import { useToast } from "@/providers/ToastContext";
+import { COUNTRIES } from "@constants/countries";
+import { formatPhoneNumber, cleanPhoneNumber } from "@/utils/profileValidation";
+import {
+  zodValidateCreateProfile,
+  StepValidationSchemas,
+  normalizeForSchema,
+} from "@/validation/onboardingSchemas";
+import { Colors, Layout } from "@constants";
+import ImageUpload from "@components/profile/ImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
+import type { ProfileImage } from "@/types/image";
 import {
   MOTHER_TONGUE_OPTIONS,
   RELIGION_OPTIONS,
@@ -74,7 +82,7 @@ const STEPS = [
 export default function ProfileSetupScreen({
   navigation,
 }: ProfileSetupScreenProps) {
-  const { } = useClerkAuth();
+  const { user, refreshUser } = useAuth();
   const apiClient = useApiClient();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -106,7 +114,7 @@ export default function ProfileSetupScreen({
         );
       }
       toast.show("Your profile has been created successfully.", "success");
-      refreshProfile?.();
+      refreshUser?.();
       navigation.navigate("Main");
     },
     onError: () => {
@@ -120,7 +128,7 @@ export default function ProfileSetupScreen({
     },
     onSuccess: () => {
       toast.show("Your profile has been updated.", "success");
-      refreshProfile?.();
+      refreshUser?.();
       navigation.navigate("Main");
     },
     onError: () => {
@@ -152,29 +160,22 @@ export default function ProfileSetupScreen({
   };
 
   const validateCurrentStep = (): boolean => {
-    const stepValidations = {
-      1: ["fullName", "dateOfBirth", "gender", "preferredGender"],
-      2: ["country", "city"],
-      3: ["height", "maritalStatus"],
-      4: ["education", "occupation", "annualIncome"],
-      5: [], // Cultural fields are optional
-      6: ["aboutMe", "phoneNumber"],
-      7: [], // Lifestyle fields are optional
-    };
-
-    const fieldsToValidate =
-      stepValidations[currentStep as keyof typeof stepValidations] || [];
+    const schema = (StepValidationSchemas as any)[currentStep];
+    if (!schema) return true;
+    const partialData = normalizeForSchema(formData as any);
+    const result = schema.safeParse(partialData);
+    if (result.success) {
+      setErrors({});
+      return true;
+    }
     const stepErrors: Record<string, string> = {};
-
-    const fullValidation = validateCreateProfile(formData);
-    fieldsToValidate.forEach((field) => {
-      if (fullValidation[field]) {
-        stepErrors[field] = fullValidation[field];
-      }
-    });
-
+    for (const issue of result.error.issues) {
+      const key = issue.path[0];
+      if (typeof key === "string" && !stepErrors[key])
+        stepErrors[key] = issue.message;
+    }
     setErrors(stepErrors);
-    return Object.keys(stepErrors).length === 0;
+    return false;
   };
 
   const handleNext = () => {
@@ -195,21 +196,33 @@ export default function ProfileSetupScreen({
 
   const handleSubmit = () => {
     // Final validation
-    const validationErrors = validateCreateProfile(formData);
+    const { errors: validationErrors, parsed } = zodValidateCreateProfile(
+      formData as any
+    );
     setErrors(validationErrors);
 
-    if (Object.keys(validationErrors).length > 0) {
+    if (Object.keys(validationErrors).length > 0 || !parsed) {
       toast.show("Please complete all required fields.", "error");
       return;
     }
 
     // Clean phone number for storage
     const profileData = { ...formData } as CreateProfileData;
+    if (profileData.preferredGender) {
+      profileData.preferredGender = normalizePreferredGender(
+        profileData.preferredGender
+      ) as any;
+    }
+    if (profileData.maritalStatus) {
+      profileData.maritalStatus = normalizeMaritalStatus(
+        profileData.maritalStatus
+      ) as any;
+    }
     if (profileData.phoneNumber) {
       profileData.phoneNumber = cleanPhoneNumber(profileData.phoneNumber);
     }
 
-    if (existingProfile) {
+    if (user?.profile) {
       updateProfileMutation.mutate(profileData);
     } else {
       createProfileMutation.mutate(profileData);
@@ -833,14 +846,24 @@ export default function ProfileSetupScreen({
         Add photos to showcase your personality
       </Text>
 
-      <LocalImageUpload
+      <ImageUpload
+        mode="local"
         title="Upload Photos"
         subtitle="Your first photo will be your main profile picture"
         maxImages={5}
         required={false}
-        onImagesChange={(images) => {
-          // Store local image IDs for later upload after authentication
-          const imageIds = images.map((img) => img.id);
+        onImagesChange={(images: ProfileImage[]) => {
+          // Prefer id -> _id -> storageId, then filter to valid strings
+          const imageIds = images
+            .map(
+              (img) =>
+                (img.id as string) ||
+                ((img as any)._id as string) ||
+                ((img as any).storageId as string)
+            )
+            .filter(
+              (id): id is string => typeof id === "string" && id.length > 0
+            );
           setLocalImages(imageIds);
           setFormData((prev) => ({ ...prev, localImageIds: imageIds }));
         }}

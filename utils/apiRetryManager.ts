@@ -1,4 +1,4 @@
-import { MessagingErrorHandler, RetryManager } from "./messagingErrors";
+import { MessagingErrorHandler } from "./messagingErrors";
 import { ApiResponse, ApiError } from "../types/profile";
 
 /**
@@ -30,96 +30,71 @@ export class ApiRetryManager {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const result = await operation();
-
-        // If the operation succeeded, return the result
         if (result.success) {
           return result;
         }
-
-        // If it's the last attempt or shouldn't retry, return the error
         if (attempt === maxRetries || !shouldRetry(result)) {
           return result;
         }
-
         lastError = result;
       } catch (error) {
-        lastError = error;
-
-        // If it's the last attempt or shouldn't retry, handle and return error
+        const messagingError = MessagingErrorHandler.classifyError(error);
         if (attempt === maxRetries || !shouldRetry(error)) {
-          const messagingError = MessagingErrorHandler.handle(error, context);
           return {
             success: false,
             error: {
               code: messagingError.type,
               message: messagingError.message,
-              details: messagingError.details,
             },
           };
         }
+        lastError = error;
       }
-
-      // Calculate delay with exponential backoff and jitter
+      // Calculate delay and retry
       const delay = Math.min(
         baseDelay * Math.pow(2, attempt) + Math.random() * 1000,
-        this.MAX_DELAY
+        ApiRetryManager.MAX_DELAY
       );
-
       console.warn(
         `[ApiRetryManager] ${context} failed (attempt ${attempt + 1}/${
           maxRetries + 1
         }), retrying in ${delay}ms:`,
         lastError
       );
-
-      await this.delay(delay);
+      await ApiRetryManager.delay(delay);
     }
-
-    // This should never be reached, but just in case
-    const messagingError = MessagingErrorHandler.handle(lastError, context);
+    // If all retries are exhausted, return a generic failure response
     return {
       success: false,
       error: {
-        code: messagingError.type,
-        message: messagingError.message,
-        details: messagingError.details,
+        code: "RETRY_EXHAUSTED",
+        message: `All retry attempts failed for ${context}`,
       },
     };
   }
 
   /**
-   * Default retry logic - determines if an error should trigger a retry
+   * Default retry logic for API errors
    */
   private static defaultShouldRetry(error: any): boolean {
-    // Don't retry on successful responses
-    if (error.success === true) {
-      return false;
-    }
-
-    // Extract status code from various error formats
-    const status = error.status || error.response?.status || error.code;
-
+    const status = error.status || error.response?.status;
     // Don't retry on client errors (4xx) except for specific cases
     if (typeof status === "number" && status >= 400 && status < 500) {
       // Retry on rate limiting and request timeout
       return status === 429 || status === 408;
     }
-
     // Don't retry on authentication/authorization errors
     if (status === 401 || status === 403) {
       return false;
     }
-
     // Don't retry on validation errors
     if (status === 400 || status === 422) {
       return false;
     }
-
     // Retry on network errors and server errors (5xx)
     if (typeof status === "number" && status >= 500) {
       return true;
     }
-
     // Retry on network-related errors
     if (
       error.name === "NetworkError" ||
@@ -130,14 +105,9 @@ export class ApiRetryManager {
     ) {
       return true;
     }
-
-    // Don't retry by default for unknown errors
     return false;
   }
 
-  /**
-   * Specialized retry for message sending operations
-   */
   static async retryMessageSend<T>(
     operation: () => Promise<ApiResponse<T>>,
     context: string = "sendMessage"
@@ -148,7 +118,6 @@ export class ApiRetryManager {
       shouldRetry: (error) => {
         // More conservative retry logic for message sending
         const status = error.status || error.response?.status;
-
         // Only retry on server errors and network issues
         return (
           (typeof status === "number" && status >= 500) ||
@@ -212,12 +181,7 @@ export class ApiRetryManager {
 
     for (let i = 0; i < operations.length; i++) {
       try {
-        const result = await this.executeWithRetry(
-          operations[i],
-          `${context}[${i}]`,
-          options
-        );
-
+        const result = await operations[i]();
         if (result.success) {
           results.push(result.data!);
         } else {
@@ -226,14 +190,12 @@ export class ApiRetryManager {
               ? result.error
               : result.error?.message || "Unknown error";
           errors.push(errorMessage);
-
           if (options?.failFast) {
             return {
               success: false,
               error: {
                 code: "BATCH_OPERATION_FAILED",
                 message: `Batch operation failed at index ${i}: ${errorMessage}`,
-                details: { index: i, error: result.error },
               },
             };
           }
@@ -242,27 +204,23 @@ export class ApiRetryManager {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
         errors.push(errorMessage);
-
         if (options?.failFast) {
           return {
             success: false,
             error: {
               code: "BATCH_OPERATION_FAILED",
               message: `Batch operation failed at index ${i}: ${errorMessage}`,
-              details: { index: i, error: errorMessage },
             },
           };
         }
       }
     }
-
     if (errors.length > 0 && results.length === 0) {
       return {
         success: false,
         error: {
           code: "ALL_BATCH_OPERATIONS_FAILED",
           message: `All batch operations failed: ${errors.join(", ")}`,
-          details: { errors, totalOperations: operations.length },
         },
       };
     }
@@ -307,14 +265,12 @@ export class ApiRetryManager {
           error: {
             code: "CIRCUIT_BREAKER_OPEN",
             message: `Circuit breaker is open for ${context}. Try again later.`,
-            details: { state, failureCount, lastFailureTime },
           },
         };
       }
 
       try {
         const result = await operation();
-
         if (result.success) {
           // Reset on success
           failureCount = 0;
@@ -324,28 +280,23 @@ export class ApiRetryManager {
           // Count as failure
           failureCount++;
           lastFailureTime = now;
-
           if (failureCount >= failureThreshold) {
             state = "open";
           }
-
           return result;
         }
       } catch (error) {
         failureCount++;
         lastFailureTime = now;
-
         if (failureCount >= failureThreshold) {
           state = "open";
         }
-
-        const messagingError = MessagingErrorHandler.handle(error, context);
+        const messagingError = MessagingErrorHandler.classifyError(error);
         return {
           success: false,
           error: {
             code: messagingError.type,
             message: messagingError.message,
-            details: messagingError.details,
           },
         };
       }

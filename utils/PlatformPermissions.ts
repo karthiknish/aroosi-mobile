@@ -8,6 +8,7 @@ export enum PermissionType {
   LocationForeground = "locationForeground",
   LocationBackground = "locationBackground",
   Contacts = "contacts",
+  Microphone = "microphone",
 }
 
 export enum PermissionStatus {
@@ -28,19 +29,31 @@ class PlatformPermissions {
   // Optional UI handler hooks to keep this utility UI-agnostic
   private static rationaleHandler?: (args: {
     type: PermissionType;
-    rationale: { title: string; message: string; buttonPositive?: string; buttonNegative?: string };
+    rationale: {
+      title: string;
+      message: string;
+      buttonPositive?: string;
+      buttonNegative?: string;
+    };
     proceed: () => Promise<PermissionResult>;
     cancel: () => PermissionResult;
   }) => void;
 
   private static openSettingsHandler?: () => void;
 
-  static setRationaleHandler(handler: (args: {
-    type: PermissionType;
-    rationale: { title: string; message: string; buttonPositive?: string; buttonNegative?: string };
-    proceed: () => Promise<PermissionResult>;
-    cancel: () => PermissionResult;
-  }) => void) {
+  static setRationaleHandler(
+    handler: (args: {
+      type: PermissionType;
+      rationale: {
+        title: string;
+        message: string;
+        buttonPositive?: string;
+        buttonNegative?: string;
+      };
+      proceed: () => Promise<PermissionResult>;
+      cancel: () => PermissionResult;
+    }) => void
+  ) {
     PlatformPermissions.rationaleHandler = handler;
   }
 
@@ -78,6 +91,12 @@ class PlatformPermissions {
           }
           return PlatformPermissions.permissionModules.Contacts;
 
+        case PermissionType.Microphone:
+          if (!PlatformPermissions.permissionModules.Audio) {
+            PlatformPermissions.permissionModules.Audio = require("expo-audio");
+          }
+          return PlatformPermissions.permissionModules.Audio;
+
         default:
           throw new Error(`Unsupported permission type: ${type}`);
       }
@@ -111,6 +130,20 @@ class PlatformPermissions {
         case PermissionType.Notifications:
           result = await module.getPermissionsAsync();
           break;
+        case PermissionType.Microphone: {
+          // Support both expo-audio API shapes
+          const AudioApi = module;
+          if (AudioApi?.Audio?.getRecordingPermissionsAsync) {
+            result = await AudioApi.Audio.getRecordingPermissionsAsync();
+          } else if (AudioApi?.getRecordingPermissionsAsync) {
+            result = await AudioApi.getRecordingPermissionsAsync();
+          } else if (AudioApi?.AudioModule?.getRecordingPermissionsAsync) {
+            result = await AudioApi.AudioModule.getRecordingPermissionsAsync();
+          } else {
+            throw new Error("expo-audio recording permissions API not found");
+          }
+          break;
+        }
         case PermissionType.Location:
         case PermissionType.LocationForeground:
           result = await module.getForegroundPermissionsAsync();
@@ -164,6 +197,20 @@ class PlatformPermissions {
         case PermissionType.Notifications:
           result = await module.requestPermissionsAsync();
           break;
+        case PermissionType.Microphone: {
+          const AudioApi = module;
+          if (AudioApi?.Audio?.requestRecordingPermissionsAsync) {
+            result = await AudioApi.Audio.requestRecordingPermissionsAsync();
+          } else if (AudioApi?.requestRecordingPermissionsAsync) {
+            result = await AudioApi.requestRecordingPermissionsAsync();
+          } else if (AudioApi?.AudioModule?.requestRecordingPermissionsAsync) {
+            result =
+              await AudioApi.AudioModule.requestRecordingPermissionsAsync();
+          } else {
+            throw new Error("expo-audio recording permissions API not found");
+          }
+          break;
+        }
         case PermissionType.Location:
         case PermissionType.LocationForeground:
           result = await module.requestForegroundPermissionsAsync();

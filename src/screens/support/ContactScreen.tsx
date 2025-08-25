@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, { useResponsiveTypography } from "@/hooks/useResponsive";
 import ContactForm from "@components/contact/ContactForm";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";

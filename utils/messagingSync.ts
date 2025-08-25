@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+import EventEmitter from "eventemitter3";
 import { Message } from "../types/message";
 import { messageCache } from "./MessageCache";
 import { RealtimeMessagingService } from "../services/RealtimeMessagingService";
@@ -341,7 +341,7 @@ export class MessageSyncManager extends EventEmitter {
 
         // Update sync state
         const latestTimestamp = Math.max(
-          ...serverMessages.map((m) => m.createdAt || 0)
+          ...serverMessages.map((m: Message) => m.createdAt || 0)
         );
         this.updateConversationSyncState(conversationId, {
           lastMessageTimestamp: latestTimestamp,

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useState } from "react";
-import { useRealtime } from "../hooks/useRealtime";
+import { useRealtime } from "@/hooks/useRealtime";
 import { useQueryClient } from "@tanstack/react-query";
 import { showInfoToast } from "../utils/toast";
 

@@ -3,8 +3,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as FileSystem from "expo-file-system";
 import { Platform } from "react-native";
-// Move to enhancedApiClient for standardized flow
-import { enhancedApiClient } from "./enhancedApiClient";
+// Use base apiClient for standardized flow
+import { apiClient } from "./api";
 
 export interface ImageUploadOptions {
   quality?: number;
@@ -293,8 +293,8 @@ export class ImageUploadManager {
   }> {
     try {
       // First, get upload URL from server
-      // Standardized: get upload URL via enhancedApiClient
-      const uploadUrlResponse: any = await enhancedApiClient.getUploadUrl();
+      // Standardized: get upload URL via base apiClient
+      const uploadUrlResponse: any = await apiClient.getUploadUrl();
 
       if (
         !uploadUrlResponse?.success ||
@@ -337,7 +337,7 @@ export class ImageUploadManager {
       // Confirm upload with server
       // Save image metadata to finalize and obtain URL (aligns with PhotoService)
       const fsInfo2 = await FileSystem.getInfoAsync(uri);
-      const confirmResponse: any = await enhancedApiClient.saveImageMetadata({
+      const confirmResponse: any = await apiClient.saveImageMetadata({
         userId: "", // unknown at this layer
         storageId,
         fileName: uri.split("/").pop() || `image-${Date.now()}.jpg`,
@@ -368,9 +368,10 @@ export class ImageUploadManager {
 
   public async deleteImage(storageId: string): Promise<boolean> {
     try {
-      const response: any = (enhancedApiClient as any).deleteImage
-        ? await (enhancedApiClient as any).deleteImage(storageId)
-        : await (enhancedApiClient as any).request?.(`/images/${storageId}`, { method: "DELETE" });
+      const response: any = await apiClient.deleteProfileImage({
+        userId: "", // not needed for delete by storage ID
+        imageId: storageId,
+      });
       return !!response?.success;
     } catch (error) {
       console.error("Failed to delete image:", error);
@@ -380,12 +381,10 @@ export class ImageUploadManager {
 
   public async reorderImages(imageIds: string[]): Promise<boolean> {
     try {
-      const response: any = (enhancedApiClient as any).updateImageOrder
-        ? await (enhancedApiClient as any).updateImageOrder(imageIds)
-        : await (enhancedApiClient as any).request?.("/images/reorder", {
-            method: "POST",
-            body: JSON.stringify({ imageIds }),
-          });
+      const response: any = await apiClient.reorderProfileImages({
+        profileId: "", // not needed for reorder
+        imageIds,
+      });
 
       return !!response?.success;
     } catch (error) {

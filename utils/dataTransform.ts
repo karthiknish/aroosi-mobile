@@ -6,7 +6,7 @@ import {
 } from "../types/profile";
 import { User, LoginResponse, RegisterResponse } from "../types/auth";
 import { Message, Conversation } from "../types/message";
-import { Interest, Match } from "../types/interest";
+import { Interest, Match } from "../types/profile";
 
 // Profile transformations
 export function transformProfileForApi(
@@ -40,7 +40,7 @@ export function transformProfileForApi(
     // Ensure interests are array
     interests:
       typeof profile.interests === "string"
-        ? profile.interests.split(",").map((i) => i.trim())
+        ? profile.interests.split(",").map((i: string) => i.trim())
         : profile.interests,
 
     // Remove undefined values
@@ -84,8 +84,7 @@ export function transformProfileFromApi(profile: any): Profile {
         : profile.interests || [],
 
     // Ensure boolean fields
-    isProfileComplete: Boolean(profile.isProfileComplete),
-    isOnboardingComplete: Boolean(profile.isOnboardingComplete),
+    // completeness flags removed
     banned: Boolean(profile.banned),
 
     // Ensure timestamps
@@ -119,10 +118,7 @@ export function transformLoginResponseFromApi(response: any): LoginResponse {
     profile: response.profile
       ? {
           id: response.profile.id || response.profile._id,
-          isComplete: Boolean(
-            response.profile.isComplete || response.profile.isProfileComplete
-          ),
-          isOnboardingComplete: Boolean(response.profile.isOnboardingComplete),
+          // completeness flags omitted
         }
       : undefined,
   };
@@ -133,31 +129,33 @@ export function transformMessageFromApi(message: any): Message {
   return {
     _id: message._id || message.id,
     conversationId: message.conversationId,
-    fromUserId: message.fromUserId || message.senderId,
-    toUserId: message.toUserId || message.recipientId,
+    fromUserId: message.fromUserId,
+    toUserId: message.toUserId,
     text: message.text || message.content || "",
     type: message.type || "text",
     createdAt: message.createdAt || message.timestamp || Date.now(),
     readAt: message.readAt,
-    deliveredAt: message.deliveredAt,
+    // deliveredAt removed; not in Message type
     status: message.status || "sent",
 
     // Voice message fields
     audioStorageId: message.audioStorageId,
-    audioUrl: message.audioUrl,
+    // audioUrl removed; not in Message type
     duration: message.duration,
     fileSize: message.fileSize,
     mimeType: message.mimeType,
 
     // Image message fields
     imageStorageId: message.imageStorageId,
-    imageUrl: message.imageUrl,
+    // imageUrl removed; not in Message type
   };
 }
 
 export function transformConversationFromApi(conversation: any): Conversation {
   return {
     _id: conversation._id || conversation.id,
+    conversationId:
+      conversation.conversationId || conversation._id || conversation.id,
     participants: conversation.participants || [],
     lastMessage: conversation.lastMessage
       ? transformMessageFromApi(conversation.lastMessage)
@@ -172,11 +170,11 @@ export function transformConversationFromApi(conversation: any): Conversation {
 export function transformInterestFromApi(interest: any): Interest {
   return {
     _id: interest._id || interest.id,
-    fromUserId: interest.fromUserId || interest.senderId,
-    toUserId: interest.toUserId || interest.recipientId,
+    fromUserId: interest.fromUserId,
+    toUserId: interest.toUserId,
     status: interest.status || "pending",
     createdAt: interest.createdAt || Date.now(),
-    updatedAt: interest.updatedAt,
+    // updatedAt removed; not in Interest type
 
     // Profile enrichment
     fromProfile: interest.fromProfile
@@ -230,9 +228,6 @@ export function transformSearchResultFromApi(result: any): any {
       fullName: result.profile?.fullName || result.fullName,
       city: result.profile?.city || result.city,
       dateOfBirth: result.profile?.dateOfBirth || result.dateOfBirth,
-      isProfileComplete: Boolean(
-        result.profile?.isProfileComplete || result.isProfileComplete
-      ),
       hiddenFromSearch: Boolean(
         result.profile?.hiddenFromSearch || result.hiddenFromSearch
       ),

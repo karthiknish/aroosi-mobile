@@ -6,10 +6,12 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from "react-native";
-import { useClerkAuth } from "@contexts/ClerkAuthContext";
+import { useAuth } from "@contexts/AuthProvider";
 import { useToast } from "@providers/ToastContext";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 interface SocialAuthButtonsProps {
   onGoogleSuccess?: () => void;
@@ -21,7 +23,7 @@ export default function SocialAuthButtons({
   onGoogleError,
 }: SocialAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
-  const { signInWithGoogle } = useClerkAuth();
+  const { signInWithGoogle } = useAuth();
   const toast = useToast();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -29,7 +31,6 @@ export default function SocialAuthButtons({
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      // Use Clerk's OAuth flow directly
       const result = await signInWithGoogle();
 
       if (result.success) {

@@ -15,7 +15,43 @@ export type PlansResponse = {
 
 const scope = 'subs.service';
 
-// GET /api/subscriptions/plans
+// Unified plan retrieval: web app currently renders plans statically; if the
+// backend provides /api/subscriptions/plans we use it, else fall back to static.
+const STATIC_PLANS: Plan[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: 0,
+    features: [
+      'Browse limited profiles',
+      'Send limited likes',
+    ],
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    price: 1499, // minor units (e.g. GBP £14.99)
+    popular: true,
+    features: [
+      'Unlimited likes',
+      'Initiate chats',
+      'Advanced filters (basic)',
+    ],
+  },
+  {
+    id: 'premiumPlus',
+    name: 'Premium Plus',
+    price: 3999,
+    features: [
+      'All Premium features',
+      'Profile boosts',
+      'See profile viewers',
+      'Spotlight badge',
+      'Incognito mode',
+    ],
+  },
+];
+
 export async function getPlans(): Promise<Plan[]> {
   const correlationId = Math.random().toString(36).slice(2, 10);
   const startedAt = Date.now();
@@ -23,12 +59,25 @@ export async function getPlans(): Promise<Plan[]> {
   try {
     const { data } = await http.get<PlansResponse>('/api/subscriptions/plans', { withCredentials: true });
     const plans = (data as any)?.plans ?? data ?? [];
-    console.info('[SUBS] plans:load:success', { scope, correlationId, count: Array.isArray(plans) ? plans.length : 0, durationMs: Date.now() - startedAt });
+    if (!Array.isArray(plans) || plans.length === 0)
+      throw new Error("Empty plans response");
+    console.info("[SUBS] plans:load:success", {
+      scope,
+      correlationId,
+      count: plans.length,
+      durationMs: Date.now() - startedAt,
+    });
     return plans;
   } catch (e: any) {
     const status = e?.response?.status;
-    console.error('[SUBS] plans:load:error', { scope, correlationId, status, message: e?.response?.data?.error || e?.message });
-    throw e;
+    console.warn("[SUBS] plans:load:fallback", {
+      scope,
+      correlationId,
+      status,
+      message: e?.response?.data?.error || e?.message,
+    });
+    // Fallback to static definitions (alignment with web static offerings)
+    return STATIC_PLANS;
   }
 }
 
@@ -53,14 +102,14 @@ export async function checkAccess(feature: string): Promise<boolean> {
   }
 }
 
-// POST /api/payments/checkout { planId, platform } -> returns { url }
+// POST /api/stripe/checkout { planId } -> returns { url } (platform passed for analytics if backend supports)
 export async function createCheckoutSession(planId: string, platform: 'ios' | 'android'): Promise<{ url: string }> {
   const correlationId = Math.random().toString(36).slice(2, 10);
   const startedAt = Date.now();
   console.info('[SUBS] checkout:start', { scope, correlationId, planId, platform });
   try {
     const { data } = await http.post<{ url: string }>(
-      '/api/payments/checkout',
+      "/api/stripe/checkout",
       { planId, platform },
       { withCredentials: true }
     );
@@ -74,15 +123,25 @@ export async function createCheckoutSession(planId: string, platform: 'ios' | 'a
   }
 }
 
-// GET /api/subscriptions/portal -> { url }
+// POST /api/stripe/portal -> { url }
 export async function getBillingPortalUrl(): Promise<{ url: string }> {
   const correlationId = Math.random().toString(36).slice(2, 10);
   const startedAt = Date.now();
   console.info('[SUBS] portal:start', { scope, correlationId });
   try {
-    const { data } = await http.get<{ url: string }>('/api/subscriptions/portal', { withCredentials: true });
+    // Some backends use POST for portal session creation (Stripe best practice)
+    const { data } = await http.post<{ url: string }>(
+      "/api/stripe/portal",
+      {},
+      { withCredentials: true }
+    );
     const url = (data as any)?.url;
-    console.info('[SUBS] portal:success', { scope, correlationId, hasUrl: !!url, durationMs: Date.now() - startedAt });
+    console.info("[SUBS] portal:success", {
+      scope,
+      correlationId,
+      hasUrl: !!url,
+      durationMs: Date.now() - startedAt,
+    });
     return { url };
   } catch (e: any) {
     const status = e?.response?.status;

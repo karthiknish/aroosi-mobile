@@ -13,7 +13,7 @@ import { Layout } from "@constants/Layout";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "@hooks/useResponsive";
+} from "@/hooks/useResponsive";
 
 const { height, width } = Dimensions.get("window");
 

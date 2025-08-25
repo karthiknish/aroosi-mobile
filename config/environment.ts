@@ -14,9 +14,7 @@ export interface EnvironmentConfig {
   // Payments
   STRIPE_PUBLISHABLE_KEY: string;
 
-  // Storage
-  CONVEX_URL?: string;
-  CONVEX_DEPLOYMENT?: string;
+  // Storage (Convex removed)
 
   // Monitoring & Analytics
   SENTRY_DSN?: string;
@@ -73,9 +71,7 @@ const getEnvironmentConfig = (): EnvironmentConfig => {
     STRIPE_PUBLISHABLE_KEY:
       process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
 
-    // Storage
-    CONVEX_URL: process.env.EXPO_PUBLIC_CONVEX_URL,
-    CONVEX_DEPLOYMENT: process.env.EXPO_PUBLIC_CONVEX_DEPLOYMENT,
+    // Storage (Convex removed)
 
     // Monitoring & Analytics
     SENTRY_DSN: process.env.EXPO_PUBLIC_SENTRY_DSN,

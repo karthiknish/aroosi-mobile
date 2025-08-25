@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -9,6 +10,9 @@
       "channel": "development",
       "env": {
         "ENVIRONMENT": "development"
+      },
+      "ios": {
+        "simulator": true
       }
     },
     "staging": {
@@ -55,8 +59,7 @@
       "ios": {
         "appleId": "${{ secrets.APPLE_ID }}",
         "ascAppId": "${{ secrets.ASC_APP_ID }}",
-        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}",
-        "password": "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
+        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}"
       }
     },
     "staging": {
@@ -68,8 +71,7 @@
       "ios": {
         "appleId": "${{ secrets.APPLE_ID }}",
         "ascAppId": "${{ secrets.ASC_APP_ID }}",
-        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}",
-        "password": "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}"
+        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}"
       }
     }
   }

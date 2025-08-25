@@ -37,31 +37,31 @@ export function ErrorMessage({
     switch (type) {
       case "error":
         return {
-          background: Colors.red[50],
-          border: Colors.red[200],
-          text: Colors.red[800],
-          icon: Colors.red[500],
+          background: Colors.error[50],
+          border: Colors.error[200],
+          text: Colors.error[800],
+          icon: Colors.error[500],
         };
       case "warning":
         return {
-          background: Colors.yellow[50],
-          border: Colors.yellow[200],
-          text: Colors.yellow[800],
-          icon: Colors.yellow[500],
+          background: Colors.warning[50],
+          border: Colors.warning[200],
+          text: Colors.warning[800],
+          icon: Colors.warning[500],
         };
       case "info":
         return {
-          background: Colors.blue[50],
-          border: Colors.blue[200],
-          text: Colors.blue[800],
-          icon: Colors.blue[500],
+          background: Colors.secondary[50],
+          border: Colors.secondary[200],
+          text: Colors.secondary[800],
+          icon: Colors.secondary[500],
         };
       default:
         return {
-          background: Colors.red[50],
-          border: Colors.red[200],
-          text: Colors.red[800],
-          icon: Colors.red[500],
+          background: Colors.error[50],
+          border: Colors.error[200],
+          text: Colors.error[800],
+          icon: Colors.error[500],
         };
     }
   };

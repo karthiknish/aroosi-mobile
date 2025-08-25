@@ -57,14 +57,16 @@ export default function PlatformButton({
 
   const getButtonStyles = () => {
     const baseStyle = {
-      height: PlatformDesign.button.height,
-      borderRadius: PlatformDesign.radius.button,
-      paddingHorizontal: PlatformDesign.button.padding.horizontal,
-      paddingVertical: PlatformDesign.button.padding.vertical,
+      height: PlatformDesign.button?.height ?? Layout.spacing.xl,
+      borderRadius: PlatformDesign.radius?.button ?? Layout.radius.md,
+      paddingHorizontal:
+        PlatformDesign.button?.padding?.horizontal ?? Layout.spacing.md,
+      paddingVertical:
+        PlatformDesign.button?.padding?.vertical ?? Layout.spacing.sm,
       flexDirection: "row" as const,
       alignItems: "center" as const,
       justifyContent: "center" as const,
-      ...PlatformDesign.shadows.small,
+      ...(PlatformDesign.shadows?.small || {}),
     };
 
     const sizeStyles = {
@@ -73,7 +75,7 @@ export default function PlatformButton({
         paddingHorizontal: Layout.spacing.md,
       },
       md: {
-        height: PlatformDesign.button.height,
+        height: PlatformDesign.button?.height ?? Layout.spacing.xl,
       },
       lg: {
         height: PlatformUtils.getValue(56, 52),
@@ -85,9 +87,9 @@ export default function PlatformButton({
       primary: {
         backgroundColor: disabled
           ? Colors.neutral[300]
-          : PlatformDesign.colors.primary,
+          : PlatformDesign.colors?.primary ?? Colors.primary[500],
         ...(!Platform.OS !== ("android" as any) &&
-          PlatformDesign.shadows.small),
+          PlatformDesign.shadows?.small),
       },
       secondary: {
         backgroundColor: disabled ? Colors.neutral[100] : Colors.neutral[200],
@@ -99,7 +101,7 @@ export default function PlatformButton({
         borderWidth: PlatformUtils.getValue(1, 2),
         borderColor: disabled
           ? Colors.neutral[300]
-          : PlatformDesign.colors.primary,
+          : PlatformDesign.colors?.primary ?? Colors.primary[500],
       },
       ghost: {
         backgroundColor: "transparent",
@@ -116,23 +118,29 @@ export default function PlatformButton({
   const getTextStyles = () => {
     const baseTextStyle = {
       fontSize:
-        Layout.typography.fontSize.base * PlatformDesign.typography.scale,
-      fontWeight: PlatformDesign.typography.fontWeight.medium,
+        Layout.typography.fontSize.base *
+        (PlatformDesign.typography?.scale ?? 1),
+      fontWeight:
+        PlatformDesign.typography?.fontWeight?.medium ??
+        Layout.typography.fontWeight.medium,
       textAlign: "center" as const,
     };
 
     const sizeTextStyles = {
       sm: {
         fontSize:
-          Layout.typography.fontSize.sm * PlatformDesign.typography.scale,
+          Layout.typography.fontSize.sm *
+          (PlatformDesign.typography?.scale ?? 1),
       },
       md: {
         fontSize:
-          Layout.typography.fontSize.base * PlatformDesign.typography.scale,
+          Layout.typography.fontSize.base *
+          (PlatformDesign.typography?.scale ?? 1),
       },
       lg: {
         fontSize:
-          Layout.typography.fontSize.lg * PlatformDesign.typography.scale,
+          Layout.typography.fontSize.lg *
+          (PlatformDesign.typography?.scale ?? 1),
       },
     };
 
@@ -144,10 +152,14 @@ export default function PlatformButton({
         color: disabled ? Colors.neutral[400] : Colors.text.primary,
       },
       outline: {
-        color: disabled ? Colors.neutral[400] : PlatformDesign.colors.primary,
+        color: disabled
+          ? Colors.neutral[400]
+          : PlatformDesign.colors?.primary ?? Colors.primary[500],
       },
       ghost: {
-        color: disabled ? Colors.neutral[400] : PlatformDesign.colors.primary,
+        color: disabled
+          ? Colors.neutral[400]
+          : PlatformDesign.colors?.primary ?? Colors.primary[500],
       },
     };
 
@@ -166,9 +178,9 @@ export default function PlatformButton({
           color={
             variant === "primary"
               ? Colors.background.primary
-              : PlatformDesign.colors.primary
+              : PlatformDesign.colors?.primary ?? Colors.primary[500]
           }
-          style={[icon && { marginRight: Layout.spacing.sm }]}
+          style={[(icon ? { marginRight: Layout.spacing.sm } : null) as any]}
         />
       )}
       {!loading && icon && iconPosition === "left" && (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,21 +10,20 @@ import {
   Platform,
 } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 import SubscriptionCard from "@components/subscription/SubscriptionCard";
 // UsageDashboard is optional and not wired in this API-based flow
 import UpgradeConfirmationModal from "@components/subscription/UpgradeConfirmationModal";
 import PaywallModal from "@components/subscription/PaywallModal";
-import { Colors, Layout } from "../../../constants";
-import { useToast } from "@providers/ToastContext";
-import {
-  getPlans,
-  createCheckoutSession,
-} from "../../../services/subscriptions";
+import { Colors, Layout } from "@constants";
+import { useToast } from "@/providers/ToastContext";
+import { getPlans, getBillingPortalUrl } from "@services/subscriptions";
 import type {
   SubscriptionPlan,
   SubscriptionTier,
-} from "../../../types/subscription";
+} from "@/types/subscription";
+import { useInAppPurchase } from "@/hooks/useInAppPurchase";
+import { PRODUCT_IDS } from "@/types/inAppPurchase";
 
 // Helper to coerce backend ids to SubscriptionTier safely
 const asTier = (id: string): SubscriptionTier =>
@@ -61,9 +60,10 @@ export default function SubscriptionScreen({
   const [loadingPlans, setLoadingPlans] = useState(true);
 
   // Source of truth for subscription status comes from profile in AuthContext
-  const { } = useClerkAuth();
+  const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const iap = useInAppPurchase();
 
   const profile = user?.profile as any | null;
   const currentTier: string = profile?.subscriptionPlan ?? "free";
@@ -92,43 +92,52 @@ export default function SubscriptionScreen({
       } catch (e: any) {
         toast.show("Unable to load plans. Please try again.", "error");
       } finally {
-        mounted = false;
         setLoadingPlans(false);
       }
     })();
+    // Initialize IAP and load products
+    (async () => {
+      const ok = await iap.initializePurchases();
+      if (ok) await iap.loadProducts();
+    })();
+    return () => {
+      mounted = false;
+    };
   }, [toast]);
 
-  const startCheckout = useCallback(
-    async (planId: string): Promise<boolean> => {
-      try {
-        setPurchasing(planId);
-        const platform = (Platform?.OS === "ios" ? "ios" : "android") as
-          | "ios"
-          | "android";
-        const { url } = await createCheckoutSession(planId, platform);
-        if (url) {
-          await Linking.openURL(url);
-        } else {
-          toast.show("Checkout link unavailable. Try again.", "error");
-          return false;
-        }
-        // On return, refresh session/profile and queries
-        await refreshUser();
-        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
-        return true;
-      } catch (error: any) {
-        const message =
-          typeof error?.message === "string"
-            ? error.message
-            : "Something went wrong. Please try again later.";
-        toast.show(message, "error");
-        return false;
-      } finally {
-        setPurchasing(null);
-      }
+  // Map plan -> store productId
+  const platformKey = Platform.OS === "ios" ? "ios" : "android";
+  const getProductIdForPlan = useCallback(
+    (planId: string): string | null => {
+      if (planId === "premium") return PRODUCT_IDS[platformKey].premium;
+      if (planId === "premiumPlus") return PRODUCT_IDS[platformKey].premiumPlus;
+      return null; // free plan has no product
     },
-    [toast, refreshUser, queryClient]
+    [platformKey]
   );
+
+  // Map plans with IAP price data when available
+  const enrichedPlans = useMemo(() => {
+    return plans.map((plan) => {
+      if (plan.id === "free") return plan;
+      const pid = getProductIdForPlan(plan.id);
+      const prod = pid
+        ? iap.state.products.find((p) => p.productId === pid)
+        : undefined;
+      if (prod) {
+        // Convert string price to minor units if possible; fall back to plan.price
+        const numeric = Number(prod.price);
+        return {
+          ...plan,
+          price: Number.isFinite(numeric)
+            ? Math.round(numeric * 100)
+            : plan.price,
+          // keep features/popular as-is
+        };
+      }
+      return plan;
+    });
+  }, [plans, iap.state.products, getProductIdForPlan]);
 
   const handlePurchase = async (planId: string) => {
     // If user has an active subscription and selected a different plan, confirm upgrade
@@ -137,40 +146,85 @@ export default function SubscriptionScreen({
       setShowUpgradeModal(true);
       return;
     }
-    await startCheckout(planId);
+    // IAP purchase flow
+    try {
+      const pid = getProductIdForPlan(planId);
+      if (!pid) return; // free
+      setPurchasing(planId);
+      const result = await iap.purchaseProduct(pid);
+      if (result.success) {
+        // Status will update via listener; ensure user refresh
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+        toast.show("Purchase completed.", "success");
+      } else if (result.error && result.error.type !== "UserCancel") {
+        toast.show(result.error.message || "Purchase failed.", "error");
+      }
+    } finally {
+      setPurchasing(null);
+    }
   };
 
   const handleUpgradeConfirm = async (planId: string): Promise<boolean> => {
-    const ok = await startCheckout(planId);
-    if (ok) {
-      setShowUpgradeModal(false);
-      setUpgradeTargetId(null);
-      setSelectedPlanId(null);
-      toast.show("Your plan has been upgraded.", "success");
+    try {
+      const pid = getProductIdForPlan(planId);
+      if (!pid) return false;
+      setPurchasing(planId);
+      const res = await iap.purchaseProduct(pid);
+      if (res.success) {
+        await refreshUser();
+        queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+        setShowUpgradeModal(false);
+        setUpgradeTargetId(null);
+        setSelectedPlanId(null);
+        toast.show("Your plan has been upgraded.", "success");
+        return true;
+      }
+      if (res.error && res.error.type !== "UserCancel") {
+        toast.show(res.error.message || "Upgrade failed.", "error");
+      }
+      return false;
+    } finally {
+      setPurchasing(null);
     }
-    return ok;
   };
 
   const handleCancelSubscription = () => {
-    // Cancellation flow depends on provider; for Stripe Checkout billing, direct users to web portal
+    // For IAP-managed subscriptions, open the store's subscription management
     Alert.alert(
       "Cancel Subscription",
-      "Subscription management is handled on our billing portal. Open the portal to manage or cancel your plan?",
+      Platform.OS === "ios"
+        ? "Manage your subscription in the App Store."
+        : "Manage your subscription in Google Play.",
       [
-        { text: "Keep Subscription", style: "cancel" },
+        { text: "Close", style: "cancel" },
         {
-          text: "Open Portal",
+          text: "Open",
           style: "default",
           onPress: async () => {
             try {
-              // Optionally: GET /api/subscriptions/portal -> { url }
-              // For now, guide user:
-              toast.show(
-                "Please manage your subscription on the billing portal.",
-                "info"
-              );
+              if (Platform.OS === "ios") {
+                await Linking.openURL(
+                  "itms-apps://apps.apple.com/account/subscriptions"
+                );
+              } else {
+                // Optionally include package name params
+                await Linking.openURL(
+                  "https://play.google.com/store/account/subscriptions"
+                );
+              }
             } catch {
-              toast.show("Could not open billing portal.", "error");
+              // Fallback to Stripe portal if available (for web-managed subs)
+              try {
+                const { url } = await getBillingPortalUrl();
+                if (url) {
+                  await Linking.openURL(url);
+                } else {
+                  toast.show("Could not open subscription settings.", "error");
+                }
+              } catch {
+                toast.show("Could not open subscription settings.", "error");
+              }
             }
           },
         },
@@ -179,9 +233,14 @@ export default function SubscriptionScreen({
   };
 
   const handleRestorePurchases = async () => {
-    // For web checkout (Stripe), restore happens via session/profile refresh
-    await refreshUser();
-    toast.show("Subscription status refreshed.", "success");
+    const res = await iap.restorePurchases();
+    if (res.success) {
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+      toast.show("Purchases restored.", "success");
+    } else {
+      toast.show("No purchases to restore.", "info");
+    }
   };
 
   // Removed legacy feature table renderer; plans are rendered via SubscriptionCard
@@ -232,7 +291,7 @@ export default function SubscriptionScreen({
             <Text style={styles.loadingText}>Loading plans...</Text>
           </View>
         ) : (
-          plans.map((plan) => (
+          enrichedPlans.map((plan) => (
             <SubscriptionCard
               key={plan.id}
               plan={
@@ -242,7 +301,7 @@ export default function SubscriptionScreen({
                   name: plan.name,
                   description: "",
                   price: (plan.price ?? 0) / 100,
-                  currency: "GBP",
+                  currency: Platform.select({ ios: "GBP", android: "GBP" })!,
                   duration: "monthly",
                   features: plan.features ?? [],
                   popularBadge: !!plan.popular,
@@ -258,7 +317,7 @@ export default function SubscriptionScreen({
       </View>
 
       {/* Purchase Button */}
-      {selectedPlanId && selectedPlanId !== currentTier && (
+  {selectedPlanId && selectedPlanId !== currentTier && selectedPlanId !== "free" && (
         <View style={styles.purchaseSection}>
           <TouchableOpacity
             style={styles.purchaseButton}
@@ -268,9 +327,7 @@ export default function SubscriptionScreen({
             {purchasing === selectedPlanId ? (
               <ActivityIndicator color={Colors.background.primary} />
             ) : (
-              <Text style={styles.purchaseButtonText}>
-                Continue to Checkout
-              </Text>
+              <Text style={styles.purchaseButtonText}>Subscribe</Text>
             )}
           </TouchableOpacity>
           <Text style={styles.purchaseHelpText}>
@@ -293,18 +350,7 @@ export default function SubscriptionScreen({
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={async () => {
-              try {
-                const { getBillingPortalUrl } = await import("../../../services/subscriptions");
-                const { url } = await getBillingPortalUrl();
-                if (url) {
-                  await Linking.openURL(url);
-                } else {
-                  // fallback
-                  handleCancelSubscription();
-                }
-              } catch (e) {
-                handleCancelSubscription();
-              }
+              handleCancelSubscription();
             }}
           >
             <Text style={styles.cancelButtonText}>Manage/Cancel</Text>

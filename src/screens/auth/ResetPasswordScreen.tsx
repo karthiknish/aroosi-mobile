@@ -10,9 +10,11 @@ import {
   SafeAreaView,
   ScrollView,
 } from "react-native";
-import { useClerkAuth } from "@contexts/ClerkAuthContext";
+import { useAuth } from "@contexts/AuthProvider";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
@@ -27,17 +29,18 @@ type ResetPasswordScreenNavigationProp = StackNavigationProp<
 type ResetPasswordRouteProp = RouteProp<AuthStackParamList, "ResetPassword">;
 
 export default function ResetPasswordScreen() {
-  const { resetPassword } = useClerkAuth();
+  const { resetPasswordWithCode } = useAuth();
   const navigation = useNavigation<ResetPasswordScreenNavigationProp>();
   const route = useRoute<ResetPasswordRouteProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const toast = useToast();
 
-  // Email-based reset per Convex-auth compatible API
+  // Email-based reset via Firebase
   const [email, setEmail] = useState<string>(
     (route.params as any)?.email || ""
   );
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -49,10 +52,13 @@ export default function ResetPasswordScreen() {
     if (!emailTrimmed) nextErrors.email = "Email is required";
     else if (!emailRegex.test(emailTrimmed))
       nextErrors.email = "Please enter a valid email address";
+    if (!code.trim()) {
+      nextErrors.code = "Reset code is required";
+    }
     if (!password) {
       nextErrors.password = "Password is required";
-    } else if (password.length < 8) {
-      nextErrors.password = "Password must be at least 8 characters";
+    } else if (password.length < 12) {
+      nextErrors.password = "Password must be at least 12 characters";
     }
     if (!confirmPassword) {
       nextErrors.confirmPassword = "Confirm your password";
@@ -63,18 +69,15 @@ export default function ResetPasswordScreen() {
     if (Object.keys(nextErrors).length > 0) return;
 
     try {
-      const res = await resetPassword(emailTrimmed, password);
-      if (res.success) {
-        toast.show("Your password has been reset successfully.", "success");
-        navigation.navigate("Login");
-      } else {
-        toast.show(res.error || "Unable to reset password", "error");
+      const result = await resetPasswordWithCode(code.trim(), password);
+      if (!result.success) {
+        toast.show(result.error || "Reset failed", "error");
+        return;
       }
-    } catch (e) {
-      toast.show(
-        "An unexpected error occurred while resetting password",
-        "error"
-      );
+      toast.show("Password reset. You can sign in now.", "success");
+      navigation.navigate("Login" as any, { email });
+    } catch (e: any) {
+      toast.show(e?.message || "Unable to reset password", "error");
     }
   };
 
@@ -159,6 +162,24 @@ export default function ResetPasswordScreen() {
               </View>
 
               <View style={styles.form}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Reset Code</Text>
+                  <TextInput
+                    style={[styles.input, errors.code && styles.inputError]}
+                    placeholder="Enter reset code"
+                    placeholderTextColor={Colors.text.secondary}
+                    value={code}
+                    onChangeText={(v) => {
+                      setCode(v);
+                      if (errors.code) setErrors((e) => ({ ...e, code: "" }));
+                    }}
+                    autoCapitalize="none"
+                  />
+                  {!!errors.code && (
+                    <Text style={styles.errorText}>{errors.code}</Text>
+                  )}
+                </View>
+
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Email</Text>
                   <TextInput

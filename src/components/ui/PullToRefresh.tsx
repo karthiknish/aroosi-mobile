@@ -17,7 +17,7 @@ interface PullToRefreshProps {
   colors?: string[];
   tintColor?: string;
   backgroundColor?: string;
-  size?: 'default' | 'large';
+  size?: "default" | "large"; // mapped internally to numeric for RefreshControl
   enabled?: boolean;
   hapticFeedback?: boolean;
   customIndicator?: React.ReactNode;
@@ -178,20 +178,20 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     <View style={{ flex: 1, backgroundColor }}>
       <Animated.View
         style={{
-          position: 'absolute',
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,
           height: pullDistance as any,
-          justifyContent: 'flex-end',
-          alignItems: 'center',
+          justifyContent: "flex-end",
+          alignItems: "center",
           paddingBottom: 10,
           zIndex: 1000,
         }}
       >
         {renderCustomIndicator()}
       </Animated.View>
-      
+
       <GestureDetector gesture={panGesture}>
         <ScrollView
           style={{ flex: 1 }}
@@ -203,7 +203,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
               colors={colors as any}
               tintColor={tintColor}
               progressBackgroundColor={backgroundColor}
-              size={size}
+              // Map textual size to numeric constant (0 default, 1 large)
+              size={size === "large" ? 1 : 0}
               enabled={enabled}
             />
           }
@@ -251,7 +252,7 @@ export const EnhancedRefreshControl: React.FC<{
       colors={colors as any}
       tintColor={tintColor}
       progressBackgroundColor={backgroundColor}
-      size={size}
+      size={size === "large" ? 1 : 0}
       title={title}
       titleColor={titleColor}
       progressViewOffset={0}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { useAppFonts } from '../utils/fonts';
+import { useAppFonts } from "@utils/fonts";
 import { Colors } from '../constants';
 
 interface FontLoaderProps {

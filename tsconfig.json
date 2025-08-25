@@ -7,18 +7,34 @@
     "strict": true,
     "noEmit": true,
     "resolveJsonModule": true,
-    "types": ["jest", "react", "react-native"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["jest"],
     "baseUrl": ".",
     "paths": {
       "@components/*": ["components/*"],
-      "@hooks/*": ["src/hooks/*"],
+      "@screens/*": ["src/screens/*"],
       "@services/*": ["services/*"],
       "@contexts/*": ["contexts/*"],
+      "@constants": ["constants/index"],
       "@constants/*": ["constants/*"],
+      "@/constants/*": ["src/constants/*"],
+      "@validation/*": ["src/validation/*"],
+      "@/validation/*": ["src/validation/*"],
       "@src/*": ["src/*"],
-      "@utils/*": ["src/utils/*"]
+      "@utils/*": ["utils/*"],
+      "@providers/*": ["providers/*"],
+      "@navigation/*": ["src/navigation/*"],
+      "@/components/*": ["src/components/*"],
+      "@/screens/*": ["src/screens/*"],
+      "@/hooks/*": ["src/hooks/*"],
+      "@/utils/*": ["utils/*"],
+      "@/navigation/*": ["src/navigation/*"],
+      "@/providers/*": ["providers/*"],
+      "@types/*": ["types/*"],
+      "@/types/*": ["types/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "types", "utils"],
   "exclude": ["node_modules", "dist", "build"]
 }

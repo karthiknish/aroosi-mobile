@@ -595,7 +595,7 @@ export class ClientRateLimit {
     remaining: number;
     windowMs: number;
     timeUntilReset: number;
-    burstStatus: ReturnType<typeof this.getBurstStatus>;
+    burstStatus: ReturnType<ClientRateLimit["getBurstStatus"]>;
   } {
     return {
       currentCount: this.messageCount,

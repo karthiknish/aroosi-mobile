@@ -11,26 +11,26 @@ import {
   FlatList,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
-import { Colors, Layout } from "../../../constants";
-import { useTheme } from "../../../contexts/ThemeContext";
+import { useApiClient } from "@/utils/api";
+import { useAuth } from "@contexts/AuthProvider";
+import { Colors, Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   FullScreenLoading,
   ProfileCardSkeleton,
-} from "../../components/ui/LoadingStates";
-import { NoSearchResults } from "../../components/ui/EmptyStates";
-import { ErrorBoundary } from "../../components/ui/ErrorHandling";
+} from "@/components/ui/LoadingStates";
+import { NoSearchResults } from "@/components/ui/EmptyStates";
+import { ErrorBoundary } from "@/components/ui/ErrorHandling";
 import {
   FadeInView,
   ScaleInView,
   SlideInView,
   AnimatedButton,
-} from "../../components/ui/AnimatedComponents";
-import { SearchFilters } from "../../../types/profile";
-import PaywallModal from "../../../components/subscription/PaywallModal";
-import { useFeatureAccess } from "../../../hooks/useFeatureAccess";
-import { getPlans } from "../../../services/subscriptions";
+} from "@/components/ui/AnimatedComponents";
+import { SearchFilters } from "@/types/profile";
+import PaywallModal from "@components/subscription/PaywallModal";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import { getPlans } from "@services/subscriptions";
 
 interface SearchScreenProps {
   navigation: any;
@@ -111,7 +111,8 @@ function getAge(dateOfBirth: string): number {
 }
 
 export default function SearchScreen({ navigation }: SearchScreenProps) {
-  const { } = useClerkAuth();
+  const { user } = useAuth();
+  const userId = user?.id;
   const { theme } = useTheme();
   const apiClient = useApiClient();
 
@@ -740,6 +741,60 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
 
         {/* Filters */}
         {showFilters && renderFilters()}
+
+        {/* Icebreaker engagement banner */}
+        {((!user?.profile as any) ||
+          !(user?.profile as any)?.answeredIcebreakersCount ||
+          ((user?.profile as any)?.answeredIcebreakersCount as number) < 3) && (
+          <View
+            style={{
+              marginHorizontal: Layout.spacing.lg,
+              marginTop: Layout.spacing.md,
+              marginBottom: Layout.spacing.sm,
+              padding: Layout.spacing.md,
+              borderRadius: Layout.radius.lg,
+              borderWidth: 1,
+              borderColor: theme.colors.border.primary,
+              backgroundColor: theme.colors.background.primary,
+            }}
+          >
+            <Text
+              style={{
+                color: theme.colors.text.primary,
+                fontFamily: Layout.typography.fontFamily.serif,
+                fontSize: Layout.typography.fontSize.lg,
+                marginBottom: 6,
+              }}
+            >
+              Boost your profile with icebreakers
+            </Text>
+            <Text
+              style={{ color: theme.colors.text.secondary, marginBottom: 10 }}
+            >
+              Answer a few quick questions so your personality shines. Profiles
+              with icebreakers get more interests.
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                navigation.navigate(
+                  "ProfileTab" as any,
+                  { screen: "Icebreakers" } as any
+                )
+              }
+              style={{
+                alignSelf: "flex-start",
+                backgroundColor: theme.colors.primary[500],
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: theme.colors.text.inverse }}>
+                Answer Icebreakers
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Content */}
         <FlatList

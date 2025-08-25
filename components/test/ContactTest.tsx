@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useContact } from '../../hooks/useContact';
+import { useContact } from "@/hooks/useContact";
 import { ContactFormData } from '../../types/contact';
 import { Colors } from '../../constants';
 

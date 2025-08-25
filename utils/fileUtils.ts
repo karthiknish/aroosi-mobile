@@ -38,7 +38,10 @@ export async function uriToBlob(uri: string): Promise<Blob> {
 export async function getFileSize(uri: string): Promise<number> {
   try {
     const fileInfo = await FileSystem.getInfoAsync(uri);
-    return fileInfo.size || 0;
+    // Ensure fileInfo.size is optional in FileInfo type
+    return typeof (fileInfo as { size?: number }).size === "number"
+      ? (fileInfo as { size?: number }).size!
+      : 0;
   } catch (error) {
     console.error("Failed to get file size:", error);
     return 0;

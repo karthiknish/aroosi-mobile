@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
-import { Colors } from '../../../constants/Colors';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../../hooks/useResponsive';
+import { Colors } from "@constants/Colors";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface OnboardingCompleteScreenProps {

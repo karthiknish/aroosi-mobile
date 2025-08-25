@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { useOfflineMessagingHealth } from "../../hooks/useOfflineMessaging";
+import { useOfflineMessagingHealth } from "@/hooks/useOfflineMessaging";
 import { useToast } from "../../contexts/ToastContext";
 import { Layout } from "@constants";
 

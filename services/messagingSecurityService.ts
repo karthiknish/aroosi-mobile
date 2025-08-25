@@ -5,9 +5,8 @@ import {
   UserRelationship,
   ClientRateLimit,
   MessageSecurity,
-} from "../utils/messageValidation";
+} from "@utils/messageValidation";
 import { ValidationResult, MessagingErrorType } from "../types/messaging";
-import { Message } from "../types/message";
 
 export interface SecurityConfig {
   enableRateLimit?: boolean;
@@ -47,6 +46,8 @@ export class MessagingSecurityService extends EventEmitter {
   private config: Required<SecurityConfig>;
   private rateLimiter: ClientRateLimit | null = null;
   private authContext: AuthContext | null = null;
+  private tokenProvider?: () => Promise<string | null>;
+  private providerUserId?: string;
   private userRelationships = new Map<string, UserRelationship[]>();
   private blockedUsers = new Set<string>();
   private securityViolations: SecurityViolation[] = [];
@@ -80,6 +81,23 @@ export class MessagingSecurityService extends EventEmitter {
   initialize(authContext: AuthContext): void {
     this.authContext = authContext;
     this.emit("initialized", { userId: authContext.userId });
+  }
+
+  /**
+   * Set an async token provider; enables lazy token retrieval / refresh without re-initializing.
+   */
+  setTokenProvider(
+    userId: string,
+    provider: () => Promise<string | null>
+  ): void {
+    this.providerUserId = userId;
+    this.tokenProvider = provider;
+    if (!this.authContext) {
+      // Seed minimal auth context; token will be populated on demand
+      this.authContext = { userId, token: "" };
+    } else {
+      this.authContext.userId = userId;
+    }
   }
 
   /**
@@ -121,36 +139,58 @@ export class MessagingSecurityService extends EventEmitter {
    * Validate authentication context
    */
   validateAuthentication(): ValidationResult {
-    if (!this.config.enableAuthValidation) {
-      return { valid: true };
-    }
-
-    if (!this.authContext) {
-      return {
-        valid: false,
-        error: "Authentication context not initialized",
-      };
-    }
-
-    if (!this.authContext.token) {
-      return {
-        valid: false,
-        error: "Authentication token missing",
-      };
-    }
-
-    // Check token expiry if provided
+    // Synchronous validation (used when token already resolved). Async path handled in ensureAuthContext.
+    if (!this.config.enableAuthValidation) return { valid: true };
+    if (!this.authContext)
+      return { valid: false, error: "Authentication context not initialized" };
+    if (!this.authContext.token)
+      return { valid: false, error: "Authentication token missing" };
     if (
       this.authContext.tokenExpiry &&
       Date.now() > this.authContext.tokenExpiry
     ) {
-      return {
-        valid: false,
-        error: "Authentication token expired",
-      };
+      return { valid: false, error: "Authentication token expired" };
+    }
+    return { valid: true };
+  }
+
+  /**
+   * Ensure auth context has a valid (non-expired) token. Uses async token provider if configured.
+   */
+  private async ensureAuthContext(): Promise<ValidationResult> {
+    if (!this.config.enableAuthValidation) return { valid: true };
+
+    // If we have a token provider, fetch token when missing or expired
+    if (this.tokenProvider) {
+      const needsToken =
+        !this.authContext ||
+        !this.authContext.token ||
+        (this.authContext.tokenExpiry &&
+          Date.now() > this.authContext.tokenExpiry - 5000); // refresh slightly early
+
+      if (needsToken) {
+        const token = await this.tokenProvider();
+        if (!token) {
+          return {
+            valid: false,
+            error: "Unable to retrieve authentication token",
+          };
+        }
+        const userId =
+          this.providerUserId || this.authContext?.userId || "unknown";
+        const approxExpiry = Date.now() + 55 * 60 * 1000; // Firebase ID tokens ~1h; refresh earlier
+        this.authContext = {
+          ...(this.authContext || { permissions: [] }),
+          userId,
+          token,
+          tokenExpiry: approxExpiry,
+        };
+      }
+      return { valid: true };
     }
 
-    return { valid: true };
+    // Fallback to existing synchronous validation
+    return this.validateAuthentication();
   }
 
   /**
@@ -195,8 +235,8 @@ export class MessagingSecurityService extends EventEmitter {
     fileSize?: number;
     mimeType?: string;
   }): Promise<ValidationResult> {
-    // 1. Validate authentication
-    const authValidation = this.validateAuthentication();
+    // 1. Ensure authentication (async capable)
+    const authValidation = await this.ensureAuthContext();
     if (!authValidation.valid) {
       this.recordSecurityViolation(
         "auth",

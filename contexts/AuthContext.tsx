@@ -21,8 +21,7 @@ interface User {
   profile?: {
     id: string;
     fullName?: string;
-    isProfileComplete?: boolean;
-    isOnboardingComplete?: boolean;
+    // completeness flags removed
     [key: string]: unknown;
   } | null;
 }
@@ -36,7 +35,6 @@ interface AuthContextType {
   error: string | null;
 
   // Derived
-  isOnboardingComplete: boolean;
   isAdmin: boolean;
   userId: string;
 
@@ -91,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // No token storage for cookie-session auth
 
-  // Fetch current user using cookie session (Convex-auth compatible)
+  // Fetch current user using cookie session
   const fetchUser = useCallback(async (): Promise<User | null> => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
@@ -115,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // No API auth header; we rely on cookie sessions with credentials: 'include'
 
-  // Get user profile from API (Convex-auth protected)
+  // Get user profile from API (cookie-session protected)
   const {
     data: profile,
     isLoading: isProfileLoading,
@@ -185,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [fetchUser, queryClient, refreshUser]);
 
-  // Sign in with email/password (Convex-auth compatible; server sets cookies)
+  // Sign in with email/password (server sets cookies)
   const signIn = useCallback(
     async (email: string, password: string) => {
       try {
@@ -348,7 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Reset password with email (Convex-auth compatible endpoint)
+  // Reset password with email
   const resetPassword = useCallback(async (email: string, password: string) => {
     try {
       setError(null);
@@ -412,7 +410,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Derive auth state
   const hasProfile = !!profile;
   const typedProfile = profile as Profile | null;
-  const isOnboardingComplete = typedProfile?.isOnboardingComplete ?? false;
+  // onboarding completeness removed; derive as needed via profile fields when required
 
   // Determine subscription status
   const subscription = {
@@ -437,7 +435,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated,
     error,
 
-    isOnboardingComplete,
     isAdmin,
     userId,
 
@@ -464,7 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useClerkAuth() {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
@@ -472,5 +469,5 @@ export function useClerkAuth() {
   return context;
 }
 
-// Alias for backward compatibility
+// Backward compatibility alias
 export const useAuthContext = useAuth;

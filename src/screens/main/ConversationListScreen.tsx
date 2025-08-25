@@ -6,18 +6,15 @@ import {
   TouchableOpacity,
   RefreshControl,
 } from "react-native";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 import { useQuery } from "@tanstack/react-query";
-import { useApiClient } from "../../../utils/api";
-import { Colors, Layout } from "../../../constants";
-import { useTheme } from "../../../contexts/ThemeContext";
-import { ChatListSkeleton } from "../../components/ui/LoadingStates";
-import { NoMessages } from "../../components/ui/EmptyStates";
-import {
-  ErrorBoundary,
-  ApiErrorDisplay,
-} from "../../components/ui/ErrorHandling";
-import { Conversation } from "../../../types/profile";
+import { useApiClient } from "@/utils/api";
+import { Colors, Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
+import { ChatListSkeleton } from "@/components/ui/LoadingStates";
+import { NoMessages } from "@/components/ui/EmptyStates";
+import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
+import { Conversation } from "@/types/profile";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface ConversationListScreenProps {
@@ -27,7 +24,7 @@ interface ConversationListScreenProps {
 export default function ConversationListScreen({
   navigation,
 }: ConversationListScreenProps) {
-  const { } = useClerkAuth();
+  const { userId } = useAuth();
   const { theme } = useTheme();
   const apiClient = useApiClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -170,8 +167,7 @@ export default function ConversationListScreen({
               ]}
               numberOfLines={1}
             >
-              {(lastMessage?.senderId || lastMessage?.fromUserId) === userId &&
-                "You: "}
+              {lastMessage?.fromUserId === userId && "You: "}
               {lastMessagePreview}
             </Text>
 

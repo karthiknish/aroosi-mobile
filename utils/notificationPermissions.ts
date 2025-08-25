@@ -1,4 +1,4 @@
-import { Platform, Alert } from "react-native";
+import { Platform, Alert, Linking } from "react-native";
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -26,6 +26,22 @@ export class NotificationPermissionsManager {
    */
   public static async requestPermissions(): Promise<PermissionStatus> {
     try {
+      // Android 13+: ensure a channel exists BEFORE prompting for permission
+      if (Platform.OS === "android") {
+        try {
+          await Notifications.setNotificationChannelAsync("default", {
+            name: "Default",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#FF231F7C",
+          });
+        } catch (e) {
+          console.warn(
+            "Failed to create default Android notification channel before permission:",
+            e
+          );
+        }
+      }
       const { status } = await Notifications.requestPermissionsAsync();
       return status as PermissionStatus;
     } catch (error) {
@@ -158,14 +174,18 @@ export class NotificationPermissionsManager {
         {
           text: "Open Settings",
           onPress: () => {
-            // On iOS, this would open the app settings
-            // On Android, this would open the app info page
-            if (Platform.OS === "ios") {
-              // Linking.openURL('app-settings:');
-              console.log("Would open iOS app settings");
-            } else {
-              // Linking.openSettings();
-              console.log("Would open Android app settings");
+            // Try the cross-platform openSettings API first
+            try {
+              Linking.openSettings();
+            } catch (e) {
+              // Fallbacks per-platform
+              if (Platform.OS === "ios") {
+                Linking.openURL("app-settings:").catch(() => {
+                  console.warn("Failed to open iOS settings");
+                });
+              } else {
+                console.warn("Failed to open Android settings");
+              }
             }
           },
         },

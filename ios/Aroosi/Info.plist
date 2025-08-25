@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+    <key>CFBundleAllowMixedLocalizations</key>
+    <true/>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>Aroosi</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+      <string>en</string>
+      <string>fa</string>
+      <string>ps</string>
+    </array>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>aroosi</string>
+          <string>com.aroosi.mobile</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>exp+aroosi</string>
+        </array>
+      </dict>
+    </array>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <key>NSAllowsArbitraryLoads</key>
+      <false/>
+      <key>NSAllowsLocalNetworking</key>
+      <true/>
+    </dict>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Aroosi can access your calendar to help you schedule dates with your matches (optional).</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Aroosi needs access to your camera to take profile pictures and share moments with your matches.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Aroosi can access your contacts to help you find friends who are also using the app (optional).</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Aroosi uses your location to show you matches nearby and improve your experience.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Allow Aroosi to access your microphone to record voice messages.</string>
+    <key>NSPhotoLibraryAddUsageDescription</key>
+    <string>Aroosi can save photos shared by your matches to your photo library.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Aroosi needs access to your photo library to upload beautiful profile pictures that help you find your perfect match.</string>
+    <key>NSUserNotificationsUsageDescription</key>
+    <string>Aroosi sends notifications about new matches, messages, and important updates.</string>
+    <key>SKAdNetworkItems</key>
+    <array>
+      <dict>
+        <key>SKAdNetworkIdentifier</key>
+        <string>cstr6suwn9.skadnetwork</string>
+      </dict>
+    </array>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>background-fetch</string>
+      <string>remote-notification</string>
+      <string>audio</string>
+    </array>
+    <key>UIFileSharingEnabled</key>
+    <false/>
+    <key>UILaunchStoryboardName</key>
+    <string>SplashScreen</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+      <string>armv7</string>
+    </array>
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDefault</string>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+      <string>UIInterfaceOrientationPortrait</string>
+    </array>
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+      <string>UIInterfaceOrientationPortrait</string>
+      <string>UIInterfaceOrientationPortraitUpsideDown</string>
+      <string>UIInterfaceOrientationLandscapeLeft</string>
+      <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UISupportsDocumentBrowser</key>
+    <false/>
+    <key>UIUserInterfaceStyle</key>
+    <string>Automatic</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+  </dict>
+</plist>

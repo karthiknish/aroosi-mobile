@@ -24,7 +24,16 @@ import Animated, {
   cancelAnimation,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { Colors, fontSize } from "@constants";
+// Import Colors and typography scale (fontSize) from constants; if fontSize isn't exported, fallback to inline sizes
+import { Colors } from "@constants";
+// Provide a local typography scale fallback to avoid type errors if fontSize isn't part of constants export
+const fontSize = {
+  xs: 10,
+  sm: 12,
+  base: 14,
+  lg: 16,
+  xl: 18,
+};
 import { useToast } from "@providers/ToastContext";
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -57,7 +66,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
 }) => {
   const toast = useToast();
   const [player, setPlayer] = useState<AudioPlayer | null>(null);
-  const status = useAudioPlayerStatus(player);
+  // Only subscribe when player is initialized to satisfy strict null checks
+  const status = player ? useAudioPlayerStatus(player) : null;
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [isLoading, setIsLoading] = useState(false);

@@ -8,7 +8,10 @@ import {
   Animated,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 export interface LoadingStateProps {
   size?: 'small' | 'large';

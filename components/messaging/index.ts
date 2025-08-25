@@ -1,7 +1,8 @@
 // Individual component exports
 export { VoiceRecorder } from "./VoiceRecorder";
 export { VoicePlayer } from "./VoicePlayer";
-export { VoiceMessageInput, VoiceMessageDisplay } from "./VoiceMessage";
+// VoiceMessageInput was previously exported but no longer exists; only export display component
+export { VoiceMessageDisplay } from "./VoiceMessage";
 export { VoiceMessageBubble } from "./VoiceMessageBubble";
 export { VoiceMessageToolbar } from "./VoiceMessageToolbar";
 export {
@@ -24,9 +25,9 @@ export { VoiceMessageManager } from "../../services/voiceMessageManager";
 export { VoiceMessageStorage } from "../../services/voiceMessageStorage";
 
 // Voice Message Hooks
-export { useVoiceRecording } from "../../hooks/useVoiceRecording";
-export { useVoicePlayback } from "../../hooks/useVoicePlayback";
+export { useVoiceRecording } from "@/hooks/useVoiceRecording";
+export { useVoicePlayback } from "@/hooks/useVoicePlayback";
 export {
   useMessagingFeatures,
   useVoiceMessageLimits,
-} from "../../hooks/useMessagingFeatures";
+} from "@/hooks/useMessagingFeatures";

@@ -1,1 +1,630 @@
-import { EventEmitter } from 'events';\nimport { Platform, NetInfo } from 'react-native';\n\nexport interface WebSocketConnection {\n  id: string;\n  url: string;\n  ws: WebSocket;\n  state: 'connecting' | 'connected' | 'disconnected' | 'error';\n  lastActivity: number;\n  reconnectAttempts: number;\n  metrics: {\n    latency: number;\n    messagesPerSecond: number;\n    errorRate: number;\n    uptime: number;\n    bytesTransferred: number;\n  };\n}\n\nexport interface ConnectionManagerConfig {\n  maxConnections: number;\n  connectionTimeout: number;\n  maxReconnectAttempts: number;\n  reconnectDelay: number;\n  healthCheckInterval: number;\n  loadBalancingStrategy: 'round-robin' | 'least-latency' | 'least-load';\n  enableFailover: boolean;\n  compressionEnabled: boolean;\n}\n\nexport interface LoadBalancingStrategy {\n  selectConnection(connections: WebSocketConnection[]): WebSocketConnection | null;\n}\n\n/**\n * Round-robin load balancing strategy\n */\nclass RoundRobinStrategy implements LoadBalancingStrategy {\n  private currentIndex = 0;\n  \n  selectConnection(connections: WebSocketConnection[]): WebSocketConnection | null {\n    const activeConnections = connections.filter(conn => conn.state === 'connected');\n    if (activeConnections.length === 0) return null;\n    \n    const connection = activeConnections[this.currentIndex % activeConnections.length];\n    this.currentIndex = (this.currentIndex + 1) % activeConnections.length;\n    \n    return connection;\n  }\n}\n\n/**\n * Least latency load balancing strategy\n */\nclass LeastLatencyStrategy implements LoadBalancingStrategy {\n  selectConnection(connections: WebSocketConnection[]): WebSocketConnection | null {\n    const activeConnections = connections.filter(conn => conn.state === 'connected');\n    if (activeConnections.length === 0) return null;\n    \n    return activeConnections.reduce((best, current) => \n      current.metrics.latency < best.metrics.latency ? current : best\n    );\n  }\n}\n\n/**\n * Least load balancing strategy\n */\nclass LeastLoadStrategy implements LoadBalancingStrategy {\n  selectConnection(connections: WebSocketConnection[]): WebSocketConnection | null {\n    const activeConnections = connections.filter(conn => conn.state === 'connected');\n    if (activeConnections.length === 0) return null;\n    \n    return activeConnections.reduce((best, current) => \n      current.metrics.messagesPerSecond < best.metrics.messagesPerSecond ? current : best\n    );\n  }\n}\n\n/**\n * WebSocket Connection Manager with pooling and load balancing\n */\nexport class WebSocketConnectionManager extends EventEmitter {\n  private connections = new Map<string, WebSocketConnection>();\n  private config: ConnectionManagerConfig;\n  private loadBalancer: LoadBalancingStrategy;\n  private healthCheckTimer: NodeJS.Timeout | null = null;\n  private reconnectTimers = new Map<string, NodeJS.Timeout>();\n  private isNetworkAvailable = true;\n  private messageQueue: Array<{ message: any; priority: number }> = [];\n  \n  constructor(config: Partial<ConnectionManagerConfig> = {}) {\n    super();\n    \n    this.config = {\n      maxConnections: 3,\n      connectionTimeout: 10000,\n      maxReconnectAttempts: 5,\n      reconnectDelay: 1000,\n      healthCheckInterval: 30000,\n      loadBalancingStrategy: 'least-latency',\n      enableFailover: true,\n      compressionEnabled: true,\n      ...config\n    };\n    \n    this.loadBalancer = this.createLoadBalancer(this.config.loadBalancingStrategy);\n    this.setupNetworkMonitoring();\n    this.startHealthCheck();\n  }\n  \n  /**\n   * Create load balancer based on strategy\n   */\n  private createLoadBalancer(strategy: string): LoadBalancingStrategy {\n    switch (strategy) {\n      case 'round-robin':\n        return new RoundRobinStrategy();\n      case 'least-latency':\n        return new LeastLatencyStrategy();\n      case 'least-load':\n        return new LeastLoadStrategy();\n      default:\n        return new LeastLatencyStrategy();\n    }\n  }\n  \n  /**\n   * Add a WebSocket connection to the pool\n   */\n  async addConnection(id: string, url: string): Promise<boolean> {\n    if (this.connections.size >= this.config.maxConnections) {\n      console.warn('Maximum connections reached');\n      return false;\n    }\n    \n    if (this.connections.has(id)) {\n      console.warn(`Connection ${id} already exists`);\n      return false;\n    }\n    \n    try {\n      const connection = await this.createConnection(id, url);\n      this.connections.set(id, connection);\n      \n      console.log(`Connection ${id} added successfully`);\n      this.emit('connection_added', connection);\n      \n      return true;\n    } catch (error) {\n      console.error(`Failed to add connection ${id}:`, error);\n      return false;\n    }\n  }\n  \n  /**\n   * Create a WebSocket connection\n   */\n  private async createConnection(id: string, url: string): Promise<WebSocketConnection> {\n    return new Promise((resolve, reject) => {\n      const wsUrl = this.config.compressionEnabled \n        ? `${url}?compression=true` \n        : url;\n      \n      const ws = new WebSocket(wsUrl);\n      const startTime = Date.now();\n      \n      const connection: WebSocketConnection = {\n        id,\n        url,\n        ws,\n        state: 'connecting',\n        lastActivity: Date.now(),\n        reconnectAttempts: 0,\n        metrics: {\n          latency: 0,\n          messagesPerSecond: 0,\n          errorRate: 0,\n          uptime: 0,\n          bytesTransferred: 0\n        }\n      };\n      \n      // Connection timeout\n      const timeout = setTimeout(() => {\n        ws.close();\n        reject(new Error(`Connection timeout for ${id}`));\n      }, this.config.connectionTimeout);\n      \n      ws.onopen = () => {\n        clearTimeout(timeout);\n        connection.state = 'connected';\n        connection.metrics.uptime = Date.now();\n        \n        console.log(`WebSocket ${id} connected`);\n        this.emit('connection_opened', connection);\n        \n        resolve(connection);\n      };\n      \n      ws.onmessage = (event) => {\n        connection.lastActivity = Date.now();\n        connection.metrics.bytesTransferred += event.data.length;\n        \n        // Calculate latency if message has timestamp\n        try {\n          const data = JSON.parse(event.data);\n          if (data.timestamp) {\n            const latency = Date.now() - data.timestamp;\n            connection.metrics.latency = connection.metrics.latency * 0.8 + latency * 0.2;\n          }\n        } catch (e) {\n          // Ignore parsing errors for latency calculation\n        }\n        \n        this.emit('message', { connectionId: id, data: event.data });\n      };\n      \n      ws.onclose = (event) => {\n        clearTimeout(timeout);\n        connection.state = 'disconnected';\n        \n        console.log(`WebSocket ${id} disconnected:`, event.code, event.reason);\n        this.emit('connection_closed', { connection, event });\n        \n        // Schedule reconnection if not intentional\n        if (event.code !== 1000 && this.config.enableFailover) {\n          this.scheduleReconnection(connection);\n        }\n      };\n      \n      ws.onerror = (error) => {\n        clearTimeout(timeout);\n        connection.state = 'error';\n        connection.metrics.errorRate += 1;\n        \n        console.error(`WebSocket ${id} error:`, error);\n        this.emit('connection_error', { connection, error });\n        \n        reject(error);\n      };\n    });\n  }\n  \n  /**\n   * Remove a connection from the pool\n   */\n  removeConnection(id: string): boolean {\n    const connection = this.connections.get(id);\n    if (!connection) {\n      return false;\n    }\n    \n    // Clear reconnect timer if exists\n    const timer = this.reconnectTimers.get(id);\n    if (timer) {\n      clearTimeout(timer);\n      this.reconnectTimers.delete(id);\n    }\n    \n    // Close WebSocket\n    if (connection.ws.readyState === WebSocket.OPEN) {\n      connection.ws.close(1000, 'Connection removed');\n    }\n    \n    this.connections.delete(id);\n    this.emit('connection_removed', connection);\n    \n    console.log(`Connection ${id} removed`);\n    return true;\n  }\n  \n  /**\n   * Send message using load balancing\n   */\n  sendMessage(message: any, priority: number = 1): boolean {\n    if (!this.isNetworkAvailable) {\n      this.queueMessage(message, priority);\n      return false;\n    }\n    \n    const connection = this.loadBalancer.selectConnection(Array.from(this.connections.values()));\n    if (!connection) {\n      this.queueMessage(message, priority);\n      return false;\n    }\n    \n    try {\n      const messageStr = JSON.stringify({\n        ...message,\n        timestamp: Date.now()\n      });\n      \n      connection.ws.send(messageStr);\n      connection.lastActivity = Date.now();\n      connection.metrics.bytesTransferred += messageStr.length;\n      connection.metrics.messagesPerSecond += 1;\n      \n      return true;\n    } catch (error) {\n      console.error('Failed to send message:', error);\n      this.queueMessage(message, priority);\n      return false;\n    }\n  }\n  \n  /**\n   * Send message to specific connection\n   */\n  sendMessageToConnection(connectionId: string, message: any): boolean {\n    const connection = this.connections.get(connectionId);\n    if (!connection || connection.state !== 'connected') {\n      return false;\n    }\n    \n    try {\n      const messageStr = JSON.stringify({\n        ...message,\n        timestamp: Date.now()\n      });\n      \n      connection.ws.send(messageStr);\n      connection.lastActivity = Date.now();\n      connection.metrics.bytesTransferred += messageStr.length;\n      connection.metrics.messagesPerSecond += 1;\n      \n      return true;\n    } catch (error) {\n      console.error(`Failed to send message to ${connectionId}:`, error);\n      return false;\n    }\n  }\n  \n  /**\n   * Queue message for later sending\n   */\n  private queueMessage(message: any, priority: number): void {\n    this.messageQueue.push({ message, priority });\n    \n    // Sort by priority (higher priority first)\n    this.messageQueue.sort((a, b) => b.priority - a.priority);\n    \n    // Limit queue size\n    if (this.messageQueue.length > 1000) {\n      this.messageQueue = this.messageQueue.slice(0, 1000);\n    }\n  }\n  \n  /**\n   * Process queued messages\n   */\n  private processMessageQueue(): void {\n    while (this.messageQueue.length > 0) {\n      const { message, priority } = this.messageQueue.shift()!;\n      if (!this.sendMessage(message, priority)) {\n        // If sending fails, put it back at the front\n        this.messageQueue.unshift({ message, priority });\n        break;\n      }\n    }\n  }\n  \n  /**\n   * Schedule reconnection for a connection\n   */\n  private scheduleReconnection(connection: WebSocketConnection): void {\n    if (connection.reconnectAttempts >= this.config.maxReconnectAttempts) {\n      console.error(`Max reconnection attempts reached for ${connection.id}`);\n      this.emit('connection_failed', connection);\n      return;\n    }\n    \n    connection.reconnectAttempts++;\n    const delay = this.config.reconnectDelay * Math.pow(2, connection.reconnectAttempts - 1);\n    \n    console.log(`Scheduling reconnection for ${connection.id} in ${delay}ms`);\n    \n    const timer = setTimeout(async () => {\n      try {\n        const newConnection = await this.createConnection(connection.id, connection.url);\n        this.connections.set(connection.id, newConnection);\n        \n        console.log(`Connection ${connection.id} reconnected successfully`);\n        this.emit('connection_reconnected', newConnection);\n        \n        // Process queued messages\n        this.processMessageQueue();\n      } catch (error) {\n        console.error(`Reconnection failed for ${connection.id}:`, error);\n        this.scheduleReconnection(connection);\n      }\n    }, delay);\n    \n    this.reconnectTimers.set(connection.id, timer);\n  }\n  \n  /**\n   * Setup network monitoring\n   */\n  private setupNetworkMonitoring(): void {\n    NetInfo.addEventListener(state => {\n      const wasAvailable = this.isNetworkAvailable;\n      this.isNetworkAvailable = state.isConnected;\n      \n      if (!wasAvailable && this.isNetworkAvailable) {\n        console.log('Network restored - processing queued messages');\n        this.processMessageQueue();\n        this.emit('network_restored');\n      } else if (wasAvailable && !this.isNetworkAvailable) {\n        console.log('Network lost - queuing messages');\n        this.emit('network_lost');\n      }\n    });\n  }\n  \n  /**\n   * Start health check for all connections\n   */\n  private startHealthCheck(): void {\n    this.healthCheckTimer = setInterval(() => {\n      this.performHealthCheck();\n    }, this.config.healthCheckInterval);\n  }\n  \n  /**\n   * Perform health check on all connections\n   */\n  private performHealthCheck(): void {\n    const now = Date.now();\n    \n    for (const [id, connection] of this.connections.entries()) {\n      // Update uptime\n      if (connection.state === 'connected') {\n        connection.metrics.uptime = now - connection.metrics.uptime;\n      }\n      \n      // Reset messages per second counter\n      connection.metrics.messagesPerSecond = 0;\n      \n      // Check if connection is stale\n      const timeSinceLastActivity = now - connection.lastActivity;\n      if (timeSinceLastActivity > this.config.healthCheckInterval * 2) {\n        console.warn(`Connection ${id} appears stale, sending ping`);\n        this.sendPing(connection);\n      }\n      \n      // Check connection state\n      if (connection.ws.readyState === WebSocket.CLOSED) {\n        console.warn(`Connection ${id} is closed, scheduling reconnection`);\n        this.scheduleReconnection(connection);\n      }\n    }\n    \n    this.emit('health_check_completed', {\n      totalConnections: this.connections.size,\n      activeConnections: this.getActiveConnectionCount(),\n      queuedMessages: this.messageQueue.length\n    });\n  }\n  \n  /**\n   * Send ping to connection\n   */\n  private sendPing(connection: WebSocketConnection): void {\n    if (connection.state === 'connected') {\n      try {\n        connection.ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));\n      } catch (error) {\n        console.error(`Failed to send ping to ${connection.id}:`, error);\n      }\n    }\n  }\n  \n  /**\n   * Get number of active connections\n   */\n  getActiveConnectionCount(): number {\n    return Array.from(this.connections.values())\n      .filter(conn => conn.state === 'connected').length;\n  }\n  \n  /**\n   * Get connection by ID\n   */\n  getConnection(id: string): WebSocketConnection | undefined {\n    return this.connections.get(id);\n  }\n  \n  /**\n   * Get all connections\n   */\n  getAllConnections(): WebSocketConnection[] {\n    return Array.from(this.connections.values());\n  }\n  \n  /**\n   * Get connection metrics\n   */\n  getConnectionMetrics(): Map<string, WebSocketConnection['metrics']> {\n    const metrics = new Map<string, WebSocketConnection['metrics']>();\n    \n    for (const [id, connection] of this.connections.entries()) {\n      metrics.set(id, { ...connection.metrics });\n    }\n    \n    return metrics;\n  }\n  \n  /**\n   * Get overall statistics\n   */\n  getStatistics(): {\n    totalConnections: number;\n    activeConnections: number;\n    averageLatency: number;\n    totalBytesTransferred: number;\n    queuedMessages: number;\n    networkAvailable: boolean;\n  } {\n    const connections = Array.from(this.connections.values());\n    const activeConnections = connections.filter(conn => conn.state === 'connected');\n    \n    const averageLatency = activeConnections.length > 0\n      ? activeConnections.reduce((sum, conn) => sum + conn.metrics.latency, 0) / activeConnections.length\n      : 0;\n    \n    const totalBytesTransferred = connections\n      .reduce((sum, conn) => sum + conn.metrics.bytesTransferred, 0);\n    \n    return {\n      totalConnections: connections.length,\n      activeConnections: activeConnections.length,\n      averageLatency,\n      totalBytesTransferred,\n      queuedMessages: this.messageQueue.length,\n      networkAvailable: this.isNetworkAvailable\n    };\n  }\n  \n  /**\n   * Update configuration\n   */\n  updateConfig(config: Partial<ConnectionManagerConfig>): void {\n    this.config = { ...this.config, ...config };\n    \n    // Update load balancer if strategy changed\n    if (config.loadBalancingStrategy) {\n      this.loadBalancer = this.createLoadBalancer(config.loadBalancingStrategy);\n    }\n    \n    // Restart health check if interval changed\n    if (config.healthCheckInterval && this.healthCheckTimer) {\n      clearInterval(this.healthCheckTimer);\n      this.startHealthCheck();\n    }\n  }\n  \n  /**\n   * Disconnect all connections and cleanup\n   */\n  disconnect(): void {\n    // Clear health check timer\n    if (this.healthCheckTimer) {\n      clearInterval(this.healthCheckTimer);\n      this.healthCheckTimer = null;\n    }\n    \n    // Clear all reconnect timers\n    for (const timer of this.reconnectTimers.values()) {\n      clearTimeout(timer);\n    }\n    this.reconnectTimers.clear();\n    \n    // Close all connections\n    for (const connection of this.connections.values()) {\n      if (connection.ws.readyState === WebSocket.OPEN) {\n        connection.ws.close(1000, 'Manager shutdown');\n      }\n    }\n    \n    this.connections.clear();\n    this.messageQueue = [];\n    \n    // Remove all listeners\n    this.removeAllListeners();\n    \n    console.log('WebSocket Connection Manager disconnected');\n  }\n}"
+import { EventEmitter } from "events";
+import NetInfo from "@react-native-community/netinfo";
+
+export interface WebSocketConnection {
+  id: string;
+  url: string;
+  ws: WebSocket;
+  state: "connecting" | "connected" | "disconnected" | "error";
+  lastActivity: number;
+  reconnectAttempts: number;
+  metrics: {
+    latency: number;
+    messagesPerSecond: number;
+    errorRate: number;
+    uptime: number;
+    bytesTransferred: number;
+  };
+}
+
+export interface ConnectionManagerConfig {
+  maxConnections: number;
+  connectionTimeout: number;
+  maxReconnectAttempts: number;
+  reconnectDelay: number;
+  healthCheckInterval: number;
+  loadBalancingStrategy: "round-robin" | "least-latency" | "least-load";
+  enableFailover: boolean;
+  compressionEnabled: boolean;
+}
+
+export interface LoadBalancingStrategy {
+  selectConnection(
+    connections: WebSocketConnection[]
+  ): WebSocketConnection | null;
+}
+
+/**
+ * Round-robin load balancing strategy
+ */
+class RoundRobinStrategy implements LoadBalancingStrategy {
+  private currentIndex = 0;
+
+  selectConnection(
+    connections: WebSocketConnection[]
+  ): WebSocketConnection | null {
+    const activeConnections = connections.filter(
+      (conn) => conn.state === "connected"
+    );
+    if (activeConnections.length === 0) return null;
+
+    const connection =
+      activeConnections[this.currentIndex % activeConnections.length];
+    this.currentIndex = (this.currentIndex + 1) % activeConnections.length;
+
+    return connection;
+  }
+}
+
+/**
+ * Least latency load balancing strategy
+ */
+class LeastLatencyStrategy implements LoadBalancingStrategy {
+  selectConnection(
+    connections: WebSocketConnection[]
+  ): WebSocketConnection | null {
+    const activeConnections = connections.filter(
+      (conn) => conn.state === "connected"
+    );
+    if (activeConnections.length === 0) return null;
+
+    return activeConnections.reduce((best, current) =>
+      current.metrics.latency < best.metrics.latency ? current : best
+    );
+  }
+}
+
+/**
+ * Least load balancing strategy
+ */
+class LeastLoadStrategy implements LoadBalancingStrategy {
+  selectConnection(
+    connections: WebSocketConnection[]
+  ): WebSocketConnection | null {
+    const activeConnections = connections.filter(
+      (conn) => conn.state === "connected"
+    );
+    if (activeConnections.length === 0) return null;
+
+    return activeConnections.reduce((best, current) =>
+      current.metrics.messagesPerSecond < best.metrics.messagesPerSecond
+        ? current
+        : best
+    );
+  }
+}
+
+/**
+ * WebSocket Connection Manager with pooling and load balancing
+ */
+export class WebSocketConnectionManager extends EventEmitter {
+  private connections = new Map<string, WebSocketConnection>();
+  private config: ConnectionManagerConfig;
+  private loadBalancer: LoadBalancingStrategy;
+  private healthCheckTimer: NodeJS.Timeout | null = null;
+  private reconnectTimers = new Map<string, NodeJS.Timeout>();
+  private isNetworkAvailable = true;
+  private messageQueue: Array<{ message: any; priority: number }> = [];
+
+  constructor(config: Partial<ConnectionManagerConfig> = {}) {
+    super();
+
+    this.config = {
+      maxConnections: 3,
+      connectionTimeout: 10000,
+      maxReconnectAttempts: 5,
+      reconnectDelay: 1000,
+      healthCheckInterval: 30000,
+      loadBalancingStrategy: "least-latency",
+      enableFailover: true,
+      compressionEnabled: true,
+      ...config,
+    };
+
+    this.loadBalancer = this.createLoadBalancer(
+      this.config.loadBalancingStrategy
+    );
+    this.setupNetworkMonitoring();
+    this.startHealthCheck();
+  }
+
+  /**
+   * Create load balancer based on strategy
+   */
+  private createLoadBalancer(strategy: string): LoadBalancingStrategy {
+    switch (strategy) {
+      case "round-robin":
+        return new RoundRobinStrategy();
+      case "least-latency":
+        return new LeastLatencyStrategy();
+      case "least-load":
+        return new LeastLoadStrategy();
+      default:
+        return new LeastLatencyStrategy();
+    }
+  }
+
+  /**
+   * Add a WebSocket connection to the pool
+   */
+  async addConnection(id: string, url: string): Promise<boolean> {
+    if (this.connections.size >= this.config.maxConnections) {
+      console.warn("Maximum connections reached");
+      return false;
+    }
+
+    if (this.connections.has(id)) {
+      console.warn(`Connection ${id} already exists`);
+      return false;
+    }
+
+    try {
+      const connection = await this.createConnection(id, url);
+      this.connections.set(id, connection);
+
+      console.log(`Connection ${id} added successfully`);
+      this.emit("connection_added", connection);
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to add connection ${id}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Create a WebSocket connection
+   */
+  private async createConnection(
+    id: string,
+    url: string
+  ): Promise<WebSocketConnection> {
+    return new Promise((resolve, reject) => {
+      const wsUrl = this.config.compressionEnabled
+        ? `${url}?compression=true`
+        : url;
+
+      const ws = new WebSocket(wsUrl);
+      const startTime = Date.now();
+
+      const connection: WebSocketConnection = {
+        id,
+        url,
+        ws,
+        state: "connecting",
+        lastActivity: Date.now(),
+        reconnectAttempts: 0,
+        metrics: {
+          latency: 0,
+          messagesPerSecond: 0,
+          errorRate: 0,
+          uptime: 0,
+          bytesTransferred: 0,
+        },
+      };
+
+      // Connection timeout
+      const timeout = setTimeout(() => {
+        ws.close();
+        reject(new Error(`Connection timeout for ${id}`));
+      }, this.config.connectionTimeout);
+
+      ws.onopen = () => {
+        clearTimeout(timeout);
+        connection.state = "connected";
+        connection.metrics.uptime = Date.now();
+
+        console.log(`WebSocket ${id} connected`);
+        this.emit("connection_opened", connection);
+
+        resolve(connection);
+      };
+
+      ws.onmessage = (event) => {
+        connection.lastActivity = Date.now();
+        connection.metrics.bytesTransferred += event.data.length;
+
+        // Calculate latency if message has timestamp
+        try {
+          const data = JSON.parse(event.data);
+          if (data.timestamp) {
+            const latency = Date.now() - data.timestamp;
+            connection.metrics.latency =
+              connection.metrics.latency * 0.8 + latency * 0.2;
+          }
+        } catch (e) {
+          // Ignore parsing errors for latency calculation
+        }
+
+        this.emit("message", { connectionId: id, data: event.data });
+      };
+
+      ws.onclose = (event) => {
+        clearTimeout(timeout);
+        connection.state = "disconnected";
+
+        console.log(`WebSocket ${id} disconnected:`, event.code, event.reason);
+        this.emit("connection_closed", { connection, event });
+
+        // Schedule reconnection if not intentional
+        if (event.code !== 1000 && this.config.enableFailover) {
+          this.scheduleReconnection(connection);
+        }
+      };
+
+      ws.onerror = (error) => {
+        clearTimeout(timeout);
+        connection.state = "error";
+        connection.metrics.errorRate += 1;
+
+        console.error(`WebSocket ${id} error:`, error);
+        this.emit("connection_error", { connection, error });
+
+        reject(error);
+      };
+    });
+  }
+
+  /**
+   * Remove a connection from the pool
+   */
+  removeConnection(id: string): boolean {
+    const connection = this.connections.get(id);
+    if (!connection) {
+      return false;
+    }
+
+    // Clear reconnect timer if exists
+    const timer = this.reconnectTimers.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      this.reconnectTimers.delete(id);
+    }
+
+    // Close WebSocket
+    if (connection.ws.readyState === WebSocket.OPEN) {
+      connection.ws.close(1000, "Connection removed");
+    }
+
+    this.connections.delete(id);
+    this.emit("connection_removed", connection);
+
+    console.log(`Connection ${id} removed`);
+    return true;
+  }
+
+  /**
+   * Send message using load balancing
+   */
+  sendMessage(message: any, priority: number = 1): boolean {
+    if (!this.isNetworkAvailable) {
+      this.queueMessage(message, priority);
+      return false;
+    }
+
+    const connection = this.loadBalancer.selectConnection(
+      Array.from(this.connections.values())
+    );
+    if (!connection) {
+      this.queueMessage(message, priority);
+      return false;
+    }
+
+    try {
+      const messageStr = JSON.stringify({
+        ...message,
+        timestamp: Date.now(),
+      });
+
+      connection.ws.send(messageStr);
+      connection.lastActivity = Date.now();
+      connection.metrics.bytesTransferred += messageStr.length;
+      connection.metrics.messagesPerSecond += 1;
+
+      return true;
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      this.queueMessage(message, priority);
+      return false;
+    }
+  }
+
+  /**
+   * Send message to specific connection
+   */
+  sendMessageToConnection(connectionId: string, message: any): boolean {
+    const connection = this.connections.get(connectionId);
+    if (!connection || connection.state !== "connected") {
+      return false;
+    }
+
+    try {
+      const messageStr = JSON.stringify({
+        ...message,
+        timestamp: Date.now(),
+      });
+
+      connection.ws.send(messageStr);
+      connection.lastActivity = Date.now();
+      connection.metrics.bytesTransferred += messageStr.length;
+      connection.metrics.messagesPerSecond += 1;
+
+      return true;
+    } catch (error) {
+      console.error(`Failed to send message to ${connectionId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Queue message for later sending
+   */
+  private queueMessage(message: any, priority: number): void {
+    this.messageQueue.push({ message, priority });
+
+    // Sort by priority (higher priority first)
+    this.messageQueue.sort((a, b) => b.priority - a.priority);
+
+    // Limit queue size
+    if (this.messageQueue.length > 1000) {
+      this.messageQueue = this.messageQueue.slice(0, 1000);
+    }
+  }
+
+  /**
+   * Process queued messages
+   */
+  private processMessageQueue(): void {
+    while (this.messageQueue.length > 0) {
+      const { message, priority } = this.messageQueue.shift()!;
+      if (!this.sendMessage(message, priority)) {
+        // If sending fails, put it back at the front
+        this.messageQueue.unshift({ message, priority });
+        break;
+      }
+    }
+  }
+
+  /**
+   * Schedule reconnection for a connection
+   */
+  private scheduleReconnection(connection: WebSocketConnection): void {
+    if (connection.reconnectAttempts >= this.config.maxReconnectAttempts) {
+      console.error(`Max reconnection attempts reached for ${connection.id}`);
+      this.emit("connection_failed", connection);
+      return;
+    }
+
+    connection.reconnectAttempts++;
+    const delay =
+      this.config.reconnectDelay *
+      Math.pow(2, connection.reconnectAttempts - 1);
+
+    console.log(`Scheduling reconnection for ${connection.id} in ${delay}ms`);
+
+    const timer = setTimeout(async () => {
+      try {
+        const newConnection = await this.createConnection(
+          connection.id,
+          connection.url
+        );
+        this.connections.set(connection.id, newConnection);
+
+        console.log(`Connection ${connection.id} reconnected successfully`);
+        this.emit("connection_reconnected", newConnection);
+
+        // Process queued messages
+        this.processMessageQueue();
+      } catch (error) {
+        console.error(`Reconnection failed for ${connection.id}:`, error);
+        this.scheduleReconnection(connection);
+      }
+    }, delay);
+
+    this.reconnectTimers.set(connection.id, timer);
+  }
+
+  /**
+   * Setup network monitoring
+   */
+  private setupNetworkMonitoring(): void {
+    NetInfo.addEventListener((state) => {
+      const wasAvailable = this.isNetworkAvailable;
+      this.isNetworkAvailable = !!state.isConnected;
+
+      if (!wasAvailable && this.isNetworkAvailable) {
+        console.log("Network restored - processing queued messages");
+        this.processMessageQueue();
+        this.emit("network_restored");
+      } else if (wasAvailable && !this.isNetworkAvailable) {
+        console.log("Network lost - queuing messages");
+        this.emit("network_lost");
+      }
+    });
+  }
+
+  /**
+   * Start health check for all connections
+   */
+  private startHealthCheck(): void {
+    this.healthCheckTimer = setInterval(() => {
+      this.performHealthCheck();
+    }, this.config.healthCheckInterval);
+  }
+
+  /**
+   * Perform health check on all connections
+   */
+  private performHealthCheck(): void {
+    const now = Date.now();
+
+    for (const [id, connection] of this.connections.entries()) {
+      // Update uptime
+      if (connection.state === "connected") {
+        connection.metrics.uptime = now - connection.metrics.uptime;
+      }
+
+      // Reset messages per second counter
+      connection.metrics.messagesPerSecond = 0;
+
+      // Check if connection is stale
+      const timeSinceLastActivity = now - connection.lastActivity;
+      if (timeSinceLastActivity > this.config.healthCheckInterval * 2) {
+        console.warn(`Connection ${id} appears stale, sending ping`);
+        this.sendPing(connection);
+      }
+
+      // Check connection state
+      if (connection.ws.readyState === WebSocket.CLOSED) {
+        console.warn(`Connection ${id} is closed, scheduling reconnection`);
+        this.scheduleReconnection(connection);
+      }
+    }
+
+    this.emit("health_check_completed", {
+      totalConnections: this.connections.size,
+      activeConnections: this.getActiveConnectionCount(),
+      queuedMessages: this.messageQueue.length,
+    });
+  }
+
+  /**
+   * Send ping to connection
+   */
+  private sendPing(connection: WebSocketConnection): void {
+    if (connection.state === "connected") {
+      try {
+        connection.ws.send(
+          JSON.stringify({ type: "ping", timestamp: Date.now() })
+        );
+      } catch (error) {
+        console.error(`Failed to send ping to ${connection.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Get number of active connections
+   */
+  getActiveConnectionCount(): number {
+    return Array.from(this.connections.values()).filter(
+      (conn) => conn.state === "connected"
+    ).length;
+  }
+
+  /**
+   * Get connection by ID
+   */
+  getConnection(id: string): WebSocketConnection | undefined {
+    return this.connections.get(id);
+  }
+
+  /**
+   * Get all connections
+   */
+  getAllConnections(): WebSocketConnection[] {
+    return Array.from(this.connections.values());
+  }
+
+  /**
+   * Get connection metrics
+   */
+  getConnectionMetrics(): Map<string, WebSocketConnection["metrics"]> {
+    const metrics = new Map<string, WebSocketConnection["metrics"]>();
+
+    for (const [id, connection] of this.connections.entries()) {
+      metrics.set(id, { ...connection.metrics });
+    }
+
+    return metrics;
+  }
+
+  /**
+   * Get overall statistics
+   */
+  getStatistics(): {
+    totalConnections: number;
+    activeConnections: number;
+    averageLatency: number;
+    totalBytesTransferred: number;
+    queuedMessages: number;
+    networkAvailable: boolean;
+  } {
+    const connections = Array.from(this.connections.values());
+    const activeConnections = connections.filter(
+      (conn) => conn.state === "connected"
+    );
+
+    const averageLatency =
+      activeConnections.length > 0
+        ? activeConnections.reduce(
+            (sum, conn) => sum + conn.metrics.latency,
+            0
+          ) / activeConnections.length
+        : 0;
+
+    const totalBytesTransferred = connections.reduce(
+      (sum, conn) => sum + conn.metrics.bytesTransferred,
+      0
+    );
+
+    return {
+      totalConnections: connections.length,
+      activeConnections: activeConnections.length,
+      averageLatency,
+      totalBytesTransferred,
+      queuedMessages: this.messageQueue.length,
+      networkAvailable: this.isNetworkAvailable,
+    };
+  }
+
+  /**
+   * Update configuration
+   */
+  updateConfig(config: Partial<ConnectionManagerConfig>): void {
+    this.config = { ...this.config, ...config };
+
+    // Update load balancer if strategy changed
+    if (config.loadBalancingStrategy) {
+      this.loadBalancer = this.createLoadBalancer(config.loadBalancingStrategy);
+    }
+
+    // Restart health check if interval changed
+    if (config.healthCheckInterval && this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.startHealthCheck();
+    }
+  }
+
+  /**
+   * Disconnect all connections and cleanup
+   */
+  disconnect(): void {
+    // Clear health check timer
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+      this.healthCheckTimer = null;
+    }
+
+    // Clear all reconnect timers
+    for (const timer of this.reconnectTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.reconnectTimers.clear();
+
+    // Close all connections
+    for (const connection of this.connections.values()) {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        connection.ws.close(1000, "Manager shutdown");
+      }
+    }
+
+    this.connections.clear();
+    this.messageQueue = [];
+
+    // Remove all listeners
+    this.removeAllListeners();
+
+    console.log("WebSocket Connection Manager disconnected");
+  }
+}

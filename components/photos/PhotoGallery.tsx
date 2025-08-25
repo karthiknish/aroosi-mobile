@@ -272,7 +272,8 @@ export default function PhotoGallery({
 
   const renderPhotoGrid = () => {
     const slots = [];
-    const mainImage = images.find((img) => img[0]) || images[0];
+    // Determine main image: prefer explicit isMain flag, else first image
+    const mainImage = images.find((img) => (img as any).isMain) || images[0];
 
     // Add existing photos
     images.forEach((image, index) => {

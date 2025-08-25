@@ -26,6 +26,8 @@ export type ProfileStackParamList = {
   Settings: undefined;
   Subscription: undefined;
   Contact: undefined;
+  Icebreakers: undefined;
+  Shortlists: undefined;
 };
 
 export type ChatStackParamList = {

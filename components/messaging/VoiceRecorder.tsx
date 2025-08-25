@@ -7,9 +7,10 @@ import {
   Animated,
   Easing,
   ActivityIndicator,
+  Platform,
 } from "react-native";
-import { useVoiceRecording } from "../../hooks/useVoiceRecording";
-import { useVoiceMessageLimits } from "../../hooks/useMessagingFeatures";
+import { useVoiceRecording } from "@/hooks/useVoiceRecording";
+import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 import { VoiceDurationIndicator } from "./VoiceDurationIndicator";
 
 interface VoiceRecorderProps {
@@ -51,6 +52,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     cancelRecording,
     isRecording,
     duration,
+    audioUri,
     error,
     hasPermission,
   } = useVoiceRecording();
@@ -109,10 +111,16 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (isRecording) {
       setRecordingState("processing");
       const audioBlob = await stopRecording();
-      if (audioBlob) {
-        // Convert blob to URI for React Native (this is a placeholder)
-        const uri = URL.createObjectURL(audioBlob);
-        onRecordingComplete(uri, duration);
+      if (Platform.OS === "web") {
+        if (audioBlob) {
+          const uri = URL.createObjectURL(audioBlob);
+          onRecordingComplete(uri, duration);
+        }
+      } else {
+        // On native, use the file URI from the hook
+        if (audioUri) {
+          onRecordingComplete(audioUri, duration);
+        }
       }
       setRecordingState("idle");
     } else {
@@ -134,8 +142,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   };
 
   // Handle cancel button press
-  const handleCancelPress = () => {
-    cancelRecording();
+  const handleCancelPress = async () => {
+    await cancelRecording();
     setRecordingState("idle");
     onRecordingCancel?.();
     onCancel?.();

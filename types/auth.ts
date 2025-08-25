@@ -62,8 +62,6 @@ export interface LoginResponse {
   tokens: AuthTokens;
   profile?: {
     id: string;
-    isComplete: boolean;
-    isOnboardingComplete: boolean;
   };
 }
 

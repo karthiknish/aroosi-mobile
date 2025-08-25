@@ -5,8 +5,6 @@
 -keep class com.facebook.react.** { *; }
 -keep class com.facebook.hermes.** { *; }
 
-# Keep Clerk classes
--keep class com.clerk.** { *; }
 
 # Keep image picker classes
 -keep class com.imagepicker.** { *; }

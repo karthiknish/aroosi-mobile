@@ -1,1 +1,666 @@
-import { Message } from '../types/message';\nimport { MessageCache } from './MessageCache';\nimport { ApiResponse } from '../types/messaging';\n\nexport interface PerformanceMetrics {\n  /**\n   * Cache hit rate (0-1)\n   */\n  cacheHitRate: number;\n  \n  /**\n   * Average message load time in milliseconds\n   */\n  averageLoadTime: number;\n  \n  /**\n   * Number of API calls made\n   */\n  apiCallCount: number;\n  \n  /**\n   * Number of cache hits\n   */\n  cacheHits: number;\n  \n  /**\n   * Number of cache misses\n   */\n  cacheMisses: number;\n  \n  /**\n   * Memory usage estimate in bytes\n   */\n  memoryUsage: number;\n  \n  /**\n   * Number of optimistic updates\n   */\n  optimisticUpdates: number;\n  \n  /**\n   * Number of failed optimistic updates\n   */\n  failedOptimisticUpdates: number;\n  \n  /**\n   * Average time for optimistic update confirmation\n   */\n  averageOptimisticConfirmTime: number;\n}\n\nexport interface OptimisticMessage extends Message {\n  /**\n   * Temporary ID for optimistic updates\n   */\n  tempId?: string;\n  \n  /**\n   * Whether this is an optimistic update\n   */\n  isOptimistic: boolean;\n  \n  /**\n   * Timestamp when optimistic update was created\n   */\n  optimisticTimestamp?: number;\n  \n  /**\n   * Retry count for failed messages\n   */\n  retryCount?: number;\n}\n\nexport interface CacheStrategy {\n  /**\n   * Maximum number of messages per conversation to cache\n   */\n  maxMessagesPerConversation: number;\n  \n  /**\n   * Maximum number of conversations to cache\n   */\n  maxConversations: number;\n  \n  /**\n   * Cache TTL in milliseconds\n   */\n  cacheTTL: number;\n  \n  /**\n   * Whether to preload recent conversations\n   */\n  preloadRecentConversations: boolean;\n  \n  /**\n   * Number of recent conversations to preload\n   */\n  preloadCount: number;\n  \n  /**\n   * Whether to use compression for cached data\n   */\n  useCompression: boolean;\n}\n\nexport interface OptimizationConfig {\n  /**\n   * Cache strategy configuration\n   */\n  cacheStrategy: CacheStrategy;\n  \n  /**\n   * Whether to enable optimistic updates\n   */\n  enableOptimisticUpdates: boolean;\n  \n  /**\n   * Timeout for optimistic updates in milliseconds\n   */\n  optimisticTimeout: number;\n  \n  /**\n   * Whether to batch API requests\n   */\n  enableRequestBatching: boolean;\n  \n  /**\n   * Batch size for API requests\n   */\n  batchSize: number;\n  \n  /**\n   * Batch timeout in milliseconds\n   */\n  batchTimeout: number;\n  \n  /**\n   * Whether to enable performance monitoring\n   */\n  enablePerformanceMonitoring: boolean;\n  \n  /**\n   * Performance metrics collection interval\n   */\n  metricsInterval: number;\n}\n\nexport class MessagingPerformanceOptimizer {\n  private messageCache: MessageCache;\n  private config: OptimizationConfig;\n  private metrics: PerformanceMetrics;\n  private optimisticMessages = new Map<string, OptimisticMessage>();\n  private pendingBatches = new Map<string, {\n    requests: Array<() => Promise<any>>;\n    timeout: NodeJS.Timeout;\n  }>();\n  private performanceTimer: NodeJS.Timeout | null = null;\n  private loadTimes: number[] = [];\n  private optimisticTimes: number[] = [];\n  \n  constructor(\n    messageCache: MessageCache,\n    config: Partial<OptimizationConfig> = {}\n  ) {\n    this.messageCache = messageCache;\n    this.config = {\n      cacheStrategy: {\n        maxMessagesPerConversation: 500,\n        maxConversations: 50,\n        cacheTTL: 30 * 60 * 1000, // 30 minutes\n        preloadRecentConversations: true,\n        preloadCount: 5,\n        useCompression: false\n      },\n      enableOptimisticUpdates: true,\n      optimisticTimeout: 10000, // 10 seconds\n      enableRequestBatching: true,\n      batchSize: 5,\n      batchTimeout: 100, // 100ms\n      enablePerformanceMonitoring: true,\n      metricsInterval: 60000, // 1 minute\n      ...config\n    };\n    \n    this.metrics = {\n      cacheHitRate: 0,\n      averageLoadTime: 0,\n      apiCallCount: 0,\n      cacheHits: 0,\n      cacheMisses: 0,\n      memoryUsage: 0,\n      optimisticUpdates: 0,\n      failedOptimisticUpdates: 0,\n      averageOptimisticConfirmTime: 0\n    };\n    \n    if (this.config.enablePerformanceMonitoring) {\n      this.startPerformanceMonitoring();\n    }\n  }\n  \n  /**\n   * Optimized message loading with caching and batching\n   */\n  async loadMessages(\n    conversationId: string,\n    apiCall: () => Promise<ApiResponse<Message[]>>,\n    options: {\n      useCache?: boolean;\n      enableOptimistic?: boolean;\n      batchKey?: string;\n    } = {}\n  ): Promise<Message[]> {\n    const startTime = Date.now();\n    const { useCache = true, enableOptimistic = this.config.enableOptimisticUpdates, batchKey } = options;\n    \n    try {\n      // Try cache first\n      if (useCache) {\n        const cachedMessages = this.messageCache.get(conversationId);\n        if (cachedMessages) {\n          this.metrics.cacheHits++;\n          this.recordLoadTime(Date.now() - startTime);\n          return cachedMessages;\n        }\n        this.metrics.cacheMisses++;\n      }\n      \n      // Use batching if enabled and batch key provided\n      if (this.config.enableRequestBatching && batchKey) {\n        return await this.batchRequest(batchKey, apiCall);\n      }\n      \n      // Make API call\n      const response = await apiCall();\n      this.metrics.apiCallCount++;\n      \n      if (response.success && response.data) {\n        // Cache the results\n        if (useCache) {\n          this.messageCache.set(conversationId, response.data);\n        }\n        \n        this.recordLoadTime(Date.now() - startTime);\n        return response.data;\n      }\n      \n      throw new Error(response.error?.message || 'Failed to load messages');\n    } catch (error) {\n      this.recordLoadTime(Date.now() - startTime);\n      throw error;\n    }\n  }\n  \n  /**\n   * Send message with optimistic updates\n   */\n  async sendMessageOptimistic(\n    message: Omit<Message, '_id' | 'createdAt'>,\n    apiCall: (message: any) => Promise<ApiResponse<Message>>\n  ): Promise<Message> {\n    const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;\n    const optimisticTimestamp = Date.now();\n    \n    // Create optimistic message\n    const optimisticMessage: OptimisticMessage = {\n      ...message,\n      _id: tempId,\n      tempId,\n      createdAt: optimisticTimestamp,\n      isOptimistic: true,\n      optimisticTimestamp,\n      status: 'pending',\n      retryCount: 0\n    };\n    \n    // Add to cache immediately for optimistic UI\n    this.optimisticMessages.set(tempId, optimisticMessage);\n    this.messageCache.addMessages(message.conversationId, [optimisticMessage]);\n    this.metrics.optimisticUpdates++;\n    \n    try {\n      // Send actual message\n      const response = await apiCall(message);\n      \n      if (response.success && response.data) {\n        // Replace optimistic message with real one\n        const realMessage = response.data;\n        this.confirmOptimisticMessage(tempId, realMessage);\n        \n        // Record confirmation time\n        const confirmTime = Date.now() - optimisticTimestamp;\n        this.optimisticTimes.push(confirmTime);\n        \n        return realMessage;\n      } else {\n        // Mark as failed\n        this.failOptimisticMessage(tempId, response.error?.message || 'Send failed');\n        throw new Error(response.error?.message || 'Failed to send message');\n      }\n    } catch (error) {\n      this.failOptimisticMessage(tempId, error.message);\n      throw error;\n    }\n  }\n  \n  /**\n   * Retry failed optimistic message\n   */\n  async retryOptimisticMessage(\n    tempId: string,\n    apiCall: (message: any) => Promise<ApiResponse<Message>>\n  ): Promise<Message> {\n    const optimisticMessage = this.optimisticMessages.get(tempId);\n    if (!optimisticMessage) {\n      throw new Error('Optimistic message not found');\n    }\n    \n    // Increment retry count\n    optimisticMessage.retryCount = (optimisticMessage.retryCount || 0) + 1;\n    optimisticMessage.status = 'pending';\n    \n    // Update in cache\n    this.messageCache.updateMessage(\n      optimisticMessage.conversationId,\n      tempId,\n      { status: 'pending' }\n    );\n    \n    try {\n      const response = await apiCall(optimisticMessage);\n      \n      if (response.success && response.data) {\n        this.confirmOptimisticMessage(tempId, response.data);\n        return response.data;\n      } else {\n        this.failOptimisticMessage(tempId, response.error?.message || 'Retry failed');\n        throw new Error(response.error?.message || 'Failed to retry message');\n      }\n    } catch (error) {\n      this.failOptimisticMessage(tempId, error.message);\n      throw error;\n    }\n  }\n  \n  /**\n   * Preload recent conversations for better performance\n   */\n  async preloadRecentConversations(\n    getRecentConversations: () => Promise<string[]>,\n    loadMessages: (conversationId: string) => Promise<Message[]>\n  ): Promise<void> {\n    if (!this.config.cacheStrategy.preloadRecentConversations) {\n      return;\n    }\n    \n    try {\n      const recentConversationIds = await getRecentConversations();\n      const conversationsToPreload = recentConversationIds\n        .slice(0, this.config.cacheStrategy.preloadCount)\n        .filter(id => !this.messageCache.has(id));\n      \n      // Preload in parallel but limit concurrency\n      const batchSize = 3;\n      for (let i = 0; i < conversationsToPreload.length; i += batchSize) {\n        const batch = conversationsToPreload.slice(i, i + batchSize);\n        await Promise.all(\n          batch.map(async (conversationId) => {\n            try {\n              const messages = await loadMessages(conversationId);\n              this.messageCache.set(conversationId, messages);\n            } catch (error) {\n              console.warn(`Failed to preload conversation ${conversationId}:`, error);\n            }\n          })\n        );\n      }\n    } catch (error) {\n      console.warn('Failed to preload recent conversations:', error);\n    }\n  }\n  \n  /**\n   * Get current performance metrics\n   */\n  getMetrics(): PerformanceMetrics {\n    return { ...this.metrics };\n  }\n  \n  /**\n   * Get optimistic messages for a conversation\n   */\n  getOptimisticMessages(conversationId: string): OptimisticMessage[] {\n    return Array.from(this.optimisticMessages.values())\n      .filter(msg => msg.conversationId === conversationId);\n  }\n  \n  /**\n   * Clear optimistic messages for a conversation\n   */\n  clearOptimisticMessages(conversationId: string): void {\n    const toDelete: string[] = [];\n    \n    for (const [tempId, message] of this.optimisticMessages.entries()) {\n      if (message.conversationId === conversationId) {\n        toDelete.push(tempId);\n      }\n    }\n    \n    toDelete.forEach(tempId => {\n      this.optimisticMessages.delete(tempId);\n    });\n  }\n  \n  /**\n   * Optimize cache based on usage patterns\n   */\n  optimizeCache(): void {\n    const stats = this.messageCache.getStats();\n    \n    // If cache hit rate is low, increase cache size\n    if (this.metrics.cacheHitRate < 0.7 && stats.size < this.config.cacheStrategy.maxConversations) {\n      console.log('Low cache hit rate, consider increasing cache size');\n    }\n    \n    // If memory usage is high, reduce cache size\n    if (this.metrics.memoryUsage > 50 * 1024 * 1024) { // 50MB\n      console.log('High memory usage, consider reducing cache size');\n    }\n    \n    // Clean up old optimistic messages\n    const now = Date.now();\n    const expiredOptimistic: string[] = [];\n    \n    for (const [tempId, message] of this.optimisticMessages.entries()) {\n      if (message.optimisticTimestamp && \n          now - message.optimisticTimestamp > this.config.optimisticTimeout) {\n        expiredOptimistic.push(tempId);\n      }\n    }\n    \n    expiredOptimistic.forEach(tempId => {\n      this.failOptimisticMessage(tempId, 'Timeout');\n    });\n  }\n  \n  /**\n   * Get performance recommendations\n   */\n  getPerformanceRecommendations(): string[] {\n    const recommendations: string[] = [];\n    \n    if (this.metrics.cacheHitRate < 0.6) {\n      recommendations.push('Consider increasing cache size or TTL to improve hit rate');\n    }\n    \n    if (this.metrics.averageLoadTime > 2000) {\n      recommendations.push('Average load time is high, consider optimizing API calls or network');\n    }\n    \n    if (this.metrics.failedOptimisticUpdates / this.metrics.optimisticUpdates > 0.1) {\n      recommendations.push('High optimistic update failure rate, check network stability');\n    }\n    \n    if (this.metrics.averageOptimisticConfirmTime > 5000) {\n      recommendations.push('Optimistic updates taking too long to confirm, check API performance');\n    }\n    \n    return recommendations;\n  }\n  \n  /**\n   * Destroy optimizer and clean up resources\n   */\n  destroy(): void {\n    if (this.performanceTimer) {\n      clearInterval(this.performanceTimer);\n      this.performanceTimer = null;\n    }\n    \n    // Clear all pending batches\n    for (const batch of this.pendingBatches.values()) {\n      clearTimeout(batch.timeout);\n    }\n    this.pendingBatches.clear();\n    \n    this.optimisticMessages.clear();\n  }\n  \n  /**\n   * Confirm optimistic message with real message\n   */\n  private confirmOptimisticMessage(tempId: string, realMessage: Message): void {\n    const optimisticMessage = this.optimisticMessages.get(tempId);\n    if (!optimisticMessage) {\n      return;\n    }\n    \n    // Remove optimistic message from cache and add real message\n    this.messageCache.removeMessage(optimisticMessage.conversationId, tempId);\n    this.messageCache.addMessages(optimisticMessage.conversationId, [realMessage]);\n    \n    // Clean up\n    this.optimisticMessages.delete(tempId);\n  }\n  \n  /**\n   * Mark optimistic message as failed\n   */\n  private failOptimisticMessage(tempId: string, error: string): void {\n    const optimisticMessage = this.optimisticMessages.get(tempId);\n    if (!optimisticMessage) {\n      return;\n    }\n    \n    // Update message status in cache\n    this.messageCache.updateMessage(\n      optimisticMessage.conversationId,\n      tempId,\n      { status: 'failed' }\n    );\n    \n    this.metrics.failedOptimisticUpdates++;\n  }\n  \n  /**\n   * Batch API requests for better performance\n   */\n  private async batchRequest<T>(\n    batchKey: string,\n    request: () => Promise<T>\n  ): Promise<T> {\n    return new Promise((resolve, reject) => {\n      let batch = this.pendingBatches.get(batchKey);\n      \n      if (!batch) {\n        batch = {\n          requests: [],\n          timeout: setTimeout(() => {\n            this.executeBatch(batchKey);\n          }, this.config.batchTimeout)\n        };\n        this.pendingBatches.set(batchKey, batch);\n      }\n      \n      batch.requests.push(async () => {\n        try {\n          const result = await request();\n          resolve(result);\n        } catch (error) {\n          reject(error);\n        }\n      });\n      \n      // Execute immediately if batch is full\n      if (batch.requests.length >= this.config.batchSize) {\n        clearTimeout(batch.timeout);\n        this.executeBatch(batchKey);\n      }\n    });\n  }\n  \n  /**\n   * Execute batched requests\n   */\n  private async executeBatch(batchKey: string): Promise<void> {\n    const batch = this.pendingBatches.get(batchKey);\n    if (!batch) {\n      return;\n    }\n    \n    this.pendingBatches.delete(batchKey);\n    \n    // Execute all requests in parallel\n    await Promise.all(batch.requests.map(request => request()));\n  }\n  \n  /**\n   * Record load time for metrics\n   */\n  private recordLoadTime(time: number): void {\n    this.loadTimes.push(time);\n    \n    // Keep only recent load times (last 100)\n    if (this.loadTimes.length > 100) {\n      this.loadTimes = this.loadTimes.slice(-100);\n    }\n    \n    // Update average\n    this.metrics.averageLoadTime = this.loadTimes.reduce((sum, t) => sum + t, 0) / this.loadTimes.length;\n  }\n  \n  /**\n   * Start performance monitoring\n   */\n  private startPerformanceMonitoring(): void {\n    this.performanceTimer = setInterval(() => {\n      this.updateMetrics();\n      this.optimizeCache();\n    }, this.config.metricsInterval);\n  }\n  \n  /**\n   * Update performance metrics\n   */\n  private updateMetrics(): void {\n    // Update cache hit rate\n    const totalRequests = this.metrics.cacheHits + this.metrics.cacheMisses;\n    this.metrics.cacheHitRate = totalRequests > 0 ? this.metrics.cacheHits / totalRequests : 0;\n    \n    // Update average optimistic confirm time\n    if (this.optimisticTimes.length > 0) {\n      this.metrics.averageOptimisticConfirmTime = \n        this.optimisticTimes.reduce((sum, t) => sum + t, 0) / this.optimisticTimes.length;\n      \n      // Keep only recent times\n      if (this.optimisticTimes.length > 100) {\n        this.optimisticTimes = this.optimisticTimes.slice(-100);\n      }\n    }\n    \n    // Estimate memory usage\n    const stats = this.messageCache.getStats();\n    this.metrics.memoryUsage = this.estimateMemoryUsage(stats.totalMessages);\n  }\n  \n  /**\n   * Estimate memory usage based on message count\n   */\n  private estimateMemoryUsage(messageCount: number): number {\n    // Rough estimate: 1KB per message on average\n    return messageCount * 1024;\n  }\n}\n\n/**\n * Global performance optimizer instance\n */\nexport let messagingPerformanceOptimizer: MessagingPerformanceOptimizer | null = null;\n\n/**\n * Initialize performance optimizer\n */\nexport function initializePerformanceOptimizer(\n  messageCache: MessageCache,\n  config?: Partial<OptimizationConfig>\n): MessagingPerformanceOptimizer {\n  if (messagingPerformanceOptimizer) {\n    messagingPerformanceOptimizer.destroy();\n  }\n  \n  messagingPerformanceOptimizer = new MessagingPerformanceOptimizer(messageCache, config);\n  return messagingPerformanceOptimizer;\n}\n\n/**\n * Get global performance optimizer instance\n */\nexport function getPerformanceOptimizer(): MessagingPerformanceOptimizer | null {\n  return messagingPerformanceOptimizer;\n}"
+import { Message } from "../types/message";
+import { MessageCache } from "./MessageCache";
+import { ApiResponse } from "../types/messaging";
+
+export interface PerformanceMetrics {
+  /**
+   * Cache hit rate (0-1)
+   */
+  cacheHitRate: number;
+
+  /**
+   * Average message load time in milliseconds
+   */
+  averageLoadTime: number;
+
+  /**
+   * Number of API calls made
+   */
+  apiCallCount: number;
+
+  /**
+   * Number of cache hits
+   */
+  cacheHits: number;
+
+  /**
+   * Number of cache misses
+   */
+  cacheMisses: number;
+
+  /**
+   * Memory usage estimate in bytes
+   */
+  memoryUsage: number;
+
+  /**
+   * Number of optimistic updates
+   */
+  optimisticUpdates: number;
+
+  /**
+   * Number of failed optimistic updates
+   */
+  failedOptimisticUpdates: number;
+
+  /**
+   * Average time for optimistic update confirmation
+   */
+  averageOptimisticConfirmTime: number;
+}
+
+export interface OptimisticMessage extends Message {
+  /**
+   * Temporary ID for optimistic updates
+   */
+  tempId?: string;
+
+  /**
+   * Whether this is an optimistic update
+   */
+  isOptimistic: boolean;
+
+  /**
+   * Timestamp when optimistic update was created
+   */
+  optimisticTimestamp?: number;
+
+  /**
+   * Retry count for failed messages
+   */
+  retryCount?: number;
+}
+
+export interface CacheStrategy {
+  /**
+   * Maximum number of messages per conversation to cache
+   */
+  maxMessagesPerConversation: number;
+
+  /**
+   * Maximum number of conversations to cache
+   */
+  maxConversations: number;
+
+  /**
+   * Cache TTL in milliseconds
+   */
+  cacheTTL: number;
+
+  /**
+   * Whether to preload recent conversations
+   */
+  preloadRecentConversations: boolean;
+
+  /**
+   * Number of recent conversations to preload
+   */
+  preloadCount: number;
+
+  /**
+   * Whether to use compression for cached data
+   */
+  useCompression: boolean;
+}
+
+export interface OptimizationConfig {
+  /**
+   * Cache strategy configuration
+   */
+  cacheStrategy: CacheStrategy;
+
+  /**
+   * Whether to enable optimistic updates
+   */
+  enableOptimisticUpdates: boolean;
+
+  /**
+   * Timeout for optimistic updates in milliseconds
+   */
+  optimisticTimeout: number;
+
+  /**
+   * Whether to batch API requests
+   */
+  enableRequestBatching: boolean;
+
+  /**
+   * Batch size for API requests
+   */
+  batchSize: number;
+
+  /**
+   * Batch timeout in milliseconds
+   */
+  batchTimeout: number;
+
+  /**
+   * Whether to enable performance monitoring
+   */
+  enablePerformanceMonitoring: boolean;
+
+  /**
+   * Performance metrics collection interval
+   */
+  metricsInterval: number;
+}
+
+export class MessagingPerformanceOptimizer {
+  private messageCache: MessageCache;
+  private config: OptimizationConfig;
+  private metrics: PerformanceMetrics;
+  private optimisticMessages = new Map<string, OptimisticMessage>();
+  private pendingBatches = new Map<
+    string,
+    {
+      requests: Array<() => Promise<any>>;
+      timeout: NodeJS.Timeout;
+    }
+  >();
+  private performanceTimer: NodeJS.Timeout | null = null;
+  private loadTimes: number[] = [];
+  private optimisticTimes: number[] = [];
+
+  constructor(
+    messageCache: MessageCache,
+    config: Partial<OptimizationConfig> = {}
+  ) {
+    this.messageCache = messageCache;
+    this.config = {
+      cacheStrategy: {
+        maxMessagesPerConversation: 500,
+        maxConversations: 50,
+        cacheTTL: 30 * 60 * 1000, // 30 minutes
+        preloadRecentConversations: true,
+        preloadCount: 5,
+        useCompression: false,
+      },
+      enableOptimisticUpdates: true,
+      optimisticTimeout: 10000, // 10 seconds
+      enableRequestBatching: true,
+      batchSize: 5,
+      batchTimeout: 100, // 100ms
+      enablePerformanceMonitoring: true,
+      metricsInterval: 60000, // 1 minute
+      ...config,
+    };
+
+    this.metrics = {
+      cacheHitRate: 0,
+      averageLoadTime: 0,
+      apiCallCount: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      memoryUsage: 0,
+      optimisticUpdates: 0,
+      failedOptimisticUpdates: 0,
+      averageOptimisticConfirmTime: 0,
+    };
+
+    if (this.config.enablePerformanceMonitoring) {
+      this.startPerformanceMonitoring();
+    }
+  }
+
+  /**
+   * Optimized message loading with caching and batching
+   */
+  async loadMessages(
+    conversationId: string,
+    apiCall: () => Promise<ApiResponse<Message[]>>,
+    options: {
+      useCache?: boolean;
+      enableOptimistic?: boolean;
+      batchKey?: string;
+    } = {}
+  ): Promise<Message[]> {
+    const startTime = Date.now();
+    const {
+      useCache = true,
+      enableOptimistic = this.config.enableOptimisticUpdates,
+      batchKey,
+    } = options;
+
+    try {
+      // Try cache first
+      if (useCache) {
+        const cachedMessages = this.messageCache.get(conversationId);
+        if (cachedMessages) {
+          this.metrics.cacheHits++;
+          this.recordLoadTime(Date.now() - startTime);
+          return cachedMessages;
+        }
+        this.metrics.cacheMisses++;
+      }
+
+      // Use batching if enabled and batch key provided
+      if (this.config.enableRequestBatching && batchKey) {
+        const batchResult = await this.batchRequest(batchKey, apiCall);
+        return Array.isArray(batchResult)
+          ? batchResult
+          : batchResult?.data || [];
+      }
+
+      // Make API call
+      const response = await apiCall();
+      this.metrics.apiCallCount++;
+
+      if (response.success && response.data) {
+        // Cache the results
+        if (useCache) {
+          this.messageCache.set(conversationId, response.data);
+        }
+
+        this.recordLoadTime(Date.now() - startTime);
+        return response.data;
+      }
+
+      throw new Error(response.error?.message || "Failed to load messages");
+    } catch (error) {
+      this.recordLoadTime(Date.now() - startTime);
+      throw error;
+    }
+  }
+
+  /**
+   * Send message with optimistic updates
+   */
+  async sendMessageOptimistic(
+    message: Omit<Message, "_id" | "createdAt">,
+    apiCall: (message: any) => Promise<ApiResponse<Message>>
+  ): Promise<Message> {
+    const tempId = `temp-${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    const optimisticTimestamp = Date.now();
+
+    // Create optimistic message
+    const optimisticMessage: OptimisticMessage = {
+      ...message,
+      _id: tempId,
+      tempId,
+      createdAt: optimisticTimestamp,
+      isOptimistic: true,
+      optimisticTimestamp,
+      status: "pending",
+      retryCount: 0,
+    };
+
+    // Add to cache immediately for optimistic UI
+    this.optimisticMessages.set(tempId, optimisticMessage);
+    this.messageCache.addMessages(message.conversationId, [optimisticMessage]);
+    this.metrics.optimisticUpdates++;
+
+    try {
+      // Send actual message
+      const response = await apiCall(message);
+
+      if (response.success && response.data) {
+        // Replace optimistic message with real one
+        const realMessage = response.data;
+        this.confirmOptimisticMessage(tempId, realMessage);
+
+        // Record confirmation time
+        const confirmTime = Date.now() - optimisticTimestamp;
+        this.optimisticTimes.push(confirmTime);
+
+        return realMessage;
+      } else {
+        // Mark as failed
+        this.failOptimisticMessage(
+          tempId,
+          response.error?.message || "Send failed"
+        );
+        throw new Error(response.error?.message || "Failed to send message");
+      }
+    } catch (error: any) {
+      this.failOptimisticMessage(tempId, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Retry failed optimistic message
+   */
+  async retryOptimisticMessage(
+    tempId: string,
+    apiCall: (message: any) => Promise<ApiResponse<Message>>
+  ): Promise<Message> {
+    const optimisticMessage = this.optimisticMessages.get(tempId);
+    if (!optimisticMessage) {
+      throw new Error("Optimistic message not found");
+    }
+
+    // Increment retry count
+    optimisticMessage.retryCount = (optimisticMessage.retryCount || 0) + 1;
+    optimisticMessage.status = "pending";
+
+    // Update in cache
+    this.messageCache.updateMessage(optimisticMessage.conversationId, tempId, {
+      status: "pending",
+    });
+
+    try {
+      const response = await apiCall(optimisticMessage);
+
+      if (response.success && response.data) {
+        this.confirmOptimisticMessage(tempId, response.data);
+        return response.data;
+      } else {
+        this.failOptimisticMessage(
+          tempId,
+          response.error?.message || "Retry failed"
+        );
+        throw new Error(response.error?.message || "Failed to retry message");
+      }
+    } catch (error: any) {
+      this.failOptimisticMessage(tempId, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get current performance metrics
+   */
+  getMetrics(): PerformanceMetrics {
+    return { ...this.metrics };
+  }
+
+  /**
+   * Get optimistic messages for a conversation
+   */
+  getOptimisticMessages(conversationId: string): OptimisticMessage[] {
+    return Array.from(this.optimisticMessages.values()).filter(
+      (msg) => msg.conversationId === conversationId
+    );
+  }
+
+  /**
+   * Clear optimistic messages for a conversation
+   */
+  clearOptimisticMessages(conversationId: string): void {
+    const toDelete: string[] = [];
+
+    for (const [tempId, message] of this.optimisticMessages.entries()) {
+      if (message.conversationId === conversationId) {
+        toDelete.push(tempId);
+      }
+    }
+
+    toDelete.forEach((tempId) => {
+      this.optimisticMessages.delete(tempId);
+    });
+  }
+
+  /**
+   * Destroy optimizer and clean up resources
+   */
+  destroy(): void {
+    if (this.performanceTimer) {
+      clearInterval(this.performanceTimer);
+      this.performanceTimer = null;
+    }
+
+    // Clear all pending batches
+    for (const batch of this.pendingBatches.values()) {
+      clearTimeout(batch.timeout);
+    }
+    this.pendingBatches.clear();
+
+    this.optimisticMessages.clear();
+  }
+
+  /**
+   * Confirm optimistic message with real message
+   */
+  private confirmOptimisticMessage(tempId: string, realMessage: Message): void {
+    const optimisticMessage = this.optimisticMessages.get(tempId);
+    if (!optimisticMessage) {
+      return;
+    }
+
+    // Remove optimistic message from cache and add real message
+    this.messageCache.removeMessage(optimisticMessage.conversationId, tempId);
+    this.messageCache.addMessages(optimisticMessage.conversationId, [
+      realMessage,
+    ]);
+
+    // Clean up
+    this.optimisticMessages.delete(tempId);
+  }
+
+  /**
+   * Mark optimistic message as failed
+   */
+  private failOptimisticMessage(tempId: string, error: string): void {
+    const optimisticMessage = this.optimisticMessages.get(tempId);
+    if (!optimisticMessage) {
+      return;
+    }
+
+    // Update message status in cache
+    this.messageCache.updateMessage(optimisticMessage.conversationId, tempId, {
+      status: "failed",
+    });
+
+    this.metrics.failedOptimisticUpdates++;
+  }
+
+  /**
+   * Batch API requests for better performance
+   */
+  private async batchRequest<T>(
+    batchKey: string,
+    request: () => Promise<T>
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      let batch = this.pendingBatches.get(batchKey);
+
+      if (!batch) {
+        batch = {
+          requests: [],
+          timeout: setTimeout(() => {
+            this.executeBatch(batchKey);
+          }, this.config.batchTimeout),
+        };
+        this.pendingBatches.set(batchKey, batch);
+      }
+
+      batch.requests.push(async () => {
+        try {
+          const result = await request();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      // Execute immediately if batch is full
+      if (batch.requests.length >= this.config.batchSize) {
+        clearTimeout(batch.timeout);
+        this.executeBatch(batchKey);
+      }
+    });
+  }
+
+  /**
+   * Execute batched requests
+   */
+  private async executeBatch(batchKey: string): Promise<void> {
+    const batch = this.pendingBatches.get(batchKey);
+    if (!batch) {
+      return;
+    }
+
+    this.pendingBatches.delete(batchKey);
+
+    // Execute all requests in parallel
+    await Promise.all(batch.requests.map((request) => request()));
+  }
+
+  /**
+   * Record load time for metrics
+   */
+  private recordLoadTime(time: number): void {
+    this.loadTimes.push(time);
+
+    // Keep only recent load times (last 100)
+    if (this.loadTimes.length > 100) {
+      this.loadTimes = this.loadTimes.slice(-100);
+    }
+
+    // Update average
+    this.metrics.averageLoadTime =
+      this.loadTimes.reduce((sum, t) => sum + t, 0) / this.loadTimes.length;
+  }
+
+  /**
+   * Start performance monitoring
+   */
+  private startPerformanceMonitoring(): void {
+    this.performanceTimer = setInterval(() => {
+      this.updateMetrics();
+    }, this.config.metricsInterval);
+  }
+
+  /**
+   * Update performance metrics
+   */
+  private updateMetrics(): void {
+    // Update cache hit rate
+    const totalRequests = this.metrics.cacheHits + this.metrics.cacheMisses;
+    this.metrics.cacheHitRate =
+      totalRequests > 0 ? this.metrics.cacheHits / totalRequests : 0;
+
+    // Update average optimistic confirm time
+    if (this.optimisticTimes.length > 0) {
+      this.metrics.averageOptimisticConfirmTime =
+        this.optimisticTimes.reduce((sum, t) => sum + t, 0) /
+        this.optimisticTimes.length;
+
+      // Keep only recent times
+      if (this.optimisticTimes.length > 100) {
+        this.optimisticTimes = this.optimisticTimes.slice(-100);
+      }
+    }
+
+    // Estimate memory usage
+    const stats = this.messageCache.getStats();
+    this.metrics.memoryUsage = this.estimateMemoryUsage(stats.totalMessages);
+  }
+
+  /**
+   * Estimate memory usage based on message count
+   */
+  private estimateMemoryUsage(messageCount: number): number {
+    // Rough estimate: 1KB per message on average
+    return messageCount * 1024;
+  }
+
+  /**
+   * Preload recent conversations for better performance
+   */
+  async preloadRecentConversations(
+    getRecentConversations: () => Promise<string[]>,
+    loadMessages: (conversationId: string) => Promise<Message[]>
+  ): Promise<void> {
+    if (!this.config.cacheStrategy.preloadRecentConversations) {
+      return;
+    }
+
+    try {
+      const recentConversationIds = await getRecentConversations();
+      const conversationsToPreload = recentConversationIds
+        .slice(0, this.config.cacheStrategy.preloadCount)
+        .filter((id) => !this.messageCache.has(id));
+
+      // Preload in parallel but limit concurrency
+      const batchSize = 3;
+      for (let i = 0; i < conversationsToPreload.length; i += batchSize) {
+        const batch = conversationsToPreload.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (conversationId) => {
+            try {
+              const messages = await loadMessages(conversationId);
+              this.messageCache.set(conversationId, messages);
+            } catch (error) {
+              console.warn(
+                `Failed to preload conversation ${conversationId}:`,
+                error
+              );
+            }
+          })
+        );
+      }
+    } catch (error) {
+      console.warn("Failed to preload recent conversations:", error);
+    }
+  }
+
+  /**
+   * Get performance recommendations
+   */
+  getPerformanceRecommendations(): string[] {
+    const recommendations: string[] = [];
+
+    if (this.metrics.cacheHitRate < 0.6) {
+      recommendations.push(
+        "Consider increasing cache size or TTL to improve hit rate"
+      );
+    }
+
+    if (this.metrics.averageLoadTime > 2000) {
+      recommendations.push(
+        "Average load time is high, consider optimizing API calls or network"
+      );
+    }
+
+    if (
+      this.metrics.failedOptimisticUpdates / this.metrics.optimisticUpdates >
+      0.1
+    ) {
+      recommendations.push(
+        "High optimistic update failure rate, check network stability"
+      );
+    }
+
+    if (this.metrics.averageOptimisticConfirmTime > 5000) {
+      recommendations.push(
+        "Optimistic updates taking too long to confirm, check API performance"
+      );
+    }
+
+    return recommendations;
+  }
+}
+
+/**
+ * Global performance optimizer instance
+ */
+export let messagingPerformanceOptimizer: MessagingPerformanceOptimizer | null =
+  null;
+
+/**
+ * Initialize performance optimizer
+ */
+export function initializePerformanceOptimizer(
+  messageCache: MessageCache,
+  config?: Partial<OptimizationConfig>
+): MessagingPerformanceOptimizer {
+  if (messagingPerformanceOptimizer) {
+    messagingPerformanceOptimizer.destroy();
+  }
+
+  messagingPerformanceOptimizer = new MessagingPerformanceOptimizer(
+    messageCache,
+    config
+  );
+  return messagingPerformanceOptimizer;
+}
+
+/**
+ * Get global performance optimizer instance
+ */
+export function getPerformanceOptimizer(): MessagingPerformanceOptimizer | null {
+  return messagingPerformanceOptimizer;
+}

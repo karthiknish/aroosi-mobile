@@ -10,10 +10,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
-import { useTypingIndicator } from "../../hooks/useTypingIndicator";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import VoiceRecorder from "./VoiceRecorder";
 import PlatformHaptics from "../../utils/PlatformHaptics";
 import { uriToBlob } from "../../utils/fileUtils";
+import EmojiPicker, { EmojiType } from "rn-emoji-keyboard";
+import InlineUpgradeBanner from "../subscription/InlineUpgradeBanner";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface ChatInputProps {
   conversationId: string;
@@ -37,11 +40,16 @@ export default function ChatInput({
   const [message, setMessage] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const { subscription } = useSubscription();
 
   const inputRef = useRef<TextInput>(null);
 
   // useTypingIndicator expects an options object
-  const { startTyping, stopTyping } = useTypingIndicator({ conversationId, userId: currentUserId });
+  const { startTyping, stopTyping } = useTypingIndicator({
+    conversationId,
+    userId: currentUserId,
+  });
 
   const canSend = message.trim().length > 0 && !disabled;
 
@@ -76,6 +84,28 @@ export default function ChatInput({
       }
     },
     [startTyping, stopTyping]
+  );
+
+  const handleEmojiToggle = useCallback(async () => {
+    await PlatformHaptics.light();
+    if (isEmojiPickerOpen) {
+      setIsEmojiPickerOpen(false);
+      inputRef.current?.focus();
+    } else {
+      Keyboard.dismiss();
+      setIsEmojiPickerOpen(true);
+    }
+  }, [isEmojiPickerOpen]);
+
+  const handleEmojiSelected = useCallback(
+    (emoji: EmojiType) => {
+      const symbol = emoji?.emoji || "";
+      if (!symbol) return;
+      const newText = message + symbol;
+      setMessage(newText);
+      startTyping();
+    },
+    [message, startTyping]
   );
 
   const handleSend = useCallback(async () => {
@@ -166,8 +196,24 @@ export default function ChatInput({
             )}
           </View>
 
-          {/* Send/Voice Button */}
+          {/* Emoji + Send/Voice Buttons */}
           <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                styles.emojiButton,
+                disabled && styles.actionButtonDisabled,
+              ]}
+              onPress={handleEmojiToggle}
+              disabled={disabled}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name={isEmojiPickerOpen ? "close" : "happy-outline"}
+                size={22}
+                color={Colors.primary[500]}
+              />
+            </TouchableOpacity>
             {canSend ? (
               <TouchableOpacity
                 style={[
@@ -228,6 +274,38 @@ export default function ChatInput({
         visible={showVoiceRecorder}
         onRecordingComplete={handleVoiceRecordingComplete}
         onCancel={handleVoiceRecordingCancel}
+      />
+
+      {/* Inline upgrade banner for free users */}
+      {subscription?.plan === "free" && (
+        <View
+          style={{
+            paddingHorizontal: Layout.spacing.md,
+            paddingTop: Layout.spacing.xs,
+          }}
+        >
+          <InlineUpgradeBanner
+            message="Upgrade for unlimited messaging and premium features"
+            ctaLabel="Upgrade"
+            onPress={() => {
+              // Simple navigation without coupling to screen props
+              try {
+                const nav = require("@/navigation");
+                // If a global navigate helper exists
+                (nav.navigate || (() => {}))("Subscription");
+              } catch {}
+            }}
+          />
+        </View>
+      )}
+
+      {/* Emoji Picker */}
+      <EmojiPicker
+        onEmojiSelected={handleEmojiSelected}
+        open={isEmojiPickerOpen}
+        onClose={() => setIsEmojiPickerOpen(false)}
+        enableSearchBar
+        categoryPosition="top"
       />
     </>
   );
@@ -293,6 +371,8 @@ const styles = StyleSheet.create({
 
   actionButtons: {
     alignItems: "flex-end",
+    flexDirection: "row",
+    gap: Layout.spacing.xs,
   },
 
   actionButton: {
@@ -325,6 +405,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderWidth: 2,
     borderColor: Colors.primary[500],
+  },
+
+  emojiButton: {
+    backgroundColor: Colors.background.primary,
+    borderWidth: 2,
+    borderColor: Colors.neutral[300] || Colors.border.primary,
   },
 
   disabledOverlay: {

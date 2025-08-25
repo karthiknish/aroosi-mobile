@@ -1,6 +1,6 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { VoiceMessageInput, VoiceMessageDisplay } from "./VoiceMessage";
+import { VoiceMessageDisplay } from "./VoiceMessage";
 import { VoiceMessageBubble } from "./VoiceMessageBubble";
 import { VoiceMessageToolbar } from "./VoiceMessageToolbar";
 import { VoiceRecorder } from "./VoiceRecorder";
@@ -12,7 +12,6 @@ import {
 
 // Export all voice message components for easy import
 export {
-  VoiceMessageInput,
   VoiceMessageDisplay,
   VoiceMessageBubble,
   VoiceMessageToolbar,
@@ -64,7 +63,14 @@ export const VoiceMessageUI: React.FC<VoiceMessageUIProps> = ({
       );
 
     case "input":
-      return <VoiceMessageInput {...commonProps} />;
+      // Fall back to toolbar mode since input component has been removed
+      return (
+        <VoiceMessageToolbar
+          {...commonProps}
+          onVoiceMessageSent={onVoiceMessageSent}
+          disabled={disabled}
+        />
+      );
 
     case "recorder":
       return (

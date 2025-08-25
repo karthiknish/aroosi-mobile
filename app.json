@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Aroosi",
-    "slug": "aroosi-mobile",
+    "slug": "aroosi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,32 +9,25 @@
     "newArchEnabled": true,
     "scheme": "aroosi",
     "description": "Find your perfect match in the Afghan community. Connect with like-minded individuals for meaningful relationships and marriage.",
-    "keywords": [
-      "matrimony",
-      "dating",
-      "afghan",
-      "muslim",
-      "marriage",
-      "relationships"
+    "platforms": [
+      "ios",
+      "android"
     ],
-    "privacy": "public",
-    "platforms": ["ios", "android"],
     "primaryColor": "#BFA67A",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#BFA67A"
     },
-    "assetBundlePatterns": ["**/*"],
-    "fonts": ["./assets/fonts/Boldonse-Regular.ttf"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.aroosi.mobile",
       "buildNumber": "1",
-      "deploymentTarget": "13.0",
       "requireFullScreen": false,
       "userInterfaceStyle": "automatic",
-      "statusBarStyle": "auto",
       "backgroundColor": "#F9F7F5",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Aroosi needs access to your photo library to upload beautiful profile pictures that help you find your perfect match.",
@@ -47,17 +40,29 @@
         "NSPhotoLibraryAddUsageDescription": "Aroosi can save photos shared by your matches to your photo library.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": true,
-        "CFBundleLocalizations": ["en", "fa", "ps"],
-        "UIBackgroundModes": ["background-fetch", "remote-notification"],
+        "CFBundleLocalizations": [
+          "en",
+          "fa",
+          "ps"
+        ],
+        "UIBackgroundModes": [
+          "background-fetch",
+          "remote-notification",
+          "audio"
+        ],
         "UIViewControllerBasedStatusBarAppearance": true,
-        "UISupportedInterfaceOrientations": ["UIInterfaceOrientationPortrait"],
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
           "UIInterfaceOrientationPortraitUpsideDown",
           "UIInterfaceOrientationLandscapeLeft",
           "UIInterfaceOrientationLandscapeRight"
         ],
-        "UIRequiredDeviceCapabilities": ["armv7"],
+        "UIRequiredDeviceCapabilities": [
+          "armv7"
+        ],
         "UIFileSharingEnabled": false,
         "UISupportsDocumentBrowser": false,
         "LSRequiresIPhoneOS": true,
@@ -75,16 +80,14 @@
         "com.apple.developer.kernel.increased-memory-limit": true,
         "com.apple.developer.in-app-purchase": true
       },
-      "associatedDomains": ["applinks:aroosi.app", "applinks:www.aroosi.app"],
-      "scheme": "aroosi"
+      "associatedDomains": [
+        "applinks:aroosi.app",
+        "applinks:www.aroosi.app"
+      ]
     },
     "android": {
       "package": "com.aroosi.mobile",
       "versionCode": 1,
-      "compileSdkVersion": 34,
-      "targetSdkVersion": 34,
-      "minSdkVersion": 21,
-      "buildToolsVersion": "34.0.0",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#BFA67A",
@@ -92,31 +95,51 @@
       },
       "icon": "./assets/icon.png",
       "backgroundColor": "#F9F7F5",
-      "statusBarStyle": "auto",
-      "navigationBarStyle": "dark-content",
       "allowBackup": false,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO",
-        "RECORD_AUDIO",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "ACCESS_WIFI_STATE",
-        "VIBRATE",
-        "WAKE_LOCK",
-        "RECEIVE_BOOT_COMPLETED",
-        "FOREGROUND_SERVICE",
-        "POST_NOTIFICATIONS",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "READ_CONTACTS",
-        "com.android.vending.BILLING"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "com.android.vending.BILLING",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_CONTACTS",
+        "com.android.vending.BILLING",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "blockedPermissions": [
+        "ACCESS_BACKGROUND_LOCATION",
+        "SYSTEM_ALERT_WINDOW",
         "ACCESS_BACKGROUND_LOCATION",
         "SYSTEM_ALERT_WINDOW"
       ],
@@ -135,21 +158,26 @@
               "host": "www.aroosi.app"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ],
       "scheme": "aroosi",
-      "config": {
-        "branch": {
-          "apikey": "key_live_your_branch_key"
-        }
-      }
+      "config": {}
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ],
       "expo-secure-store",
       [
         "expo-image-picker",
@@ -161,19 +189,29 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/icon.png",
           "color": "#EC4899",
-          "defaultChannel": "default",
-          "sounds": ["notification.wav"]
+          "defaultChannel": "default"
         }
       ],
       "expo-font",
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Aroosi to access your microphone to record voice messages."
+        }
+      ],
+      "expo-router"
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "90150339-514c-413a-bfa1-9ce4cb689ba8"
       }
+    },
+    "owner": "karthiknish",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/90150339-514c-413a-bfa1-9ce4cb689ba8"
     }
   }
 }

@@ -1,16 +1,13 @@
-import { EventEmitter } from "events";
+import EventEmitter from "eventemitter3";
 import { Message } from "../types/message";
 import {
   MessagingAPI,
   MessagingError,
   MessagingErrorType,
 } from "../types/messaging";
-import {
-  OfflineMessageQueue,
-  QueuedMessage,
-} from "../utils/offlineMessageQueue";
-import { messageCache } from "../utils/MessageCache";
-import { MessageSyncManager } from "../utils/messagingSync";
+import { OfflineMessageQueue, QueuedMessage } from "@utils/offlineMessageQueue";
+import { messageCache } from "@utils/MessageCache";
+import { MessageSyncManager } from "@utils/messagingSync";
 
 export interface OfflineMessagingOptions {
   enableOfflineQueue?: boolean;

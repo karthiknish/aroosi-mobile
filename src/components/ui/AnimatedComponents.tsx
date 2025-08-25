@@ -19,7 +19,7 @@ import {
   createShakeAnimation,
   createSequentialFadeIn,
   ANIMATION_DURATIONS,
-} from "../../utils/animations";
+} from "@utils/animations";
 import { Colors } from "../../../constants/Colors";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");

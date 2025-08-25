@@ -16,7 +16,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from \"../../../constants\";
+import { Colors, Layout } from "../../../constants";
 import * as Haptics from "expo-haptics";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: 20,
-    fontWeight: \"600\",
+    fontWeight: "600",
     color: Colors.text.primary,
   },
   closeButton: {
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 16,
     color: Colors.text.secondary,
-    fontWeight: \"600\",
+    fontWeight: "600",
   },
   content: {
     flex: 1,

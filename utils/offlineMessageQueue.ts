@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { EventEmitter } from "events";
+import EventEmitter from "eventemitter3";
 import { Message } from "../types/message";
 import {
   MessagingAPI,
@@ -67,6 +67,46 @@ export class OfflineMessageQueue extends EventEmitter {
       storageKey: options.storageKey || "offline_message_queue",
       batchSize: options.batchSize || 5,
     };
+  }
+
+  /**
+   * Helper to handle ApiResponse<void> for MessagingAPI methods
+   */
+  private async handleApiResponseVoid(
+    promise: Promise<import("../types/profile").ApiResponse<void>>,
+    errorMsg: string
+  ): Promise<void> {
+    const response = await promise;
+    if (!response.success) {
+      throw new Error(response.error?.message || errorMsg);
+    }
+  }
+
+  /**
+   * Send typing indicator using MessagingAPI (void semantics)
+   */
+  async sendTypingIndicator(
+    conversationId: string,
+    action: "start" | "stop"
+  ): Promise<void> {
+    try {
+      await this.apiClient.sendTypingIndicator(conversationId, action);
+    } catch (e) {
+      console.warn("Failed to send typing indicator", e);
+      throw e;
+    }
+  }
+
+  /**
+   * Send delivery receipt using MessagingAPI (void semantics)
+   */
+  async sendDeliveryReceipt(messageId: string, status: string): Promise<void> {
+    try {
+      await this.apiClient.sendDeliveryReceipt(messageId, status);
+    } catch (e) {
+      console.warn("Failed to send delivery receipt", e);
+      throw e;
+    }
   }
 
   /**
@@ -161,7 +201,8 @@ export class OfflineMessageQueue extends EventEmitter {
   /**
    * Process the message queue
    */
-  private async processQueue(): Promise<void> {
+  // Exposed for tests & external manual triggering
+  async processQueue(): Promise<void> {
     if (this.isProcessing || !this.isOnline || this.queue.size === 0) {
       return;
     }
@@ -266,6 +307,31 @@ export class OfflineMessageQueue extends EventEmitter {
     } finally {
       this.processing.delete(id);
     }
+  }
+
+  /**
+   * Backwards compatibility: tests expect addMessage instead of enqueue
+   * and access to full queued metadata (QueuedMessage[])
+   */
+  addMessage(
+    messageData: Omit<Message, "_id">,
+    priority: "high" | "normal" | "low" = "normal"
+  ) {
+    return this.enqueue(messageData, priority);
+  }
+
+  /**
+   * Original method returning full queued message objects with metadata
+   */
+  getQueuedMessages(): QueuedMessage[] {
+    return Array.from(this.queue.values()).map((q) => ({ ...q }));
+  }
+
+  /**
+   * Simple variant returning only raw message payloads (used by components that only need message fields)
+   */
+  getQueuedMessagesSimple(): Omit<Message, "_id">[] {
+    return Array.from(this.queue.values()).map((q) => ({ ...q.message }));
   }
 
   /**
@@ -480,14 +546,7 @@ export class OfflineMessageQueue extends EventEmitter {
     };
   }
 
-  /**
-   * Get all queued messages
-   */
-  getQueuedMessages(): QueuedMessage[] {
-    return Array.from(this.queue.values()).sort(
-      (a, b) => a.createdAt - b.createdAt
-    );
-  }
+  // (Original getQueuedMessages returning QueuedMessage[] removed in favor of compatibility variant above)
 
   /**
    * Get failed messages

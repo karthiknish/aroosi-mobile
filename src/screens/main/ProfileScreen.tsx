@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,40 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
-import { useSubscription } from "@hooks/useSubscription";
-import { useApiClient } from "@utils/api";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@contexts/AuthProvider";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import { useApiClient } from "@/utils/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Colors, Layout } from "@constants";
-import { useToast } from "@providers/ToastContext";
-import { Profile, ProfileImage } from "@types";
+import { useToast } from "@/providers/ToastContext";
+import { Profile } from "@/types/profile";
+// Dynamic profile completion calculator (replaces removed isProfileComplete flag)
+const REQUIRED_FIELDS: (keyof Profile)[] = [
+  "fullName",
+  "dateOfBirth",
+  "gender",
+  "maritalStatus",
+  "city",
+  "country",
+  "education",
+  "occupation",
+  "aboutMe",
+  "phoneNumber",
+];
+
+function calcCompletion(profile: Profile): number {
+  const filled = REQUIRED_FIELDS.filter((f) => {
+    const v: any = profile[f];
+    return v !== undefined && v !== null && String(v).trim().length > 0;
+  }).length;
+  return filled / REQUIRED_FIELDS.length;
+}
+import { ProfileImage } from "@/types/image";
 import { useTheme } from "@contexts/ThemeContext";
 import useResponsiveSpacing, {
   useResponsiveTypography,
-} from "@hooks/useResponsive";
+} from "@/hooks/useResponsive";
 import {
   GradientButton,
   GlassmorphismCard,
@@ -37,6 +60,8 @@ import {
 import * as Haptics from "expo-haptics";
 import ScreenContainer from "@components/common/ScreenContainer";
 import ConfirmModal from "@components/ui/ConfirmModal";
+import VerifyEmailInline from "@components/auth/VerifyEmailInline";
+import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 
 const { width } = Dimensions.get("window");
 
@@ -45,7 +70,15 @@ interface ProfileScreenProps {
 }
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
-  const { } = useClerkAuth();
+  const {
+    user,
+    needsEmailVerification,
+    resendEmailVerification,
+    verifyEmailCode,
+    startEmailVerificationPolling,
+    refreshUser,
+  } = useAuth() as any;
+  const userId = user?.id;
   const apiClient = useApiClient();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const { theme } = useTheme();
@@ -54,6 +87,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const toast = useToast();
   const [showBoostConfirm, setShowBoostConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { checkFeatureAccess } = useFeatureAccess();
+  const queryClient = useQueryClient();
+  let analyticsTrack: any;
+  try {
+    // dynamic require to avoid bundling issues if tree-shaken
+    analyticsTrack = require("@/utils/analytics").track;
+  } catch {}
 
   // Removed fontSize usage to avoid TS errors and keep spacing-only responsive updates
   const {
@@ -62,6 +102,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     isTrialActive,
     daysUntilExpiry,
     loading: subscriptionLoading,
+    trackFeatureUsage,
   } = useSubscription();
 
   const { data: profile, isLoading: profileLoading } = useQuery<Profile | null>(
@@ -84,13 +125,21 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     enabled: !!userId,
   });
 
+  // Feature access evaluation for profile viewers
+  const canViewProfileViewers = useMemo(() => {
+    // Use subscription features directly
+    return (
+      subscription?.plan === "premium" || subscription?.plan === "premiumPlus"
+    );
+  }, [subscription]);
+
   const { data: profileViewers = [] } = useQuery<any[]>({
     queryKey: ["profileViewers"],
     queryFn: async () => {
-      const response = await apiClient.getProfileViewers();
+      const response = await apiClient.getProfileViewers(userId as string);
       return response.success ? (response.data as any[]) : [];
     },
-    enabled: !!userId && hasActiveSubscription,
+    enabled: !!userId && canViewProfileViewers,
   });
 
   // Delete profile mutation
@@ -107,12 +156,37 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   // Boost profile mutation
   const boostProfileMutation = useMutation({
-    mutationFn: () => apiClient.boostProfile(),
-    onSuccess: () => {
-      toast.show("Profile boosted for 24 hours!", "success");
+    mutationFn: async () => {
+      analyticsTrack?.("profile_boost_attempt", { plan: subscription?.plan });
+      const res = await apiClient.boostProfile();
+      if (!res.success) {
+        throw new Error(
+          typeof res.error === "string" ? res.error : "Boost failed"
+        );
+      }
+      return res;
     },
-    onError: () => {
-      toast.show("Failed to boost profile. Please try again.", "error");
+    onSuccess: () => {
+      analyticsTrack?.("profile_boost_success", { plan: subscription?.plan });
+      toast.show("Profile boosted for 24 hours!", "success");
+      try {
+        trackFeatureUsage("profileBoosts");
+      } catch (e) {
+        console.log("Failed to track boost usage", e);
+      }
+      queryClient.invalidateQueries({ queryKey: ["subscription", userId] });
+      queryClient.invalidateQueries({ queryKey: ["usage", userId] });
+      queryClient.invalidateQueries({ queryKey: ["currentProfile"] });
+    },
+    onError: (error: any) => {
+      analyticsTrack?.("profile_boost_failed", {
+        plan: subscription?.plan,
+        error: String(error),
+      });
+      const msg = /quota|limit|boost/i.test(String(error))
+        ? "You've reached your boost quota. Upgrade for more."
+        : "Failed to boost profile. Please try again.";
+      toast.show(msg, "error");
     },
   });
 
@@ -149,6 +223,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       padding: spacing.xs,
     },
     settingsText: {},
+    emailBadge: {
+      marginLeft: spacing.sm,
+      paddingHorizontal: spacing.xs,
+      paddingVertical: spacing.xs / 2,
+      borderRadius: 12,
+    },
+    emailBadgeText: {
+      color: "#fff",
+      fontWeight: "600",
+    },
     actionButtonsRow: {
       flexDirection: "row",
       paddingHorizontal: spacing.md,
@@ -342,20 +426,48 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     navigation.navigate("Settings");
   };
 
+  // Email verification actions consolidated in VerifyEmailInline component
+
   const handleViewSubscription = () => {
     navigation.navigate("Subscription");
   };
 
-  const handleBoostProfile = () => {
-    if (!hasActiveSubscription) {
-      // Replace premium gating alert with navigation to subscription and a toast
+  const handleViewShortlists = () => {
+    navigation.navigate("Shortlists");
+  };
+
+  const handleBoostProfile = async () => {
+    // Gating logic: Premium has limited boosts (>=1 remaining). Premium Plus unlimited. Free -> upgrade.
+    if (!subscription) {
+      toast.show("Please sign in to boost your profile", "info");
+      return;
+    }
+    const plan = subscription.plan;
+    if (plan === "free") {
       toast.show(
-        "Boost is a premium feature. Please upgrade your plan.",
+        "Boosting is a Premium feature. Upgrade to unlock boosts.",
         "info"
       );
       handleViewSubscription();
       return;
     }
+    // Determine remaining boosts if limited
+    const unlimited = plan === "premiumPlus";
+    const boostsRemaining = unlimited
+      ? Infinity
+      : subscription.boostsRemaining ?? 0;
+    if (!unlimited && boostsRemaining <= 0) {
+      toast.show(
+        "You've used your monthly boost. Upgrade to Premium Plus for unlimited boosts.",
+        "info"
+      );
+      handleViewSubscription();
+      return;
+    }
+    analyticsTrack?.("profile_boost_attempt", {
+      from: "pre_confirm",
+      plan,
+    });
     setShowBoostConfirm(true);
   };
 
@@ -479,6 +591,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           >
             My Profile
           </Text>
+          {needsEmailVerification ? (
+            <VerifyEmailInline variant="badge" />
+          ) : null}
           <TouchableOpacity
             onPress={handleViewSettings}
             style={styles.settingsButton}
@@ -522,6 +637,18 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               />
             </ScaleInView>
             <ScaleInView delay={500}>
+              <GradientButton
+                title="❤️ Shortlists"
+                variant="secondary"
+                size="medium"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleViewShortlists();
+                }}
+                style={styles.actionBtn}
+              />
+            </ScaleInView>
+            <ScaleInView delay={600}>
               <GradientButton
                 title={
                   deleteProfileMutation.isPending
@@ -671,14 +798,40 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 >
                   Email:
                 </Text>
-                <Text
-                  style={[
-                    styles.infoValue,
-                    { color: theme.colors.text.primary },
-                  ]}
+                <View
+                  style={{
+                    flex: 2,
+                    flexDirection: "row",
+                    justifyContent: "flex-end",
+                    alignItems: "center",
+                    gap: spacing.xs,
+                  }}
                 >
-                  {profile.email}
-                </Text>
+                  <Text
+                    style={[
+                      styles.infoValue,
+                      { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    {profile.email}
+                  </Text>
+                  {needsEmailVerification ? (
+                    <VerifyEmailInline variant="link" label="Unverified" />
+                  ) : (
+                    <View
+                      style={{
+                        backgroundColor: theme.colors.success[500],
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "600" }}>
+                        Verified
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
             {profile?.dateOfBirth && (
@@ -1250,7 +1403,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                     { color: theme.colors.text.primary },
                   ]}
                 >
-                  {profile.boostsRemaining}
+                  {subscription?.plan === "premiumPlus"
+                    ? "Unlimited"
+                    : profile.boostsRemaining}
                 </Text>
               </View>
             )}
@@ -1315,10 +1470,64 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               </View>
             )}
           </View>
+          {/* Boost Action / CTA */}
+          <View style={{ marginTop: spacing.md }}>
+            {subscription?.plan === "free" && (
+              <GradientButton
+                title="🚀 Boost Your Profile (Upgrade)"
+                variant="primary"
+                size="medium"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  handleViewSubscription();
+                }}
+              />
+            )}
+            {subscription?.plan === "free" && (
+              <View style={{ marginTop: spacing.sm }}>
+                <InlineUpgradeBanner
+                  message="Unlock Profile Viewers and more with Premium"
+                  ctaLabel="Upgrade"
+                  onPress={handleViewSubscription}
+                />
+              </View>
+            )}
+            {subscription?.plan && subscription.plan !== "free" && (
+              <GradientButton
+                title={(() => {
+                  const boostedActive =
+                    !!profile?.boostedUntil &&
+                    new Date(profile.boostedUntil) > new Date();
+                  if (boostedActive) return "🔥 Boost Active";
+                  const remaining =
+                    subscription.plan === "premiumPlus"
+                      ? "∞"
+                      : subscription.boostsRemaining ?? 0;
+                  return `🚀 Boost Profile (${remaining} left)`;
+                })()}
+                variant="secondary"
+                size="medium"
+                disabled={
+                  boostProfileMutation.isPending ||
+                  (subscription.plan === "premium" &&
+                    (subscription.boostsRemaining ?? 0) <= 0 &&
+                    !(
+                      profile?.boostedUntil &&
+                      new Date(profile.boostedUntil) > new Date()
+                    ))
+                }
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  handleBoostProfile();
+                }}
+                style={{ opacity: boostProfileMutation.isPending ? 0.7 : 1 }}
+              />
+            )}
+          </View>
         </View>
 
-        {/* Profile Viewers (Premium Only) */}
-        {hasActiveSubscription && (
+        {/* Profile Viewers (Premium & above) */}
+        {canViewProfileViewers && (
           <View
             style={[
               styles.section,
@@ -1346,7 +1555,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                           { color: theme.colors.text.secondary },
                         ]}
                       >
-                        {viewer.email || viewer.userId}
+                        {viewer.fullName || viewer.userId}
                       </Text>
                     </View>
                   ))}
@@ -1371,6 +1580,43 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                 No profile views yet
               </Text>
             )}
+          </View>
+        )}
+        {!canViewProfileViewers && (
+          <View
+            style={[
+              styles.section,
+              { backgroundColor: theme.colors.background.primary },
+            ]}
+          >
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.colors.text.primary },
+              ]}
+            >
+              Who Viewed Your Profile
+            </Text>
+            <Text
+              style={[
+                styles.noDataText,
+                {
+                  color: theme.colors.text.secondary,
+                  marginBottom: spacing.sm,
+                },
+              ]}
+            >
+              Upgrade to Premium to see who viewed your profile.
+            </Text>
+            <GradientButton
+              title="Upgrade"
+              variant="primary"
+              size="medium"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleViewSubscription();
+              }}
+            />
           </View>
         )}
 
@@ -1425,7 +1671,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               <ScaleInView delay={800}>
                 <View style={styles.statItem}>
                   <CircularProgress
-                    progress={(profile?.isProfileComplete ? 100 : 75) / 100}
+                    progress={profile ? calcCompletion(profile) : 0}
                     size={80}
                     strokeWidth={6}
                     color={theme.colors.success[500]}
@@ -1479,7 +1725,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             {/* Profile Completion Progress */}
             <View style={styles.progressSection}>
               <LinearProgress
-                progress={(profile?.isProfileComplete ? 100 : 75) / 100}
+                progress={profile ? calcCompletion(profile) : 0}
                 height={8}
                 colors={[theme.colors.success[400], theme.colors.success[600]]}
                 showLabel={true}
@@ -1514,5 +1760,3 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     </ScreenContainer>
   );
 }
-
-

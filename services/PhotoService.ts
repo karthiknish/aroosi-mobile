@@ -1,11 +1,9 @@
 import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
-import { Image } from "react-native";
-import { enhancedApiClient } from "../utils/enhancedApiClient";
+// removed unused: ImageManipulator, Image
+import { apiClient } from "@utils/api";
 import { ProfileImage } from "../types/image";
-import { errorHandler, AppError } from "../utils/errorHandling";
-import { networkManager } from "../utils/NetworkManager";
-import { offlineImageQueue } from "../utils/OfflineImageQueue";
+import { errorHandler, AppError } from "@utils/errorHandling";
+import { networkManager } from "@utils/NetworkManager";
 // Removed util toast usage. Services remain UI-agnostic; UI surfaces messages via ToastContext.
 
 export interface PhotoUploadResult {
@@ -28,10 +26,7 @@ export interface ProcessedPhoto {
 }
 
 export class PhotoService {
-  private apiClient = enhancedApiClient;
-
-  // Maximum file size in bytes (5MB)
-  private readonly MAX_FILE_SIZE = 5 * 1024 * 1024;
+  private apiClient = apiClient;
 
   // Maximum dimensions
   private readonly MAX_WIDTH = 1080;
@@ -40,18 +35,7 @@ export class PhotoService {
   // Compression quality
   private readonly COMPRESSION_QUALITY = 0.8;
 
-  // Helper to use centralized picker (library by default)
-  private async pickOneFromLibrary(): Promise<string | null> {
-    try {
-      const { pickFromLibrary } = await import("../utils/imagePicker");
-      const res = await pickFromLibrary({ allowsEditing: true, aspect: [1, 1], quality: 1 });
-      if (res.canceled || !res.assets?.[0]?.uri) return null;
-      return res.assets[0].uri;
-    } catch (e) {
-      console.error("pickOneFromLibrary error:", e);
-      return null;
-    }
-  }
+  // removed unused pickOneFromLibrary helper
 
   /**
    * Request camera and media library permissions
@@ -92,7 +76,7 @@ export class PhotoService {
    */
   async processImage(imageUri: string): Promise<ProcessedPhoto | null> {
     try {
-      const { processImage, DEFAULT_PROCESS_IMAGE_OPTIONS } = await import("../utils/imageProcessing");
+      const { processImage } = await import("../utils/imageProcessing");
       const processed = await processImage(imageUri, {
         maxWidth: this.MAX_WIDTH,
         maxHeight: this.MAX_HEIGHT,
@@ -110,7 +94,8 @@ export class PhotoService {
           type: processed.type,
         },
         compressed:
-          processed.width < this.MAX_WIDTH || processed.height < this.MAX_HEIGHT,
+          processed.width < this.MAX_WIDTH ||
+          processed.height < this.MAX_HEIGHT,
       };
     } catch (error) {
       console.error("Error processing image:", error);
@@ -131,16 +116,10 @@ export class PhotoService {
 
       // Check network connectivity
       if (!networkManager.isOnline()) {
-        // Queue for offline upload
-        await offlineImageQueue.addToQueue({
-          uri: processedPhoto.uri,
-          fileName,
-          userId: userId || "",
-          timestamp: Date.now(),
-        });
+        // Offline queue disabled; return a user-friendly error
         return {
           success: false,
-          error: "No internet connection. Upload queued for when online.",
+          error: "No internet connection. Please try again when you're online.",
         };
       }
 
@@ -234,15 +213,23 @@ export class PhotoService {
   /**
    * Complete photo upload process from selection to server
    */
-  async addPhoto(userId?: string): Promise<
-    PhotoUploadResult & { profileImage?: ProfileImage }
-  > {
+  async addPhoto(
+    userId?: string
+  ): Promise<PhotoUploadResult & { profileImage?: ProfileImage }> {
     try {
       // Use centralized picker (library by default)
       const { pickFromLibrary } = await import("../utils/imagePicker");
-      const pickerResult = await pickFromLibrary({ allowsEditing: true, aspect: [1, 1], quality: 1 });
+      const pickerResult = await pickFromLibrary({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
 
-      if (!pickerResult || pickerResult.canceled || !pickerResult.assets?.[0]?.uri) {
+      if (
+        !pickerResult ||
+        pickerResult.canceled ||
+        !pickerResult.assets?.[0]?.uri
+      ) {
         return { success: false, error: "No photo selected" };
       }
 
@@ -281,11 +268,13 @@ export class PhotoService {
    */
   async validateImage(imageUri: string): Promise<boolean> {
     try {
-      const { validateImageUri, DEFAULT_VALIDATION_OPTIONS } = await import("../utils/imageValidation");
+      const { validateImageUri, DEFAULT_VALIDATION_OPTIONS } = await import(
+        "../utils/imageValidation"
+      );
       const result = await validateImageUri(imageUri, {
         maxFileSizeBytes: DEFAULT_VALIDATION_OPTIONS.maxFileSizeBytes, // 5MB default
-        minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth,                 // 200
-        minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight,               // 200
+        minWidth: DEFAULT_VALIDATION_OPTIONS.minWidth, // 200
+        minHeight: DEFAULT_VALIDATION_OPTIONS.minHeight, // 200
         allowedFormats: DEFAULT_VALIDATION_OPTIONS.allowedFormats,
       });
       if (!result.isValid) {
@@ -302,7 +291,7 @@ export class PhotoService {
    * Initialize offline queue processing
    */
   initializeOfflineQueue(): void {
-    offlineImageQueue.initializeNetworkListener();
+    // No-op: offline image queue removed
   }
 }
 

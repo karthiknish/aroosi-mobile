@@ -10,7 +10,10 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Layout } from '../../constants';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 // Helper functions for responsive button styles
 const getResponsiveButtonStyle = (size: 'sm' | 'md' | 'lg', spacing: any) => {

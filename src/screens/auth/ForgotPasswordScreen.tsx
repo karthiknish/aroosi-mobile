@@ -10,9 +10,11 @@ import {
   SafeAreaView,
   ScrollView,
 } from "react-native";
-import { useClerkAuth } from "@contexts/ClerkAuthContext";
+import { useAuth } from "@contexts/AuthProvider";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
@@ -25,7 +27,7 @@ type ForgotPasswordScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function ForgotPasswordScreen() {
-  const { requestPasswordReset } = useClerkAuth();
+  const { sendPasswordReset } = useAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -48,21 +50,15 @@ export default function ForgotPasswordScreen() {
     if (error) return;
 
     try {
-      const res = await requestPasswordReset(emailTrimmed);
-      if (res.success) {
-        toast.show(
-          "If an account exists for this email, you'll receive a password reset link shortly.",
-          "success"
-        );
-        navigation.goBack();
-      } else {
-        toast.show(res.error || "Unable to request password reset", "error");
+      const result = await sendPasswordReset(emailTrimmed);
+      if (!result.success && result.error) {
+        toast.show(result.error, "error");
+        return;
       }
-    } catch (e) {
-      toast.show(
-        "An unexpected error occurred while requesting reset",
-        "error"
-      );
+      toast.show("If that email exists, we've sent a reset link.", "success");
+      setEmail("");
+    } catch (e: any) {
+      toast.show(e?.message || "Unable to send reset email", "error");
     }
   };
 

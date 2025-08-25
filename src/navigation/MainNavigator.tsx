@@ -1,9 +1,10 @@
-import React from "react";
 import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
-import { useApiClient } from "../../utils/api";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { useApiClient } from "@/utils/api";
+import { navigationAnimations } from "@/utils/navigationAnimations";
 import { createStackNavigator } from "@react-navigation/stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 
 // Import navigation types
@@ -17,28 +18,36 @@ import {
 import {
   getScreenTransition,
   tabBarAnimationConfig,
-} from "../utils/navigationAnimations";
+} from "@/utils/navigationAnimations";
 
 // Import main screens
-import ProfileScreen from "../screens/main/ProfileScreen";
-import ProfileDetailScreen from "../screens/main/ProfileDetailScreen";
-import SubscriptionScreen from "../screens/main/SubscriptionScreen";
-import EditProfileScreen from "../screens/main/EditProfileScreen";
-import SearchScreen from "../screens/main/SearchScreen";
-import MatchesScreen from "../screens/main/MatchesScreen";
-import InterestsScreen from "@src/screens/main/InterestsScreen";
-import ConversationListScreen from "../screens/main/ConversationListScreen";
-import ChatScreen from "../screens/main/ChatScreen";
-import SettingsScreen from "../screens/settings/SettingsScreen";
-import ContactScreen from "../screens/support/ContactScreen";
+import ProfileScreen from "@screens/main/ProfileScreen";
+import ProfileDetailScreen from "@screens/main/ProfileDetailScreen";
+import SubscriptionScreen from "@screens/main/SubscriptionScreen";
+import EditProfileScreen from "@screens/main/EditProfileScreen";
+import SearchScreen from "@screens/main/SearchScreen";
+import MatchesScreen from "@screens/main/MatchesScreen";
+import InterestsScreen from "@screens/main/InterestsScreen";
+import ConversationListScreen from "@screens/main/ConversationListScreen";
+import ChatScreen from "@screens/main/ChatScreen";
+import SettingsScreen from "@screens/settings/SettingsScreen";
+import IcebreakersScreen from "@screens/main/IcebreakersScreen";
+import ContactScreen from "@screens/support/ContactScreen";
+import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 
 // Placeholder screens for now
 import { View, Text } from "react-native";
 import { RouteProp } from "@react-navigation/native";
-import { useThemedStyles } from "../../contexts/ThemeContext";
+import { useThemedStyles } from "@contexts/ThemeContext";
 
-const SC = withScreenContainer;
+const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
+  const Wrapped: React.FC<P> = (props) => {
+    const C = withScreenContainer(Comp);
+    return <C {...props} />;
+  };
+  return Wrapped;
+};
 
 const PlaceholderScreen = ({ name }: { name: string }) => (
   <View
@@ -89,7 +98,7 @@ function ProfileStackNavigator() {
     >
       <ProfileStack.Screen
         name="Profile"
-        component={SC(ProfileScreen)}
+        component={withSC(ProfileScreen)}
         options={getScreenTransition("Profile")}
       />
       <ProfileStack.Screen
@@ -99,23 +108,33 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="EditProfile"
-        component={SC(EditProfileScreen)}
+        component={withSC(EditProfileScreen)}
         options={getScreenTransition("EditProfile")}
       />
       <ProfileStack.Screen
         name="Settings"
-        component={SC(SettingsScreen)}
+        component={withSC(SettingsScreen)}
         options={getScreenTransition("Settings")}
       />
       <ProfileStack.Screen
         name="Subscription"
-        component={SC(SubscriptionScreen)}
+        component={withSC(SubscriptionScreen)}
         options={getScreenTransition("Subscription")}
       />
       <ProfileStack.Screen
+        name="Icebreakers"
+        component={withSC(IcebreakersScreen)}
+        options={getScreenTransition("default")}
+      />
+      <ProfileStack.Screen
         name="Contact"
-        component={SC(ContactScreen)}
+        component={withSC(ContactScreen)}
         options={getScreenTransition("Contact")}
+      />
+      <ProfileStack.Screen
+        name="Shortlists"
+        component={withSC(ShortlistsScreen)}
+        options={getScreenTransition("default")}
       />
     </ProfileStack.Navigator>
   );
@@ -164,12 +183,12 @@ function ChatStackNavigator() {
     >
       <ChatStack.Screen
         name="ConversationList"
-        component={SC(ConversationListScreen)}
+        component={withSC(ConversationListScreen)}
         options={getScreenTransition("ConversationList")}
       />
       <ChatStack.Screen
         name="Chat"
-        component={SC(ChatScreen)}
+        component={withSC(ChatScreen)}
         options={getScreenTransition("Chat")}
       />
     </ChatStack.Navigator>
@@ -187,12 +206,12 @@ function MatchesStackNavigator() {
     >
       <MatchesStack.Screen
         name="MatchesMain"
-        component={SC(MatchesScreen)}
+        component={withSC(MatchesScreen)}
         options={getScreenTransition("MatchesMain")}
       />
       <MatchesStack.Screen
         name="Interests"
-        component={SC(InterestsScreen)}
+        component={withSC(InterestsScreen)}
         options={getScreenTransition("Interests")}
       />
     </MatchesStack.Navigator>
@@ -207,8 +226,16 @@ export default function MainNavigator() {
         route,
       }: {
         route: RouteProp<MainTabParamList, keyof MainTabParamList>;
-      }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+      }): BottomTabNavigationOptions => ({
+        tabBarIcon: ({
+          focused,
+          color,
+          size,
+        }: {
+          focused: boolean;
+          color: string;
+          size: number;
+        }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home";
 
           if (route.name === "Search") {
@@ -235,7 +262,7 @@ export default function MainNavigator() {
     >
       <Tab.Screen
         name="Search"
-        component={SC(SearchScreen)}
+        component={withSC(SearchScreen)}
         options={{ title: "Browse" }}
       />
       <Tab.Screen
@@ -255,7 +282,7 @@ export default function MainNavigator() {
       />
       <Tab.Screen
         name="Premium"
-        component={SC(SubscriptionScreen)}
+        component={withSC(SubscriptionScreen)}
         options={{ title: "Premium" }}
       />
     </Tab.Navigator>

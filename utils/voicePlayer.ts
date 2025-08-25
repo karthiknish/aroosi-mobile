@@ -1,11 +1,13 @@
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
+import type { AudioStatus } from "expo-audio";
+import type { AudioPlayer } from "expo-audio";
 import { VoicePlayer } from "../types/messaging";
 
 /**
- * Voice player implementation for React Native using Expo AV
+ * Voice player implementation for React Native using expo-audio
  */
 export class ExpoVoicePlayer implements VoicePlayer {
-  private sound: Audio.Sound | null = null;
+  private player: AudioPlayer | null = null;
   private currentUrl: string | null = null;
   private positionUpdateInterval: NodeJS.Timeout | null = null;
 
@@ -22,12 +24,11 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   private async setupAudio(): Promise<void> {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldRouteThroughEarpiece: false,
+        shouldPlayInBackground: false,
       });
     } catch (error) {
       console.error("Failed to setup audio playback:", error);
@@ -40,26 +41,26 @@ export class ExpoVoicePlayer implements VoicePlayer {
   async play(url: string): Promise<void> {
     try {
       // If already playing the same URL, just resume
-      if (this.sound && this.currentUrl === url && !this.isPlaying) {
-        await this.sound.playAsync();
+      if (this.player && this.currentUrl === url && !this.isPlaying) {
+        this.player.play();
         this.isPlaying = true;
         this.startPositionTracking();
         return;
       }
 
       // Stop current playback if playing different URL
-      if (this.sound && this.currentUrl !== url) {
+      if (this.player && this.currentUrl !== url) {
         await this.stop();
       }
 
       // Load new audio if needed
-      if (!this.sound || this.currentUrl !== url) {
+      if (!this.player || this.currentUrl !== url) {
         await this.loadAudio(url);
       }
 
       // Start playback
-      if (this.sound) {
-        await this.sound.playAsync();
+      if (this.player) {
+        this.player.play();
         this.isPlaying = true;
         this.startPositionTracking();
         console.log("Voice playback started for:", url);
@@ -67,7 +68,11 @@ export class ExpoVoicePlayer implements VoicePlayer {
     } catch (error) {
       console.error("Failed to play audio:", error);
       this.cleanup();
-      throw new Error(`Failed to play audio: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to play audio: ${error.message}`);
+      } else {
+        throw new Error("Failed to play audio: Unknown error");
+      }
     }
   }
 
@@ -76,8 +81,8 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   async pause(): Promise<void> {
     try {
-      if (this.sound && this.isPlaying) {
-        await this.sound.pauseAsync();
+      if (this.player && this.isPlaying) {
+        this.player.pause();
         this.isPlaying = false;
         this.stopPositionTracking();
         console.log("Voice playback paused");
@@ -92,8 +97,9 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   async stop(): Promise<void> {
     try {
-      if (this.sound) {
-        await this.sound.stopAsync();
+      if (this.player) {
+        this.player.pause();
+        await this.player.seekTo(0);
         this.isPlaying = false;
         this.currentTime = 0;
         this.stopPositionTracking();
@@ -109,9 +115,8 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   async seek(position: number): Promise<void> {
     try {
-      if (this.sound && position >= 0 && position <= this.duration) {
-        const positionMs = position * 1000;
-        await this.sound.setPositionAsync(positionMs);
+      if (this.player && position >= 0 && position <= this.duration) {
+        await this.player.seekTo(position);
         this.currentTime = position;
         console.log("Voice playback seeked to:", position, "seconds");
       }
@@ -126,59 +131,47 @@ export class ExpoVoicePlayer implements VoicePlayer {
   private async loadAudio(url: string): Promise<void> {
     try {
       // Unload previous sound
-      if (this.sound) {
-        await this.sound.unloadAsync();
+      if (this.player) {
+        this.player.remove();
       }
 
-      // Create new sound
-      const { sound, status } = await Audio.Sound.createAsync(
-        { uri: url },
-        {
-          shouldPlay: false,
-          isLooping: false,
-          volume: 1.0,
-        }
-      );
-
-      this.sound = sound;
+      // Create new player
+      const player = createAudioPlayer({ uri: url });
+      this.player = player;
       this.currentUrl = url;
 
       // Set up playback status listener
-      this.sound.setOnPlaybackStatusUpdate((status) => {
+      player.addListener("playbackStatusUpdate", (status: AudioStatus) => {
         this.handlePlaybackStatusUpdate(status);
       });
 
       // Get initial duration
-      if (status.isLoaded) {
-        this.duration = (status.durationMillis || 0) / 1000;
-      }
+      this.duration = player.duration || 0;
 
       console.log("Voice audio loaded, duration:", this.duration, "seconds");
     } catch (error) {
       console.error("Failed to load audio:", error);
-      throw new Error(`Failed to load audio: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to load audio: ${error.message}`);
+      } else {
+        throw new Error("Failed to load audio: Unknown error");
+      }
     }
   }
 
   /**
    * Handles playback status updates
    */
-  private handlePlaybackStatusUpdate(status: any): void {
-    if (status.isLoaded) {
-      this.currentTime = (status.positionMillis || 0) / 1000;
-      this.duration = (status.durationMillis || 0) / 1000;
-      this.isPlaying = status.isPlaying || false;
-
-      // Handle playback completion
-      if (status.didJustFinish) {
-        this.isPlaying = false;
-        this.currentTime = 0;
-        this.stopPositionTracking();
-        console.log("Voice playback completed");
-      }
-    } else if (status.error) {
-      console.error("Playback error:", status.error);
-      this.cleanup();
+  private handlePlaybackStatusUpdate(status: AudioStatus): void {
+    // Map AudioStatus to our fields
+    this.currentTime = status.currentTime || 0;
+    this.duration = status.duration || 0;
+    this.isPlaying = status.playing || false;
+    if (status.didJustFinish) {
+      this.isPlaying = false;
+      this.currentTime = 0;
+      this.stopPositionTracking();
+      console.log("Voice playback completed");
     }
   }
 
@@ -191,12 +184,9 @@ export class ExpoVoicePlayer implements VoicePlayer {
     }
 
     this.positionUpdateInterval = setInterval(async () => {
-      if (this.sound && this.isPlaying) {
+      if (this.player && this.isPlaying) {
         try {
-          const status = await this.sound.getStatusAsync();
-          if (status.isLoaded) {
-            this.currentTime = (status.positionMillis || 0) / 1000;
-          }
+          this.currentTime = this.player.currentTime || 0;
         } catch (error) {
           console.error("Failed to get playback position:", error);
         }
@@ -224,9 +214,13 @@ export class ExpoVoicePlayer implements VoicePlayer {
     this.currentUrl = null;
     this.stopPositionTracking();
 
-    if (this.sound) {
-      this.sound.unloadAsync().catch(console.error);
-      this.sound = null;
+    if (this.player) {
+      try {
+        this.player.remove();
+      } catch (e) {
+        console.error(e);
+      }
+      this.player = null;
     }
   }
 
@@ -243,7 +237,7 @@ export class ExpoVoicePlayer implements VoicePlayer {
       isPlaying: this.isPlaying,
       currentTime: this.currentTime,
       duration: this.duration,
-      isLoaded: this.sound !== null,
+      isLoaded: this.player !== null,
     };
   }
 
@@ -252,8 +246,8 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   async setVolume(volume: number): Promise<void> {
     try {
-      if (this.sound && volume >= 0 && volume <= 1) {
-        await this.sound.setVolumeAsync(volume);
+      if (this.player && volume >= 0 && volume <= 1) {
+        this.player.volume = volume;
       }
     } catch (error) {
       console.error("Failed to set volume:", error);
@@ -265,11 +259,8 @@ export class ExpoVoicePlayer implements VoicePlayer {
    */
   async getVolume(): Promise<number> {
     try {
-      if (this.sound) {
-        const status = await this.sound.getStatusAsync();
-        if (status.isLoaded) {
-          return status.volume || 1.0;
-        }
+      if (this.player) {
+        return this.player.volume ?? 1.0;
       }
       return 1.0;
     } catch (error) {

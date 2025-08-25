@@ -123,11 +123,14 @@ export class ApiResponseInterceptor {
       }
     });
 
-    const messagingError = MessagingErrorHandler.handle(error, context);
-    return {
-      success: false,
-      error: messagingError.message,
-    };
+  const messagingError = MessagingErrorHandler.classifyError(error);
+  return {
+    success: false,
+    error: {
+      code: messagingError.type || "UNKNOWN_ERROR",
+      message: messagingError.message,
+    },
+  };
   }
 
   /**

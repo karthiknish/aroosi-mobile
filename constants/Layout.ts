@@ -1,4 +1,5 @@
 import { Dimensions, Platform } from "react-native";
+import { responsive as sharedResponsive } from "@utils/responsive";
 
 const { width, height } = Dimensions.get("window");
 
@@ -29,25 +30,13 @@ export const Layout = {
   isLandscape: width > height,
 
   // Dynamic spacing based on device size
-  getResponsiveSpacing: (base: number) => {
-    if (width < 375) return base * 0.8;
-    if (width >= 414) return base * 1.1;
-    return base;
-  },
+  getResponsiveSpacing: (base: number) => sharedResponsive.spacing(base),
 
   // Responsive font size utility
-  getResponsiveFontSize: (base: number) => {
-    if (width < 375) return base * 0.9; // iPhone SE
-    if (width >= 428) return base * 1.05; // iPhone Pro Max
-    return base;
-  },
+  getResponsiveFontSize: (base: number) => sharedResponsive.font(base),
 
   // Responsive padding utility
-  getResponsivePadding: (base: number) => {
-    if (width < 375) return base * 0.75; // Smaller padding on small screens
-    if (width >= 414) return base * 1.15; // Larger padding on big screens
-    return base;
-  },
+  getResponsivePadding: (base: number) => sharedResponsive.spacing(base),
 
   // Get responsive value based on screen size
   getResponsiveValue: <T>(

@@ -1,6 +1,9 @@
 import { Message, Conversation, MessageStatus } from "./message";
 import { ApiResponse } from "./profile";
 
+// Align subscription tier type with web (and re-export for downstream tests)
+export type SubscriptionTier = "free" | "premium" | "premiumPlus";
+
 // Re-export types for consistency
 export { ApiResponse, Message, Conversation, MessageStatus };
 
@@ -32,7 +35,7 @@ export interface MessagingAPI {
   >;
   getVoiceMessageUrl(storageId: string): Promise<ApiResponse<{ url: string }>>;
 
-  // Real-time operations
+  // Real-time operations (non-API envelope: fire-and-forget semantics)
   sendTypingIndicator(
     conversationId: string,
     action: "start" | "stop"

@@ -1,5 +1,4 @@
-import { EventEmitter } from "events";
-import { Platform } from "react-native";
+import EventEmitter from "eventemitter3";
 
 export interface RealtimeMessage {
   id: string;

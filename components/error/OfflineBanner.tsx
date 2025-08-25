@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
-import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import PlatformHaptics from '../../utils/PlatformHaptics';
 
 const { width: screenWidth } = Dimensions.get('window');

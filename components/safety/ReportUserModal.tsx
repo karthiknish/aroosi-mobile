@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
-import { useReportUser } from '../../hooks/useSafety';
+import { useReportUser } from "@/hooks/useSafety";
 import { REPORT_REASONS, REPORT_REASON_DESCRIPTIONS, ReportReason } from '../../types/safety';
 
 interface ReportUserModalProps {

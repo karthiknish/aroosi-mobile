@@ -3,6 +3,11 @@ import {
   UpdateProfileData,
   calculateAge,
 } from "../types/profile";
+import {
+  zodValidateCreateProfile,
+  BaseProfileData,
+  normalizeForSchema,
+} from "../src/validation/onboardingSchemas";
 
 // Validation error messages
 export const ValidationMessages = {
@@ -95,6 +100,8 @@ const PATTERNS = {
 };
 
 // Field validation functions
+// Legacy per-field validators retained temporarily for granular UI feedback in edit flows.
+// Creation & update now delegate to centralized Zod schemas for consistency with web.
 export const validators = {
   fullName: (value: string | undefined): string | null => {
     if (!value?.trim()) return ValidationMessages.fullName.required;
@@ -247,54 +254,7 @@ export const validators = {
 export function validateCreateProfile(
   data: Partial<CreateProfileData>
 ): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  // Required fields for onboarding
-  const requiredFields = [
-    "fullName",
-    "dateOfBirth",
-    "gender",
-    "preferredGender",
-    "city",
-    "height",
-    "maritalStatus",
-    "education",
-    "occupation",
-    "annualIncome",
-    "aboutMe",
-    "phoneNumber",
-  ] as const;
-
-  // Validate required fields
-  requiredFields.forEach((field) => {
-    const validator = validators[field];
-    if (validator) {
-      const error = validator(data[field] as never);
-      if (error) errors[field] = error;
-    }
-  });
-
-  // Country now required in onboarding
-  {
-    const error = validators.country(data.country as any);
-    if (error) errors.country = error;
-  }
-
-  // Validate partner preferences if provided
-  if (data.partnerPreferenceAgeMin || data.partnerPreferenceAgeMax) {
-    const minError = validators.partnerPreferenceAgeMin(
-      data.partnerPreferenceAgeMin,
-      data.partnerPreferenceAgeMax
-    );
-    if (minError) errors.partnerPreferenceAgeMin = minError;
-
-    const maxError = validators.partnerPreferenceAgeMax(
-      data.partnerPreferenceAgeMax,
-      data.partnerPreferenceAgeMin
-    );
-    if (maxError) errors.partnerPreferenceAgeMax = maxError;
-  }
-
+  const { errors } = zodValidateCreateProfile(data as any);
   return errors;
 }
 
@@ -302,81 +262,20 @@ export function validateCreateProfile(
 export function validateUpdateProfile(
   data: Partial<UpdateProfileData>
 ): Record<string, string> {
+  // For updates, allow partial: filter to provided keys + required keys for consistency if present
+  const normalized = normalizeForSchema(data as any);
+  const partialShape = BaseProfileData.partial();
+  const result = partialShape.safeParse(normalized);
+  if (result.success) return {};
   const errors: Record<string, string> = {};
-
-  // Validate each provided field
-  Object.entries(data).forEach(([field, value]) => {
-    const validator = validators[field];
-    if (validator && value !== undefined && value !== "") {
-      const error = validator(value as any);
-      if (error) errors[field] = error;
-    }
-  });
-
-  // Country is required on update as well - validate even if empty/undefined
-  {
-    const error = validators.country((data.country as any) ?? "");
-    if (error) errors.country = error;
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (typeof key === "string" && !errors[key]) errors[key] = issue.message;
   }
-
-  // Country is required in updates as per product decision
-  if (data.country === undefined || data.country === "") {
-    const countryError = validators.country((data.country as unknown as string) ?? "");
-    if (countryError) errors.country = countryError;
-  }
-
-  // Full name is required even for updates
-  if (data.fullName !== undefined) {
-    const fullNameError = validators.fullName(data.fullName);
-    if (fullNameError) errors.fullName = fullNameError;
-  }
-
-  // Country is required on update as well
-  {
-    const countryError = validators.country(data.country as any);
-    if (countryError) errors.country = countryError;
-  }
-
-  // Special handling for partner preferences
-  if (
-    data.partnerPreferenceAgeMin !== undefined ||
-    data.partnerPreferenceAgeMax !== undefined
-  ) {
-    const minError = validators.partnerPreferenceAgeMin(
-      data.partnerPreferenceAgeMin,
-      data.partnerPreferenceAgeMax
-    );
-    if (minError) errors.partnerPreferenceAgeMin = minError;
-
-    const maxError = validators.partnerPreferenceAgeMax(
-      data.partnerPreferenceAgeMax,
-      data.partnerPreferenceAgeMin
-    );
-    if (maxError) errors.partnerPreferenceAgeMax = maxError;
-  }
-
   return errors;
 }
 // Utility to check if profile is complete
-export function isProfileComplete(
-  profile: Partial<CreateProfileData>
-): boolean {
-  const requiredFields: (keyof CreateProfileData)[] = [
-    "fullName",
-    "gender",
-    "dateOfBirth",
-    "maritalStatus",
-    "city",
-    "occupation",
-    "education",
-    "aboutMe",
-  ];
-
-  return requiredFields.every((field) => {
-    const value = profile[field];
-    return value !== undefined && value !== null && value !== "";
-  });
-}
+// isProfileComplete removed: completeness derived from Zod validation at creation time.
 
 // Format phone number for display
 export function formatPhoneNumber(phone: string): string {

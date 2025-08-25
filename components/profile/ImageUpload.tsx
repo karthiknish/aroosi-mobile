@@ -21,9 +21,13 @@ try {
   OptionalDraggableFlatList =
     require("react-native-draggable-flatlist").default;
 } catch {}
-import { useImageUpload, validateImage } from "../../hooks/useImageUpload";
-import PlatformHaptics from "../../utils/PlatformHaptics";
-import { useEnhancedApiClient } from "../../utils/enhancedApiClient";
+import { useImageUpload, validateImage } from "@/hooks/useImageUpload";
+import {
+  useLocalPhotoManagement,
+  LocalImageType,
+} from "@/hooks/useLocalPhotoManagement";
+import PlatformHaptics from "@utils/PlatformHaptics";
+import { useApiClient } from "@utils/api";
 import { ProfileImage, IMAGE_VALIDATION } from "../../types/image";
 import { Colors, Layout } from "../../constants";
 import { useToast } from "../../providers/ToastContext";
@@ -41,6 +45,7 @@ interface ImageUploadProps {
   maxImages?: number;
   required?: boolean;
   onImagesChange?: (images: ProfileImage[]) => void;
+  mode?: "remote" | "local";
 }
 
 const { width } = Dimensions.get("window");
@@ -52,18 +57,20 @@ export default function ImageUpload({
   maxImages = IMAGE_VALIDATION.MAX_IMAGES_PER_USER,
   required = false,
   onImagesChange,
+  mode = "remote",
 }: ImageUploadProps) {
-  const {
-    images,
-    isLoading,
-    isUploading,
-    uploadProgress,
-    uploadImage,
-    deleteImage,
-    reorderImages,
-    refetchImages,
-  } = useImageUpload();
-  const enhancedApi = useEnhancedApiClient();
+  const remote = useImageUpload();
+  const local = useLocalPhotoManagement();
+  const isLocal = mode === "local";
+
+  const images = (isLocal
+    ? (local.images as any)
+    : (remote.images as any)) as (ProfileImage | LocalImageType)[];
+  const isLoading = isLocal ? false : remote.isLoading;
+  const isUploading = isLocal ? local.uploading : remote.isUploading;
+  const uploadProgress = isLocal ? 0 : remote.uploadProgress;
+  const refetchImages = isLocal ? () => {} : remote.refetchImages;
+  const apiClient = useApiClient();
 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -79,8 +86,21 @@ export default function ImageUpload({
 
   // Notify parent component of image changes
   React.useEffect(() => {
-    onImagesChange?.(images);
-  }, [images, onImagesChange]);
+    // Only pass remote-compatible shape to parent to avoid type mismatch
+    if (!onImagesChange) return;
+    if (isLocal) {
+      // Map LocalImageType to minimal ProfileImage shape expected elsewhere
+      const mapped = (images as LocalImageType[]).map((img) => ({
+        _id: img.id,
+        id: img.id,
+        url: img.url,
+        storageId: img.storageId,
+      })) as unknown as ProfileImage[];
+      onImagesChange(mapped);
+    } else {
+      onImagesChange(images as ProfileImage[]);
+    }
+  }, [images, onImagesChange, isLocal]);
 
   // Reflect global uploadProgress on most recent local tile
   useEffect(() => {
@@ -95,6 +115,16 @@ export default function ImageUpload({
   const handleImagePicker = () => {
     if (images.length >= maxImages) {
       toast.show(`You can only upload up to ${maxImages} images.`, "info");
+      return;
+    }
+    if (isLocal) {
+      // Use local photo picker/manager (1:1 enforced in hook)
+      (async () => {
+        const ok = await local.addPhoto();
+        if (!ok) {
+          // optional feedback already handled in hook
+        }
+      })();
       return;
     }
 
@@ -136,7 +166,8 @@ export default function ImageUpload({
       setCurrentTempId(tempId);
 
       // Upload image
-      uploadImage(imageResult)
+      remote
+        .uploadImage(imageResult)
         .then(() => {
           setLocalUploads((prev) => prev.filter((u) => u.id !== tempId));
           setCurrentTempId(null);
@@ -156,7 +187,11 @@ export default function ImageUpload({
   const confirmDelete = async () => {
     if (!pendingDeleteId) return;
     try {
-      await deleteImage(pendingDeleteId);
+      if (isLocal) {
+        await local.deletePhoto(pendingDeleteId);
+      } else {
+        await remote.deleteImage(pendingDeleteId);
+      }
       toast.show("Image deleted.", "success");
     } catch (e) {
       // Hook handles error toast/alerts if any
@@ -193,7 +228,11 @@ export default function ImageUpload({
   const confirmBatchDelete = async () => {
     const ids = Array.from(selectedIds);
     try {
-      await Promise.all(ids.map((id) => deleteImage(id)));
+      if (isLocal) {
+        await Promise.all(ids.map((id) => local.deletePhoto(id)));
+      } else {
+        await Promise.all(ids.map((id) => remote.deleteImage(id)));
+      }
       setSelectedIds(new Set());
       setSelectionMode(false);
       toast.show("Selected photos deleted.", "success");
@@ -203,11 +242,17 @@ export default function ImageUpload({
 
   const handleSetMain = async (idx: number) => {
     if (idx <= 0) return;
-    // Prefer dedicated endpoint if available
-    const target = images[idx];
+    if (isLocal) {
+      const target = images[idx] as LocalImageType;
+      await local.setMainPhoto((target as any).id || getImageId(target as any));
+      toast.show("Set as main photo.", "success");
+      return;
+    }
+    // Remote: prefer dedicated endpoint if available
+    const target = images[idx] as ProfileImage;
     const serverImageId = (target._id as string) || (target.id as string);
     if (serverImageId) {
-      const res: any = await enhancedApi.setMainProfileImage(serverImageId);
+      const res: any = await apiClient.setMainProfileImage(serverImageId);
       if (res?.success) {
         await refetchImages();
         toast.show("Set as main photo.", "success");
@@ -215,35 +260,50 @@ export default function ImageUpload({
       }
     }
     // Fallback: reorder
-    const ids = images.map((img) => getImageId(img));
+    const ids = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
     const [picked] = ids.splice(idx, 1);
     const newOrder = [picked, ...ids];
-    await reorderImages(newOrder);
+    await remote.reorderImages(newOrder);
     toast.show("Set as main photo.", "success");
   };
 
   const handleMove = async (fromIdx: number, direction: -1 | 1) => {
     const toIdx = fromIdx + direction;
     if (toIdx < 0 || toIdx >= images.length) return;
-    const ids = images.map((img) => getImageId(img));
+    if (isLocal) {
+      const next = [...(images as LocalImageType[])];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      await local.reorderPhotos(next);
+      return;
+    }
+    const ids = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
     const [moved] = ids.splice(fromIdx, 1);
     ids.splice(toIdx, 0, moved);
-    await reorderImages(ids);
+    await remote.reorderImages(ids);
   };
 
   // Handle drag-and-drop end: compute new order of image items only
   const handleDragEnd = async (data: GridItem[]) => {
     try {
+      if (isLocal) {
+        const next = data
+          .filter((it) => it.type === "image")
+          .map((it: any) => it.image as LocalImageType);
+        await local.reorderPhotos(next);
+        PlatformHaptics.success();
+        return;
+      }
       const newOrder = data
         .filter((it) => it.type === "image")
         .map((it) => getImageId((it as any).image as ProfileImage));
       // Only call if order actually changed
-      const currentOrder = images.map((img) => getImageId(img));
+      const currentOrder = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
       const changed =
         newOrder.length === currentOrder.length &&
         newOrder.some((id, i) => id !== currentOrder[i]);
       if (changed) {
-        await reorderImages(newOrder);
+        await remote.reorderImages(newOrder);
         PlatformHaptics.success();
       }
     } catch (e) {
@@ -266,7 +326,7 @@ export default function ImageUpload({
         } as GridItem)
     );
     const imgs = images.map(
-      (img) => ({ key: getImageId(img), type: "image", image: img } as GridItem)
+      (img: any) => ({ key: getImageId(img as any), type: "image", image: img } as GridItem)
     );
     return [...uploads, ...imgs];
   }, [localUploads, images]);

@@ -1,3 +1,8 @@
+import {
+  useBlockUser,
+  useUnblockUser,
+  useBlockStatus,
+} from "@/hooks/useSafety";
 import React from "react";
 import {
   View,
@@ -7,10 +12,10 @@ import {
   Modal,
   Alert,
 } from "react-native";
+import { showSuccessToast, showErrorToast } from "@utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Colors, Layout } from "../../constants";
-import { useBlockUser, useUnblockUser, useBlockStatus } from "../../hooks/useSafety";
 import PlatformHaptics from "../../utils/PlatformHaptics";
 
 interface SafetyActionSheetProps {
@@ -19,6 +24,7 @@ interface SafetyActionSheetProps {
   userId: string;
   userName: string;
   isBlocked?: boolean;
+  onReport?: (userId: string, userName: string) => void;
 }
 
 export default function SafetyActionSheet({
@@ -27,26 +33,35 @@ export default function SafetyActionSheet({
   userId,
   userName,
   isBlocked = false,
+  onReport,
 }: SafetyActionSheetProps) {
   const blockUserMutation = useBlockUser();
   const unblockUserMutation = useUnblockUser();
   const { data: blockStatus } = useBlockStatus(userId);
-  
+
   const actualIsBlocked = blockStatus?.isBlocked ?? isBlocked;
   const isBlockedBy = blockStatus?.isBlockedBy ?? false;
   const blocking = blockUserMutation.isPending || unblockUserMutation.isPending;
 
   const handleReport = () => {
+    if (!userId) return;
+    // Prevent self-reporting (cannot easily access current user id here unless passed; left as placeholder if needed)
     onClose();
-    router.push({
-      pathname: "/report-user",
-      params: { userId, userName },
-    });
+    if (onReport) {
+      onReport(userId, userName);
+    } else {
+      // Fallback to expo-router route if available
+      try {
+        router.push({ pathname: "/report-user", params: { userId, userName } });
+      } catch {
+        // no-op
+      }
+    }
   };
 
   const handleBlock = async () => {
     onClose();
-    
+
     Alert.alert(
       "Block User",
       `Are you sure you want to block ${userName}? They won't be able to see your profile or contact you.`,
@@ -58,15 +73,16 @@ export default function SafetyActionSheet({
           onPress: async () => {
             try {
               await PlatformHaptics.medium();
+              if (!userId) return;
               await blockUserMutation.mutateAsync({ blockedUserId: userId });
               await PlatformHaptics.success();
-              Alert.alert("User Blocked", `${userName} has been blocked.`);
+              showSuccessToast("User blocked successfully");
             } catch (error) {
               console.error("Error blocking user:", error);
               await PlatformHaptics.error();
-              Alert.alert("Error", "Failed to block user. Please try again.");
+              showErrorToast("Failed to block user. Please try again.");
             }
-          }
+          },
         },
       ]
     );
@@ -74,7 +90,7 @@ export default function SafetyActionSheet({
 
   const handleUnblock = async () => {
     onClose();
-    
+
     Alert.alert(
       "Unblock User",
       `Are you sure you want to unblock ${userName}? They will be able to see your profile and contact you again.`,
@@ -86,15 +102,16 @@ export default function SafetyActionSheet({
           onPress: async () => {
             try {
               await PlatformHaptics.medium();
+              if (!userId) return;
               await unblockUserMutation.mutateAsync({ blockedUserId: userId });
               await PlatformHaptics.success();
-              Alert.alert("User Unblocked", `${userName} has been unblocked.`);
+              showSuccessToast("User unblocked successfully");
             } catch (error) {
               console.error("Error unblocking user:", error);
               await PlatformHaptics.error();
-              Alert.alert("Error", "Failed to unblock user. Please try again.");
+              showErrorToast("Failed to unblock user. Please try again.");
             }
-          }
+          },
         },
       ]
     );
@@ -113,12 +130,12 @@ export default function SafetyActionSheet({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <TouchableOpacity 
-          style={styles.backdrop} 
+        <TouchableOpacity
+          style={styles.backdrop}
           onPress={onClose}
           activeOpacity={1}
         />
-        
+
         <View style={styles.actionSheet}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Safety Options</Text>
@@ -133,8 +150,17 @@ export default function SafetyActionSheet({
               onPress={handleReport}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIcon, { backgroundColor: Colors.error[100] }]}>
-                <Ionicons name="flag-outline" size={20} color={Colors.error[500]} />
+              <View
+                style={[
+                  styles.actionIcon,
+                  { backgroundColor: Colors.error[100] },
+                ]}
+              >
+                <Ionicons
+                  name="flag-outline"
+                  size={20}
+                  color={Colors.error[500]}
+                />
               </View>
               <View style={styles.actionContent}>
                 <Text style={styles.actionTitle}>Report User</Text>
@@ -142,7 +168,11 @@ export default function SafetyActionSheet({
                   Report inappropriate behavior or content
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.neutral[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.neutral[400]}
+              />
             </TouchableOpacity>
 
             <View style={styles.divider} />
@@ -154,8 +184,17 @@ export default function SafetyActionSheet({
                 activeOpacity={0.7}
                 disabled={blocking}
               >
-                <View style={[styles.actionIcon, { backgroundColor: Colors.success[100] }]}>
-                  <Ionicons name="person-add-outline" size={20} color={Colors.success[500]} />
+                <View
+                  style={[
+                    styles.actionIcon,
+                    { backgroundColor: Colors.success[100] },
+                  ]}
+                >
+                  <Ionicons
+                    name="person-add-outline"
+                    size={20}
+                    color={Colors.success[500]}
+                  />
                 </View>
                 <View style={styles.actionContent}>
                   <Text style={styles.actionTitle}>Unblock User</Text>
@@ -163,7 +202,11 @@ export default function SafetyActionSheet({
                     Allow this user to contact you again
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.neutral[400]} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={Colors.neutral[400]}
+                />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
@@ -172,8 +215,17 @@ export default function SafetyActionSheet({
                 activeOpacity={0.7}
                 disabled={blocking}
               >
-                <View style={[styles.actionIcon, { backgroundColor: Colors.error[100] }]}>
-                  <Ionicons name="ban-outline" size={20} color={Colors.error[500]} />
+                <View
+                  style={[
+                    styles.actionIcon,
+                    { backgroundColor: Colors.error[100] },
+                  ]}
+                >
+                  <Ionicons
+                    name="ban-outline"
+                    size={20}
+                    color={Colors.error[500]}
+                  />
                 </View>
                 <View style={styles.actionContent}>
                   <Text style={styles.actionTitle}>Block User</Text>
@@ -181,7 +233,11 @@ export default function SafetyActionSheet({
                     Prevent this user from contacting you
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.neutral[400]} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={Colors.neutral[400]}
+                />
               </TouchableOpacity>
             )}
 
@@ -192,8 +248,17 @@ export default function SafetyActionSheet({
               onPress={handleSafetyGuidelines}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIcon, { backgroundColor: Colors.info[100] }]}>
-                <Ionicons name="shield-outline" size={20} color={Colors.info[500]} />
+              <View
+                style={[
+                  styles.actionIcon,
+                  { backgroundColor: Colors.info[100] },
+                ]}
+              >
+                <Ionicons
+                  name="shield-outline"
+                  size={20}
+                  color={Colors.info[500]}
+                />
               </View>
               <View style={styles.actionContent}>
                 <Text style={styles.actionTitle}>Safety Guidelines</Text>
@@ -201,7 +266,11 @@ export default function SafetyActionSheet({
                   Learn about staying safe on our platform
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.neutral[400]} />
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={Colors.neutral[400]}
+              />
             </TouchableOpacity>
           </View>
         </View>

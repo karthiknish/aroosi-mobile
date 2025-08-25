@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, RefreshControl } from "react-native";
 import ScreenContainer from "@components/common/ScreenContainer";
-import { Colors, Layout } from "../../../constants";
-import { useTheme } from "../../../contexts/ThemeContext";
-import { useInterests } from "../../../hooks/useInterests";
-import { useToast } from "../../../providers/ToastContext";
+import { Colors, Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
+import { useInterests } from "@/hooks/useInterests";
+import { useToast } from "@/providers/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
-import { ErrorBoundary } from "../../components/ui/ErrorHandling";
+import { ErrorBoundary } from "@/components/ui/ErrorHandling";
 
 export default function InterestsScreen() {
   const { theme } = useTheme();
@@ -33,18 +33,41 @@ export default function InterestsScreen() {
   };
 
   const renderInterestRow = (item: any, type: "received" | "sent") => {
-    const name = type === "received" ? item.fromProfile?.fullName || "Someone" : item.toProfile?.fullName || "Someone";
+    const name =
+      type === "received"
+        ? item.fromProfile?.fullName || "Someone"
+        : item.toProfile?.fullName || "Someone";
     const otherUserId = type === "received" ? item.fromUserId : item.toUserId;
     return (
-      <View key={item._id || item.id} style={[styles.row, { borderColor: theme.colors.border.primary, backgroundColor: theme.colors.background.primary }] }>
+      <View
+        key={item._id || item.id}
+        style={[
+          styles.row,
+          {
+            borderColor: theme.colors.border.primary,
+            backgroundColor: theme.colors.background.primary,
+          },
+        ]}
+      >
         <View style={styles.rowLeft}>
-          <View style={[styles.avatar, { backgroundColor: theme.colors.neutral[100] }]}>
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: theme.colors.neutral[100] },
+            ]}
+          >
             <Text style={{ fontSize: 20 }}>👤</Text>
           </View>
           <View>
-            <Text style={[styles.name, { color: theme.colors.text.primary }]}>{name}</Text>
-            <Text style={[styles.subtitle, { color: theme.colors.text.secondary }]}>
-              {type === "received" ? "Sent you an interest" : "You expressed interest"}
+            <Text style={[styles.name, { color: theme.colors.text.primary }]}>
+              {name}
+            </Text>
+            <Text
+              style={[styles.subtitle, { color: theme.colors.text.secondary }]}
+            >
+              {type === "received"
+                ? "Sent you an interest"
+                : "You expressed interest"}
             </Text>
           </View>
         </View>
@@ -57,10 +80,24 @@ export default function InterestsScreen() {
                 if (ok) toast?.show?.("Interest sent back", "success");
                 else toast?.show?.("Could not send interest", "error");
               }}
-              style={[styles.actionBtn, { borderColor: theme.colors.border.primary }]}
+              style={[
+                styles.actionBtn,
+                { borderColor: theme.colors.border.primary },
+              ]}
             >
-              <Ionicons name="heart" size={18} color={theme.colors.primary[600]} />
-              <Text style={[styles.actionText, { color: theme.colors.primary[700] }]}>Express</Text>
+              <Ionicons
+                name="heart"
+                size={18}
+                color={theme.colors.primary[600]}
+              />
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: theme.colors.primary[700] },
+                ]}
+              >
+                Express
+              </Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -70,10 +107,24 @@ export default function InterestsScreen() {
                 if (ok) toast?.show?.("Interest removed", "success");
                 else toast?.show?.("Could not remove interest", "error");
               }}
-              style={[styles.actionBtn, { borderColor: theme.colors.border.primary }]}
+              style={[
+                styles.actionBtn,
+                { borderColor: theme.colors.border.primary },
+              ]}
             >
-              <Ionicons name="close" size={18} color={theme.colors.text.secondary} />
-              <Text style={[styles.actionText, { color: theme.colors.text.secondary }]}>Remove</Text>
+              <Ionicons
+                name="close"
+                size={18}
+                color={theme.colors.text.secondary}
+              />
+              <Text
+                style={[
+                  styles.actionText,
+                  { color: theme.colors.text.secondary },
+                ]}
+              >
+                Remove
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -95,8 +146,20 @@ export default function InterestsScreen() {
           />
         }
       >
-        <View style={[styles.header, { backgroundColor: theme.colors.background.primary, borderBottomColor: theme.colors.border.primary }]}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text.primary }]}>Interests</Text>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: theme.colors.background.primary,
+              borderBottomColor: theme.colors.border.primary,
+            },
+          ]}
+        >
+          <Text
+            style={[styles.headerTitle, { color: theme.colors.text.primary }]}
+          >
+            Interests
+          </Text>
         </View>
 
         {/* Tabs */}
@@ -125,20 +188,31 @@ export default function InterestsScreen() {
                   fontWeight: "600",
                 }}
               >
-                {t === "received" ? `Received (${received.length})` : `Sent (${sent.length})`}
+                {t === "received"
+                  ? `Received (${received.length})`
+                  : `Sent (${sent.length})`}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <ScrollView contentContainerStyle={{ paddingHorizontal: Layout.spacing.lg }}>
+        <ScrollView
+          contentContainerStyle={{ paddingHorizontal: Layout.spacing.lg }}
+        >
           {(activeTab === "received" ? received : sent).map((item) =>
             renderInterestRow(item, activeTab)
           )}
           {(activeTab === "received" ? received : sent).length === 0 && (
             <View style={{ padding: Layout.spacing.lg }}>
-              <Text style={{ textAlign: "center", color: theme.colors.text.secondary }}>
-                {activeTab === "received" ? "No received interests yet" : "No sent interests yet"}
+              <Text
+                style={{
+                  textAlign: "center",
+                  color: theme.colors.text.secondary,
+                }}
+              >
+                {activeTab === "received"
+                  ? "No received interests yet"
+                  : "No sent interests yet"}
               </Text>
             </View>
           )}
@@ -216,6 +290,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: Layout.radius.lg,
     borderWidth: 1,
+  },
+  actionText: {
+    fontSize: Layout.typography.fontSize.base,
+    fontWeight: Layout.typography.fontWeight.medium,
   },
 });
 

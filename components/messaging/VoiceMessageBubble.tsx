@@ -8,8 +8,77 @@ import {
 } from 'react-native';
 import { VoicePlayer } from './VoicePlayer';
 import { VoiceMessageManager } from '../../services/voiceMessageManager';
-import { useApiClient } from '../../utils/api';
-import { formatTime } from '../../utils/timeUtils';
+import { useApiClient } from "@utils/api";
+import { MessagingAPI } from "../../types/messaging";
+import { formatTime } from "@utils/timeUtils";
+
+// Adapter to make ApiClient compatible with MessagingAPI
+class ApiClientAdapter implements MessagingAPI {
+  constructor(private apiClient: any) {}
+
+  async getMessages(
+    conversationId: string,
+    options?: { limit?: number; before?: number }
+  ) {
+    return this.apiClient.transportRequest(
+      `/conversations/${conversationId}/messages`,
+      {
+        method: "GET",
+      }
+    );
+  }
+
+  async sendMessage(data: any) {
+    return this.apiClient.transportRequest("/messages", {
+      method: "POST",
+      body: data,
+    });
+  }
+
+  async markConversationAsRead(conversationId: string) {
+    return this.apiClient.transportRequest(
+      `/conversations/${conversationId}/read`,
+      {
+        method: "POST",
+      }
+    );
+  }
+
+  async generateVoiceUploadUrl() {
+    return this.apiClient.transportRequest("/voice/upload-url", {
+      method: "POST",
+    });
+  }
+
+  async getVoiceMessageUrl(storageId: string) {
+    return this.apiClient.transportRequest(`/voice/${storageId}/url`);
+  }
+
+  async sendTypingIndicator(conversationId: string, action: "start" | "stop") {
+    // Implementation for typing indicator
+  }
+
+  async sendDeliveryReceipt(messageId: string, status: string) {
+    // Implementation for delivery receipt
+  }
+
+  async getConversations() {
+    return this.apiClient.transportRequest("/conversations");
+  }
+
+  async createConversation(participantIds: string[]) {
+    return this.apiClient.transportRequest("/conversations", {
+      method: "POST",
+      body: { participantIds },
+    });
+  }
+
+  async deleteConversation(conversationId: string) {
+    return this.apiClient.transportRequest(`/conversations/${conversationId}`, {
+      method: "DELETE",
+    });
+  }
+}
 
 interface VoiceMessageBubbleProps {
   messageId: string;
@@ -41,7 +110,9 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
   style,
 }) => {
   const apiClient = useApiClient();
-  const [voiceManager] = useState(() => new VoiceMessageManager(apiClient));
+  const [voiceManager] = useState(
+    () => new VoiceMessageManager(new ApiClientAdapter(apiClient))
+  );
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -51,7 +122,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
       try {
         setIsDownloading(true);
         setDownloadError(null);
-        
+
         // Try to get cached version first
         const cachedUri = await voiceManager.downloadVoiceMessage(id);
         if (cachedUri) {
@@ -62,7 +133,10 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
         const url = await voiceManager.getVoiceMessageUrl(id);
         return url;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load voice message';
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to load voice message";
         setDownloadError(errorMessage);
         onError?.(error instanceof Error ? error : new Error(errorMessage));
         return null;
@@ -75,8 +149,8 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
 
   // Format file size
   const formatFileSize = (bytes?: number) => {
-    if (!bytes) return '';
-    
+    if (!bytes) return "";
+
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -93,7 +167,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
 
   // Get text color based on ownership
   const getTextColor = () => {
-    return isOwn ? '#ffffff' : '#333333';
+    return isOwn ? "#ffffff" : "#333333";
   };
 
   return (
@@ -131,7 +205,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
             onPlaybackError={onError}
             style={[
               styles.voicePlayer,
-              { backgroundColor: isOwn ? 'rgba(255,255,255,0.1)' : '#f0f0f0' },
+              { backgroundColor: isOwn ? "rgba(255,255,255,0.1)" : "#f0f0f0" },
             ]}
           />
         )}
@@ -154,11 +228,17 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
         {isOwn && (
           <View style={styles.statusContainer}>
             {isRead ? (
-              <Text style={[styles.statusText, { color: getTextColor() }]}>✓✓</Text>
+              <Text style={[styles.statusText, { color: getTextColor() }]}>
+                ✓✓
+              </Text>
             ) : isDelivered ? (
-              <Text style={[styles.statusText, { color: getTextColor() }]}>✓</Text>
+              <Text style={[styles.statusText, { color: getTextColor() }]}>
+                ✓
+              </Text>
             ) : (
-              <Text style={[styles.statusText, { color: getTextColor() }]}>⏱</Text>
+              <Text style={[styles.statusText, { color: getTextColor() }]}>
+                ⏱
+              </Text>
             )}
           </View>
         )}
@@ -169,31 +249,31 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
 
 const styles = StyleSheet.create({
   bubble: {
-    maxWidth: '80%',
+    maxWidth: "80%",
     borderRadius: 16,
     padding: 12,
     marginVertical: 2,
   },
   ownBubble: {
-    backgroundColor: '#007AFF',
-    alignSelf: 'flex-end',
+    backgroundColor: "#007AFF",
+    alignSelf: "flex-end",
     borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: '#E5E5EA',
-    alignSelf: 'flex-start',
+    backgroundColor: "#E5E5EA",
+    alignSelf: "flex-start",
     borderBottomLeftRadius: 4,
   },
   playerContainer: {
     marginBottom: 8,
   },
   voicePlayer: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     padding: 0,
   },
   loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
   },
   loadingText: {
@@ -208,24 +288,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   retryButton: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   retryText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   infoContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
   },
   metadataContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   metadataText: {
     fontSize: 12,
@@ -239,4 +319,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     opacity: 0.7,
   },
-});"
+});

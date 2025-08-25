@@ -1,7 +1,7 @@
 import React, { ReactElement, cloneElement } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { useFeatureAccess } from '../../hooks/useFeatureAccess';
-import { useSubscription } from '../../hooks/useSubscription';
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import { useSubscription } from "@/hooks/useSubscription";
 import { SubscriptionFeatures } from '../../types/subscription';
 import { Colors, Layout } from '../../constants';
 

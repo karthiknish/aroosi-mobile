@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as Notifications from "expo-notifications";
+import * as Application from "expo-application";
 import * as Device from "expo-device";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -56,14 +57,15 @@ export class NotificationHandler {
     try {
       // Configure notification behavior
       Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-          // Added for SDKs requiring explicit banner/list flags
-          shouldShowBanner: true as any,
-          shouldShowList: true as any,
-        } as any),
+        handleNotification: async () =>
+          ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+            // Added for SDKs requiring explicit banner/list flags
+            shouldShowBanner: true as any,
+            shouldShowList: true as any,
+          } as any),
       });
 
       this.isInitialized = true;
@@ -211,6 +213,35 @@ export class NotificationManager {
     }
 
     try {
+      // Skip remote push token registration on Android when running inside Expo Go
+      if (
+        Platform.OS === "android" &&
+        (Application.applicationId === "host.exp.exponent" ||
+          Application.applicationId === "dev.expo.payments")
+      ) {
+        console.warn(
+          "expo-notifications: Android remote push is unavailable in Expo Go (SDK 53+). Use a development build."
+        );
+        return null;
+      }
+
+      // Android 13+: Ensure a channel exists BEFORE prompting for permission or fetching tokens
+      if (Platform.OS === "android") {
+        try {
+          await Notifications.setNotificationChannelAsync("default", {
+            name: "Default",
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: "#FF231F7C",
+          });
+        } catch (e) {
+          console.warn(
+            "Failed to create default Android notification channel:",
+            e
+          );
+        }
+      }
+
       const { status: existingStatus } =
         await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
@@ -275,7 +306,10 @@ export class NotificationManager {
         },
         trigger:
           delay > 0
-            ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delay }
+            ? {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: delay,
+              }
             : null,
       } as any);
     } catch (error) {
@@ -368,7 +402,8 @@ export class NotificationManager {
   private async handleNotificationReceived(
     notification: Notifications.Notification
   ): Promise<void> {
-    const data = notification.request.content.data as unknown as NotificationData;
+    const data = notification.request.content
+      .data as unknown as NotificationData;
 
     // Update badge count for messages
     if (data.type === "message") {
@@ -380,7 +415,8 @@ export class NotificationManager {
   private handleNotificationTapped(
     response: Notifications.NotificationResponse
   ): void {
-    const data = response.notification.request.content.data as unknown as NotificationData;
+    const data = response.notification.request.content
+      .data as unknown as NotificationData;
 
     // Navigate based on notification type
     NotificationHandler.handleDeepLink(data);
@@ -389,7 +425,8 @@ export class NotificationManager {
   private async shouldShowNotification(
     notification: Notifications.Notification
   ): Promise<boolean> {
-    const data = notification.request.content.data as unknown as NotificationData;
+    const data = notification.request.content
+      .data as unknown as NotificationData;
 
     // Check if notification type is enabled
     if (!this.shouldAllowNotification(data.type)) {

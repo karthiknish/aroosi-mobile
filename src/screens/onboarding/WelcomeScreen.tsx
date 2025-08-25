@@ -11,8 +11,8 @@ import { Colors, Layout } from "@constants";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "@hooks/useResponsive";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+} from "@/hooks/useResponsive";
+import { useAuth } from "@contexts/AuthProvider";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface WelcomeScreenProps {
@@ -33,13 +33,9 @@ const getBoldonseFontFamily = () => {
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const {
-    profile,
-    hasProfile,
-    isOnboardingComplete,
-    isProfileLoading,
-    signOut,
-  } = useClerkAuth();
+  const { user, signOut } = useAuth();
+  const hasProfile = !!user?.profile;
+  const isProfileLoading = !user?.profile && !!user;
 
   // Note: The RootNavigator handles the main navigation logic
   // This screen should only be shown when onboarding is needed
@@ -220,14 +216,14 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
         <Text style={styles.welcomeTitle}>
           {hasProfile
             ? `Welcome back${
-                profile?.fullName ? `, ${profile.fullName.split(" ")[0]}` : ""
+                user?.profile?.fullName
+                  ? `, ${user.profile.fullName.split(" ")[0]}`
+                  : ""
               }!`
             : "Welcome to Aroosi!"}
         </Text>
         <Text style={styles.welcomeSubtitle}>
-          {hasProfile && isOnboardingComplete
-            ? "Ready to find your perfect match?"
-            : hasProfile && !isOnboardingComplete
+          {hasProfile
             ? "Let's finish setting up your profile"
             : "Find your perfect match in our trusted community"}
         </Text>
@@ -260,11 +256,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
           onPress={handleGetStarted}
         >
           <Text style={styles.primaryButtonText}>
-            {hasProfile && !isOnboardingComplete
-              ? "Continue Setup"
-              : !hasProfile
-              ? "Complete Your Profile"
-              : "Get Started"}
+            {hasProfile ? "Continue Setup" : "Complete Your Profile"}
           </Text>
         </TouchableOpacity>
 

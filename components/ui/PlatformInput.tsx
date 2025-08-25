@@ -13,7 +13,10 @@ import {
 
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, Colors, Layout } from "../../constants";
-import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 interface PlatformInputProps extends TextInputProps {
   label?: string;
@@ -140,7 +143,8 @@ export default function PlatformInput({
     return {
       flex: 1,
       fontSize:
-        Layout.typography.fontSize.base * PlatformDesign.typography.scale,
+        Layout.typography.fontSize.base *
+        (PlatformDesign.typography?.scale ?? 1),
       color: Colors.text.primary,
       paddingVertical: Platform.select({ ios: 12, android: 8 }),
       minHeight: Platform.select({ ios: 44, android: 48 }),
@@ -166,7 +170,10 @@ export default function PlatformInput({
 
     const translateY = animatedValue.interpolate({
       inputRange: [0, 1],
-      outputRange: [PlatformDesign.input.height / 2 - 8, -8],
+      outputRange: [
+        (PlatformDesign.input?.height ?? Layout.spacing.xl) / 2 - 8,
+        -8,
+      ],
     });
 
     const translateX = animatedValue.interpolate({

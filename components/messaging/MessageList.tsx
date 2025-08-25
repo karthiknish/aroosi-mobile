@@ -11,7 +11,7 @@ import {
   NativeScrollEvent,
 } from "react-native";
 import { Message } from "../../types/messaging";
-import { useMessageHistory } from "../../hooks/useMessageHistory";
+import { useMessageHistory } from "@/hooks/useMessageHistory";
 
 interface MessageListProps {
   conversationId: string;
@@ -148,7 +148,8 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // Render message with layout handling
   const renderMessageWithLayout = useCallback<ListRenderItem<Message>>(
-    ({ item, index }) => {
+    (info) => {
+      const { item, index } = info;
       return (
         <View
           onLayout={(event) => {
@@ -156,7 +157,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             handleMessageLayout(item._id, height);
           }}
         >
-          {renderMessage({ item, index })}
+          {renderMessage(info)}
         </View>
       );
     },
@@ -204,7 +205,15 @@ export const MessageList: React.FC<MessageListProps> = ({
       );
     }
 
-    return ListEmptyComponent ? <ListEmptyComponent /> : null;
+    if (!ListEmptyComponent) return null;
+    return typeof ListEmptyComponent === "function" ? (
+      // Component type
+      // @ts-ignore runtime component invocation
+      <ListEmptyComponent />
+    ) : (
+      // Already an element
+      ListEmptyComponent
+    );
   }, [isLoading, error, isEmpty, ListEmptyComponent]);
 
   // Key extractor
@@ -212,7 +221,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // Get item layout for better performance
   const getItemLayout = useCallback(
-    (data: Message[] | null | undefined, index: number) => {
+    (_data: ArrayLike<Message> | null | undefined, index: number) => {
       const averageHeight = 80; // Estimated average message height
       return {
         length: averageHeight,
@@ -250,7 +259,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
       ListHeaderComponent={renderLoadingHeader}
       ListFooterComponent={ListFooterComponent}
-      ListEmptyComponent={renderEmptyState}
+          ListEmptyComponent={renderEmptyState as any}
       removeClippedSubviews={true}
       maxToRenderPerBatch={10}
       windowSize={10}

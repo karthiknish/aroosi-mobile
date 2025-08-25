@@ -12,13 +12,15 @@ import {
   Dimensions,
 } from "react-native";
 import { useToast } from "@providers/ToastContext";
-import { useClerkAuth } from "../../../contexts/ClerkAuthContext";
+import { useAuth } from "@contexts/AuthProvider";
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
 import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@hooks/useResponsive";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 type LoginScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -28,7 +30,8 @@ type LoginScreenNavigationProp = StackNavigationProp<
 const { width, height } = Dimensions.get("window");
 
 export default function LoginScreen() {
-  const { signIn, isLoading: authLoading } = useClerkAuth();
+  const { signIn, isLoading: authLoading } = useAuth();
+  const toast = useToast();
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -43,7 +46,7 @@ export default function LoginScreen() {
   const onSignInPress = async () => {
     // Clear previous error message
     setErrorMessage(null);
-    
+
     // Inline client-side validation
     const errors: Record<string, string> = {};
 
@@ -63,7 +66,6 @@ export default function LoginScreen() {
     setFieldErrors(errors);
 
     if (Object.keys(errors).length > 0) {
-      // Show error toast with summary
       const fieldDisplay: Record<string, string> = {
         emailAddress: "Email",
         password: "Password",
@@ -75,12 +77,9 @@ export default function LoginScreen() {
         fields.length > 0
           ? `Please fix: ${fields.join(", ")}.`
           : "Please correct the highlighted fields.";
-      const toast = useToast();
       toast.show(summary, "error");
       return;
     }
-
-    const toast = useToast();
     setLoading(true);
     try {
       const result = await signIn(email, password);
@@ -88,17 +87,20 @@ export default function LoginScreen() {
       if (!result.success) {
         // Provide more specific error messages for common cases
         let errorMsg = result.error || "Invalid email or password";
-        
+
         if (errorMsg.includes("identifier_not_found")) {
-          errorMsg = "No account found with this email address. Please check your email or sign up for a new account.";
+          errorMsg =
+            "No account found with this email address. Please check your email or sign up for a new account.";
         } else if (errorMsg.includes("password_incorrect")) {
-          errorMsg = "Invalid password. Please check your password and try again.";
+          errorMsg =
+            "Invalid password. Please check your password and try again.";
         } else if (errorMsg.includes("invalid_credentials")) {
-          errorMsg = "Invalid email or password. Please check your credentials and try again.";
+          errorMsg =
+            "Invalid email or password. Please check your credentials and try again.";
         } else if (errorMsg.includes("too_many_requests")) {
           errorMsg = "Too many requests. Please try again later.";
         }
-        
+
         setErrorMessage(errorMsg);
         toast.show(errorMsg, "error");
       }
@@ -107,7 +109,6 @@ export default function LoginScreen() {
       console.error("Sign in error:", err);
       const errorMsg = "An unexpected error occurred";
       setErrorMessage(errorMsg);
-      const toast = useToast();
       toast.show(errorMsg, "error");
     } finally {
       setLoading(false);
@@ -293,7 +294,7 @@ export default function LoginScreen() {
         {/* Decorative background elements */}
         <View style={styles.backgroundCircle1} />
         <View style={styles.backgroundCircle2} />
-        
+
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -305,11 +306,16 @@ export default function LoginScreen() {
           >
             <View style={styles.inner}>
               <View style={styles.header}>
-                <View style={{ position: "relative", marginBottom: spacing.md }}>
+                <View
+                  style={{ position: "relative", marginBottom: spacing.md }}
+                >
                   <Text style={styles.title}>Sign In</Text>
                   <View style={styles.titleUnderline} />
                 </View>
-                <Text style={styles.subtitle}>Sign in to your Aroosi account to access your profile, matches, and more.</Text>
+                <Text style={styles.subtitle}>
+                  Sign in to your Aroosi account to access your profile,
+                  matches, and more.
+                </Text>
               </View>
 
               <View style={styles.formContainer}>
@@ -318,7 +324,7 @@ export default function LoginScreen() {
                   {errorMessage ? (
                     <Text style={styles.errorMessage}>{errorMessage}</Text>
                   ) : null}
-                  
+
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Email</Text>
                     <TextInput
@@ -343,7 +349,9 @@ export default function LoginScreen() {
                       editable={!loading}
                     />
                     {fieldErrors.emailAddress ? (
-                      <Text style={styles.errorText}>{fieldErrors.emailAddress}</Text>
+                      <Text style={styles.errorText}>
+                        {fieldErrors.emailAddress}
+                      </Text>
                     ) : null}
                   </View>
 
@@ -367,7 +375,9 @@ export default function LoginScreen() {
                       editable={!loading}
                     />
                     {fieldErrors.password ? (
-                      <Text style={styles.errorText}>{fieldErrors.password}</Text>
+                      <Text style={styles.errorText}>
+                        {fieldErrors.password}
+                      </Text>
                     ) : null}
                   </View>
 
@@ -386,7 +396,9 @@ export default function LoginScreen() {
                     onPress={() => navigation.navigate("ForgotPassword")}
                     disabled={loading}
                   >
-                    <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+                    <Text style={styles.forgotPasswordText}>
+                      Forgot password?
+                    </Text>
                   </TouchableOpacity>
 
                   <View style={styles.divider}>

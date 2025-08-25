@@ -1,13 +1,21 @@
-import { Audio } from "expo-av";
+import {
+  setAudioModeAsync,
+  requestRecordingPermissionsAsync,
+  getRecordingPermissionsAsync,
+  AudioModule,
+  IOSOutputFormat,
+  AudioQuality,
+} from "expo-audio";
 import { VoiceRecorder } from "../types/messaging";
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system";
 
 /**
- * Voice recorder implementation for React Native using Expo AV
+ * Voice recorder implementation for React Native using expo-audio
  */
 export class ExpoVoiceRecorder implements VoiceRecorder {
-  private recording: Audio.Recording | null = null;
+  private recording: InstanceType<typeof AudioModule.AudioRecorder> | null =
+    null;
   private recordingUri: string | null = null;
   private startTime: number = 0;
   private durationInterval: NodeJS.Timeout | null = null;
@@ -24,13 +32,12 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
    */
   private async setupAudio(): Promise<void> {
     try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
+      await requestRecordingPermissionsAsync();
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        shouldRouteThroughEarpiece: false,
+        shouldPlayInBackground: false,
       });
     } catch (error) {
       console.error("Failed to setup audio:", error);
@@ -44,7 +51,7 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
   async startRecording(): Promise<void> {
     try {
       // Check permissions first
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await requestRecordingPermissionsAsync();
       if (status !== "granted") {
         throw new Error("Microphone permission denied");
       }
@@ -55,32 +62,33 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
       }
 
       // Create new recording
-      this.recording = new Audio.Recording();
-
-      const recordingOptions = {
+      this.recording = new AudioModule.AudioRecorder({});
+      await this.recording.prepareToRecordAsync({
+        // Common
+        isMeteringEnabled: false,
+        extension: ".m4a",
+        sampleRate: 44100,
+        numberOfChannels: 1,
+        bitRate: 128000,
+        // Android
         android: {
           extension: ".m4a",
-          outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
-          audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
+          outputFormat: "mpeg4",
+          audioEncoder: "aac",
         },
+        // iOS
         ios: {
           extension: ".m4a",
-          outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
-          audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
-          sampleRate: 44100,
-          numberOfChannels: 2,
-          bitRate: 128000,
-          linearPCMBitDepth: 16,
-          linearPCMIsBigEndian: false,
-          linearPCMIsFloat: false,
+          audioQuality: AudioQuality.HIGH,
+          outputFormat: IOSOutputFormat.MPEG4AAC,
         },
-      };
-
-      await this.recording.prepareToRecordAsync(recordingOptions);
-      await this.recording.startAsync();
+        // Web (best-effort)
+        web: {
+          mimeType: "audio/mp4",
+          bitsPerSecond: 128000,
+        },
+      });
+      this.recording.record();
 
       this.isRecording = true;
       this.startTime = Date.now();
@@ -97,7 +105,11 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
     } catch (error) {
       console.error("Failed to start recording:", error);
       this.cleanup();
-      throw new Error(`Failed to start recording: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to start recording: ${error.message}`);
+      } else {
+        throw new Error("Failed to start recording: Unknown error");
+      }
     }
   }
 
@@ -110,8 +122,10 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
         throw new Error("No active recording to stop");
       }
 
-      await this.recording.stopAndUnloadAsync();
-      this.recordingUri = this.recording.getURI();
+      await this.recording.stop();
+      // Prefer uri property; fallback to status url
+      const status = this.recording.getStatus();
+      this.recordingUri = this.recording.uri || status.url || null;
       this.isRecording = false;
 
       // Clear duration interval
@@ -137,7 +151,11 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
     } catch (error) {
       console.error("Failed to stop recording:", error);
       this.cleanup();
-      throw new Error(`Failed to stop recording: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to stop recording: ${error.message}`);
+      } else {
+        throw new Error("Failed to stop recording: Unknown error");
+      }
     }
   }
 
@@ -147,7 +165,7 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
   cancelRecording(): void {
     try {
       if (this.recording && this.isRecording) {
-        this.recording.stopAndUnloadAsync().catch(console.error);
+        this.recording.stop().catch(console.error);
       }
       this.cleanup();
       console.log("Voice recording cancelled");
@@ -190,7 +208,11 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
       }
     } catch (error) {
       console.error("Failed to convert file to blob:", error);
-      throw new Error(`Failed to process recording: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to process recording: ${error.message}`);
+      } else {
+        throw new Error("Failed to process recording: Unknown error");
+      }
     }
   }
 
@@ -229,7 +251,7 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
    */
   async checkPermissions(): Promise<boolean> {
     try {
-      const { status } = await Audio.getPermissionsAsync();
+      const { status } = await getRecordingPermissionsAsync();
       return status === "granted";
     } catch (error) {
       console.error("Failed to check permissions:", error);
@@ -242,7 +264,7 @@ export class ExpoVoiceRecorder implements VoiceRecorder {
    */
   async requestPermissions(): Promise<boolean> {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
+      const { status } = await requestRecordingPermissionsAsync();
       return status === "granted";
     } catch (error) {
       console.error("Failed to request permissions:", error);

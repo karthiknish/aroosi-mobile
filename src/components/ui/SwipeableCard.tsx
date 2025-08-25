@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   overlayText: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: 32,
-    fontWeight: \"bold\",
+    fontWeight: "bold",
     color: Colors.background.primary,
     marginBottom: 10,
   },
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   name: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: 28,
-    fontWeight: \"bold\",
+    fontWeight: "bold",
     color: Colors.text.primary,
     marginBottom: 5,
   },

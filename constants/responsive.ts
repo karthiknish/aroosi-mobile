@@ -1,4 +1,5 @@
 import { Dimensions, PixelRatio, Platform } from "react-native";
+import { responsive as sharedResponsive } from "@utils/responsive";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -57,42 +58,33 @@ export const Responsive = {
   // Enhanced responsive scaling
   scale: {
     // Width-based scaling
-    width: (size: number, baseWidth = BASE_WIDTH) => {
-      return (screenWidth / baseWidth) * size;
+    width: (size: number) => {
+      return sharedResponsive.width(size);
     },
 
     // Height-based scaling
-    height: (size: number, baseHeight = BASE_HEIGHT) => {
-      return (screenHeight / baseHeight) * size;
+    height: (size: number) => {
+      return sharedResponsive.height(size);
     },
 
     // Font scaling with platform adjustments
     font: (size: number) => {
-      const scale = screenWidth / BASE_WIDTH;
-      const newSize = size * scale;
-
-      if (Platform.OS === "ios") {
-        return Math.round(PixelRatio.roundToNearestPixel(newSize));
-      } else {
-        return Math.round(PixelRatio.roundToNearestPixel(newSize)) - 1;
-      }
+      return sharedResponsive.font(size);
     },
 
     // Spacing scaling
     spacing: (size: number) => {
-      const scale = Math.min(screenWidth / BASE_WIDTH, 1.2);
-      return Math.round(size * scale);
+      return sharedResponsive.spacing(size);
     },
 
     // Border radius scaling
     radius: (size: number) => {
-      return Math.round((screenWidth / BASE_WIDTH) * size);
+      return sharedResponsive.radius(size);
     },
 
     // Icon size scaling
     icon: (size: number) => {
-      const scale = Math.min(screenWidth / BASE_WIDTH, 1.1);
-      return Math.round(size * scale);
+      return sharedResponsive.icon(size);
     },
   },
 
@@ -173,10 +165,10 @@ export const Responsive = {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowRadius: sharedResponsive.radius(2),
       },
       android: {
-        elevation: 2,
+        elevation: sharedResponsive.spacing(2),
       },
     }),
     medium: Platform.select({
@@ -184,10 +176,10 @@ export const Responsive = {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowRadius: sharedResponsive.radius(4),
       },
       android: {
-        elevation: 4,
+        elevation: sharedResponsive.spacing(4),
       },
     }),
     large: Platform.select({
@@ -195,10 +187,10 @@ export const Responsive = {
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
-        shadowRadius: 8,
+        shadowRadius: sharedResponsive.radius(8),
       },
       android: {
-        elevation: 8,
+        elevation: sharedResponsive.spacing(8),
       },
     }),
   },

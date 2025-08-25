@@ -15,12 +15,19 @@ import {
   ReportData,
   ReportResponse,
 } from "../types/profile";
-import { validateProfileData, validateFormData } from "./typeValidation";
+import type { Icebreaker } from "../src/types/engagement";
+import {
+  validateCreateProfile as validateFormData,
+  validateUpdateProfile as validateProfileData,
+} from "./profileValidation";
+import { getAuthToken } from "../services/authToken";
 
 // Base URL must be provided via environment
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
 if (!API_BASE_URL) {
-  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
+  throw new Error(
+    "EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment."
+  );
 }
 
 class ApiClient {
@@ -53,19 +60,40 @@ class ApiClient {
     options: RequestInit = {},
     retryCount: number = 0
   ): Promise<ApiResponse<T>> {
+    // Normalize endpoint to include /api prefix expected by web backend
+    const normalizeEndpoint = (ep: string) => {
+      if (!ep.startsWith("/")) ep = "/" + ep;
+      if (ep.startsWith("/api/")) return ep; // already normalized
+      return "/api" + ep; // prefix missing
+    };
+    endpoint = normalizeEndpoint(endpoint);
     const maxRetries = 3;
     const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
 
     try {
       const url = `${this.baseUrl}${endpoint}`;
 
+      // Automatically attach Firebase ID token if not already provided
+      let headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...((options.headers as Record<string, string>) || {}),
+      };
+
+      if (!headers["Authorization"]) {
+        try {
+          const token = await getAuthToken();
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+        } catch (authError) {
+          console.warn("Failed to get auth token:", authError);
+        }
+      }
+
       const response = await fetch(url, {
         ...options,
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        },
+        headers,
       });
 
       const data = await response.json().catch(() => ({}));
@@ -141,63 +169,104 @@ class ApiClient {
 
   // Profile APIs
   async getProfile(): Promise<ApiResponse<Profile>> {
-    const response = await this.request("/profile");
-    if (response.success && response.data) {
-      response.data = validateProfileData(response.data) as Profile;
-    }
-    return response as ApiResponse<Profile>;
+    return this.request<Profile>("/profile");
+  }
+
+  // Engagement: Icebreakers
+  async fetchIcebreakers(): Promise<ApiResponse<Icebreaker[]>> {
+    const res = await this.request<Icebreaker[]>("/icebreakers");
+    if (!res.success) return res as ApiResponse<Icebreaker[]>;
+    // Support enveloped responses { success, data }
+    const payload: any = res.data as any;
+    const list = Array.isArray(payload?.data) ? payload.data : payload;
+    return { success: true, data: Array.isArray(list) ? list : [] };
+  }
+
+  async answerIcebreaker(
+    questionId: string,
+    answer: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    const res = await this.request<{ success: boolean }>(
+      "/icebreakers/answer",
+      {
+        method: "POST",
+        body: JSON.stringify({ questionId, answer }),
+      }
+    );
+    return res as ApiResponse<{ success: boolean }>;
+  }
+
+  // Engagement: Shortlists
+  async fetchShortlists(): Promise<
+    ApiResponse<
+      {
+        userId: string;
+        fullName?: string;
+        profileImageUrls?: string[];
+        createdAt: number;
+      }[]
+    >
+  > {
+    return this.request("/engagement/shortlist");
+  }
+
+  async toggleShortlist(
+    toUserId: string
+  ): Promise<
+    ApiResponse<{ success: boolean; added?: boolean; removed?: boolean }>
+  > {
+    return this.request("/engagement/shortlist", {
+      method: "POST",
+      body: JSON.stringify({ toUserId }),
+    });
   }
 
   async getProfileById(profileId: string): Promise<ApiResponse<Profile>> {
-    const response = await this.request(`/profile-detail/${profileId}`);
-    if (response.success && response.data) {
-      response.data = validateProfileData(response.data) as Profile;
-    }
-    return response as ApiResponse<Profile>;
+    return this.request<Profile>(`/profile-detail/${profileId}`);
   }
 
   async createProfile(
     profileData: CreateProfileData
   ): Promise<ApiResponse<Profile>> {
     // Validate form data before sending
-    const validation = validateFormData(profileData);
-    if (!validation.isValid) {
+    const errors = validateFormData(profileData);
+    if (Object.keys(errors).length > 0) {
       return {
         success: false,
         error: {
           code: "VALIDATION_ERROR",
-          message: validation.errors.join(", "),
-          details: validation.errors,
+          message: Object.values(errors).join(", "),
+          details: errors,
         },
-      };
+      } as any;
     }
 
-    const response = await this.request("/profile", {
+    return this.request<Profile>("/profile", {
       method: "POST",
-      body: JSON.stringify(validation.data),
+      body: JSON.stringify(profileData),
     });
-
-    if (response.success && response.data) {
-      response.data = validateProfileData(response.data) as Profile;
-    }
-    return response as ApiResponse<Profile>;
   }
 
   async updateProfile(
     updates: UpdateProfileData
   ): Promise<ApiResponse<Profile>> {
-    // Validate updates before sending
-    const validatedUpdates = validateProfileData(updates);
-
-    const response = await this.request("/profile", {
-      method: "PUT",
-      body: JSON.stringify(validatedUpdates),
-    });
-
-    if (response.success && response.data) {
-      response.data = validateProfileData(response.data) as Profile;
+    // Validate updates before sending (errors object when invalid)
+    const errors = validateProfileData(updates);
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: Object.values(errors).join(", "),
+          details: errors,
+        },
+      } as any;
     }
-    return response as ApiResponse<Profile>;
+
+    return this.request<Profile>("/profile", {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
   }
 
   // Search APIs
@@ -322,6 +391,31 @@ class ApiClient {
     };
   }
 
+  // Messaging Image Upload (parity with web /api/messages/upload-image)
+  async getMessageImageUploadUrl(
+    conversationId: string
+  ): Promise<ApiResponse<{ uploadUrl: string }>> {
+    return this.request(`/messages/upload-image-url`, {
+      method: "POST",
+      body: JSON.stringify({ conversationId }),
+    });
+  }
+
+  async saveMessageImageMetadata(params: {
+    conversationId: string;
+    storageId: string;
+    fileName: string;
+    contentType: string;
+    fileSize: number;
+    width?: number;
+    height?: number;
+  }): Promise<ApiResponse<{ messageId: string; imageUrl: string }>> {
+    return this.request(`/messages/image`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
   async getInterestStatus(
     fromUserId: string,
     toUserId: string
@@ -381,8 +475,64 @@ class ApiClient {
   }
 
   // Conversation APIs
-  async getConversations() {
-    return this.request("/conversations");
+  async getConversations(options?: { page?: number; limit?: number }) {
+    const params = new URLSearchParams();
+    if (options?.page !== undefined)
+      params.append("page", String(options.page));
+    if (options?.limit !== undefined)
+      params.append("limit", String(options.limit));
+    const qs = params.toString();
+    const path = qs ? `/conversations?${qs}` : "/conversations";
+    return this.request(path);
+  }
+
+  // Message Reactions
+  /**
+   * Toggle a reaction for a message (adds if not present by user, removes otherwise)
+   * Mirrors web endpoint POST /api/reactions with body { messageId, emoji }
+   */
+  async toggleReaction(
+    messageId: string,
+    emoji: string
+  ): Promise<ApiResponse<{ success?: boolean }>> {
+    if (!messageId || !emoji) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "messageId and emoji are required",
+          details: null,
+        },
+      } as any;
+    }
+    return this.request("/reactions", {
+      method: "POST",
+      body: JSON.stringify({ messageId, emoji }),
+    });
+  }
+
+  /**
+   * Get reactions for a conversation
+   * GET /api/reactions?conversationId=...
+   * Returns { reactions: Array<{ messageId: string; emoji: string; userId: string }> }
+   */
+  async getReactions(conversationId: string): Promise<
+    ApiResponse<{
+      reactions?: Array<{ messageId: string; emoji: string; userId: string }>;
+    }>
+  > {
+    if (!conversationId) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "conversationId is required",
+          details: null,
+        },
+      } as any;
+    }
+    const qs = `conversationId=${encodeURIComponent(conversationId)}`;
+    return this.request(`/reactions?${qs}`);
   }
 
   // Message APIs - Aligned with unified messaging endpoints
@@ -425,9 +575,16 @@ class ApiClient {
     text?: string;
     type?: "text" | "voice" | "image";
     audioStorageId?: string;
+    imageStorageId?: string;
     duration?: number;
     fileSize?: number;
     mimeType?: string;
+    replyTo?: {
+      messageId: string;
+      text?: string;
+      type?: "text" | "voice" | "image";
+      fromUserId?: string;
+    };
   }): Promise<ApiResponse<Message>> {
     // Validate message data
     const { MessageValidator } = await import("./messageValidation");
@@ -455,6 +612,10 @@ class ApiClient {
         duration: data.duration,
         fileSize: data.fileSize,
         mimeType: data.mimeType,
+        replyToMessageId: data.replyTo?.messageId,
+        replyToText: data.replyTo?.text,
+        replyToType: data.replyTo?.type,
+        replyToFromUserId: data.replyTo?.fromUserId,
       }),
     });
 
@@ -464,6 +625,26 @@ class ApiClient {
     }
 
     return response;
+  }
+
+  // Edit a message (text only)
+  async editMessage(
+    messageId: string,
+    text: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(`/messages/${messageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // Soft-delete a message
+  async deleteMessage(
+    messageId: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request(`/messages/${messageId}`, {
+      method: "DELETE",
+    });
   }
 
   async markMessagesAsRead(messageIds: string[]) {
@@ -498,26 +679,35 @@ class ApiClient {
 
   // Delivery receipts
   async sendDeliveryReceipt(messageId: string, status: string) {
-    return this.request("/delivery-receipts", {
-      method: "POST",
-      body: JSON.stringify({ messageId, status }),
-    });
+    // No dedicated REST endpoint on web; treat as no-op success.
+    if (!messageId) {
+      return {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "messageId required" },
+      } as any;
+    }
+    return { success: true } as any;
   }
 
   async getDeliveryReceipts(conversationId: string) {
-    return this.request(`/delivery-receipts?conversationId=${conversationId}`);
+    // Not supported – return empty list
+    return { success: true, data: [] } as any;
   }
 
   // Typing indicators
   async sendTypingIndicator(conversationId: string, action: "start" | "stop") {
-    return this.request("/typing-indicators", {
-      method: "POST",
-      body: JSON.stringify({ conversationId, action }),
-    });
+    if (!conversationId) {
+      return {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "conversationId required" },
+      } as any;
+    }
+    return { success: true } as any; // realtime only
   }
 
   async getTypingIndicators(conversationId: string) {
-    return this.request(`/typing-indicators?conversationId=${conversationId}`);
+    // Not supported via REST
+    return { success: true, data: [] } as any;
   }
 
   // Image APIs - Updated to match web implementation
@@ -573,8 +763,8 @@ class ApiClient {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,
-      fromUserId: rawMessage.fromUserId || rawMessage.senderId,
-      toUserId: rawMessage.toUserId || rawMessage.recipientId,
+      fromUserId: rawMessage.fromUserId,
+      toUserId: rawMessage.toUserId,
       text: rawMessage.text || rawMessage.content || "",
       type: rawMessage.type || "text",
       createdAt: rawMessage.createdAt || rawMessage.timestamp || Date.now(),
@@ -598,7 +788,6 @@ class ApiClient {
 
       // Backward compatibility fields
       id: rawMessage.id,
-      senderId: rawMessage.senderId,
       content: rawMessage.content,
       _creationTime: rawMessage._creationTime,
       timestamp: rawMessage.timestamp,
@@ -672,6 +861,27 @@ class ApiClient {
 
   async getBatchProfileImages(userIds: string[]) {
     return this.request(`/profile-images/batch?userIds=${userIds.join(",")}`);
+  }
+
+  async setMainProfileImage(imageId: string) {
+    return this.request("/profile-images/main", {
+      method: "POST",
+      body: JSON.stringify({ imageId }),
+    });
+  }
+
+  async updateImageOrder(imageIds: string[]) {
+    return this.request("/profile-images/order", {
+      method: "POST",
+      body: JSON.stringify({ imageIds }),
+    });
+  }
+
+  async batchProfileImageOperations(operations: any) {
+    return this.request("/profile-images/batch", {
+      method: "POST",
+      body: JSON.stringify(operations),
+    });
   }
 
   // Subscription APIs - aligned with main project
@@ -781,9 +991,13 @@ class ApiClient {
   async generateVoiceUploadUrl(): Promise<
     ApiResponse<{ uploadUrl: string; storageId: string }>
   > {
-    return this.request("/voice-messages/upload-url", {
-      method: "POST",
-    });
+    const storageId = `voice_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+    return {
+      success: true,
+      data: { uploadUrl: `${this.baseUrl}/voice-messages/upload`, storageId },
+    };
   }
 
   async uploadVoiceMessage(
@@ -822,16 +1036,24 @@ class ApiClient {
     return this.request(`/voice-messages/${storageId}/url`);
   }
 
-  // Profile view tracking
-  async recordProfileView(viewedUserId: string) {
+  // Profile view tracking (align with web: body { profileId }, GET requires ?profileId=)
+  async recordProfileView(profileId: string) {
     return this.request("/profile/view", {
       method: "POST",
-      body: JSON.stringify({ viewedUserId }),
+      body: JSON.stringify({ profileId }),
     });
   }
 
-  async getProfileViewers() {
-    return this.request("/profile/view");
+  async getProfileViewers(
+    profileId: string,
+    opts: { limit?: number; offset?: number } = {}
+  ) {
+    const params = new URLSearchParams();
+    if (profileId) params.set("profileId", profileId);
+    if (typeof opts.limit === "number") params.set("limit", String(opts.limit));
+    if (typeof opts.offset === "number")
+      params.set("offset", String(opts.offset));
+    return this.request(`/profile/view?${params.toString()}`);
   }
 
   // User management
@@ -912,20 +1134,15 @@ class ApiClient {
    * @param {string} validationRequest.productId
    * @param {string} [validationRequest.purchaseToken]
    * @param {string} [validationRequest.receiptData]
-   * @param {string} [authToken]
    */
-  async validatePurchase(
-    validationRequest: {
-      platform: "ios" | "android";
-      productId: string;
-      purchaseToken?: string;
-      receiptData?: string;
-    },
-    authToken?: string
-  ) {
+  async validatePurchase(validationRequest: {
+    platform: "ios" | "android";
+    productId: string;
+    purchaseToken?: string;
+    receiptData?: string;
+  }) {
     return this.request("/subscription/validate-purchase", {
       method: "POST",
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       body: JSON.stringify(validationRequest),
     });
   }

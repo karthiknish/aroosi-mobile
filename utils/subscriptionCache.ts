@@ -57,8 +57,8 @@ export class SubscriptionCache {
    * Check if key exists and is not expired
    */
   static has(key: string): boolean {
-    const entry = this.cache.get(key);
-    return entry !== null && entry.expires > Date.now();
+  const entry = this.cache.get(key);
+  return entry !== undefined && entry !== null && entry.expires > Date.now();
   }
 }
 

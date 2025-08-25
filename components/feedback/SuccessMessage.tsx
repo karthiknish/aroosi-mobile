@@ -89,7 +89,7 @@ export function SuccessMessage({
           <Ionicons
             name="checkmark-circle"
             size={20}
-            color={Colors.green[500]}
+            color={Colors.success[400]}
             style={styles.icon}
           />
         )}
@@ -101,13 +101,13 @@ export function SuccessMessage({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.green[50],
-    borderColor: Colors.green[200],
+    backgroundColor: Colors.success[50],
+    borderColor: Colors.success[200],
     borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     marginVertical: 8,
-    shadowColor: Colors.green[500],
+    shadowColor: Colors.success[400],
     shadowOffset: {
       width: 0,
       height: 2,
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   message: {
     flex: 1,
     fontSize: 14,
-    color: Colors.green[800],
+    color: Colors.success[600],
     fontFamily: "NunitoSans-Regular",
     lineHeight: 20,
   },

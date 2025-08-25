@@ -14,13 +14,14 @@ module.exports = function (api) {
             "@contexts": "./contexts",
             "@constants": "./constants",
             "@src": "./src",
-            "@utils": "./src/utils"
+            "@utils": "./utils",
+            "@/utils": "./utils",
           },
-          extensions: [".js", ".jsx", ".ts", ".tsx", ".json"]
-        }
+          extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
+        },
       ],
       // Reanimated must be listed last
-      "react-native-reanimated/plugin"
-    ]
+      "react-native-reanimated/plugin",
+    ],
   };
 };

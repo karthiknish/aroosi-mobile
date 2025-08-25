@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   Switch,
 } from "react-native";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 import { useState } from "react";
-import { Colors, Layout } from "../../../constants";
-import useResponsiveSpacing from "@hooks/useResponsive";
-import useResponsiveTypography from "@hooks/useResponsive";
+import { Colors, Layout } from "@constants";
+import useResponsiveSpacing from "@/hooks/useResponsive";
+import useResponsiveTypography from "@/hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
+import VerifyEmailInline from "@components/auth/VerifyEmailInline";
 interface SettingsScreenProps {
   navigation: any;
 }
@@ -29,7 +30,15 @@ interface SettingItem {
 }
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
-  const { } = useClerkAuth();
+  const {
+    signOut,
+    user,
+    needsEmailVerification,
+    resendEmailVerification,
+    verifyEmailCode,
+    startEmailVerificationPolling,
+    refreshUser,
+  } = useAuth() as any;
   const { spacing } = useResponsiveSpacing();
   const rt = useResponsiveTypography();
   const font = (n: number) => (rt?.scale?.font ? rt.scale.font(n) : n);
@@ -40,6 +49,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const toast = useToast();
+  const [resendLoading, setResendLoading] = useState(false);
+  const [checking, setChecking] = useState(false);
   const handleSignOut = () => {
     // Immediate sign-out flow with toast feedback; replace with ConfirmModal if desired
     const doSignOut = async () => {
@@ -57,6 +68,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     // Not implemented yet; provide non-blocking feedback
     toast.show("Account deletion is not implemented in this build.", "info");
   };
+
+  // Email verification actions handled by VerifyEmailInline component
 
   const settingSections = [
     {
@@ -243,6 +256,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       fontSize: font(14),
       color: Colors.text.secondary,
     },
+    // Removed inline banner styles; using shared component
     section: {
       marginBottom: spacing.lg,
     },
@@ -364,6 +378,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <Text style={styles.userName}>{user?.profile?.fullName || "User"}</Text>
         <Text style={styles.userEmail}>{user?.email}</Text>
       </View>
+
+      {/* Email Verification Banner (Settings-specific) */}
+          {needsEmailVerification && <VerifyEmailInline variant="banner" />}
 
       {/* Settings Sections */}
       {settingSections.map((section, sectionIndex) => (

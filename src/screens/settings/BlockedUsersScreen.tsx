@@ -6,11 +6,11 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  Alert,
+  Modal,
 } from "react-native";
-import { Colors, Layout } from "../../../constants";
-import { useBlockedUsers, useUnblockUser } from "../../../hooks/useSafety";
-import { BlockedUserWithProfile } from "../../../types/safety";
+import { Colors, Layout } from "@constants";
+import { useBlockedUsers, useUnblockUser } from "@/hooks/useSafety";
+import { BlockedUserWithProfile } from "@/types/safety";
 import LoadingState from "@components/ui/LoadingState";
 import EmptyState from "@components/ui/EmptyState";
 import ScreenContainer from "@components/common/ScreenContainer";
@@ -22,6 +22,13 @@ interface BlockedUsersScreenProps {
 export default function BlockedUsersScreen({
   navigation,
 }: BlockedUsersScreenProps) {
+  const [modalVisible, setModalVisible] = React.useState(false);
+  const [modalType, setModalType] = React.useState<
+    "confirm" | "success" | "error" | null
+  >(null);
+  const [selectedUser, setSelectedUser] =
+    React.useState<BlockedUserWithProfile | null>(null);
+  const [modalMessage, setModalMessage] = React.useState<string>("");
   const {
     data: blockedUsers = [],
     isLoading,
@@ -31,31 +38,33 @@ export default function BlockedUsersScreen({
   const unblockUserMutation = useUnblockUser();
 
   const handleUnblockUser = (user: BlockedUserWithProfile) => {
-    Alert.alert(
-      "Unblock User",
-      `Are you sure you want to unblock ${user.blockedProfile.fullName}? They will be able to see your profile and contact you again.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Unblock",
-          style: "default",
-          onPress: async () => {
-            try {
-              await unblockUserMutation.mutateAsync({
-                blockedUserId: user.blockedUserId,
-              });
-              Alert.alert(
-                "Success",
-                `${user.blockedProfile.fullName} has been unblocked.`
-              );
-            } catch (error) {
-              console.error("Error unblocking user:", error);
-              Alert.alert("Error", "Failed to unblock user. Please try again.");
-            }
-          },
-        },
-      ]
+    setSelectedUser(user);
+    setModalType("confirm");
+    setModalMessage(
+      `Are you sure you want to unblock ${
+        user.blockedProfile?.fullName || "Unknown"
+      }? They will be able to see your profile and contact you again.`
     );
+    setModalVisible(true);
+  };
+
+  const handleConfirmUnblock = async () => {
+    if (!selectedUser) return;
+    try {
+      await unblockUserMutation.mutateAsync({
+        blockedUserId: selectedUser.blockedUserId,
+      });
+      setModalType("success");
+      setModalMessage(
+        `${
+          selectedUser.blockedProfile?.fullName || "Unknown"
+        } has been unblocked.`
+      );
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+      setModalType("error");
+      setModalMessage("Failed to unblock user. Please try again.");
+    }
   };
 
   const handleViewSafetyGuidelines = () => {
@@ -84,7 +93,7 @@ export default function BlockedUsersScreen({
   const renderBlockedUser = ({ item }: { item: BlockedUserWithProfile }) => (
     <View style={styles.userCard}>
       <View style={styles.userInfo}>
-        {item.blockedProfile.profileImageUrl ? (
+        {item.blockedProfile?.profileImageUrl ? (
           <Image
             source={{ uri: item.blockedProfile.profileImageUrl }}
             style={styles.userImage}
@@ -96,7 +105,9 @@ export default function BlockedUsersScreen({
         )}
 
         <View style={styles.userDetails}>
-          <Text style={styles.userName}>{item.blockedProfile.fullName}</Text>
+          <Text style={styles.userName}>
+            {item.blockedProfile?.fullName || "Unknown"}
+          </Text>
           <Text style={styles.blockDate}>
             {formatBlockDate(item.createdAt)}
           </Text>
@@ -112,6 +123,112 @@ export default function BlockedUsersScreen({
           {unblockUserMutation.isPending ? "Unblocking..." : "Unblock"}
         </Text>
       </TouchableOpacity>
+      {/* Modal for unblock confirmation, success, and error */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            backgroundColor: "rgba(0,0,0,0.3)",
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 12,
+              padding: 24,
+              minWidth: 280,
+              alignItems: "center",
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 16 }}>
+              {modalType === "confirm"
+                ? "Unblock User"
+                : modalType === "success"
+                ? "Success"
+                : "Error"}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                color: "#333",
+                marginBottom: 24,
+                textAlign: "center",
+              }}
+            >
+              {modalMessage}
+            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "center" }}>
+              {modalType === "confirm" && (
+                <>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#eee",
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      marginRight: 12,
+                    }}
+                    onPress={() => setModalVisible(false)}
+                  >
+                    <Text style={{ fontWeight: "600", color: "#333" }}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: "#4CAF50",
+                      paddingHorizontal: 20,
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                    }}
+                    onPress={handleConfirmUnblock}
+                    disabled={unblockUserMutation.isPending}
+                  >
+                    <Text style={{ fontWeight: "600", color: "#fff" }}>
+                      {unblockUserMutation.isPending
+                        ? "Unblocking..."
+                        : "Unblock"}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              {modalType === "success" && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#4CAF50",
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={{ fontWeight: "600", color: "#fff" }}>OK</Text>
+                </TouchableOpacity>
+              )}
+              {modalType === "error" && (
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#F44336",
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => setModalVisible(false)}
+                >
+                  <Text style={{ fontWeight: "600", color: "#fff" }}>OK</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 

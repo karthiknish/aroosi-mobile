@@ -13,9 +13,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { Colors, Layout } from '../../constants';
-import { useContact } from '../../hooks/useContact';
+import { useContact } from "@/hooks/useContact";
 import { ContactFormData, CONTACT_SUBJECTS } from '../../types/contact';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 interface ContactFormProps {
   onSubmitSuccess?: () => void;

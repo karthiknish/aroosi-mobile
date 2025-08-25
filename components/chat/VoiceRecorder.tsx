@@ -9,10 +9,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
-import { useVoiceRecording } from '../../hooks/useVoiceRecording';
-import PlatformHaptics from '../../utils/PlatformHaptics';
+import { useVoiceRecording } from "@/hooks/useVoiceRecording";
+import PlatformHaptics from "../../utils/PlatformHaptics";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 interface VoiceRecorderProps {
   onRecordingComplete: (uri: string, duration: number) => void;
@@ -26,13 +26,16 @@ export default function VoiceRecorder({
   visible,
 }: VoiceRecorderProps) {
   const {
-    recordingState,
     startRecording,
     stopRecording,
-    pauseRecording,
-    resumeRecording,
     cancelRecording,
-    playRecording,
+    isRecording,
+    duration,
+    audioUri,
+    error,
+    hasPermission,
+    maxDuration,
+    isDurationValid,
   } = useVoiceRecording();
 
   // Animation values
@@ -60,7 +63,7 @@ export default function VoiceRecorder({
 
   // Recording pulse animation
   useEffect(() => {
-    if (recordingState.isRecording && !recordingState.isPaused) {
+    if (isRecording) {
       const pulseAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -81,11 +84,11 @@ export default function VoiceRecorder({
         pulseAnimation.stop();
       };
     }
-  }, [recordingState.isRecording, recordingState.isPaused, pulseAnim]);
+  }, [isRecording, pulseAnim]);
 
   // Wave animation
   useEffect(() => {
-    if (recordingState.isRecording && !recordingState.isPaused) {
+    if (isRecording) {
       const waveAnimation = Animated.loop(
         Animated.timing(waveAnim, {
           toValue: 1,
@@ -100,7 +103,7 @@ export default function VoiceRecorder({
         waveAnim.setValue(0);
       };
     }
-  }, [recordingState.isRecording, recordingState.isPaused, waveAnim]);
+  }, [isRecording, waveAnim]);
 
   const handleStartRecording = async () => {
     const started = await startRecording();
@@ -110,9 +113,9 @@ export default function VoiceRecorder({
   };
 
   const handleStopRecording = async () => {
-    const uri = await stopRecording();
-    if (uri) {
-      onRecordingComplete(uri, recordingState.duration);
+    const result = await stopRecording();
+    if (audioUri) {
+      onRecordingComplete(audioUri, duration);
     }
   };
 
@@ -121,25 +124,10 @@ export default function VoiceRecorder({
     onCancel();
   };
 
-  const handlePauseResume = async () => {
-    if (recordingState.isPaused) {
-      await resumeRecording();
-    } else {
-      await pauseRecording();
-    }
-  };
-
-  const formatDuration = (milliseconds: number): string => {
-    const seconds = Math.floor(milliseconds / 1000);
+  const formatDuration = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const handlePreviewPlay = () => {
-    if (recordingState.recordingUri) {
-      playRecording(recordingState.recordingUri);
-    }
+    return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
   if (!visible) {
@@ -175,7 +163,7 @@ export default function VoiceRecorder({
                       inputRange: [0, 1],
                       outputRange: [4, 20 + Math.random() * 20],
                     }),
-                    opacity: recordingState.isRecording && !recordingState.isPaused ? 1 : 0.3,
+                    opacity: isRecording ? 1 : 0.3,
                   },
                 ]}
               />
@@ -183,25 +171,21 @@ export default function VoiceRecorder({
           </View>
 
           {/* Duration */}
-          <Text style={styles.duration}>
-            {formatDuration(recordingState.duration)}
-          </Text>
+          <Text style={styles.duration}>{formatDuration(duration)}</Text>
 
           {/* Recording Status */}
           <Text style={styles.status}>
-            {!recordingState.isRecording && !recordingState.recordingUri
-              ? 'Tap to start recording'
-              : recordingState.isPaused
-              ? 'Recording paused'
-              : recordingState.isRecording
-              ? 'Recording...'
-              : 'Recording complete'}
+            {!isRecording && !audioUri
+              ? "Tap to start recording"
+              : isRecording
+              ? "Recording..."
+              : "Recording complete"}
           </Text>
         </View>
 
         {/* Controls */}
         <View style={styles.controls}>
-          {!recordingState.isRecording && !recordingState.recordingUri && (
+          {!isRecording && !audioUri && (
             <TouchableOpacity
               style={styles.recordButton}
               onPress={handleStartRecording}
@@ -209,52 +193,44 @@ export default function VoiceRecorder({
               <Animated.View
                 style={[
                   styles.recordButtonInner,
-                  {
-                    transform: [{ scale: pulseAnim }],
-                  },
+                  { transform: [{ scale: pulseAnim }] },
                 ]}
               >
-                <Ionicons name="mic" size={24} color={Colors.background.primary} />
+                <Ionicons
+                  name="mic"
+                  size={24}
+                  color={Colors.background.primary}
+                />
               </Animated.View>
             </TouchableOpacity>
           )}
 
-          {recordingState.isRecording && (
+          {isRecording && (
             <View style={styles.recordingControls}>
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={handlePauseResume}
-              >
-                <Ionicons
-                  name={recordingState.isPaused ? 'play' : 'pause'}
-                  size={20}
-                  color={Colors.background.primary}
-                />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.controlButton, styles.stopButton]}
                 onPress={handleStopRecording}
               >
-                <Ionicons name="stop" size={20} color={Colors.background.primary} />
+                <Ionicons
+                  name="stop"
+                  size={20}
+                  color={Colors.background.primary}
+                />
               </TouchableOpacity>
             </View>
           )}
 
-          {recordingState.recordingUri && !recordingState.isRecording && (
+          {audioUri && !isRecording && (
             <View style={styles.previewControls}>
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={handlePreviewPlay}
-              >
-                <Ionicons name="play" size={20} color={Colors.background.primary} />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.controlButton, styles.sendButton]}
                 onPress={handleStopRecording}
               >
-                <Ionicons name="send" size={20} color={Colors.background.primary} />
+                <Ionicons
+                  name="send"
+                  size={20}
+                  color={Colors.background.primary}
+                />
               </TouchableOpacity>
             </View>
           )}

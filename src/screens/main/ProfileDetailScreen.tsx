@@ -10,24 +10,26 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import { useClerkAuth } from "../contexts/ClerkAuthContext"
+import { useAuth } from "@contexts/AuthProvider";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useApiClient } from "@utils/api";
-import { useInterests } from "@hooks/useInterests";
-import { useSafety } from "@hooks/useSafety";
+import { useApiClient } from "@/utils/api";
+import { useInterests } from "@/hooks/useInterests";
+import { useSafety } from "@/hooks/useSafety";
 import { useTheme } from "@contexts/ThemeContext";
 import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import ReportUserModal from "@components/safety/ReportUserModal";
 import { Colors, Layout } from "@constants";
 import useResponsiveSpacing, {
   useResponsiveTypography,
-} from "@hooks/useResponsive";
-import { useInterestStatus } from "@hooks/useInterests";
-import { useBlockStatus } from "@hooks/useSafety";
-import { Profile } from "@types";
-import type { ReportReason } from "@types";
+} from "@/hooks/useResponsive";
+import { useInterestStatus } from "@/hooks/useInterests";
+import { useBlockStatus } from "@/hooks/useSafety";
+import { Profile } from "@/types/profile";
+import type { ReportReason } from "@/types/profile";
 import ScreenContainer from "@components/common/ScreenContainer";
-import { useToast } from "@providers/ToastContext";
+import { useToast } from "@/providers/ToastContext";
 import ConfirmModal from "@components/ui/ConfirmModal";
+import { ProfileActions } from "@components/profile/ProfileActions";
 
 const { width } = Dimensions.get("window");
 
@@ -46,7 +48,8 @@ export default function ProfileDetailScreen({
   navigation,
 }: ProfileDetailScreenProps) {
   const { profileId, userId: paramUserId } = route.params;
-  const { } = useClerkAuth();
+  const { user } = useAuth();
+  const currentUserId = user?.id;
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
@@ -55,11 +58,12 @@ export default function ProfileDetailScreen({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSafetySheet, setShowSafetySheet] = useState(false);
   const [confirmBlockVisible, setConfirmBlockVisible] = useState(false);
+  const [reportModalVisible, setReportModalVisible] = useState(false);
   const toast = useToast();
 
   const { sendInterest, removeInterest } = useInterests();
 
-  const { reportUser, blockUser } = useSafety();
+  const { reportUserAsync, blockUserAsync, isUserBlocked } = useSafety();
 
   const { status: interestStatus, loading: interestLoading } =
     useInterestStatus(profileId);
@@ -239,7 +243,7 @@ export default function ProfileDetailScreen({
     queryKey: ["profileImages", profileId],
     queryFn: async () => {
       const response = await apiClient.getBatchProfileImages([profileId]);
-      return response.success ? response.data[profileId] || [] : [];
+      return response.success ? (response.data as any)[profileId] || [] : [];
     },
     enabled: !!profileId,
   });
@@ -278,19 +282,22 @@ export default function ProfileDetailScreen({
   };
 
   const handleReportUser = async (reason: string, description?: string) => {
-    if (!profileId) return;
-    try {
-      await reportUser.mutateAsync({
-        reportedUserId: profileId,
-        reason: reason as ReportReason,
-        description,
-      });
+    if (!profileId || profileId === currentUserId) {
+      toast.show("You cannot report yourself.", "info");
+      return;
+    }
+    const ok = await reportUserAsync(
+      profileId,
+      reason as ReportReason,
+      description
+    );
+    if (ok) {
       toast.show(
-        "User reported successfully. We will review this report.",
+        "User reported successfully. Our team will review this report.",
         "success"
       );
       setShowSafetySheet(false);
-    } catch (error) {
+    } else {
       toast.show("Failed to report user. Please try again.", "error");
     }
   };
@@ -300,15 +307,22 @@ export default function ProfileDetailScreen({
     setConfirmBlockVisible(true);
   };
   const confirmBlock = async () => {
-    try {
-      await blockUser.mutateAsync({ blockedUserId: profileId });
-      queryClient.invalidateQueries({ queryKey: ["blockStatus", profileId] });
-      toast.show("User blocked successfully.", "success");
-      setShowSafetySheet(false);
+    if (!profileId || profileId === currentUserId) {
+      toast.show("You cannot block yourself.", "info");
       setConfirmBlockVisible(false);
-      navigation.goBack();
-    } catch (error) {
-      toast.show("Failed to block user. Please try again.", "error");
+      return;
+    }
+    try {
+      const ok = await blockUserAsync(profileId);
+      if (ok) {
+        queryClient.invalidateQueries({ queryKey: ["blockStatus", profileId] });
+        toast.show("User blocked successfully.", "success");
+        setShowSafetySheet(false);
+        navigation.goBack();
+      } else {
+        toast.show("Failed to block user. Please try again.", "error");
+      }
+    } finally {
       setConfirmBlockVisible(false);
     }
   };
@@ -846,6 +860,14 @@ export default function ProfileDetailScreen({
               </Text>
             )}
           </TouchableOpacity>
+
+          {/* Shortlist Actions */}
+          <ProfileActions
+            toUserId={profileId}
+            onShortlistChange={(isShortlisted: boolean) => {
+              // Optional: Handle shortlist state changes if needed
+            }}
+          />
         </View>
       )}
 
@@ -856,6 +878,13 @@ export default function ProfileDetailScreen({
         userId={profileId}
         userName={profile?.fullName || ""}
         isBlocked={blockStatus?.isBlocked}
+        onReport={() => setReportModalVisible(true)}
+      />
+      <ReportUserModal
+        visible={reportModalVisible}
+        userId={profileId}
+        userName={profile?.fullName || ""}
+        onClose={() => setReportModalVisible(false)}
       />
       <ConfirmModal
         visible={confirmBlockVisible}

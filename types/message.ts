@@ -1,3 +1,26 @@
+export interface Conversation {
+  _id: string;
+  id?: string;
+  conversationId: string;
+  participants: string[];
+  lastMessage?: Message;
+  lastActivity?: number;
+  lastMessageAt?: number;
+  unreadCount?: number;
+  isTyping?: string[];
+  title?: string;
+  description?: string;
+  isGroup?: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export type MessageStatus =
+  | "pending"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed";
 export interface Message {
   _id: string;
   conversationId: string;

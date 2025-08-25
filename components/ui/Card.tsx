@@ -7,7 +7,7 @@ import {
   TouchableOpacityProps,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
-import { useResponsiveSpacing } from '../../hooks/useResponsive';
+import { useResponsiveSpacing } from "@/hooks/useResponsive";
 
 interface CardProps extends TouchableOpacityProps {
   children: React.ReactNode;

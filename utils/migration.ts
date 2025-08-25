@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
-import { ApiClient } from "./api";
+import { apiClient } from "./api";
 
 export interface MigrationResult {
   success: boolean;
@@ -18,23 +18,17 @@ export interface MigrationStep {
 }
 
 export class MigrationManager {
-  private apiClient: ApiClient;
+  private apiClient = apiClient;
   private migrationSteps: MigrationStep[] = [];
 
   constructor() {
-    this.apiClient = new ApiClient();
+    // apiClient is already initialized and imported
     this.initializeMigrationSteps();
   }
 
   private initializeMigrationSteps(): void {
     this.migrationSteps = [
-      {
-        id: "auth_system_migration",
-        name: "Authentication System Migration",
-        description: "Migrate from Clerk to custom JWT authentication",
-        execute: this.migrateAuthSystem.bind(this),
-        rollback: this.rollbackAuthSystem.bind(this),
-      },
+      // Auth system migration no longer needed (Clerk fully removed)
       {
         id: "api_endpoints_migration",
         name: "API Endpoints Migration",
@@ -215,67 +209,7 @@ export class MigrationManager {
     }
   }
 
-  private async migrateAuthSystem(): Promise<boolean> {
-    try {
-      // Check if Clerk token exists
-      const clerkToken = await AsyncStorage.getItem("clerk_token");
-
-      if (clerkToken) {
-        // Exchange Clerk token for custom JWT
-        const exchangeResult = await this.apiClient.exchangeClerkToken(
-          clerkToken
-        );
-
-        if (exchangeResult.success && exchangeResult.token) {
-          // Store new JWT token
-          await SecureStore.setItemAsync("auth_token", exchangeResult.token);
-
-          if (exchangeResult.refreshToken) {
-            await SecureStore.setItemAsync(
-              "refresh_token",
-              exchangeResult.refreshToken
-            );
-          }
-
-          // Remove old Clerk data
-          await AsyncStorage.removeItem("clerk_token");
-          await AsyncStorage.removeItem("clerk_user");
-
-          return true;
-        }
-      }
-
-      // No Clerk token found, migration not needed
-      return true;
-    } catch (error) {
-      console.error("Auth system migration failed:", error);
-      return false;
-    }
-  }
-
-  private async rollbackAuthSystem(): Promise<boolean> {
-    try {
-      // Restore from backup if needed
-      const backup = await AsyncStorage.getItem("migration_backup");
-      if (backup) {
-        const backupData = JSON.parse(backup);
-        const clerkToken = backupData.data.asyncStorage.clerk_token;
-
-        if (clerkToken) {
-          await AsyncStorage.setItem("clerk_token", clerkToken);
-        }
-      }
-
-      // Remove new JWT tokens
-      await SecureStore.deleteItemAsync("auth_token");
-      await SecureStore.deleteItemAsync("refresh_token");
-
-      return true;
-    } catch (error) {
-      console.error("Auth system rollback failed:", error);
-      return false;
-    }
-  }
+  // Removed obsolete migrateAuthSystem / rollbackAuthSystem steps tied to Clerk
 
   private async migrateApiEndpoints(): Promise<boolean> {
     try {
@@ -550,12 +484,7 @@ export class MigrationManager {
         oldProfile.partnerPreferenceCity ||
         oldProfile.partner_preference_city ||
         [],
-      isProfileComplete:
-        oldProfile.isProfileComplete || oldProfile.is_profile_complete || false,
-      isOnboardingComplete:
-        oldProfile.isOnboardingComplete ||
-        oldProfile.is_onboarding_complete ||
-        false,
+      // completeness flags removed
       isActive: oldProfile.isActive || oldProfile.is_active || true,
       subscriptionPlan:
         oldProfile.subscriptionPlan || oldProfile.subscription_plan || "free",
@@ -627,12 +556,6 @@ export class MigrationManager {
       const featureFlags = await AsyncStorage.getItem("feature_flags");
       if (!featureFlags) {
         errors.push("Feature flags not found after migration");
-      }
-
-      // Test API connectivity
-      const connectivityTest = await this.apiClient.testConnectivity();
-      if (!connectivityTest.success) {
-        errors.push("API connectivity test failed after migration");
       }
     } catch (error) {
       errors.push(

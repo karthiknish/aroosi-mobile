@@ -9,9 +9,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useThemedStyles } from "../../contexts/ThemeContext";
 import type { Theme } from "../../constants/Theme";
-import { useSubscription } from "../../hooks/useSubscription";
-import { useFeatureGate } from "../../hooks/useFeatureGate";
-import { getSubscriptionFeatures } from "../../utils/subscriptionUtils";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useFeatureGate } from "@/hooks/useFeatureGate";
 import UsageQuotaCard from "./UsageQuotaCard";
 import { LoadingState } from "../error";
 
@@ -28,7 +27,8 @@ export default function UsageDashboard({
     subscription,
     hasActiveSubscription,
     daysUntilExpiry,
-  } = useSubscription();
+    features,
+  } = useSubscription() as any;
 
   const { currentTier } = useFeatureGate();
   const styles = useThemedStyles(createStyles);
@@ -42,7 +42,8 @@ export default function UsageDashboard({
     return null;
   }
 
-  const features = getSubscriptionFeatures(currentTier as any);
+  // features already provided by hook; fallback guard
+  const safeFeatures = features || {};
 
   const getTierDisplayName = (tier: string) => {
     switch (tier) {
@@ -105,10 +106,7 @@ export default function UsageDashboard({
             Your subscription expires in {daysUntilExpiry} day
             {daysUntilExpiry !== 1 ? "s" : ""}
           </Text>
-          <TouchableOpacity
-            style={styles.renewButton}
-            onPress={onUpgradePress}
-          >
+          <TouchableOpacity style={styles.renewButton} onPress={onUpgradePress}>
             <Text style={styles.renewButtonText}>Renew</Text>
           </TouchableOpacity>
         </View>
@@ -152,7 +150,11 @@ export default function UsageDashboard({
         <UsageQuotaCard
           title="Profile Views"
           icon="eye"
-          current={typeof usage.profileViews === 'number' ? usage.profileViews : usage.profileViews.count}
+          current={
+            typeof usage.profileViews === "number"
+              ? usage.profileViews
+              : usage.profileViews.count
+          }
           max={usage.limits.maxProfileViews}
           unit="views"
           onUpgradePress={onUpgradePress}
@@ -188,42 +190,42 @@ export default function UsageDashboard({
           <FeatureItem
             title="Advanced Search Filters"
             icon="filter"
-            available={features.canUseAdvancedFilters}
+            available={safeFeatures.canUseAdvancedFilters}
             onUpgradePress={onUpgradePress}
           />
 
           <FeatureItem
             title="See Who Viewed Your Profile"
             icon="eye"
-            available={features.canViewProfileViewers}
+            available={safeFeatures.canViewProfileViewers}
             onUpgradePress={onUpgradePress}
           />
 
           <FeatureItem
             title="Read Receipts"
             icon="checkmark-done"
-            available={features.canSeeReadReceipts}
+            available={safeFeatures.canSeeReadReceipts}
             onUpgradePress={onUpgradePress}
           />
 
           <FeatureItem
             title="See Who Liked You"
             icon="heart"
-            available={features.canViewProfileViewers}
+            available={safeFeatures.canViewProfileViewers}
             onUpgradePress={onUpgradePress}
           />
 
           <FeatureItem
             title="Incognito Mode"
             icon="eye-off"
-            available={features.canUseIncognitoMode}
+            available={safeFeatures.canUseIncognitoMode}
             onUpgradePress={onUpgradePress}
           />
 
           <FeatureItem
             title="Priority Support"
             icon="headset"
-            available={features.canAccessPrioritySupport}
+            available={safeFeatures.canAccessPrioritySupport}
             onUpgradePress={onUpgradePress}
           />
         </View>
@@ -236,10 +238,7 @@ export default function UsageDashboard({
           <Text style={styles.ctaSubtitle}>
             Upgrade to Premium or Premium Plus for unlimited access
           </Text>
-          <TouchableOpacity
-            style={styles.ctaButton}
-            onPress={onUpgradePress}
-          >
+          <TouchableOpacity style={styles.ctaButton} onPress={onUpgradePress}>
             <Text style={styles.ctaButtonText}>View Plans</Text>
           </TouchableOpacity>
         </View>

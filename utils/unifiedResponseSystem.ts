@@ -1,5 +1,5 @@
 import { ApiResponse, ApiError } from "../types/profile";
-import { Message, Conversation } from "../types/message";
+import { Message } from "../types/message";
 import { ApiResponseHandler } from "./apiResponseHandler";
 import { ApiRetryManager } from "./apiRetryManager";
 import { MessagingErrorHandler } from "./messagingErrors";
@@ -89,7 +89,7 @@ export class UnifiedResponseSystem {
       return result;
     } catch (error) {
       if (!skipErrorHandling) {
-        const messagingError = MessagingErrorHandler.handle(error, context);
+        const messagingError = MessagingErrorHandler.classifyError(error);
         this.logError(messagingError, context);
 
         return {
@@ -97,7 +97,7 @@ export class UnifiedResponseSystem {
           error: {
             code: messagingError.type,
             message: messagingError.message,
-            details: messagingError.details,
+            details: messagingError.metadata,
           },
         };
       }
@@ -142,9 +142,7 @@ export class UnifiedResponseSystem {
   /**
    * Specialized method for conversation operations
    */
-  static async executeConversationOperation<
-    T extends Conversation | Conversation[]
-  >(
+  static async executeConversationOperation<T extends any>(
     operation: () => Promise<ApiResponse<T>>,
     context: string
   ): Promise<ApiResponse<T>> {
@@ -152,9 +150,9 @@ export class UnifiedResponseSystem {
       retryStrategy: "default",
       validateResponse: (data: T) => {
         if (Array.isArray(data)) {
-          return data.every((conv) => this.isValidConversation(conv));
+          return data.every((conv: any) => this.isValidConversation(conv));
         }
-        return this.isValidConversation(data as Conversation);
+              return this.isValidConversation(data as any);
       },
       normalizeResponse: (data: T) => {
         if (Array.isArray(data)) {
@@ -345,7 +343,7 @@ export class UnifiedResponseSystem {
   /**
    * Validates if data represents a valid conversation
    */
-  private static isValidConversation(data: any): data is Conversation {
+  private static isValidConversation(data: any): boolean {
     return (
       data &&
       typeof data === "object" &&
@@ -439,9 +437,7 @@ export const unifiedResponse = {
   /**
    * Execute conversation operation
    */
-  conversation: <T extends Conversation | Conversation[]>(
-    operation: () => Promise<ApiResponse<T>>
-  ) =>
+  conversation: <T extends any>(operation: () => Promise<ApiResponse<T>>) =>
     UnifiedResponseSystem.executeConversationOperation(
       operation,
       "conversation"

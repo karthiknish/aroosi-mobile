@@ -11,7 +11,7 @@ import {
   TextInput,
   Animated,
 } from 'react-native';
-import { useKeyboard, useKeyboardAnimation, dismissKeyboard, getKeyboardAvoidingViewBehavior } from '../../utils/keyboardUtils';
+import { useKeyboard, useKeyboardAnimation, dismissKeyboard, getKeyboardAvoidingViewBehavior } from '@utils/keyboardUtils';
 import { Colors } from '../../../constants/Colors';
 
 // KeyboardAwareScrollView - Automatically scrolls to focused input

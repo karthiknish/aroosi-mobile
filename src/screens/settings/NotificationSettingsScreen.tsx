@@ -13,17 +13,17 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useOneSignal } from "../../../hooks/useOneSignal";
-import { NotificationPermissionsManager } from "../../../utils/notificationPermissions";
-import { NotificationHandler } from "../../../utils/notificationHandler";
+import { useOneSignal } from "@/hooks/useOneSignal";
+import { NotificationPermissionsManager } from "@utils/notificationPermissions";
+import { NotificationHandler } from "@utils/notificationHandler";
 import {
   NotificationPreferences,
   defaultNotificationPreferences,
   NotificationPermissionStatus,
   NotificationType,
-} from "../../../types/notifications";
-import { Colors } from "../../../constants/Colors";
-import { Layout } from "../../../constants/Layout";
+} from "@/types/notifications";
+import { Colors } from "@constants/Colors";
+import { Layout } from "@constants/Layout";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
 
@@ -210,13 +210,12 @@ export default function NotificationSettingsScreen() {
     savePreferences(newPreferences);
   };
 
-
   /**
    * Clear all notifications and badge
    */
   const clearAllNotifications = async (): Promise<void> => {
     try {
-      await NotificationHandler.cancelAllNotifications();
+      await NotificationHandler.clearAll();
       toast.show("All notifications cleared", "success");
     } catch (error) {
       toast.show("Failed to clear notifications", "error");
@@ -380,7 +379,7 @@ export default function NotificationSettingsScreen() {
       {/* Sound & Vibration Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Sound & Vibration</Text>
- 
+
         <SettingsRow
           title="Sound"
           description="Play sound for notifications"
@@ -388,7 +387,7 @@ export default function NotificationSettingsScreen() {
           onToggle={(value) => handleNotificationTypeToggle("sound", value)}
           disabled={!notificationsEnabled}
         />
- 
+
         <SettingsRow
           title="Vibration"
           description="Vibrate for notifications"
@@ -397,11 +396,11 @@ export default function NotificationSettingsScreen() {
           disabled={!notificationsEnabled}
         />
       </View>
- 
+
       {/* Notification Management */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notification Management</Text>
- 
+
         <TouchableOpacity
           style={styles.actionButton}
           onPress={clearAllNotifications}

@@ -21,7 +21,7 @@ import * as Haptics from "expo-haptics";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "@hooks/useResponsive";
+} from "@/hooks/useResponsive";
 
 
 export type ToastType = "success" | "error" | "warning" | "info";

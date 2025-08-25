@@ -12,16 +12,16 @@ export class ApiResponseHandler {
   static handleResponse<T>(response: any, context: string): ApiResponse<T> {
     try {
       if (response.success === false) {
-        const messagingError = MessagingErrorHandler.handle(
-          { message: response.error, status: response.status },
-          context
-        );
+  const messagingError = MessagingErrorHandler.classifyError({
+    message: response.error,
+    status: response.status,
+  });
         return {
           success: false,
           error: {
             code: messagingError.type,
             message: messagingError.message,
-            details: messagingError.details,
+            // details removed
           },
         };
       }
@@ -31,13 +31,12 @@ export class ApiResponseHandler {
         data: response.data || response,
       };
     } catch (error) {
-      const messagingError = MessagingErrorHandler.handle(error, context);
+      const messagingError = MessagingErrorHandler.classifyError(error);
       return {
         success: false,
         error: {
           code: messagingError.type,
           message: messagingError.message,
-          details: messagingError.details,
         },
       };
     }
@@ -50,8 +49,8 @@ export class ApiResponseHandler {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,
-      fromUserId: rawMessage.fromUserId || rawMessage.senderId,
-      toUserId: rawMessage.toUserId || rawMessage.recipientId,
+      fromUserId: rawMessage.fromUserId,
+      toUserId: rawMessage.toUserId,
       text: rawMessage.text || rawMessage.content || "",
       type: rawMessage.type || "text",
       createdAt: rawMessage.createdAt || rawMessage.timestamp || Date.now(),
@@ -75,7 +74,6 @@ export class ApiResponseHandler {
 
       // Backward compatibility fields
       id: rawMessage.id,
-      senderId: rawMessage.senderId,
       content: rawMessage.content,
       _creationTime: rawMessage._creationTime,
       timestamp: rawMessage.timestamp,
@@ -107,7 +105,6 @@ export class ApiResponseHandler {
         rawConversation.lastMessageAt ||
         Date.now(),
       unreadCount: rawConversation.unreadCount || 0,
-      isBlocked: rawConversation.isBlocked || false,
 
       // Backward compatibility fields
       _id: rawConversation._id,
@@ -195,17 +192,16 @@ export class ApiResponseHandler {
     context: string
   ): ApiResponse<T> {
     const errorMessage = typeof error === "string" ? error : error.message;
-    const messagingError = MessagingErrorHandler.handle(
-      { message: errorMessage },
-      context
-    );
+  const messagingError = MessagingErrorHandler.classifyError({
+    message: errorMessage,
+  });
 
     return {
       success: false,
       error: {
         code: messagingError.type,
         message: messagingError.message,
-        details: messagingError.details,
+        // details removed
       },
     };
   }

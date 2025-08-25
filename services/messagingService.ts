@@ -2,12 +2,11 @@ import {
   MessagingPermissions,
   getMessagingFeatures,
   SubscriptionTier,
-} from "../utils/messagingFeatures";
-import { MessageValidator } from "../utils/messageValidation";
-import { UnifiedResponseSystem } from "../utils/unifiedResponseSystem";
+} from "@utils/messagingFeatures";
+import { MessageValidator } from "@utils/messageValidation";
+import { UnifiedResponseSystem } from "@utils/unifiedResponseSystem";
 import { ApiResponse } from "../types/profile";
 import { Message } from "../types/message";
-import { MessagingErrorType } from "../types/messaging";
 
 /**
  * Comprehensive messaging service that integrates subscription checks into the message flow

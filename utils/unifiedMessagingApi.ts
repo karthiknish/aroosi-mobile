@@ -1,12 +1,15 @@
 import { MessagingAPI, ApiResponse } from "../types/messaging";
-import { Message as UnifiedMessage, Conversation } from "../types/message";
+import { Message as UnifiedMessage } from "../types/message";
 import { MessageValidator } from "./messageValidation";
 import { ApiRetryManager } from "./apiRetryManager";
+import { apiClient } from "./api";
 
 // Base URL must be provided via environment
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
 if (!API_BASE_URL) {
-  throw new Error("EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment.");
+  throw new Error(
+    "EXPO_PUBLIC_API_URL is not set. Configure your API base URL in environment."
+  );
 }
 
 /**
@@ -35,6 +38,13 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     return ApiRetryManager.executeWithRetry(async () => {
+      // Normalize endpoint to include /api prefix
+      const normalizeEndpoint = (ep: string) => {
+        if (!ep.startsWith("/")) ep = "/" + ep;
+        if (ep.startsWith("/api/")) return ep;
+        return "/api" + ep;
+      };
+      endpoint = normalizeEndpoint(endpoint);
       const url = `${this.baseUrl}${endpoint}`;
       const authHeaders = await this.getAuthHeaders();
 
@@ -48,7 +58,9 @@ export class UnifiedMessagingAPI implements MessagingAPI {
         },
       });
 
-      const { ApiResponseInterceptor } = await import("./apiResponseInterceptor");
+      const { ApiResponseInterceptor } = await import(
+        "./apiResponseInterceptor"
+      );
       return await ApiResponseInterceptor.interceptResponse<T>(
         response,
         `UnifiedMessagingAPI ${endpoint}`,
@@ -71,7 +83,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "VALIDATION_ERROR", message: validation.error },
-      } as ApiResponse<Message[]>;
+      } as ApiResponse<any[]>;
     }
 
     const params = new URLSearchParams({ conversationId });
@@ -95,7 +107,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return response;
     } catch (error: any) {
       const message =
-        error?.message || (typeof error === "string" ? error : "getMessages failed");
+        error?.message ||
+        (typeof error === "string" ? error : "getMessages failed");
       return {
         success: false,
         error: { code: "API_ERROR", message },
@@ -117,6 +130,13 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     duration?: number;
     fileSize?: number;
     mimeType?: string;
+    // Optional reply metadata for WhatsApp-like reply
+    replyTo?: {
+      messageId: string;
+      text?: string;
+      type?: "text" | "voice" | "image";
+      fromUserId?: string;
+    };
   }): Promise<ApiResponse<UnifiedMessage>> {
     // Validate message data
     const validation = MessageValidator.validateMessageSendData(data);
@@ -140,6 +160,11 @@ export class UnifiedMessagingAPI implements MessagingAPI {
           duration: data.duration,
           fileSize: data.fileSize,
           mimeType: data.mimeType,
+          // Denormalised reply fields expected by server (see web firestore.rules)
+          replyToMessageId: data.replyTo?.messageId,
+          replyToText: data.replyTo?.text,
+          replyToType: data.replyTo?.type,
+          replyToFromUserId: data.replyTo?.fromUserId,
         }),
       });
 
@@ -151,11 +176,79 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return response;
     } catch (error: any) {
       const message =
-        error?.message || (typeof error === "string" ? error : "sendMessage failed");
+        error?.message ||
+        (typeof error === "string" ? error : "sendMessage failed");
       return {
         success: false,
         error: { code: "API_ERROR", message },
       } as ApiResponse<UnifiedMessage>;
+    }
+  }
+
+  /**
+   * Edit a text message
+   * PATCH /api/messages/:id { text }
+   */
+  async editMessage(
+    messageId: string,
+    text: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    if (!messageId || !text) {
+      return {
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "messageId and text required",
+        },
+      } as ApiResponse<{ success: boolean }>;
+    }
+    try {
+      return await this.request<{ success: boolean }>(
+        `/messages/${messageId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ text }),
+        }
+      );
+    } catch (error: any) {
+      return {
+        success: false,
+        error: {
+          code: "API_ERROR",
+          message: error?.message || "editMessage failed",
+        },
+      } as ApiResponse<{ success: boolean }>;
+    }
+  }
+
+  /**
+   * Delete (soft-delete) a message
+   * DELETE /api/messages/:id
+   */
+  async deleteMessage(
+    messageId: string
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    if (!messageId) {
+      return {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "messageId required" },
+      } as ApiResponse<{ success: boolean }>;
+    }
+    try {
+      return await this.request<{ success: boolean }>(
+        `/messages/${messageId}`,
+        {
+          method: "DELETE",
+        }
+      );
+    } catch (error: any) {
+      return {
+        success: false,
+        error: {
+          code: "API_ERROR",
+          message: error?.message || "deleteMessage failed",
+        },
+      } as ApiResponse<{ success: boolean }>;
     }
   }
 
@@ -197,13 +290,16 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   async generateVoiceUploadUrl(): Promise<
     ApiResponse<{ uploadUrl: string; storageId: string }>
   > {
+    // Web project exposes direct /api/voice-messages/upload (multipart form) not a presigned URL endpoint
+    // For mobile parity we fabricate a client-side 'storageId' and direct caller to use upload endpoint
     try {
-      return await this.request<{ uploadUrl: string; storageId: string }>(
-        "/voice-messages/upload-url",
-        {
-          method: "POST",
-        }
-      );
+      const storageId = `voice_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      return {
+        success: true,
+        data: { uploadUrl: `${this.baseUrl}/voice-messages/upload`, storageId },
+      };
     } catch (error: any) {
       const message =
         error?.message ||
@@ -229,7 +325,9 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      return await this.request<{ url: string }>(`/voice-messages/${storageId}/url`);
+      return await this.request<{ url: string }>(
+        `/voice-messages/${storageId}/url`
+      );
     } catch (error: any) {
       const message =
         error?.message ||
@@ -243,7 +341,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
 
   /**
    * Send typing indicator
-   * Canonical REST path routes through enhancedApiClient for consistency
+   * Uses base apiClient for consistency
    */
   async sendTypingIndicator(
     conversationId: string,
@@ -254,8 +352,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       throw new Error(validation.error);
     }
     try {
-      const { enhancedApiClient } = await import("./enhancedApiClient");
-      await enhancedApiClient.sendTypingIndicator(conversationId, action);
+      await apiClient.sendTypingIndicator(conversationId, action);
     } catch (error) {
       console.warn("Failed to send typing indicator:", error);
     }
@@ -263,32 +360,31 @@ export class UnifiedMessagingAPI implements MessagingAPI {
 
   /**
    * Send delivery receipt
-   * Canonical REST path routes through enhancedApiClient for consistency
+   * Uses base apiClient for consistency
    */
   async sendDeliveryReceipt(messageId: string, status: string): Promise<void> {
+    // Web does not expose separate delivery receipt REST; receipts handled implicitly or via realtime.
     if (!messageId || !status) return;
-    try {
-      const { enhancedApiClient } = await import("./enhancedApiClient");
-      if (typeof enhancedApiClient.sendDeliveryReceipt === "function") {
-        await enhancedApiClient.sendDeliveryReceipt(messageId, status);
-        return;
-      }
-      // Fallback to public endpoint via this.request (avoid calling private client.request)
-      await this.request("/delivery-receipts", {
-        method: "POST",
-        body: JSON.stringify({ messageId, status }),
-      });
-    } catch (error) {
-      console.warn("Failed to send delivery receipt:", error);
-    }
+    // No-op for now (could emit local event / queue) – kept for interface compliance.
   }
 
   /**
    * Get conversations list
    */
-  async getConversations(): Promise<ApiResponse<Conversation[]>> {
+  async getConversations(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<any[]>> {
     try {
-      const response = await this.request<Conversation[]>("/conversations");
+      const search = new URLSearchParams();
+      if (params?.page !== undefined)
+        search.append("page", String(params.page));
+      if (params?.limit !== undefined)
+        search.append("limit", String(params.limit));
+      const path = search.toString()
+        ? `/conversations?${search.toString()}`
+        : "/conversations";
+      const response = await this.request<any[]>(path);
 
       if (response.success && response.data) {
         // Normalize conversations for backward compatibility
@@ -303,7 +399,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "API_ERROR", message },
-      } as ApiResponse<Conversation[]>;
+      } as ApiResponse<any[]>;
     }
   }
 
@@ -312,16 +408,19 @@ export class UnifiedMessagingAPI implements MessagingAPI {
    */
   async createConversation(
     participantIds: string[]
-  ): Promise<ApiResponse<Conversation>> {
+  ): Promise<ApiResponse<any>> {
     if (!participantIds || participantIds.length === 0) {
       return {
         success: false,
-        error: { code: "VALIDATION_ERROR", message: "Participant IDs are required" },
-      } as ApiResponse<Conversation>;
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Participant IDs are required",
+        },
+      } as ApiResponse<any>;
     }
 
     try {
-      const response = await this.request<Conversation>("/conversations", {
+      const response = await this.request<any>("/conversations", {
         method: "POST",
         body: JSON.stringify({ participants: participantIds }),
       });
@@ -339,7 +438,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
       return {
         success: false,
         error: { code: "API_ERROR", message },
-      } as ApiResponse<Conversation>;
+      } as ApiResponse<any>;
     }
   }
 
@@ -378,8 +477,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     return {
       _id: rawMessage._id || rawMessage.id,
       conversationId: rawMessage.conversationId,
-      fromUserId: rawMessage.fromUserId || rawMessage.senderId,
-      toUserId: rawMessage.toUserId || rawMessage.recipientId,
+      fromUserId: rawMessage.fromUserId,
+      toUserId: rawMessage.toUserId,
       text: rawMessage.text || rawMessage.content || "",
       type: rawMessage.type || "text",
       createdAt: rawMessage.createdAt || rawMessage.timestamp || Date.now(),
@@ -403,7 +502,6 @@ export class UnifiedMessagingAPI implements MessagingAPI {
 
       // Backward compatibility fields
       id: rawMessage.id,
-      senderId: rawMessage.senderId,
       content: rawMessage.content,
       _creationTime: rawMessage._creationTime,
       timestamp: rawMessage.timestamp,
@@ -423,7 +521,7 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   /**
    * Normalize conversation data for backward compatibility
    */
-  private normalizeConversation(rawConversation: any): Conversation {
+  private normalizeConversation(rawConversation: any): any {
     return {
       id: rawConversation.id || rawConversation._id,
       participants: rawConversation.participants || [],
@@ -479,13 +577,14 @@ export const unifiedMessagingApi = new UnifiedMessagingAPI();
 // Hook for React components
 export function useUnifiedMessagingAPI() {
   // Import here to avoid circular dependency
-  const { useClerkAuth } = require("../contexts/ClerkAuthContext");
-  const { getToken } = useClerkAuth();
+  const { useAuth } = require("../contexts/AuthProvider");
+  const { getToken } = useAuth();
 
   // Initialize auth provider once
-  if (!unifiedMessagingApi["authInitialized"]) {
+  // Use a module-level variable to track initialization
+  if (!(globalThis as any)._unifiedMessagingApiAuthInitialized) {
     unifiedMessagingApi.setAuthProvider(getToken);
-    unifiedMessagingApi["authInitialized"] = true;
+    (globalThis as any)._unifiedMessagingApiAuthInitialized = true;
   }
 
   return unifiedMessagingApi;

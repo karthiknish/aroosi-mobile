@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Animated,
 } from "react-native";
-import { useVoicePlayback } from "../../hooks/useVoicePlayback";
+import { useVoicePlayback } from "@/hooks/useVoicePlayback";
 
 interface VoicePlayerProps {
   uri?: string;

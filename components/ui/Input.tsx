@@ -11,7 +11,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
-import { useResponsiveSpacing, useResponsiveTypography } from '../../hooks/useResponsive';
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -128,7 +131,9 @@ export default function Input({
   ];
 
   return (
-    <Animated.View style={[containerStyles, { transform: [{ translateX: shakeAnimation }] }]}>
+    <Animated.View
+      style={[containerStyles, { transform: [{ translateX: shakeAnimation }] }]}
+    >
       {label && (
         <View style={styles.labelContainer}>
           <Text style={styles.label}>
@@ -137,34 +142,31 @@ export default function Input({
           </Text>
         </View>
       )}
-      
+
       <View style={inputContainerStyles}>
-        {leftIcon && (
-          <View style={styles.leftIcon}>
-            {leftIcon}
-          </View>
-        )}
-        
+        {leftIcon && <View style={styles.leftIcon}>{leftIcon}</View>}
+
         <TextInput
-          style={[inputStyles, { fontSize: fontSize.base }]}
+          style={[
+            ...(inputStyles.filter(Boolean) as any[]),
+            { fontSize: fontSize.base },
+          ]}
           placeholderTextColor={Colors.text.tertiary}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           multiline={multiline}
           numberOfLines={multiline ? numberOfLines : 1}
-          textAlignVertical={multiline ? 'top' : 'center'}
+          textAlignVertical={multiline ? "top" : "center"}
           accessibilityLabel={accessibilityLabel || label}
           accessibilityHint={accessibilityHint || hint}
           accessibilityValue={error ? { text: error } : undefined}
           {...textInputProps}
         />
-        
+
         {getValidationIcon() && (
-          <View style={styles.validationIcon}>
-            {getValidationIcon()}
-          </View>
+          <View style={styles.validationIcon}>{getValidationIcon()}</View>
         )}
-        
+
         {rightIcon && (
           <TouchableOpacity
             style={styles.rightIcon}
@@ -175,7 +177,7 @@ export default function Input({
           </TouchableOpacity>
         )}
       </View>
-      
+
       {(error || hint) && (
         <Animated.View style={styles.helpContainer}>
           <Text style={[styles.help, error && styles.helpError]}>

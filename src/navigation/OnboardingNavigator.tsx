@@ -7,6 +7,14 @@ import ProfileSetupScreen from "../screens/onboarding/ProfileSetupScreen";
 import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 
+const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
+  const Wrapped: React.FC<P> = (props) => {
+    const C = withScreenContainer(Comp);
+    return <C {...props} />;
+  };
+  return Wrapped;
+};
+
 export type OnboardingStackParamList = {
   Welcome: undefined;
   ProfileSetup: { step?: number };
@@ -26,11 +34,11 @@ export default function OnboardingNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen
         name="ProfileSetup"
-        component={withScreenContainer(ProfileSetupScreen)}
+        component={withSC(ProfileSetupScreen)}
       />
       <Stack.Screen
         name="OnboardingComplete"
-        component={withScreenContainer(OnboardingCompleteScreen)}
+        component={withSC(OnboardingCompleteScreen)}
       />
     </Stack.Navigator>
   );

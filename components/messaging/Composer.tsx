@@ -3,7 +3,7 @@ import { View, TextInput, TouchableOpacity, Text, StyleSheet, KeyboardAvoidingVi
 import { Colors, Layout } from '@constants/index';
 import PaywallModal from '@components/subscription/PaywallModal';
 import { getPlans } from '@services/subscriptions';
-import { useFeatureAccess } from '@hooks/useFeatureAccess';
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 
 type SendResult =
   | { success: true }
@@ -19,15 +19,46 @@ export interface ComposerProps {
 }
 
 export default function Composer({ onSend, placeholder = 'Type a message…', disabled = false }: ComposerProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Entitlement check for unlimited messaging
-  const { allowed, isLoading } = useFeatureAccess('unlimited_messaging');
+  // Feature access utilities
+  const { checkFeatureAccess } = useFeatureAccess();
+  const [entitlementChecked, setEntitlementChecked] = useState(false);
+  const [entitlementAllowed, setEntitlementAllowed] = useState<boolean>(true); // optimistic allow until checked
+
+  // Pre-check messaging entitlement on mount (e.g., canInitiateChat / maxMessages usage)
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Using generic 'maxMessages' feature to map to usage-based gating
+        const result = await checkFeatureAccess("maxMessages" as any);
+        if (mounted) {
+          setEntitlementAllowed(result.allowed);
+        }
+      } catch (e) {
+        if (mounted) setEntitlementAllowed(false);
+      } finally {
+        if (mounted) setEntitlementChecked(true);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [checkFeatureAccess]);
 
   // Paywall state
   const [showPaywall, setShowPaywall] = useState(false);
-  const [plans, setPlans] = useState<Array<{ id: string; name: string; price: number; features?: string[]; popular?: boolean }>>([]);
+  const [plans, setPlans] = useState<
+    Array<{
+      id: string;
+      name: string;
+      price: number;
+      features?: string[];
+      popular?: boolean;
+    }>
+  >([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
 
   const canSend = useMemo(() => {
@@ -53,10 +84,8 @@ export default function Composer({ onSend, placeholder = 'Type a message…', di
 
   const handleSend = useCallback(async () => {
     // If entitlement still loading, avoid accidental gating; block until ready
-    if (isLoading) return;
-
-    // Gate on unlimited_messaging
-    if (!allowed) {
+    if (!entitlementChecked) return; // still resolving
+    if (!entitlementAllowed) {
       await openPaywall();
       return;
     }
@@ -68,21 +97,26 @@ export default function Composer({ onSend, placeholder = 'Type a message…', di
       setSending(true);
       const res = await onSend(value);
       if (res.success) {
-        setText('');
+        setText("");
       } else {
         // Optional: surface error
-        console.warn('[COMPOSER] send:error', (res as { success: false; error?: string }).error);
+        console.warn(
+          "[COMPOSER] send:error",
+          (res as { success: false; error?: string }).error
+        );
       }
     } catch (e: any) {
-      console.error('[COMPOSER] send:exception', e?.message || String(e));
+      console.error("[COMPOSER] send:exception", e?.message || String(e));
     } finally {
       setSending(false);
     }
-  }, [allowed, isLoading, onSend, openPaywall, text]);
+  }, [entitlementAllowed, entitlementChecked, onSend, openPaywall, text]);
 
   return (
     <>
-      <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })}>
+      <KeyboardAvoidingView
+        behavior={Platform.select({ ios: "padding", android: undefined })}
+      >
         <View style={styles.container}>
           <TextInput
             style={styles.input}
@@ -94,7 +128,7 @@ export default function Composer({ onSend, placeholder = 'Type a message…', di
             multiline
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!canSend) && styles.sendButtonDisabled]}
+            style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
             onPress={handleSend}
             disabled={!canSend}
           >

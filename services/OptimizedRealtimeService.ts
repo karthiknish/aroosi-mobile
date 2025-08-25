@@ -1,1 +1,419 @@
-import { EventEmitter } from 'events';\nimport { Platform, AppState, NetInfo } from 'react-native';\nimport { RealtimeMessage, TypingIndicator, DeliveryReceipt, RealtimeEventHandlers } from './RealtimeMessagingService';\n\nexport interface ConnectionPoolConfig {\n  /**\n   * Maximum number of concurrent connections\n   */\n  maxConnections: number;\n  \n  /**\n   * Connection timeout in milliseconds\n   */\n  connectionTimeout: number;\n  \n  /**\n   * Heartbeat interval in milliseconds\n   */\n  heartbeatInterval: number;\n  \n  /**\n   * Maximum reconnection attempts\n   */\n  maxReconnectAttempts: number;\n  \n  /**\n   * Base reconnection delay in milliseconds\n   */\n  baseReconnectDelay: number;\n  \n  /**\n   * Maximum reconnection delay in milliseconds\n   */\n  maxReconnectDelay: number;\n  \n  /**\n   * Enable connection compression\n   */\n  enableCompression: boolean;\n  \n  /**\n   * Message batching configuration\n   */\n  batching: {\n    enabled: boolean;\n    maxBatchSize: number;\n    batchTimeout: number;\n  };\n  \n  /**\n   * Bandwidth optimization settings\n   */\n  bandwidth: {\n    enableThrottling: boolean;\n    maxMessagesPerSecond: number;\n    prioritizeVoiceMessages: boolean;\n  };\n}\n\nexport interface ConnectionMetrics {\n  /**\n   * Connection latency in milliseconds\n   */\n  latency: number;\n  \n  /**\n   * Messages sent per second\n   */\n  messagesSentPerSecond: number;\n  \n  /**\n   * Messages received per second\n   */\n  messagesReceivedPerSecond: number;\n  \n  /**\n   * Connection uptime in milliseconds\n   */\n  uptime: number;\n  \n  /**\n   * Number of reconnections\n   */\n  reconnectionCount: number;\n  \n  /**\n   * Bandwidth usage in bytes\n   */\n  bandwidthUsage: {\n    sent: number;\n    received: number;\n  };\n  \n  /**\n   * Connection quality score (0-1)\n   */\n  qualityScore: number;\n}\n\nexport interface QueuedMessage {\n  id: string;\n  message: any;\n  priority: 'high' | 'medium' | 'low';\n  timestamp: number;\n  retryCount: number;\n  maxRetries: number;\n}\n\n/**\n * Optimized real-time messaging service with connection pooling and performance optimizations\n */\nexport class OptimizedRealtimeService extends EventEmitter {\n  private connections = new Map<string, WebSocket>();\n  private connectionMetrics = new Map<string, ConnectionMetrics>();\n  private config: ConnectionPoolConfig;\n  private userId: string | null = null;\n  private handlers: RealtimeEventHandlers = {};\n  private messageQueue: QueuedMessage[] = [];\n  private batchQueue: any[] = [];\n  private batchTimeout: NodeJS.Timeout | null = null;\n  private heartbeatIntervals = new Map<string, NodeJS.Timeout>();\n  private reconnectTimeouts = new Map<string, NodeJS.Timeout>();\n  private isAppActive = true;\n  private networkState: any = null;\n  private performanceMonitor: NodeJS.Timeout | null = null;\n  private messageRateTracker = {\n    sent: [] as number[],\n    received: [] as number[]\n  };\n  \n  constructor(config: Partial<ConnectionPoolConfig> = {}) {\n    super();\n    \n    this.config = {\n      maxConnections: 3,\n      connectionTimeout: 10000,\n      heartbeatInterval: 30000,\n      maxReconnectAttempts: 5,\n      baseReconnectDelay: 1000,\n      maxReconnectDelay: 30000,\n      enableCompression: true,\n      batching: {\n        enabled: true,\n        maxBatchSize: 10,\n        batchTimeout: 100\n      },\n      bandwidth: {\n        enableThrottling: true,\n        maxMessagesPerSecond: 20,\n        prioritizeVoiceMessages: true\n      },\n      ...config\n    };\n    \n    this.setupAppStateHandling();\n    this.setupNetworkMonitoring();\n    this.startPerformanceMonitoring();\n  }\n  \n  /**\n   * Initialize the optimized real-time service\n   */\n  async initialize(\n    userId: string,\n    handlers: RealtimeEventHandlers = {},\n    endpoints: string[] = []\n  ): Promise<boolean> {\n    this.userId = userId;\n    this.handlers = handlers;\n    \n    try {\n      // Create connections to multiple endpoints for redundancy\n      const connectionPromises = endpoints.slice(0, this.config.maxConnections)\n        .map((endpoint, index) => this.createConnection(`connection-${index}`, endpoint));\n      \n      const results = await Promise.allSettled(connectionPromises);\n      const successfulConnections = results.filter(result => result.status === 'fulfilled').length;\n      \n      if (successfulConnections === 0) {\n        throw new Error('Failed to establish any connections');\n      }\n      \n      console.log(`Established ${successfulConnections} out of ${endpoints.length} connections`);\n      return true;\n    } catch (error) {\n      console.error('Failed to initialize optimized real-time service:', error);\n      this.handlers.onError?.(error instanceof Error ? error : new Error('Initialization failed'));\n      return false;\n    }\n  }\n  \n  /**\n   * Create a WebSocket connection with optimization\n   */\n  private async createConnection(connectionId: string, url: string): Promise<void> {\n    return new Promise((resolve, reject) => {\n      try {\n        const wsUrl = `${url}?userId=${this.userId}&compression=${this.config.enableCompression}`;\n        const ws = new WebSocket(wsUrl);\n        \n        // Connection timeout\n        const timeout = setTimeout(() => {\n          ws.close();\n          reject(new Error(`Connection timeout for ${connectionId}`));\n        }, this.config.connectionTimeout);\n        \n        ws.onopen = () => {\n          clearTimeout(timeout);\n          console.log(`WebSocket connected: ${connectionId}`);\n          \n          this.connections.set(connectionId, ws);\n          this.initializeConnectionMetrics(connectionId);\n          this.startHeartbeat(connectionId);\n          \n          // Process queued messages\n          this.processMessageQueue();\n          \n          this.handlers.onConnectionChange?.(true);\n          this.emit('connected', connectionId);\n          \n          resolve();\n        };\n        \n        ws.onmessage = (event) => {\n          this.handleMessage(connectionId, event.data);\n        };\n        \n        ws.onclose = (event) => {\n          clearTimeout(timeout);\n          console.log(`WebSocket disconnected: ${connectionId}`, event.code, event.reason);\n          \n          this.connections.delete(connectionId);\n          this.stopHeartbeat(connectionId);\n          \n          // Check if we still have active connections\n          const hasActiveConnections = this.connections.size > 0;\n          this.handlers.onConnectionChange?.(hasActiveConnections);\n          \n          if (!hasActiveConnections) {\n            this.emit('disconnected');\n          }\n          \n          // Attempt reconnection if not intentional\n          if (event.code !== 1000 && this.isAppActive) {\n            this.scheduleReconnect(connectionId, url);\n          }\n        };\n        \n        ws.onerror = (error) => {\n          clearTimeout(timeout);\n          console.error(`WebSocket error: ${connectionId}`, error);\n          reject(error);\n        };\n      } catch (error) {\n        reject(error);\n      }\n    });\n  }\n  \n  /**\n   * Handle incoming WebSocket messages with optimization\n   */\n  private handleMessage(connectionId: string, data: string): void {\n    try {\n      // Update bandwidth metrics\n      this.updateBandwidthMetrics(connectionId, 'received', data.length);\n      \n      // Track message rate\n      this.messageRateTracker.received.push(Date.now());\n      \n      const message = JSON.parse(data);\n      \n      // Handle batched messages\n      if (message.type === 'batch' && Array.isArray(message.messages)) {\n        message.messages.forEach((msg: any) => this.processMessage(connectionId, msg));\n      } else {\n        this.processMessage(connectionId, message);\n      }\n    } catch (error) {\n      console.error('Failed to parse WebSocket message:', error);\n    }\n  }\n  \n  /**\n   * Process individual message\n   */\n  private processMessage(connectionId: string, message: any): void {\n    // Update latency metrics\n    if (message.timestamp) {\n      const latency = Date.now() - message.timestamp;\n      this.updateLatencyMetrics(connectionId, latency);\n    }\n    \n    switch (message.type) {\n      case 'message':\n        this.handleRealtimeMessage(message);\n        break;\n      case 'typing':\n        this.handleTypingIndicator(message);\n        break;\n      case 'delivery_receipt':\n      case 'read_receipt':\n        this.handleDeliveryReceipt(message);\n        break;\n      case 'pong':\n        // Heartbeat response - update connection health\n        this.updateConnectionHealth(connectionId);\n        break;\n      default:\n        console.warn('Unknown message type:', message.type);\n    }\n  }\n  \n  /**\n   * Send message with optimization and load balancing\n   */\n  sendMessage(message: any, priority: 'high' | 'medium' | 'low' = 'medium'): void {\n    // Check bandwidth throttling\n    if (this.config.bandwidth.enableThrottling && !this.canSendMessage()) {\n      this.queueMessage(message, priority);\n      return;\n    }\n    \n    // Use batching for non-critical messages\n    if (this.config.batching.enabled && priority !== 'high') {\n      this.addToBatch(message);\n      return;\n    }\n    \n    // Send immediately for high priority messages\n    this.sendMessageImmediate(message);\n  }\n  \n  /**\n   * Send message immediately using best available connection\n   */\n  private sendMessageImmediate(message: any): void {\n    const bestConnection = this.getBestConnection();\n    if (!bestConnection) {\n      this.queueMessage(message, 'medium');\n      return;\n    }\n    \n    try {\n      const messageStr = JSON.stringify({\n        ...message,\n        timestamp: Date.now()\n      });\n      \n      bestConnection.ws.send(messageStr);\n      \n      // Update metrics\n      this.updateBandwidthMetrics(bestConnection.id, 'sent', messageStr.length);\n      this.messageRateTracker.sent.push(Date.now());\n    } catch (error) {\n      console.error('Failed to send message:', error);\n      this.queueMessage(message, 'medium');\n    }\n  }\n  \n  /**\n   * Add message to batch queue\n   */\n  private addToBatch(message: any): void {\n    this.batchQueue.push(message);\n    \n    // Send batch if it reaches max size\n    if (this.batchQueue.length >= this.config.batching.maxBatchSize) {\n      this.sendBatch();\n    } else if (!this.batchTimeout) {\n      // Set timeout to send batch\n      this.batchTimeout = setTimeout(() => {\n        this.sendBatch();\n      }, this.config.batching.batchTimeout);\n    }\n  }\n  \n  /**\n   * Send batched messages\n   */\n  private sendBatch(): void {\n    if (this.batchQueue.length === 0) return;\n    \n    const batchMessage = {\n      type: 'batch',\n      messages: this.batchQueue.splice(0),\n      timestamp: Date.now()\n    };\n    \n    this.sendMessageImmediate(batchMessage);\n    \n    if (this.batchTimeout) {\n      clearTimeout(this.batchTimeout);\n      this.batchTimeout = null;\n    }\n  }\n  \n  /**\n   * Queue message for later sending\n   */\n  private queueMessage(message: any, priority: 'high' | 'medium' | 'low'): void {\n    const queuedMessage: QueuedMessage = {\n      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,\n      message,\n      priority,\n      timestamp: Date.now(),\n      retryCount: 0,\n      maxRetries: 3\n    };\n    \n    // Insert based on priority\n    if (priority === 'high') {\n      this.messageQueue.unshift(queuedMessage);\n    } else {\n      this.messageQueue.push(queuedMessage);\n    }\n    \n    // Limit queue size\n    if (this.messageQueue.length > 100) {\n      this.messageQueue = this.messageQueue.slice(-100);\n    }\n  }\n  \n  /**\n   * Process message queue\n   */\n  private processMessageQueue(): void {\n    while (this.messageQueue.length > 0 && this.canSendMessage()) {\n      const queuedMessage = this.messageQueue.shift();\n      if (queuedMessage) {\n        this.sendMessageImmediate(queuedMessage.message);\n      }\n    }\n  }\n  \n  /**\n   * Check if we can send a message based on rate limiting\n   */\n  private canSendMessage(): boolean {\n    if (!this.config.bandwidth.enableThrottling) return true;\n    \n    const now = Date.now();\n    const oneSecondAgo = now - 1000;\n    \n    // Clean old entries\n    this.messageRateTracker.sent = this.messageRateTracker.sent.filter(time => time > oneSecondAgo);\n    \n    return this.messageRateTracker.sent.length < this.config.bandwidth.maxMessagesPerSecond;\n  }\n  \n  /**\n   * Get the best connection based on metrics\n   */\n  private getBestConnection(): { id: string; ws: WebSocket } | null {\n    let bestConnection: { id: string; ws: WebSocket } | null = null;\n    let bestScore = -1;\n    \n    for (const [id, ws] of this.connections.entries()) {\n      if (ws.readyState === WebSocket.OPEN) {\n        const metrics = this.connectionMetrics.get(id);\n        if (metrics) {\n          // Calculate connection score based on latency and quality\n          const score = metrics.qualityScore - (metrics.latency / 1000);\n          if (score > bestScore) {\n            bestScore = score;\n            bestConnection = { id, ws };\n          }\n        } else {\n          // Fallback to first available connection\n          if (!bestConnection) {\n            bestConnection = { id, ws };\n          }\n        }\n      }\n    }\n    \n    return bestConnection;\n  }\n  \n  /**\n   * Initialize connection metrics\n   */\n  private initializeConnectionMetrics(connectionId: string): void {\n    this.connectionMetrics.set(connectionId, {\n      latency: 0,\n      messagesSentPerSecond: 0,\n      messagesReceivedPerSecond: 0,\n      uptime: Date.now(),\n      reconnectionCount: 0,\n      bandwidthUsage: { sent: 0, received: 0 },\n      qualityScore: 1.0\n    });\n  }\n  \n  /**\n   * Update bandwidth metrics\n   */\n  private updateBandwidthMetrics(connectionId: string, direction: 'sent' | 'received', bytes: number): void {\n    const metrics = this.connectionMetrics.get(connectionId);\n    if (metrics) {\n      metrics.bandwidthUsage[direction] += bytes;\n    }\n  }\n  \n  /**\n   * Update latency metrics\n   */\n  private updateLatencyMetrics(connectionId: string, latency: number): void {\n    const metrics = this.connectionMetrics.get(connectionId);\n    if (metrics) {\n      // Use exponential moving average\n      metrics.latency = metrics.latency * 0.8 + latency * 0.2;\n      \n      // Update quality score based on latency\n      if (latency < 100) {\n        metrics.qualityScore = Math.min(1.0, metrics.qualityScore + 0.01);\n      } else if (latency > 500) {\n        metrics.qualityScore = Math.max(0.1, metrics.qualityScore - 0.05);\n      }\n    }\n  }\n  \n  /**\n   * Update connection health\n   */\n  private updateConnectionHealth(connectionId: string): void {\n    const metrics = this.connectionMetrics.get(connectionId);\n    if (metrics) {\n      metrics.qualityScore = Math.min(1.0, metrics.qualityScore + 0.005);\n    }\n  }\n  \n  /**\n   * Start heartbeat for a connection\n   */\n  private startHeartbeat(connectionId: string): void {\n    const interval = setInterval(() => {\n      const ws = this.connections.get(connectionId);\n      if (ws && ws.readyState === WebSocket.OPEN) {\n        ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));\n      }\n    }, this.config.heartbeatInterval);\n    \n    this.heartbeatIntervals.set(connectionId, interval);\n  }\n  \n  /**\n   * Stop heartbeat for a connection\n   */\n  private stopHeartbeat(connectionId: string): void {\n    const interval = this.heartbeatIntervals.get(connectionId);\n    if (interval) {\n      clearInterval(interval);\n      this.heartbeatIntervals.delete(connectionId);\n    }\n  }\n  \n  /**\n   * Schedule reconnection for a connection\n   */\n  private scheduleReconnect(connectionId: string, url: string): void {\n    const metrics = this.connectionMetrics.get(connectionId);\n    if (!metrics) return;\n    \n    if (metrics.reconnectionCount >= this.config.maxReconnectAttempts) {\n      console.error(`Max reconnection attempts reached for ${connectionId}`);\n      return;\n    }\n    \n    metrics.reconnectionCount++;\n    const delay = Math.min(\n      this.config.baseReconnectDelay * Math.pow(2, metrics.reconnectionCount - 1),\n      this.config.maxReconnectDelay\n    );\n    \n    console.log(`Scheduling reconnection for ${connectionId} in ${delay}ms`);\n    \n    const timeout = setTimeout(async () => {\n      try {\n        await this.createConnection(connectionId, url);\n      } catch (error) {\n        console.error(`Reconnection failed for ${connectionId}:`, error);\n        this.scheduleReconnect(connectionId, url);\n      }\n    }, delay);\n    \n    this.reconnectTimeouts.set(connectionId, timeout);\n  }\n  \n  /**\n   * Setup app state handling for connection management\n   */\n  private setupAppStateHandling(): void {\n    AppState.addEventListener('change', (nextAppState) => {\n      this.isAppActive = nextAppState === 'active';\n      \n      if (this.isAppActive) {\n        // App became active - check connections\n        this.checkAndRestoreConnections();\n      } else {\n        // App went to background - reduce activity\n        this.reduceBackgroundActivity();\n      }\n    });\n  }\n  \n  /**\n   * Setup network monitoring\n   */\n  private setupNetworkMonitoring(): void {\n    NetInfo.addEventListener(state => {\n      this.networkState = state;\n      \n      if (state.isConnected && this.isAppActive) {\n        this.checkAndRestoreConnections();\n      } else if (!state.isConnected) {\n        this.handleNetworkDisconnection();\n      }\n    });\n  }\n  \n  /**\n   * Check and restore connections when app becomes active or network is restored\n   */\n  private checkAndRestoreConnections(): void {\n    // Check if we have any active connections\n    const activeConnections = Array.from(this.connections.values())\n      .filter(ws => ws.readyState === WebSocket.OPEN).length;\n    \n    if (activeConnections === 0) {\n      // Try to restore at least one connection\n      this.emit('connection_restore_needed');\n    }\n  }\n  \n  /**\n   * Handle network disconnection\n   */\n  private handleNetworkDisconnection(): void {\n    // Pause message sending and queue messages\n    console.log('Network disconnected - pausing real-time operations');\n    this.handlers.onConnectionChange?.(false);\n  }\n  \n  /**\n   * Reduce background activity to save battery\n   */\n  private reduceBackgroundActivity(): void {\n    // Increase heartbeat interval in background\n    for (const [connectionId, interval] of this.heartbeatIntervals.entries()) {\n      clearInterval(interval);\n      \n      const backgroundInterval = setInterval(() => {\n        const ws = this.connections.get(connectionId);\n        if (ws && ws.readyState === WebSocket.OPEN) {\n          ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));\n        }\n      }, this.config.heartbeatInterval * 2); // Double the interval\n      \n      this.heartbeatIntervals.set(connectionId, backgroundInterval);\n    }\n  }\n  \n  /**\n   * Start performance monitoring\n   */\n  private startPerformanceMonitoring(): void {\n    this.performanceMonitor = setInterval(() => {\n      this.updatePerformanceMetrics();\n      this.optimizeConnections();\n    }, 60000); // Every minute\n  }\n  \n  /**\n   * Update performance metrics\n   */\n  private updatePerformanceMetrics(): void {\n    const now = Date.now();\n    const oneSecondAgo = now - 1000;\n    \n    // Clean old message rate data\n    this.messageRateTracker.sent = this.messageRateTracker.sent.filter(time => time > oneSecondAgo);\n    this.messageRateTracker.received = this.messageRateTracker.received.filter(time => time > oneSecondAgo);\n    \n    // Update metrics for each connection\n    for (const [connectionId, metrics] of this.connectionMetrics.entries()) {\n      metrics.messagesSentPerSecond = this.messageRateTracker.sent.length;\n      metrics.messagesReceivedPerSecond = this.messageRateTracker.received.length;\n      metrics.uptime = now - metrics.uptime;\n    }\n  }\n  \n  /**\n   * Optimize connections based on performance\n   */\n  private optimizeConnections(): void {\n    // Close poor performing connections if we have redundancy\n    if (this.connections.size > 1) {\n      for (const [connectionId, metrics] of this.connectionMetrics.entries()) {\n        if (metrics.qualityScore < 0.3 && metrics.latency > 1000) {\n          console.log(`Closing poor performing connection: ${connectionId}`);\n          const ws = this.connections.get(connectionId);\n          if (ws) {\n            ws.close();\n          }\n        }\n      }\n    }\n  }\n  \n  /**\n   * Handle real-time message\n   */\n  private handleRealtimeMessage(message: RealtimeMessage): void {\n    this.handlers.onMessage?.(message);\n    this.emit('message', message);\n  }\n  \n  /**\n   * Handle typing indicator\n   */\n  private handleTypingIndicator(data: any): void {\n    const indicator: TypingIndicator = {\n      conversationId: data.conversationId,\n      userId: data.userId,\n      isTyping: data.isTyping,\n      timestamp: data.timestamp || Date.now(),\n    };\n    \n    this.handlers.onTypingIndicator?.(indicator);\n    this.emit('typing', indicator);\n  }\n  \n  /**\n   * Handle delivery receipt\n   */\n  private handleDeliveryReceipt(data: any): void {\n    const receipt: DeliveryReceipt = {\n      messageId: data.messageId,\n      conversationId: data.conversationId,\n      userId: data.userId,\n      status: data.status,\n      timestamp: data.timestamp || Date.now(),\n    };\n    \n    this.handlers.onDeliveryReceipt?.(receipt);\n    this.emit('delivery_receipt', receipt);\n  }\n  \n  /**\n   * Send typing indicator with optimization\n   */\n  sendTypingIndicator(conversationId: string, isTyping: boolean): void {\n    const message = {\n      type: 'typing',\n      conversationId,\n      userId: this.userId,\n      isTyping,\n    };\n    \n    // Typing indicators are high priority for UX\n    this.sendMessage(message, 'high');\n  }\n  \n  /**\n   * Send delivery receipt with optimization\n   */\n  sendDeliveryReceipt(\n    messageId: string,\n    conversationId: string,\n    status: 'sent' | 'delivered' | 'read'\n  ): void {\n    const message = {\n      type: 'delivery_receipt',\n      messageId,\n      conversationId,\n      userId: this.userId,\n      status,\n    };\n    \n    // Delivery receipts can be batched\n    this.sendMessage(message, 'low');\n  }\n  \n  /**\n   * Get connection metrics\n   */\n  getConnectionMetrics(): Map<string, ConnectionMetrics> {\n    return new Map(this.connectionMetrics);\n  }\n  \n  /**\n   * Get overall performance metrics\n   */\n  getOverallMetrics(): {\n    totalConnections: number;\n    activeConnections: number;\n    averageLatency: number;\n    totalBandwidth: { sent: number; received: number };\n    averageQualityScore: number;\n    queuedMessages: number;\n  } {\n    const activeConnections = Array.from(this.connections.values())\n      .filter(ws => ws.readyState === WebSocket.OPEN).length;\n    \n    let totalLatency = 0;\n    let totalBandwidth = { sent: 0, received: 0 };\n    let totalQualityScore = 0;\n    let connectionCount = 0;\n    \n    for (const metrics of this.connectionMetrics.values()) {\n      totalLatency += metrics.latency;\n      totalBandwidth.sent += metrics.bandwidthUsage.sent;\n      totalBandwidth.received += metrics.bandwidthUsage.received;\n      totalQualityScore += metrics.qualityScore;\n      connectionCount++;\n    }\n    \n    return {\n      totalConnections: this.connections.size,\n      activeConnections,\n      averageLatency: connectionCount > 0 ? totalLatency / connectionCount : 0,\n      totalBandwidth,\n      averageQualityScore: connectionCount > 0 ? totalQualityScore / connectionCount : 0,\n      queuedMessages: this.messageQueue.length\n    };\n  }\n  \n  /**\n   * Update configuration\n   */\n  updateConfig(config: Partial<ConnectionPoolConfig>): void {\n    this.config = { ...this.config, ...config };\n  }\n  \n  /**\n   * Disconnect and cleanup\n   */\n  disconnect(): void {\n    // Clear all timeouts\n    for (const timeout of this.reconnectTimeouts.values()) {\n      clearTimeout(timeout);\n    }\n    this.reconnectTimeouts.clear();\n    \n    // Stop all heartbeats\n    for (const interval of this.heartbeatIntervals.values()) {\n      clearInterval(interval);\n    }\n    this.heartbeatIntervals.clear();\n    \n    // Close all connections\n    for (const ws of this.connections.values()) {\n      ws.close(1000, 'Client disconnect');\n    }\n    this.connections.clear();\n    \n    // Clear queues\n    this.messageQueue = [];\n    this.batchQueue = [];\n    \n    if (this.batchTimeout) {\n      clearTimeout(this.batchTimeout);\n      this.batchTimeout = null;\n    }\n    \n    if (this.performanceMonitor) {\n      clearInterval(this.performanceMonitor);\n      this.performanceMonitor = null;\n    }\n    \n    // Remove all listeners\n    this.removeAllListeners();\n  }\n}"
+import { EventEmitter } from "events";
+import {
+  RealtimeMessage,
+  TypingIndicator,
+  DeliveryReceipt,
+  RealtimeEventHandlers,
+} from "./RealtimeMessagingService";
+
+export interface ConnectionPoolConfig {
+  maxConnections: number;
+  connectionTimeout: number;
+  reconnectInterval: number;
+  maxReconnectAttempts: number;
+  heartbeatInterval: number;
+  enableConnectionPooling: boolean;
+  enableMessageBatching: boolean;
+  batchSize: number;
+  batchTimeout: number;
+}
+
+export interface ConnectionMetrics {
+  connectionCount: number;
+  activeConnections: number;
+  totalMessagesReceived: number;
+  totalMessagesSent: number;
+  averageLatency: number;
+  reconnectCount: number;
+  lastConnectedAt: number;
+  uptime: number;
+  errorCount: number;
+  messageQueueSize: number;
+}
+
+export interface ConnectionHealth {
+  score: number; // 0-100
+  status: "excellent" | "good" | "fair" | "poor" | "disconnected";
+  issues: string[];
+  recommendations: string[];
+}
+
+export class OptimizedRealtimeService extends EventEmitter {
+  private userId: string;
+  private tokenProvider?: () => Promise<string | null>;
+  private config: ConnectionPoolConfig;
+  private eventHandlers: RealtimeEventHandlers;
+  private connections: Map<string, WebSocket> = new Map();
+  private metrics: ConnectionMetrics;
+  private messageQueue: RealtimeMessage[] = [];
+  private typingTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private reconnectTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private isConnected = false;
+  private isConnecting = false;
+
+  constructor(
+    userId: string,
+    eventHandlers: RealtimeEventHandlers,
+    config: Partial<ConnectionPoolConfig> = {},
+    tokenProvider?: () => Promise<string | null>
+  ) {
+    super();
+    this.userId = userId;
+    this.eventHandlers = eventHandlers;
+    this.config = {
+      maxConnections: 3,
+      connectionTimeout: 10000,
+      reconnectInterval: 5000,
+      maxReconnectAttempts: 5,
+      heartbeatInterval: 30000,
+      enableConnectionPooling: true,
+      enableMessageBatching: true,
+      batchSize: 10,
+      batchTimeout: 100,
+      ...config,
+    };
+
+    this.metrics = {
+      connectionCount: 0,
+      activeConnections: 0,
+      totalMessagesReceived: 0,
+      totalMessagesSent: 0,
+      averageLatency: 0,
+      reconnectCount: 0,
+      lastConnectedAt: 0,
+      uptime: 0,
+      errorCount: 0,
+      messageQueueSize: 0,
+    };
+    this.tokenProvider = tokenProvider;
+  }
+
+  async connect(): Promise<void> {
+    if (this.isConnecting || this.isConnected) return;
+
+    this.isConnecting = true;
+
+    try {
+      // Create primary connection
+      await this.createConnection("primary");
+
+      // Create backup connections if pooling is enabled
+      if (this.config.enableConnectionPooling) {
+        for (let i = 1; i < this.config.maxConnections; i++) {
+          this.createConnection(`backup-${i}`).catch(console.warn);
+        }
+      }
+
+      this.isConnected = true;
+      this.isConnecting = false;
+      this.metrics.lastConnectedAt = Date.now();
+
+      // Start heartbeat
+      this.startHeartbeat();
+
+      this.eventHandlers.onConnectionChange?.(true);
+    } catch (error) {
+      this.isConnecting = false;
+      this.eventHandlers.onError?.(error as Error);
+      throw error;
+    }
+  }
+
+  disconnect(): void {
+    this.isConnected = false;
+    this.isConnecting = false;
+
+    // Close all connections
+    for (const [key, ws] of this.connections.entries()) {
+      ws.close();
+      this.connections.delete(key);
+    }
+
+    // Clear timeouts
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+
+    for (const timeout of this.reconnectTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.reconnectTimeouts.clear();
+
+    for (const timeout of this.typingTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.typingTimeouts.clear();
+
+    this.eventHandlers.onConnectionChange?.(false);
+  }
+
+  async sendMessage(
+    message: Omit<RealtimeMessage, "id" | "timestamp">
+  ): Promise<void> {
+    if (!this.isConnected) {
+      throw new Error("Not connected to realtime service");
+    }
+
+    const fullMessage: RealtimeMessage = {
+      ...message,
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+    };
+
+    if (this.config.enableMessageBatching) {
+      this.messageQueue.push(fullMessage);
+      this.processBatchedMessages();
+    } else {
+      await this.sendMessageDirect(fullMessage);
+    }
+  }
+
+  sendTypingIndicator(conversationId: string, action: "start" | "stop"): void {
+    if (!this.isConnected) return;
+
+    const indicator: TypingIndicator = {
+      conversationId,
+      userId: this.userId,
+      isTyping: action === "start",
+      timestamp: Date.now(),
+    };
+
+    // Clear existing timeout for this conversation
+    const existingTimeout = this.typingTimeouts.get(conversationId);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+    }
+
+    // Send indicator
+    this.sendTypingIndicatorDirect(indicator);
+
+    // Auto-stop typing after 3 seconds
+    if (action === "start") {
+      const timeout = setTimeout(() => {
+        this.sendTypingIndicator(conversationId, "stop");
+      }, 3000);
+      this.typingTimeouts.set(conversationId, timeout);
+    }
+  }
+
+  optimizeConnection(): void {
+    // Implement connection optimization logic
+    console.log("Optimizing connection...");
+  }
+
+  optimizeForBackground(): void {
+    // Reduce connection frequency for background mode
+    console.log("Optimizing for background...");
+  }
+
+  getConnectionHealth(): number {
+    if (!this.isConnected) return 0;
+
+    const latencyScore = Math.max(0, 100 - this.metrics.averageLatency / 10);
+    const errorScore = Math.max(0, 100 - this.metrics.errorCount * 10);
+    const uptimeScore = Math.min(100, (this.metrics.uptime / 3600000) * 10); // Hours to score
+
+    return Math.round((latencyScore + errorScore + uptimeScore) / 3);
+  }
+
+  getConnectionMetrics(): ConnectionMetrics {
+    return { ...this.metrics };
+  }
+
+  subscribeToConversation(conversationId: string): void {
+    // Implement conversation subscription logic
+    console.log(`Subscribing to conversation: ${conversationId}`);
+  }
+
+  unsubscribeFromConversation(conversationId: string): void {
+    // Implement conversation unsubscription logic
+    console.log(`Unsubscribing from conversation: ${conversationId}`);
+  }
+
+  private async createConnection(key: string): Promise<void> {
+    const token = this.tokenProvider ? await this.tokenProvider() : null;
+    const baseUrl = "wss://your-websocket-url.com"; // TODO: replace with env/config constant
+    const url = new URL(baseUrl);
+    url.searchParams.set("uid", this.userId);
+    if (token) url.searchParams.set("token", token);
+
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url.toString());
+
+      const timeout = setTimeout(() => {
+        ws.close();
+        reject(new Error("Connection timeout"));
+      }, this.config.connectionTimeout);
+
+      ws.onopen = () => {
+        clearTimeout(timeout);
+        this.connections.set(key, ws);
+        this.metrics.connectionCount++;
+        this.metrics.activeConnections++;
+        // Send initial auth message if token not passed as query or needs verification handshake
+        if (token) {
+          try {
+            ws.send(
+              JSON.stringify({
+                type: "auth",
+                token,
+                userId: this.userId,
+                ts: Date.now(),
+              })
+            );
+          } catch (e) {
+            console.warn("Failed to send initial auth message", e);
+          }
+        }
+        resolve();
+      };
+
+      ws.onclose = () => {
+        this.connections.delete(key);
+        this.metrics.activeConnections--;
+        this.handleConnectionLoss(key);
+      };
+
+      ws.onerror = (error) => {
+        clearTimeout(timeout);
+        this.metrics.errorCount++;
+        reject(error);
+      };
+
+      ws.onmessage = (event) => {
+        this.handleMessage(event.data);
+      };
+    });
+  }
+
+  private handleConnectionLoss(key: string): void {
+    if (key === "primary" && this.isConnected) {
+      // Primary connection lost - attempt reconnect
+      this.attemptReconnect(key);
+    }
+  }
+
+  private attemptReconnect(key: string): void {
+    const timeout = setTimeout(async () => {
+      try {
+        await this.createConnection(key);
+        this.metrics.reconnectCount++;
+      } catch (error) {
+        console.warn(`Failed to reconnect ${key}:`, error);
+        // Try again if we haven't exceeded max attempts
+        if (this.metrics.reconnectCount < this.config.maxReconnectAttempts) {
+          this.attemptReconnect(key);
+        }
+      }
+    }, this.config.reconnectInterval);
+
+    this.reconnectTimeouts.set(key, timeout);
+  }
+
+  /**
+   * Refresh authentication token for all active connections by sending an auth_refresh
+   */
+  async refreshAuth(): Promise<void> {
+    if (!this.tokenProvider) return;
+    const token = await this.tokenProvider();
+    if (!token) return;
+    for (const ws of this.connections.values()) {
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "auth_refresh",
+            token,
+            userId: this.userId,
+            ts: Date.now(),
+          })
+        );
+      } catch (e) {
+        console.warn("Failed to send auth_refresh", e);
+      }
+    }
+  }
+
+  private handleMessage(data: string): void {
+    try {
+      const message = JSON.parse(data);
+      this.metrics.totalMessagesReceived++;
+
+      // Route message to appropriate handler
+      if (message.type === "message") {
+        this.eventHandlers.onMessage?.(message as RealtimeMessage);
+      } else if (message.type === "typing") {
+        this.eventHandlers.onTypingIndicator?.(message as TypingIndicator);
+      } else if (message.type === "receipt") {
+        this.eventHandlers.onDeliveryReceipt?.(message as DeliveryReceipt);
+      }
+    } catch (error) {
+      console.error("Failed to parse message:", error);
+      this.metrics.errorCount++;
+    }
+  }
+
+  private async sendMessageDirect(message: RealtimeMessage): Promise<void> {
+    const primaryConnection = this.connections.get("primary");
+    if (!primaryConnection) {
+      throw new Error("No primary connection available");
+    }
+
+    primaryConnection.send(JSON.stringify(message));
+    this.metrics.totalMessagesSent++;
+  }
+
+  private sendTypingIndicatorDirect(indicator: TypingIndicator): void {
+    const primaryConnection = this.connections.get("primary");
+    if (!primaryConnection) return;
+
+    primaryConnection.send(
+      JSON.stringify({
+        type: "typing",
+        ...indicator,
+      })
+    );
+  }
+
+  private processBatchedMessages(): void {
+    if (this.messageQueue.length === 0) return;
+
+    const timeout = setTimeout(() => {
+      this.flushMessageQueue();
+    }, this.config.batchTimeout);
+
+    if (this.messageQueue.length >= this.config.batchSize) {
+      clearTimeout(timeout);
+      this.flushMessageQueue();
+    }
+  }
+
+  private flushMessageQueue(): void {
+    if (this.messageQueue.length === 0) return;
+
+    const messages = [...this.messageQueue];
+    this.messageQueue = [];
+
+    const primaryConnection = this.connections.get("primary");
+    if (!primaryConnection) return;
+
+    primaryConnection.send(
+      JSON.stringify({
+        type: "batch",
+        messages,
+      })
+    );
+
+    this.metrics.totalMessagesSent += messages.length;
+  }
+
+  private startHeartbeat(): void {
+    this.heartbeatInterval = setInterval(() => {
+      const primaryConnection = this.connections.get("primary");
+      if (primaryConnection) {
+        primaryConnection.send(JSON.stringify({ type: "ping" }));
+      }
+    }, this.config.heartbeatInterval);
+  }
+}

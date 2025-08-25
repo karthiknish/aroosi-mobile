@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { Colors, Layout } from '../../../constants';
+import { Colors, Layout } from "@constants";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 interface SafetyGuidelinesScreenProps {

@@ -13,7 +13,7 @@ import { Colors } from "@constants/Colors";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
-} from "@hooks/useResponsive";
+} from "@/hooks/useResponsive";
 
 // Create responsive styles function
 const createResponsiveStyles = (spacing: any, fontSize: any) =>

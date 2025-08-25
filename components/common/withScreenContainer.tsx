@@ -6,13 +6,13 @@ import ScreenContainer from "./ScreenContainer";
  * This guarantees safe-area handling and vertical scrolling without
  * editing every screen implementation.
  */
-export default function withScreenContainer<P>(
+export default function withScreenContainer<P extends object>(
   Wrapped: React.ComponentType<P>,
   options: { showsVerticalScrollIndicator?: boolean } = {}
-) {
+): React.ComponentType<P> {
   const { showsVerticalScrollIndicator = false } = options;
 
-  const ComponentWithContainer: React.FC<P> = (props) => (
+  const ComponentWithContainer: React.FC<P> = (props: P) => (
     <ScreenContainer
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
     >
@@ -23,5 +23,5 @@ export default function withScreenContainer<P>(
   ComponentWithContainer.displayName = `withScreenContainer(${
     Wrapped.displayName || Wrapped.name || "Component"
   })`;
-  return ComponentWithContainer;
+  return ComponentWithContainer as React.ComponentType<P>;
 }

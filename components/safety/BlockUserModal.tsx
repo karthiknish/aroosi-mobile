@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
-import { useBlockUser, useUnblockUser } from '../../hooks/useSafety';
+import { useBlockUser, useUnblockUser } from "@/hooks/useSafety";
+import { showSuccessToast, showErrorToast } from "@utils/toast";
+import PlatformHaptics from "@utils/PlatformHaptics";
 
 interface BlockUserModalProps {
   visible: boolean;
@@ -23,42 +25,39 @@ interface BlockUserModalProps {
 export default function BlockUserModal({
   visible,
   userId,
-  userName = 'User',
+  userName = "User",
   isBlocked,
   onClose,
 }: BlockUserModalProps) {
   const blockUserMutation = useBlockUser();
   const unblockUserMutation = useUnblockUser();
 
-  const isLoading = blockUserMutation.isPending || unblockUserMutation.isPending;
+  const isLoading =
+    blockUserMutation.isPending || unblockUserMutation.isPending;
 
   const handleBlock = async () => {
     try {
       await blockUserMutation.mutateAsync({ blockedUserId: userId });
-      
-      Alert.alert(
-        'User Blocked',
-        `${userName} has been blocked. They will no longer be able to see your profile or contact you.`,
-        [{ text: 'OK', onPress: onClose }]
-      );
+      await PlatformHaptics.success();
+      showSuccessToast("User blocked successfully");
+      onClose();
     } catch (error) {
-      console.error('Error blocking user:', error);
-      Alert.alert('Error', 'Failed to block user. Please try again.');
+      console.error("Error blocking user:", error);
+      await PlatformHaptics.error();
+      showErrorToast("Failed to block user. Please try again.");
     }
   };
 
   const handleUnblock = async () => {
     try {
       await unblockUserMutation.mutateAsync({ blockedUserId: userId });
-      
-      Alert.alert(
-        'User Unblocked',
-        `${userName} has been unblocked. They can now see your profile and contact you again.`,
-        [{ text: 'OK', onPress: onClose }]
-      );
+      await PlatformHaptics.success();
+      showSuccessToast("User unblocked successfully");
+      onClose();
     } catch (error) {
-      console.error('Error unblocking user:', error);
-      Alert.alert('Error', 'Failed to unblock user. Please try again.');
+      console.error("Error unblocking user:", error);
+      await PlatformHaptics.error();
+      showErrorToast("Failed to unblock user. Please try again.");
     }
   };
 
@@ -79,30 +78,37 @@ export default function BlockUserModal({
         <View style={styles.modal}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerIcon}>
-              {isBlocked ? '🔓' : '🚫'}
-            </Text>
+            <Text style={styles.headerIcon}>{isBlocked ? "🔓" : "🚫"}</Text>
             <Text style={styles.headerTitle}>
-              {isBlocked ? 'Unblock User' : 'Block User'}
+              {isBlocked ? "Unblock User" : "Block User"}
             </Text>
-            <Text style={styles.headerSubtitle}>
-              {userName}
-            </Text>
+            <Text style={styles.headerSubtitle}>{userName}</Text>
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.content}
+            showsVerticalScrollIndicator={false}
+          >
             {isBlocked ? (
               <View>
                 <Text style={styles.description}>
                   If you unblock {userName}, they will be able to:
                 </Text>
-                
+
                 <View style={styles.effectsList}>
-                  <Text style={styles.effectItem}>• See your profile in search results</Text>
-                  <Text style={styles.effectItem}>• Send you messages and interests</Text>
-                  <Text style={styles.effectItem}>• View your photos and profile details</Text>
-                  <Text style={styles.effectItem}>• Contact you if you match again</Text>
+                  <Text style={styles.effectItem}>
+                    • See your profile in search results
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • Send you messages and interests
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • View your photos and profile details
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • Contact you if you match again
+                  </Text>
                 </View>
 
                 <View style={styles.infoBox}>
@@ -116,17 +122,26 @@ export default function BlockUserModal({
                 <Text style={styles.description}>
                   If you block {userName}, the following will happen:
                 </Text>
-                
+
                 <View style={styles.effectsList}>
-                  <Text style={styles.effectItem}>• They won't be able to see your profile</Text>
-                  <Text style={styles.effectItem}>• They can't send you messages or interests</Text>
-                  <Text style={styles.effectItem}>• You won't see each other in search results</Text>
-                  <Text style={styles.effectItem}>• Any existing conversations will be hidden</Text>
+                  <Text style={styles.effectItem}>
+                    • They won't be able to see your profile
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • They can't send you messages or interests
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • You won't see each other in search results
+                  </Text>
+                  <Text style={styles.effectItem}>
+                    • Any existing conversations will be hidden
+                  </Text>
                 </View>
 
                 <View style={styles.warningBox}>
                   <Text style={styles.warningText}>
-                    ⚠️ Blocking is reversible. You can unblock them later if you change your mind.
+                    ⚠️ Blocking is reversible. You can unblock them later if you
+                    change your mind.
                   </Text>
                 </View>
 
@@ -150,31 +165,38 @@ export default function BlockUserModal({
 
           {/* Actions */}
           <View style={styles.actions}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.cancelButton}
               onPress={handleCancel}
               disabled={isLoading}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[
                 styles.actionButton,
                 isBlocked ? styles.unblockButton : styles.blockButton,
-                isLoading && styles.actionButtonDisabled
+                isLoading && styles.actionButtonDisabled,
               ]}
               onPress={isBlocked ? handleUnblock : handleBlock}
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator size="small" color={Colors.background.primary} />
+                <ActivityIndicator
+                  size="small"
+                  color={Colors.background.primary}
+                />
               ) : (
-                <Text style={[
-                  styles.actionButtonText,
-                  isBlocked ? styles.unblockButtonText : styles.blockButtonText
-                ]}>
-                  {isBlocked ? 'Unblock' : 'Block'}
+                <Text
+                  style={[
+                    styles.actionButtonText,
+                    isBlocked
+                      ? styles.unblockButtonText
+                      : styles.blockButtonText,
+                  ]}
+                >
+                  {isBlocked ? "Unblock" : "Block"}
                 </Text>
               )}
             </TouchableOpacity>

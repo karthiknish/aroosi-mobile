@@ -6,13 +6,13 @@
 // OneSignal Device Types
 export type DeviceType = 'ios' | 'android' | 'unknown';
 
-// Push Registration Data (aligned with main project Convex schema)
+// Push Registration Data (aligned with main project API schema)
 export interface PushRegistration {
-  _id?: string;               // Convex document ID
+  _id?: string;
   userId: string;
-  playerId: string;           // OneSignal player ID
+  playerId: string; // OneSignal player ID
   deviceType: DeviceType;
-  deviceToken?: string;       // Native push token
+  deviceToken?: string; // Native push token
   registeredAt: number;
   isActive: boolean;
 }
