@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -54,19 +54,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     }
   };
 
-  // Debug font loading
-  useEffect(() => {
-    if (__DEV__) {
-      console.log(
-        "🔍 Font debug - Layout.typography.fontFamily.serif:",
-        Layout.typography.fontFamily.serif
-      );
-      console.log(
-        "🔍 Font debug - Available fonts:",
-        Object.keys(Layout.typography.fontFamily)
-      );
-    }
-  }, []);
+  // (Removed font debug logs)
 
   const styles = StyleSheet.create({
     container: {

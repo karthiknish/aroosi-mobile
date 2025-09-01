@@ -44,3 +44,9 @@ yarn-error.*
 secrets/
 secrets/asc-api-key.p8
 secrets/google-service-account.json
+
+# Firebase config files (handled via EAS secret file vars)
+google-services.json
+GoogleService-Info.plist
+**/google-services.json
+**/GoogleService-Info.plist
