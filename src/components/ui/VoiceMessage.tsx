@@ -26,16 +26,13 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 // Import Colors and typography scale (fontSize) from constants; if fontSize isn't exported, fallback to inline sizes
 import { Colors } from "@constants";
-// Provide a local typography scale fallback to avoid type errors if fontSize isn't part of constants export
-const fontSize = {
-  xs: 10,
-  sm: 12,
-  base: 14,
-  lg: 16,
-  xl: 18,
-};
 import { useToast } from "@providers/ToastContext";
-const { width: screenWidth } = Dimensions.get("window");
+import { API_BASE_URL } from "@constants";
+import {
+  useResponsiveSpacing,
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
+import { Responsive } from "@constants/responsive";
 
 interface VoiceMessageProps {
   audioUri?: string;
@@ -65,6 +62,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   style,
 }) => {
   const toast = useToast();
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
   const [player, setPlayer] = useState<AudioPlayer | null>(null);
   // Only subscribe when player is initialized to satisfy strict null checks
   const status = player ? useAudioPlayerStatus(player) : null;
@@ -86,8 +85,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
     let finalAudioUri = audioUri;
 
     if (!finalAudioUri && audioStorageId) {
-      // Construct URL for storage ID - this would need to be implemented
-      finalAudioUri = `${process.env.EXPO_PUBLIC_API_URL}/voice-messages/${audioStorageId}/url`;
+      // Construct URL for storage ID using central API base URL
+      finalAudioUri = `${API_BASE_URL}/api/voice-messages/${audioStorageId}/url`;
     }
 
     if (!finalAudioUri) return;
@@ -176,6 +175,154 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
     };
   });
 
+  // Responsive styles using hooks
+  const styles = StyleSheet.create({
+    voiceMessageContainer: {
+      borderRadius: spacing.md,
+      overflow: "hidden",
+      maxWidth: "70%", // Use percentage instead of hardcoded screen width
+      marginVertical: spacing.xs,
+    },
+    ownMessage: {
+      alignSelf: "flex-end",
+    },
+    otherMessage: {
+      alignSelf: "flex-start",
+    },
+    messageGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    playButton: {
+      width: spacing.xl * 2,
+      height: spacing.xl * 2,
+      borderRadius: spacing.xl,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: spacing.sm,
+    },
+    playButtonText: {
+      fontSize: fontSize.sm,
+    },
+    waveformContainer: {
+      flex: 1,
+      height: spacing.xl * 1.5,
+      position: "relative",
+      marginRight: spacing.sm,
+    },
+    waveformBackground: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      borderRadius: spacing.xl,
+    },
+    waveformProgress: {
+      height: "100%",
+      backgroundColor: "rgba(255,255,255,0.4)",
+      borderRadius: spacing.xl,
+    },
+    waveform: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-around",
+      height: "100%",
+      paddingHorizontal: spacing.xs,
+    },
+    waveformBar: {
+      width: 2,
+      borderRadius: 1,
+      opacity: 0.7,
+    },
+    durationText: {
+      fontSize: fontSize.xs,
+      fontWeight: "500",
+    },
+    recorderContainer: {
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+    },
+    recordingControls: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: spacing.xl * 7.5,
+    },
+    cancelButton: {
+      width: spacing.xl * 1.25,
+      height: spacing.xl * 1.25,
+      borderRadius: spacing.xl * 0.625,
+      backgroundColor: Colors.error[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    cancelButtonText: {
+      color: Colors.background.primary,
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    recordingIndicator: {
+      position: "relative",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pulseCircle: {
+      position: "absolute",
+      width: spacing.xl * 5,
+      height: spacing.xl * 5,
+      borderRadius: spacing.xl * 2.5,
+      backgroundColor: Colors.error[500],
+    },
+    recordButton: {
+      width: spacing.xl * 3.75,
+      height: spacing.xl * 3.75,
+      borderRadius: spacing.xl * 1.875,
+      backgroundColor: Colors.error[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    recordingDot: {
+      width: spacing.md * 1.25,
+      height: spacing.md * 1.25,
+      borderRadius: spacing.md * 0.625,
+      backgroundColor: Colors.background.primary,
+    },
+    stopButton: {
+      width: spacing.xl * 1.25,
+      height: spacing.xl * 1.25,
+      borderRadius: spacing.xl * 0.625,
+      backgroundColor: Colors.success[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    stopButtonText: {
+      color: Colors.background.primary,
+      fontSize: fontSize.base,
+    },
+    startRecordButton: {
+      width: spacing.xl * 1.875,
+      height: spacing.xl * 1.875,
+      borderRadius: spacing.xl * 0.9375,
+      backgroundColor: Colors.primary[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    startRecordButtonText: {
+      fontSize: fontSize.lg,
+    },
+    recordingDuration: {
+      marginTop: spacing.sm,
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      fontWeight: "500",
+    },
+  });
+
   return (
     <View
       style={[
@@ -257,6 +404,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [permissionGranted, setPermissionGranted] = useState<boolean>(false);
 
+  // Responsive values for local styles
+  const { spacing } = useResponsiveSpacing();
+  const { fontSize } = useResponsiveTypography();
+
   const recordingScale = useSharedValue(1);
   const pulseOpacity = useSharedValue(0);
 
@@ -274,7 +425,10 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (permissionGranted) return true;
     const status = await AudioModule.requestRecordingPermissionsAsync();
     if (!status.granted) {
-      toast.show("Microphone permission is required to record voice messages.", "error");
+      toast.show(
+        "Microphone permission is required to record voice messages.",
+        "error"
+      );
       return false;
     }
     setPermissionGranted(true);
@@ -403,6 +557,88 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     };
   });
 
+  // Local styles for the recorder UI
+  const styles = StyleSheet.create({
+    recorderContainer: {
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+    },
+    recordingControls: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: spacing.xl * 7.5,
+    },
+    cancelButton: {
+      width: spacing.xl * 1.25,
+      height: spacing.xl * 1.25,
+      borderRadius: spacing.xl * 0.625,
+      backgroundColor: Colors.error[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    cancelButtonText: {
+      color: Colors.background.primary,
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
+    recordingIndicator: {
+      position: "relative",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pulseCircle: {
+      position: "absolute",
+      width: spacing.xl * 5,
+      height: spacing.xl * 5,
+      borderRadius: spacing.xl * 2.5,
+      backgroundColor: Colors.error[500],
+    },
+    recordButton: {
+      width: spacing.xl * 3.75,
+      height: spacing.xl * 3.75,
+      borderRadius: spacing.xl * 1.875,
+      backgroundColor: Colors.error[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    recordingDot: {
+      width: spacing.md * 1.25,
+      height: spacing.md * 1.25,
+      borderRadius: spacing.md * 0.625,
+      backgroundColor: Colors.background.primary,
+    },
+    stopButton: {
+      width: spacing.xl * 1.25,
+      height: spacing.xl * 1.25,
+      borderRadius: spacing.xl * 0.625,
+      backgroundColor: Colors.success[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    stopButtonText: {
+      color: Colors.background.primary,
+      fontSize: fontSize.base,
+    },
+    startRecordButton: {
+      width: spacing.xl * 1.875,
+      height: spacing.xl * 1.875,
+      borderRadius: spacing.xl * 0.9375,
+      backgroundColor: Colors.primary[500],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    startRecordButtonText: {
+      fontSize: fontSize.lg,
+    },
+    recordingDuration: {
+      marginTop: spacing.sm,
+      fontSize: fontSize.sm,
+      color: Colors.text.secondary,
+      fontWeight: "500",
+    },
+  });
+
   return (
     <View style={[styles.recorderContainer, style]}>
       {isRecording ? (
@@ -444,150 +680,3 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  voiceMessageContainer: {
-    borderRadius: 20,
-    overflow: "hidden",
-    maxWidth: screenWidth * 0.7,
-    marginVertical: 4,
-  },
-  ownMessage: {
-    alignSelf: "flex-end",
-  },
-  otherMessage: {
-    alignSelf: "flex-start",
-  },
-  messageGradient: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  playButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-  },
-  playButtonText: {
-    fontSize: 14,
-  },
-  waveformContainer: {
-    flex: 1,
-    height: 30,
-    position: "relative",
-    marginRight: 8,
-  },
-  waveformBackground: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 15,
-  },
-  waveformProgress: {
-    height: "100%",
-    backgroundColor: "rgba(255,255,255,0.4)",
-    borderRadius: 15,
-  },
-  waveform: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-    height: "100%",
-    paddingHorizontal: 4,
-  },
-  waveformBar: {
-    width: 2,
-    borderRadius: 1,
-    opacity: 0.7,
-  },
-  durationText: {
-    fontSize: fontSize.xs,
-    fontWeight: "500",
-  },
-  recorderContainer: {
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  recordingControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: 200,
-  },
-  cancelButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.error[500],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    color: Colors.background.primary,
-    fontSize: fontSize.base,
-    fontWeight: "600",
-  },
-  recordingIndicator: {
-    position: "relative",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pulseCircle: {
-    position: "absolute",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.error[500],
-  },
-  recordButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.error[500],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  recordingDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.background.primary,
-  },
-  stopButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.success[500],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stopButtonText: {
-    color: Colors.background.primary,
-    fontSize: fontSize.base,
-  },
-  startRecordButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.primary[500],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  startRecordButtonText: {
-    fontSize: fontSize.lg,
-  },
-  recordingDuration: {
-    marginTop: 8,
-    fontSize: fontSize.sm,
-    color: Colors.text.secondary,
-    fontWeight: "500",
-  },
-});

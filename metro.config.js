@@ -3,6 +3,12 @@ const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
+// Workaround for Expo SDK 53 + Firebase dual-package hazard
+config.resolver = config.resolver || {};
+config.resolver.sourceExts = Array.from(new Set([...(config.resolver.sourceExts || []), 'cjs']));
+// @ts-ignore
+config.resolver.unstable_enablePackageExports = false;
+
 // Add support for additional asset extensions
 config.resolver.assetExts.push(
   // Audio formats

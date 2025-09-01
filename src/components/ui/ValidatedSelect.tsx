@@ -53,12 +53,19 @@ export const ValidatedSelect: React.FC<ValidatedSelectProps> = ({
   ) : null;
 
   return (
-    <View style={[styles.container, containerStyle]} testID={testID ?? `vs-${field}`}>
+    <View
+      style={[styles.container, containerStyle]}
+      testID={testID ?? `vs-${field}`}
+    >
       {labelNode}
       <View
         style={[
           styles.selectWrapper,
-          showError ? styles.selectWrapperError : value ? styles.selectWrapperValid : null,
+          showError
+            ? styles.selectWrapperError
+            : value
+            ? styles.selectWrapperValid
+            : null,
           disabled ? styles.selectWrapperDisabled : null,
         ]}
         pointerEvents="box-none"
@@ -68,6 +75,7 @@ export const ValidatedSelect: React.FC<ValidatedSelectProps> = ({
           selectedValue={value}
           onValueChange={onValueChange}
           placeholder={placeholder}
+          // Allow passing extra styles without affecting text color
           containerStyle={selectStyle}
         />
       </View>

@@ -5,7 +5,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from "react-native";
+import * as AppleAuthentication from "expo-apple-authentication";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@contexts/AuthProvider";
 import { useToast } from "@providers/ToastContext";
 import { Colors, Layout } from "@constants";
@@ -23,7 +26,7 @@ export default function SocialAuthButtons({
   onGoogleError,
 }: SocialAuthButtonsProps) {
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
-  const { signInWithGoogle } = useAuth();
+  const { signInWithGoogle, signInWithApple } = useAuth();
   const toast = useToast();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -82,6 +85,14 @@ export default function SocialAuthButtons({
     googleButtonText: {
       color: Colors.text.inverse,
     },
+    leftIcon: {
+      marginRight: spacing.sm,
+    },
+    inlineRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
   });
 
   return (
@@ -95,11 +106,47 @@ export default function SocialAuthButtons({
         {isGoogleLoading ? (
           <ActivityIndicator size="small" color={Colors.text.inverse} />
         ) : (
-          <Text style={[styles.buttonText, styles.googleButtonText]}>
-            Continue with Google
-          </Text>
+          <View style={styles.inlineRow}>
+            <Ionicons
+              name="logo-google"
+              size={18}
+              color={Colors.text.inverse}
+              style={styles.leftIcon}
+            />
+            <Text style={[styles.buttonText, styles.googleButtonText]}>
+              Continue with Google
+            </Text>
+          </View>
         )}
       </TouchableOpacity>
+      {Platform.OS === "ios" && (
+        <View style={{ marginTop: spacing.md }}>
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={
+              AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+            }
+            buttonStyle={
+              AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+            }
+            cornerRadius={8}
+            style={{ width: "100%", height: 48 }}
+            onPress={async () => {
+              try {
+                const res = await signInWithApple?.();
+                if (!res?.success) {
+                  const msg = res?.error || "Apple authentication failed";
+                  onGoogleError?.(msg);
+                  toast.show(msg, "error");
+                }
+              } catch (e: any) {
+                const msg = e?.message || "Apple authentication failed";
+                onGoogleError?.(msg);
+                toast.show(msg, "error");
+              }
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 }

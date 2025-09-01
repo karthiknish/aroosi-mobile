@@ -1,6 +1,9 @@
 import Expo
 import React
 import ReactAppDependencyProvider
+#if canImport(FirebaseCore)
+import FirebaseCore
+#endif
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -13,6 +16,10 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+  // Initialize Firebase if the SDK is available (installed via Swift Package Manager).
+#if canImport(FirebaseCore)
+  FirebaseApp.configure()
+#endif
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

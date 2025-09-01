@@ -60,8 +60,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       fontSize: fontSize["4xl"],
     },
     successTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: fontSize.xl,
-      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.md,
       textAlign: "center",
@@ -77,8 +77,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       paddingVertical: spacing.lg,
     },
     nextStepsTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg + 2,
-      fontWeight: "bold",
       color: Colors.text.primary,
       marginBottom: spacing.xl,
       textAlign: "center",
@@ -105,8 +105,8 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       flex: 1,
     },
     stepTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg,
-      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.xs / 2,
     },

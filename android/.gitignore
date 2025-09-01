@@ -14,3 +14,9 @@ local.properties
 
 # Bundle artifacts
 *.jsbundle
+
+# Keystore and signing
+app/upload.keystore
+*.keystore
+**/key.properties
+app/keystore.properties

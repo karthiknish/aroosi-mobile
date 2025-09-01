@@ -21,6 +21,8 @@ import { Colors, Layout } from "@constants";
 import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
+import { GradientBackground } from "@src/components/ui/GradientComponents";
+import { Ionicons } from "@expo/vector-icons";
 
 type LoginScreenNavigationProp = StackNavigationProp<
   AuthStackParamList,
@@ -38,6 +40,7 @@ export default function LoginScreen() {
 
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -118,7 +121,6 @@ export default function LoginScreen() {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#f8f4f0", // base-light equivalent
     },
     safeArea: {
       flex: 1,
@@ -128,28 +130,6 @@ export default function LoginScreen() {
     },
     scrollContent: {
       flexGrow: 1,
-    },
-    backgroundCircle1: {
-      position: "absolute",
-      top: -128,
-      left: -128,
-      width: 640,
-      height: 640,
-      borderRadius: 320,
-      backgroundColor: "#BFA67A", // primary color
-      opacity: 0.4,
-      zIndex: 0,
-    },
-    backgroundCircle2: {
-      position: "absolute",
-      bottom: -96,
-      right: -96,
-      width: 512,
-      height: 512,
-      borderRadius: 256,
-      backgroundColor: "#f0e6d2", // accent-100 equivalent
-      opacity: 0.2,
-      zIndex: 0,
     },
     inner: {
       flex: 1,
@@ -167,7 +147,6 @@ export default function LoginScreen() {
       fontSize: fontSize["2xl"],
       color: "#BFA67A", // primary color
       marginBottom: spacing.xs,
-      fontWeight: "bold",
     },
     titleUnderline: {
       position: "absolute",
@@ -205,6 +184,9 @@ export default function LoginScreen() {
     inputContainer: {
       marginBottom: spacing.lg,
     },
+    inputWrapper: {
+      position: "relative",
+    },
     label: {
       fontSize: fontSize.sm,
       color: Colors.text.primary,
@@ -220,8 +202,19 @@ export default function LoginScreen() {
       color: Colors.text.primary,
       backgroundColor: "white",
     },
+    inputWithIcon: {
+      paddingRight: spacing.xl * 2,
+    },
     inputError: {
       borderColor: Colors.error[500],
+    },
+    eyeButton: {
+      position: "absolute",
+      right: spacing.md,
+      top: 0,
+      bottom: 0,
+      justifyContent: "center",
+      alignItems: "center",
     },
     button: {
       backgroundColor: "#BFA67A", // primary color
@@ -289,12 +282,11 @@ export default function LoginScreen() {
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Decorative background elements */}
-        <View style={styles.backgroundCircle1} />
-        <View style={styles.backgroundCircle2} />
-
+    <GradientBackground
+      colors={Colors.gradient.secondary as any}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -357,23 +349,43 @@ export default function LoginScreen() {
 
                   <View style={styles.inputContainer}>
                     <Text style={styles.label}>Password</Text>
-                    <TextInput
-                      style={[
-                        styles.input,
-                        fieldErrors.password && styles.inputError,
-                      ]}
-                      placeholder="Enter your password"
-                      placeholderTextColor={Colors.text.secondary}
-                      value={password}
-                      onChangeText={(v) => {
-                        setPassword(v);
-                        if (fieldErrors.password) {
-                          setFieldErrors((prev) => ({ ...prev, password: "" }));
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          styles.inputWithIcon,
+                          fieldErrors.password && styles.inputError,
+                        ]}
+                        placeholder="Enter your password"
+                        placeholderTextColor={Colors.text.secondary}
+                        value={password}
+                        onChangeText={(v) => {
+                          setPassword(v);
+                          if (fieldErrors.password) {
+                            setFieldErrors((prev) => ({
+                              ...prev,
+                              password: "",
+                            }));
+                          }
+                        }}
+                        secureTextEntry={!showPassword}
+                        editable={!loading}
+                      />
+                      <TouchableOpacity
+                        style={styles.eyeButton}
+                        onPress={() => setShowPassword((s) => !s)}
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          showPassword ? "Hide password" : "Show password"
                         }
-                      }}
-                      secureTextEntry
-                      editable={!loading}
-                    />
+                      >
+                        <Ionicons
+                          name={showPassword ? "eye-off" : "eye"}
+                          size={20}
+                          color={Colors.text.secondary}
+                        />
+                      </TouchableOpacity>
+                    </View>
                     {fieldErrors.password ? (
                       <Text style={styles.errorText}>
                         {fieldErrors.password}
@@ -418,11 +430,15 @@ export default function LoginScreen() {
 
                   <TouchableOpacity
                     style={styles.linkButton}
-                    onPress={() => navigation.navigate("SignUp")}
+                    onPress={() => {
+                      // redirect to onboarding to create an account
+                      // @ts-ignore
+                      navigation.navigate("Onboarding");
+                    }}
                     disabled={loading}
                   >
                     <Text style={styles.linkText}>
-                      Don't have an account? Sign Up
+                      Don't have an account? Start Onboarding
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -430,7 +446,7 @@ export default function LoginScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </GradientBackground>
   );
 }

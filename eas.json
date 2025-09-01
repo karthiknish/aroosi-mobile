@@ -15,6 +15,12 @@
         "simulator": true
       }
     },
+    "development-device": {
+      "extends": "development",
+      "ios": {
+        "simulator": false
+      }
+    },
     "staging": {
       "distribution": "internal",
       "channel": "staging",
@@ -57,9 +63,12 @@
         "releaseStatus": "completed"
       },
       "ios": {
-        "appleId": "${{ secrets.APPLE_ID }}",
         "ascAppId": "${{ secrets.ASC_APP_ID }}",
-        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}"
+        "appleId": "${{ secrets.APPLE_ID }}",
+        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}",
+        "ascApiKeyId": "${{ secrets.ASC_API_KEY_ID }}",
+        "ascApiKeyIssuerId": "${{ secrets.ASC_API_KEY_ISSUER_ID }}",
+        "ascApiKeyPath": "./secrets/asc-api-key.p8"
       }
     },
     "staging": {
@@ -69,9 +78,12 @@
         "releaseStatus": "draft"
       },
       "ios": {
-        "appleId": "${{ secrets.APPLE_ID }}",
         "ascAppId": "${{ secrets.ASC_APP_ID }}",
-        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}"
+        "appleId": "${{ secrets.APPLE_ID }}",
+        "appleTeamId": "${{ secrets.APPLE_TEAM_ID }}",
+        "ascApiKeyId": "${{ secrets.ASC_API_KEY_ID }}",
+        "ascApiKeyIssuerId": "${{ secrets.ASC_API_KEY_ISSUER_ID }}",
+        "ascApiKeyPath": "./secrets/asc-api-key.p8"
       }
     }
   }

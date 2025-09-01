@@ -1,16 +1,15 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
+import { Layout } from "@constants";
 
 // Import auth screens
 import LoginScreen from "../screens/auth/LoginScreen";
-import SignUpScreen from "../screens/auth/SignUpScreen";
 import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../screens/auth/ResetPasswordScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 
 export type AuthStackParamList = {
   Login: undefined;
-  SignUp: undefined;
   ForgotPassword: undefined;
   ResetPassword: { token?: string } | undefined;
 };
@@ -27,18 +26,13 @@ export default function AuthNavigator() {
         },
         headerTintColor: "#333",
         headerTitleStyle: {
-          fontWeight: "bold",
+          fontFamily: Layout.typography.fontFamily.serif,
         },
       }}
     >
       <Stack.Screen
         name="Login"
         component={withScreenContainer(LoginScreen)}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SignUp"
-        component={withScreenContainer(SignUpScreen)}
         options={{ headerShown: false }}
       />
       <Stack.Screen

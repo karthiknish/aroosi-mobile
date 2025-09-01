@@ -178,8 +178,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   headerTitle: {
+    fontFamily: "Boldonse-Regular",
     fontSize: 24,
-    fontWeight: "700",
     color: "#111827",
     marginBottom: 4,
   },
@@ -250,8 +250,8 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyTitle: {
+    fontFamily: "Boldonse-Regular",
     fontSize: 20,
-    fontWeight: "600",
     color: "#374151",
     marginTop: 16,
     marginBottom: 8,

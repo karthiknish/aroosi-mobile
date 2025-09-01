@@ -39,3 +39,8 @@ yarn-error.*
 
 # Generic env patterns
 *.env
+
+# Secrets
+secrets/
+secrets/asc-api-key.p8
+secrets/google-service-account.json

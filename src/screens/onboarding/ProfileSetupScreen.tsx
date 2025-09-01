@@ -3,14 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   Alert,
   ActivityIndicator,
   Platform,
-  KeyboardAvoidingView,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
 import { useApiClient } from "@/utils/api";
@@ -60,8 +59,354 @@ import {
   ETHNICITY_OPTIONS,
 } from "../../../constants/languages";
 
+// Local component for Step 9: Create Account (signup embedded)
+function CreateAccountStep({
+  missing,
+  onBackToStart,
+  navigation,
+}: {
+  missing: string[];
+  onBackToStart: () => void;
+  navigation: any;
+}) {
+  const [emailAddress, setEmailAddress] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [awaitingEmailVerification, setAwaitingEmailVerification] =
+    useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const {
+    signUp,
+    verifyEmailCode,
+    resendEmailVerification,
+    startEmailVerificationPolling,
+  } = useAuth();
+  const toastCtx = useToast();
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setInterval(
+      () => setSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
+      1000
+    );
+    return () => clearInterval(timer);
+  }, [secondsLeft]);
+
+  const handleResend = async () => {
+    if (!awaitingEmailVerification || secondsLeft > 0) return;
+    setResendLoading(true);
+    try {
+      const resp = await resendEmailVerification?.();
+      if (!resp?.success) {
+        toastCtx.show(resp?.error || "Unable to resend email", "error");
+        return;
+      }
+      toastCtx.show("Verification email sent again", "info");
+      setSecondsLeft(60);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleIHaveVerified = async () => {
+    setLoading(true);
+    try {
+      const res = await verifyEmailCode?.();
+      if (res?.success) {
+        toastCtx.show("Email verified! Finalizing your profile...", "success");
+      } else {
+        toastCtx.show(
+          res?.error || "Still not verified. Try again shortly.",
+          "error"
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onCreateAccount = async () => {
+    const errs: Record<string, string> = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedEmail = emailAddress.trim().toLowerCase();
+    if (!normalizedEmail) errs.emailAddress = "Email is required";
+    else if (!emailRegex.test(normalizedEmail))
+      errs.emailAddress = "Please enter a valid email address";
+    if (!password) errs.password = "Password is required";
+    else if (password.length < 12)
+      errs.password =
+        "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.";
+    else {
+      const hasLower = /[a-z]/.test(password);
+      const hasUpper = /[A-Z]/.test(password);
+      const hasDigit = /\d/.test(password);
+      const hasSymbol = /[^A-Za-z0-9]/.test(password);
+      if (!(hasLower && hasUpper && hasDigit && hasSymbol))
+        errs.password =
+          "Password must include uppercase, lowercase, number, and symbol.";
+    }
+    if (!confirmPassword) errs.confirmPassword = "Confirm your password";
+    else if (password !== confirmPassword)
+      errs.confirmPassword = "Passwords do not match";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      const labels: Record<string, string> = {
+        emailAddress: "Email",
+        password: "Password",
+        confirmPassword: "Confirm Password",
+      };
+      const summary = `Please fix: ${Object.keys(errs)
+        .map((k) => labels[k] || k)
+        .join(", ")}.`;
+      toastCtx.show(summary, "error");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const fullName = normalizedEmail.split("@")[0];
+      const result = await signUp(normalizedEmail, password, fullName);
+      if (result.success) {
+        if (result.emailVerified) {
+          toastCtx.show(
+            "Account created! Finalizing your profile...",
+            "success"
+          );
+        } else {
+          setAwaitingEmailVerification(true);
+          toastCtx.show(
+            "Verification email sent. Please check your inbox.",
+            "info"
+          );
+          setSecondsLeft(60);
+          startEmailVerificationPolling?.();
+        }
+      } else {
+        toastCtx.show(result.error || "Sign up failed", "error");
+      }
+    } catch (e) {
+      toastCtx.show("An unexpected error occurred during sign up", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.stepContainer}>
+      <Text style={styles.stepTitle}>Create Account</Text>
+      <Text style={styles.stepSubtitle}>Finish and create your account</Text>
+
+      {missing.length > 0 ? (
+        <View
+          style={{
+            backgroundColor: "#FEF2F2",
+            borderColor: "#FECACA",
+            borderWidth: 1,
+            borderRadius: 8,
+            padding: Layout.spacing.md,
+            marginBottom: Layout.spacing.lg,
+          }}
+        >
+          <Text
+            style={{ color: "#DC2626", fontWeight: "600", marginBottom: 4 }}
+          >
+            Cannot create account - Profile incomplete
+          </Text>
+          <Text style={{ color: "#EF4444", marginBottom: 8 }}>
+            You must complete all profile sections before creating an account.
+          </Text>
+          <Text style={{ color: "#F87171", fontSize: 12, marginBottom: 8 }}>
+            Missing: {missing.slice(0, 5).join(", ")}
+            {missing.length > 5 ? ` and ${missing.length - 5} more fields` : ""}
+          </Text>
+          <TouchableOpacity style={styles.backButton} onPress={onBackToStart}>
+            <Text style={styles.backButtonText}>
+              Go back to complete profile
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : awaitingEmailVerification ? (
+        <View>
+          <Text style={styles.stepSubtitle}>
+            We sent a verification link to {emailAddress}. Once verified, tap
+            below.
+          </Text>
+          <TouchableOpacity
+            style={[styles.nextButton, loading && { opacity: 0.7 }]}
+            onPress={handleIHaveVerified}
+            disabled={loading}
+          >
+            <Text style={styles.nextButtonText}>
+              {loading ? "Checking..." : "I have verified"}
+            </Text>
+          </TouchableOpacity>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              marginTop: Layout.spacing.md,
+            }}
+          >
+            <Text style={{ color: Colors.text.secondary }}>
+              {secondsLeft > 0
+                ? `Resend available in ${secondsLeft}s`
+                : "Need a new email?"}
+            </Text>
+            <TouchableOpacity
+              disabled={secondsLeft > 0 || resendLoading || loading}
+              onPress={handleResend}
+            >
+              <Text style={{ color: Colors.primary[500], fontWeight: "500" }}>
+                {resendLoading
+                  ? "Resending..."
+                  : secondsLeft > 0
+                  ? "Waiting"
+                  : "Resend email"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={[
+                styles.input,
+                fieldErrors.emailAddress && styles.inputError,
+              ]}
+              placeholder="Enter your email"
+              placeholderTextColor={Colors.text.secondary}
+              value={emailAddress}
+              onChangeText={(t) => {
+                setEmailAddress(t);
+                if (fieldErrors.emailAddress)
+                  setFieldErrors((e) => ({ ...e, emailAddress: "" }));
+              }}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              editable={!loading}
+            />
+            {!!fieldErrors.emailAddress && (
+              <Text style={styles.errorText}>{fieldErrors.emailAddress}</Text>
+            )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Password</Text>
+            <View style={{ position: "relative" }}>
+              <TextInput
+                style={[
+                  styles.input,
+                  { paddingRight: Layout.spacing.xl * 2 },
+                  fieldErrors.password && styles.inputError,
+                ]}
+                placeholder="Create a strong password"
+                placeholderTextColor={Colors.text.secondary}
+                value={password}
+                onChangeText={(t) => {
+                  setPassword(t);
+                  if (fieldErrors.password)
+                    setFieldErrors((e) => ({ ...e, password: "" }));
+                }}
+                secureTextEntry={!showPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  right: Layout.spacing.md,
+                  top: 0,
+                  bottom: 0,
+                  justifyContent: "center",
+                }}
+                onPress={() => setShowPassword((s) => !s)}
+              >
+                <Text style={{ color: Colors.text.secondary }}>
+                  {showPassword ? "Hide" : "Show"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {!!fieldErrors.password && (
+              <Text style={styles.errorText}>{fieldErrors.password}</Text>
+            )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Confirm Password</Text>
+            <View style={{ position: "relative" }}>
+              <TextInput
+                style={[
+                  styles.input,
+                  { paddingRight: Layout.spacing.xl * 2 },
+                  fieldErrors.confirmPassword && styles.inputError,
+                ]}
+                placeholder="Confirm your password"
+                placeholderTextColor={Colors.text.secondary}
+                value={confirmPassword}
+                onChangeText={(t) => {
+                  setConfirmPassword(t);
+                  if (fieldErrors.confirmPassword)
+                    setFieldErrors((e) => ({ ...e, confirmPassword: "" }));
+                }}
+                secureTextEntry={!showConfirmPassword}
+                editable={!loading}
+              />
+              <TouchableOpacity
+                style={{
+                  position: "absolute",
+                  right: Layout.spacing.md,
+                  top: 0,
+                  bottom: 0,
+                  justifyContent: "center",
+                }}
+                onPress={() => setShowConfirmPassword((s) => !s)}
+              >
+                <Text style={{ color: Colors.text.secondary }}>
+                  {showConfirmPassword ? "Hide" : "Show"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {!!fieldErrors.confirmPassword && (
+              <Text style={styles.errorText}>
+                {fieldErrors.confirmPassword}
+              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.nextButton, loading && { opacity: 0.7 }]}
+            onPress={onCreateAccount}
+            disabled={loading}
+          >
+            <Text style={styles.nextButtonText}>
+              {loading ? "Creating Account..." : "Create Account"}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ marginTop: Layout.spacing.md, alignItems: "center" }}
+            onPress={() => navigation.navigate("Auth", { screen: "Login" })}
+          >
+            <Text style={{ color: Colors.primary[500] }}>
+              Already have an account? Sign In
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 interface ProfileSetupScreenProps {
   navigation: any;
+  route?: { params?: { step?: number } };
 }
 
 // Helper: map { value,label }[] to string[] of labels for ValidatedSelect
@@ -77,10 +422,16 @@ const STEPS = [
   { id: 6, title: "About Me", subtitle: "Describe yourself" },
   { id: 7, title: "Lifestyle", subtitle: "Your preferences" },
   { id: 8, title: "Photos", subtitle: "Add your profile photos" },
+  {
+    id: 9,
+    title: "Create Account",
+    subtitle: "Finish and create your account",
+  },
 ];
 
 export default function ProfileSetupScreen({
   navigation,
+  route,
 }: ProfileSetupScreenProps) {
   const { user, refreshUser } = useAuth();
   const apiClient = useApiClient();
@@ -95,6 +446,12 @@ export default function ProfileSetupScreen({
   const [heightFeet, setHeightFeet] = useState(5);
   const [heightInches, setHeightInches] = useState(6);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Helpers for display vs stored values (capitalize labels while storing lowercase)
+  const toTitleCase = (s: string) =>
+    s.replace(/([\wÀ-ÿ][^\s-]*)/g, (w) => w[0]?.toUpperCase() + w.slice(1));
+  const mapOptionsToTitle = (opts: string[]) => opts.map((o) => toTitleCase(o));
+  const normalizeStored = (label: string) => label.toLowerCase();
 
   // Create profile mutation
   const toast = useToast();
@@ -149,12 +506,24 @@ export default function ProfileSetupScreen({
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+    // Persist snapshot for continuity across auth
+    persistSnapshot({ ...formData, [field]: value }, currentStep).catch(
+      () => {}
+    );
   };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === "ios");
     if (selectedDate) {
       const dateString = selectedDate.toISOString().split("T")[0];
+      // Enforce 18+ at selection time for clearer UX
+      try {
+        const age = calculateAge(dateString);
+        if (age < 18) {
+          toast.show("You must be at least 18 years old.", "error");
+          return;
+        }
+      } catch {}
       handleInputChange("dateOfBirth", dateString);
     }
   };
@@ -183,7 +552,8 @@ export default function ProfileSetupScreen({
       if (currentStep < STEPS.length) {
         setCurrentStep(currentStep + 1);
       } else {
-        handleSubmit();
+        // At final step we don't submit here; Create Account step controls flow
+        // This branch should not be reached as we hide Next button at step 9
       }
     }
   };
@@ -263,15 +633,405 @@ export default function ProfileSetupScreen({
         return renderLifestyleStep();
       case 8:
         return renderPhotosStep();
+      case 9: {
+        const requiredFields: (keyof CreateProfileData)[] = [
+          "fullName",
+          "dateOfBirth",
+          "gender",
+          "city",
+          "aboutMe",
+          "occupation",
+          "education",
+          "height",
+          "maritalStatus",
+          "phoneNumber",
+        ];
+        const missing = requiredFields.filter((f) => {
+          const v = (formData as any)[f];
+          return !v || (typeof v === "string" && v.trim() === "");
+        });
+        return (
+          <CreateAccountStep
+            missing={missing}
+            onBackToStart={() => setCurrentStep(1)}
+            navigation={navigation}
+          />
+        );
+      }
       default:
         return null;
     }
   };
 
+  const renderCreateAccountStep = () => {
+    // Determine if required fields are present like web Step7AccountCreation
+    const requiredFields: (keyof CreateProfileData)[] = [
+      "fullName",
+      "dateOfBirth",
+      "gender",
+      "city",
+      "aboutMe",
+      "occupation",
+      "education",
+      "height",
+      "maritalStatus",
+      "phoneNumber",
+    ];
+    const missing = requiredFields.filter((f) => {
+      const v = (formData as any)[f];
+      return !v || (typeof v === "string" && v.trim() === "");
+    });
+
+    // Inline signup state and handlers
+    const [emailAddress, setEmailAddress] = useState("");
+    const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [awaitingEmailVerification, setAwaitingEmailVerification] =
+      useState(false);
+    const [resendLoading, setResendLoading] = useState(false);
+    const [secondsLeft, setSecondsLeft] = useState(0);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+    const {
+      signUp,
+      verifyEmailCode,
+      resendEmailVerification,
+      startEmailVerificationPolling,
+    } = useAuth();
+    const toastCtx = useToast();
+
+    useEffect(() => {
+      if (secondsLeft <= 0) return;
+      const timer = setInterval(
+        () => setSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
+        1000
+      );
+      return () => clearInterval(timer);
+    }, [secondsLeft]);
+
+    const handleResend = async () => {
+      if (!awaitingEmailVerification || secondsLeft > 0) return;
+      setResendLoading(true);
+      try {
+        const resp = await resendEmailVerification?.();
+        if (!resp?.success) {
+          toastCtx.show(resp?.error || "Unable to resend email", "error");
+          return;
+        }
+        toastCtx.show("Verification email sent again", "info");
+        setSecondsLeft(60);
+      } finally {
+        setResendLoading(false);
+      }
+    };
+
+    const handleIHaveVerified = async () => {
+      setLoading(true);
+      try {
+        const res = await verifyEmailCode?.();
+        if (res?.success) {
+          toastCtx.show(
+            "Email verified! Finalizing your profile...",
+            "success"
+          );
+          // Profile submission will be triggered by outer effect when user is authenticated
+        } else {
+          toastCtx.show(
+            res?.error || "Still not verified. Try again shortly.",
+            "error"
+          );
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const onCreateAccount = async () => {
+      const errs: Record<string, string> = {};
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const normalizedEmail = emailAddress.trim().toLowerCase();
+      if (!normalizedEmail) errs.emailAddress = "Email is required";
+      else if (!emailRegex.test(normalizedEmail))
+        errs.emailAddress = "Please enter a valid email address";
+      if (!password) errs.password = "Password is required";
+      else if (password.length < 12)
+        errs.password =
+          "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.";
+      else {
+        const hasLower = /[a-z]/.test(password);
+        const hasUpper = /[A-Z]/.test(password);
+        const hasDigit = /\d/.test(password);
+        const hasSymbol = /[^A-Za-z0-9]/.test(password);
+        if (!(hasLower && hasUpper && hasDigit && hasSymbol))
+          errs.password =
+            "Password must include uppercase, lowercase, number, and symbol.";
+      }
+      if (!confirmPassword) errs.confirmPassword = "Confirm your password";
+      else if (password !== confirmPassword)
+        errs.confirmPassword = "Passwords do not match";
+      setFieldErrors(errs);
+      if (Object.keys(errs).length > 0) {
+        const labels: Record<string, string> = {
+          emailAddress: "Email",
+          password: "Password",
+          confirmPassword: "Confirm Password",
+        };
+        const summary = `Please fix: ${Object.keys(errs)
+          .map((k) => labels[k] || k)
+          .join(", ")}.`;
+        toastCtx.show(summary, "error");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const fullName = normalizedEmail.split("@")[0];
+        const result = await signUp(normalizedEmail, password, fullName);
+        if (result.success) {
+          if (result.emailVerified) {
+            toastCtx.show(
+              "Account created! Finalizing your profile...",
+              "success"
+            );
+            // Auto-submit handled by outer effect
+          } else {
+            setAwaitingEmailVerification(true);
+            toastCtx.show(
+              "Verification email sent. Please check your inbox.",
+              "info"
+            );
+            setSecondsLeft(60);
+            startEmailVerificationPolling?.();
+          }
+        } else {
+          toastCtx.show(result.error || "Sign up failed", "error");
+        }
+      } catch (e) {
+        toastCtx.show("An unexpected error occurred during sign up", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    return (
+      <View style={styles.stepContainer}>
+        <Text style={styles.stepTitle}>Create Account</Text>
+        <Text style={styles.stepSubtitle}>Finish and create your account</Text>
+
+        {missing.length > 0 ? (
+          <View
+            style={{
+              backgroundColor: "#FEF2F2",
+              borderColor: "#FECACA",
+              borderWidth: 1,
+              borderRadius: 8,
+              padding: Layout.spacing.md,
+              marginBottom: Layout.spacing.lg,
+            }}
+          >
+            <Text
+              style={{ color: "#DC2626", fontWeight: "600", marginBottom: 4 }}
+            >
+              Cannot create account - Profile incomplete
+            </Text>
+            <Text style={{ color: "#EF4444", marginBottom: 8 }}>
+              You must complete all profile sections before creating an account.
+            </Text>
+            <Text style={{ color: "#F87171", fontSize: 12, marginBottom: 8 }}>
+              Missing: {missing.slice(0, 5).join(", ")}
+              {missing.length > 5
+                ? ` and ${missing.length - 5} more fields`
+                : ""}
+            </Text>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setCurrentStep(1)}
+            >
+              <Text style={styles.backButtonText}>
+                Go back to complete profile
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : awaitingEmailVerification ? (
+          <View>
+            <Text style={styles.stepSubtitle}>
+              We sent a verification link to {emailAddress}. Once verified, tap
+              below.
+            </Text>
+            <TouchableOpacity
+              style={[styles.nextButton, loading && { opacity: 0.7 }]}
+              onPress={handleIHaveVerified}
+              disabled={loading}
+            >
+              <Text style={styles.nextButtonText}>
+                {loading ? "Checking..." : "I have verified"}
+              </Text>
+            </TouchableOpacity>
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginTop: Layout.spacing.md,
+              }}
+            >
+              <Text style={{ color: Colors.text.secondary }}>
+                {secondsLeft > 0
+                  ? `Resend available in ${secondsLeft}s`
+                  : "Need a new email?"}
+              </Text>
+              <TouchableOpacity
+                disabled={secondsLeft > 0 || resendLoading || loading}
+                onPress={handleResend}
+              >
+                <Text style={{ color: Colors.primary[500], fontWeight: "500" }}>
+                  {resendLoading
+                    ? "Resending..."
+                    : secondsLeft > 0
+                    ? "Waiting"
+                    : "Resend email"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  fieldErrors.emailAddress && styles.inputError,
+                ]}
+                placeholder="Enter your email"
+                placeholderTextColor={Colors.text.secondary}
+                value={emailAddress}
+                onChangeText={(t) => {
+                  setEmailAddress(t);
+                  if (fieldErrors.emailAddress)
+                    setFieldErrors((e) => ({ ...e, emailAddress: "" }));
+                }}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+              {!!fieldErrors.emailAddress && (
+                <Text style={styles.errorText}>{fieldErrors.emailAddress}</Text>
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={{ position: "relative" }}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { paddingRight: Layout.spacing.xl * 2 },
+                    fieldErrors.password && styles.inputError,
+                  ]}
+                  placeholder="Create a strong password"
+                  placeholderTextColor={Colors.text.secondary}
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    if (fieldErrors.password)
+                      setFieldErrors((e) => ({ ...e, password: "" }));
+                  }}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={{
+                    position: "absolute",
+                    right: Layout.spacing.md,
+                    top: 0,
+                    bottom: 0,
+                    justifyContent: "center",
+                  }}
+                  onPress={() => setShowPassword((s) => !s)}
+                >
+                  <Text style={{ color: Colors.text.secondary }}>
+                    {showPassword ? "Hide" : "Show"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {!!fieldErrors.password && (
+                <Text style={styles.errorText}>{fieldErrors.password}</Text>
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Confirm Password</Text>
+              <View style={{ position: "relative" }}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { paddingRight: Layout.spacing.xl * 2 },
+                    fieldErrors.confirmPassword && styles.inputError,
+                  ]}
+                  placeholder="Confirm your password"
+                  placeholderTextColor={Colors.text.secondary}
+                  value={confirmPassword}
+                  onChangeText={(t) => {
+                    setConfirmPassword(t);
+                    if (fieldErrors.confirmPassword)
+                      setFieldErrors((e) => ({ ...e, confirmPassword: "" }));
+                  }}
+                  secureTextEntry={!showConfirmPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={{
+                    position: "absolute",
+                    right: Layout.spacing.md,
+                    top: 0,
+                    bottom: 0,
+                    justifyContent: "center",
+                  }}
+                  onPress={() => setShowConfirmPassword((s) => !s)}
+                >
+                  <Text style={{ color: Colors.text.secondary }}>
+                    {showConfirmPassword ? "Hide" : "Show"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              {!!fieldErrors.confirmPassword && (
+                <Text style={styles.errorText}>
+                  {fieldErrors.confirmPassword}
+                </Text>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.nextButton, loading && { opacity: 0.7 }]}
+              onPress={onCreateAccount}
+              disabled={loading}
+            >
+              <Text style={styles.nextButtonText}>
+                {loading ? "Creating Account..." : "Create Account"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ marginTop: Layout.spacing.md, alignItems: "center" }}
+              onPress={() => navigation.navigate("Auth", { screen: "Login" })}
+            >
+              <Text style={{ color: Colors.primary[500] }}>
+                Already have an account? Sign In
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderBasicInfoStep = () => {
-    // Map option objects to label arrays for ValidatedSelect
-    const religionOptions = toLabelArray(RELIGION_OPTIONS as any);
-    const motherTongueOptions = toLabelArray(MOTHER_TONGUE_OPTIONS as any);
+    // Use capitalized labels for display, store normalized lowercase
+    const religionOptions = mapOptionsToTitle(RELIGION_OPTIONS as any);
+    const motherTongueOptions = mapOptionsToTitle(MOTHER_TONGUE_OPTIONS as any);
     const genderOptions = (GENDER_OPTIONS as any[]).map((o) => o.label);
     const preferredGenderOptions = (PREFERRED_GENDER_OPTIONS as any[]).map(
       (o) => o.label
@@ -285,12 +1045,27 @@ export default function ProfileSetupScreen({
         <ErrorSummary errors={errors} />
 
         <View style={styles.formGroup}>
+          <ValidatedInput
+            label="Full Name"
+            field="fullName"
+            required
+            value={formData.fullName || ""}
+            onValueChange={(text) => handleInputChange("fullName", text)}
+            placeholder="Enter your full name"
+            maxLength={100}
+            error={errors.fullName}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
           <ValidatedSelect
             label="Religion"
             field="religion"
             options={religionOptions}
-            value={formData.religion || ""}
-            onValueChange={(v) => handleInputChange("religion", v)}
+            value={formData.religion ? toTitleCase(formData.religion) : ""}
+            onValueChange={(v) =>
+              handleInputChange("religion", normalizeStored(v))
+            }
             placeholder="Select religion"
           />
         </View>
@@ -300,8 +1075,12 @@ export default function ProfileSetupScreen({
             label="Mother Tongue"
             field="motherTongue"
             options={motherTongueOptions}
-            value={formData.motherTongue || ""}
-            onValueChange={(v) => handleInputChange("motherTongue", v)}
+            value={
+              formData.motherTongue ? toTitleCase(formData.motherTongue) : ""
+            }
+            onValueChange={(v) =>
+              handleInputChange("motherTongue", normalizeStored(v))
+            }
             placeholder="Select mother tongue"
           />
         </View>
@@ -351,7 +1130,10 @@ export default function ProfileSetupScreen({
             field="gender"
             required
             options={genderOptions}
-            value={formData.gender || ""}
+            value={
+              (GENDER_OPTIONS as any[]).find((o) => o.value === formData.gender)
+                ?.label || ""
+            }
             onValueChange={(label) => {
               // map back from label to value using GENDER_OPTIONS
               const found = (GENDER_OPTIONS as any[]).find(
@@ -370,7 +1152,11 @@ export default function ProfileSetupScreen({
             field="preferredGender"
             required
             options={preferredGenderOptions}
-            value={formData.preferredGender || ""}
+            value={
+              (PREFERRED_GENDER_OPTIONS as any[]).find(
+                (o) => o.value === formData.preferredGender
+              )?.label || ""
+            }
             onValueChange={(label) => {
               const found = (PREFERRED_GENDER_OPTIONS as any[]).find(
                 (o) => o.label === label
@@ -561,9 +1347,9 @@ export default function ProfileSetupScreen({
   );
 
   const renderCulturalStep = () => {
-    const motherTongueOptions = toLabelArray(MOTHER_TONGUE_OPTIONS as any);
-    const ethnicityOptions = toLabelArray(ETHNICITY_OPTIONS as any);
-    const religionOptions = toLabelArray(RELIGION_OPTIONS as any);
+    const motherTongueOptions = mapOptionsToTitle(MOTHER_TONGUE_OPTIONS as any);
+    const ethnicityOptions = mapOptionsToTitle(ETHNICITY_OPTIONS as any);
+    const religionOptions = mapOptionsToTitle(RELIGION_OPTIONS as any);
 
     return (
       <View style={styles.stepContainer}>
@@ -582,18 +1368,11 @@ export default function ProfileSetupScreen({
             field="motherTongue"
             options={motherTongueOptions}
             value={
-              (MOTHER_TONGUE_OPTIONS as any[]).find(
-                (o) => o.value === formData.motherTongue
-              )?.label ||
-              formData.motherTongue ||
-              ""
+              formData.motherTongue ? toTitleCase(formData.motherTongue) : ""
             }
-            onValueChange={(label) => {
-              const found = (MOTHER_TONGUE_OPTIONS as any[]).find(
-                (o) => o.label === label
-              );
-              handleInputChange("motherTongue", found ? found.value : label);
-            }}
+            onValueChange={(label) =>
+              handleInputChange("motherTongue", normalizeStored(label))
+            }
             placeholder="Select mother tongue"
           />
 
@@ -601,8 +1380,10 @@ export default function ProfileSetupScreen({
             label="Ethnicity"
             field="ethnicity"
             options={ethnicityOptions}
-            value={formData.ethnicity || ""}
-            onValueChange={(label) => handleInputChange("ethnicity", label)}
+            value={formData.ethnicity ? toTitleCase(formData.ethnicity) : ""}
+            onValueChange={(label) =>
+              handleInputChange("ethnicity", normalizeStored(label))
+            }
             placeholder="Select ethnicity"
           />
         </View>
@@ -612,19 +1393,10 @@ export default function ProfileSetupScreen({
             label="Religion"
             field="religion"
             options={religionOptions}
-            value={
-              (RELIGION_OPTIONS as any[]).find(
-                (o) => o.value === formData.religion
-              )?.label ||
-              formData.religion ||
-              ""
+            value={formData.religion ? toTitleCase(formData.religion) : ""}
+            onValueChange={(label) =>
+              handleInputChange("religion", normalizeStored(label))
             }
-            onValueChange={(label) => {
-              const found = (RELIGION_OPTIONS as any[]).find(
-                (o) => o.label === label
-              );
-              handleInputChange("religion", found ? found.value : label);
-            }}
             placeholder="Select religion"
           />
         </View>
@@ -637,9 +1409,13 @@ export default function ProfileSetupScreen({
               onValueChange={(value) => handleInputChange("profileFor", value)}
               style={styles.picker}
             >
-              <Picker.Item label="Self" value="self" />
-              <Picker.Item label="Friend" value="friend" />
-              <Picker.Item label="Family Member" value="family" />
+              <Picker.Item key="pf-self" label="Self" value="self" />
+              <Picker.Item key="pf-friend" label="Friend" value="friend" />
+              <Picker.Item
+                key="pf-family"
+                label="Family Member"
+                value="family"
+              />
             </Picker>
           </View>
         </View>
@@ -880,30 +1656,69 @@ export default function ProfileSetupScreen({
 
   const currentStepData = STEPS[currentStep - 1];
 
+  // Persist and restore wizard snapshot to survive auth navigation
+  const STORAGE_KEY = "PROFILE_CREATION_MOBILE";
+
+  const persistSnapshot = async (
+    data: Partial<CreateProfileData>,
+    step: number
+  ) => {
+    try {
+      const snapshot = { step, data };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {}
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.data && typeof parsed === "object") {
+            setFormData((prev) => ({ ...prev, ...(parsed.data as any) }));
+          }
+          if (
+            Number.isFinite(parsed?.step) &&
+            parsed.step >= 1 &&
+            parsed.step <= STEPS.length
+          ) {
+            setCurrentStep(parsed.step);
+          }
+        }
+
+        // If a step was provided via route params, override snapshot step on first mount
+        if (
+          route?.params?.step &&
+          route.params.step >= 1 &&
+          route.params.step <= STEPS.length
+        ) {
+          setCurrentStep(route.params.step);
+        }
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    persistSnapshot(formData, currentStep).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
+
+  // After successful auth at final step, auto-submit profile like web
+  useEffect(() => {
+    if (user && currentStep === 9 && !createProfileMutation.isPending) {
+      handleSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, currentStep]);
+
   return (
     <ScreenContainer
       containerStyle={styles.container}
       contentStyle={styles.contentStyle}
-    >
-      <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Create Profile</Text>
-          <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
-        </View>
-
-        {/* Progress Bar */}
-        {renderProgressBar()}
-
-        {/* Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {renderStepContent()}
-        </ScrollView>
-
-        {/* Navigation Buttons */}
+      showsVerticalScrollIndicator={false}
+      footer={
         <View style={styles.navigationContainer}>
           {currentStep > 1 && (
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -911,38 +1726,51 @@ export default function ProfileSetupScreen({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            style={[
-              styles.nextButton,
-              currentStep === 1 && styles.nextButtonFull,
-            ]}
-            onPress={handleNext}
-            disabled={createProfileMutation.isPending}
-          >
-            {createProfileMutation.isPending ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Text style={styles.nextButtonText}>
-                {currentStep === STEPS.length ? "Create Profile" : "Next"}
-              </Text>
-            )}
-          </TouchableOpacity>
+          {currentStep < STEPS.length && (
+            <TouchableOpacity
+              style={[
+                styles.nextButton,
+                currentStep === 1 && styles.nextButtonFull,
+              ]}
+              onPress={handleNext}
+              disabled={createProfileMutation.isPending}
+            >
+              {createProfileMutation.isPending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.nextButtonText}>Next</Text>
+              )}
+            </TouchableOpacity>
+          )}
+          {currentStep === STEPS.length && <View style={{ flex: 2 }} />}
         </View>
+      }
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Create Profile</Text>
+        <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
+      </View>
 
-        {/* Date Picker Modal */}
-        {showDatePicker && (
-          <DateTimePicker
-            value={
-              formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date()
-            }
-            mode="date"
-            display="default"
-            onChange={handleDateChange}
-            maximumDate={new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000)} // 18 years ago
-            minimumDate={new Date(Date.now() - 120 * 365 * 24 * 60 * 60 * 1000)} // 120 years ago
-          />
-        )}
-      </KeyboardAvoidingView>
+      {/* Progress Bar */}
+      {renderProgressBar()}
+
+      {/* Content */}
+      <View style={styles.content}>{renderStepContent()}</View>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <DateTimePicker
+          value={
+            formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date()
+          }
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+          maximumDate={new Date(Date.now() - 18 * 365 * 24 * 60 * 60 * 1000)} // 18 years ago
+          minimumDate={new Date(Date.now() - 120 * 365 * 24 * 60 * 60 * 1000)} // 120 years ago
+        />
+      )}
     </ScreenContainer>
   );
 }
@@ -954,6 +1782,7 @@ const styles = StyleSheet.create({
   },
   contentStyle: {
     flexGrow: 1,
+    paddingBottom: Layout.spacing.xl * 3,
   },
   header: {
     paddingHorizontal: Layout.spacing.lg,
@@ -964,7 +1793,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.xl,
-    fontWeight: "600",
     color: Colors.text.primary,
     textAlign: "center",
   },
@@ -996,15 +1824,14 @@ const styles = StyleSheet.create({
     marginTop: Layout.spacing.xs,
   },
   content: {
-    flex: 1,
     paddingHorizontal: Layout.spacing.lg,
   },
   stepContainer: {
     paddingBottom: Layout.spacing.xl,
   },
   stepTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
@@ -1014,8 +1841,8 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },
@@ -1069,6 +1896,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+    color: "#000",
   },
   heightSliders: {
     flexDirection: "row",

@@ -1,0 +1,93 @@
+name: EAS iOS Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile to use (default: production)'
+        required: false
+        default: 'production'
+      autoSubmit:
+        description: 'Auto submit after build? (true/false)'
+        required: false
+        default: 'true'
+      channel:
+        description: 'EAS update channel (optional)'
+        required: false
+        default: 'production'
+  push:
+    tags:
+      - 'ios-v*'
+
+jobs:
+  build-and-submit-ios:
+    name: Build and Submit iOS
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        run: npm i -g eas-cli@latest
+
+      - name: Login to Expo
+        run: eas whoami || eas login --token "$EXPO_TOKEN"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Write ASC API Key (if provided)
+        if: ${{ secrets.ASC_API_KEY_P8 != '' }}
+        run: |
+          mkdir -p secrets
+          echo "$ASC_API_KEY_P8" | base64 --decode > secrets/asc-api-key.p8
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+
+      - name: Configure Xcode CLI tools
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build iOS (EAS)
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'production' }}
+          if [ "${{ github.event.inputs.autoSubmit || 'true' }}" = "true" ]; then
+            eas build --platform ios --profile "$PROFILE" --non-interactive --auto-submit
+          else
+            eas build --platform ios --profile "$PROFILE" --non-interactive
+          fi
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_NO_VCS: 1
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+
+      - name: Submit to App Store (if not auto)
+        if: ${{ github.event.inputs.autoSubmit == 'false' }}
+        run: |
+          eas submit --platform ios --profile ${{ github.event.inputs.profile || 'production' }} --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+          EXPO_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.EXPO_APPLE_APP_SPECIFIC_PASSWORD }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+

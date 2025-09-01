@@ -324,7 +324,11 @@ export default function EditProfileScreen({
               >
                 <Picker.Item label="Select gender" value="" />
                 {GENDER_OPTIONS.map((option) => (
-                  <Picker.Item label={option.label} value={option.value} />
+                  <Picker.Item
+                    key={option.value}
+                    label={option.label}
+                    value={option.value}
+                  />
                 ))}
               </Picker>
             </View>
@@ -354,7 +358,11 @@ export default function EditProfileScreen({
               >
                 <Picker.Item label="Select preference" value="" />
                 {PREFERRED_GENDER_OPTIONS.map((option) => (
-                  <Picker.Item label={option.label} value={option.value} />
+                  <Picker.Item
+                    key={option.value}
+                    label={option.label}
+                    value={option.value}
+                  />
                 ))}
               </Picker>
             </View>
@@ -482,7 +490,11 @@ export default function EditProfileScreen({
               >
                 <Picker.Item label="Select status" value="" />
                 {MARITAL_STATUS_OPTIONS.map((option) => (
-                  <Picker.Item label={option.label} value={option.value} />
+                  <Picker.Item
+                    key={option.value}
+                    label={option.label}
+                    value={option.value}
+                  />
                 ))}
               </Picker>
             </View>
@@ -701,7 +713,11 @@ export default function EditProfileScreen({
                   >
                     <Picker.Item label="Select diet" value="" />
                     {DIET_OPTIONS.map((option) => (
-                      <Picker.Item label={option.label} value={option.value} />
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                      />
                     ))}
                   </Picker>
                 </View>
@@ -721,7 +737,11 @@ export default function EditProfileScreen({
                   >
                     <Picker.Item label="Select option" value="" />
                     {SMOKING_DRINKING_OPTIONS.map((option) => (
-                      <Picker.Item label={option.label} value={option.value} />
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                      />
                     ))}
                   </Picker>
                 </View>
@@ -741,7 +761,11 @@ export default function EditProfileScreen({
                   >
                     <Picker.Item label="Select option" value="" />
                     {SMOKING_DRINKING_OPTIONS.map((option) => (
-                      <Picker.Item label={option.label} value={option.value} />
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                      />
                     ))}
                   </Picker>
                 </View>
@@ -761,7 +785,11 @@ export default function EditProfileScreen({
                   >
                     <Picker.Item label="Select status" value="" />
                     {PHYSICAL_STATUS_OPTIONS.map((option) => (
-                      <Picker.Item label={option.label} value={option.value} />
+                      <Picker.Item
+                        key={option.value}
+                        label={option.label}
+                        value={option.value}
+                      />
                     ))}
                   </Picker>
                 </View>
@@ -954,8 +982,8 @@ const styles = StyleSheet.create({
     color: Colors.text.secondary,
   },
   headerTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
     color: Colors.text.primary,
   },
   saveButton: {
@@ -970,8 +998,8 @@ const styles = StyleSheet.create({
     marginTop: Layout.spacing.lg,
   },
   sectionTitle: {
+    fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },

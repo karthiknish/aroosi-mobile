@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Switch,
+  Alert,
 } from "react-native";
 import { useAuth } from "@contexts/AuthProvider";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import useResponsiveSpacing from "@/hooks/useResponsive";
 import useResponsiveTypography from "@/hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
+import { useApiClient } from "@/utils/api";
 import VerifyEmailInline from "@components/auth/VerifyEmailInline";
 interface SettingsScreenProps {
   navigation: any;
@@ -49,6 +51,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const toast = useToast();
+  const apiClient = useApiClient();
   const [resendLoading, setResendLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const handleSignOut = () => {
@@ -65,8 +68,34 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const handleDeleteAccount = () => {
-    // Not implemented yet; provide non-blocking feedback
-    toast.show("Account deletion is not implemented in this build.", "info");
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all associated data. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const res = await apiClient.deleteProfile();
+              if (res.success) {
+                toast.show("Your account has been deleted.", "success");
+                await signOut();
+                navigation.navigate("Auth");
+              } else {
+                toast.show(
+                  res.error?.message || "Failed to delete account.",
+                  "error"
+                );
+              }
+            } catch (e: any) {
+              toast.show(e?.message || "Failed to delete account.", "error");
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Email verification actions handled by VerifyEmailInline component
@@ -380,7 +409,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       </View>
 
       {/* Email Verification Banner (Settings-specific) */}
-          {needsEmailVerification && <VerifyEmailInline variant="banner" />}
+      {needsEmailVerification && <VerifyEmailInline variant="banner" />}
 
       {/* Settings Sections */}
       {settingSections.map((section, sectionIndex) => (

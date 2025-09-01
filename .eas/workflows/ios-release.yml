@@ -1,0 +1,20 @@
+on:
+  push:
+    tags: ['ios-v*']
+  workflow_dispatch:
+
+jobs:
+  build_ios:
+    name: Build iOS app (production)
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Submit to Apple App Store (production)
+    needs: [build_ios]
+    type: submit
+    params:
+      platform: ios
+      build_id: ${{ needs.build_ios.outputs.build_id }}

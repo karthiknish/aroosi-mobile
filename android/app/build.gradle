@@ -1,6 +1,10 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Apply the Google services Gradle plugin for Firebase
+apply plugin: 'com.google.gms.google-services'
+// Apply Gradle Play Publisher plugin for Play Store automation
+apply plugin: 'com.github.triplet.play'
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -92,9 +96,29 @@ android {
         applicationId 'com.aroosi.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+    versionCode 4
+    versionName "1.0.3"
+        // Build only ARM ABIs for release to reduce build size and disk usage
+        ndk {
+            abiFilters "arm64-v8a", "armeabi-v7a"
+        }
+    // Prefer the Play store flavor for libraries that define a 'store' dimension (e.g. react-native-iap)
+    missingDimensionStrategy 'store', 'play'
     }
+    // Upload keystore path (created in CI from a base64 secret)
+    def uploadKeystoreFile = file('upload.keystore')
+    def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+    // Allow local debug signing fallback when explicitly enabled
+    def allowLocalDebugSigning = (
+        System.getenv('ALLOW_DEBUG_SIGNING_FOR_LOCAL') ?: findProperty('android.allowLocalDebugSigning') ?: "false"
+    ).toString().toBoolean()
+    // Try to load keystore credentials from local properties file when env vars are not set
+    def keystoreProps = new Properties()
+    def keystorePropsFile = file("keystore.properties")
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.withInputStream { stream -> keystoreProps.load(stream) }
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -102,15 +126,36 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (isReleaseBuild && !allowLocalDebugSigning) {
+                if (!uploadKeystoreFile.exists()) {
+                    throw new GradleException("Release keystore missing at ${uploadKeystoreFile}. Create 'android/app/upload.keystore' and set ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD.")
+                }
+                def storePass = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: keystoreProps.getProperty('storePassword')
+                def keyAliasEnv = System.getenv('ANDROID_KEY_ALIAS') ?: keystoreProps.getProperty('keyAlias')
+                def keyPass = System.getenv('ANDROID_KEY_PASSWORD') ?: keystoreProps.getProperty('keyPassword')
+                if (!storePass || !keyAliasEnv || !keyPass) {
+                    throw new GradleException("Missing signing credentials for release. Set env vars ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD or provide android/app/keystore.properties with storePassword,keyAlias,keyPassword.")
+                }
+                storeFile uploadKeystoreFile
+                storePassword storePass
+                keyAlias keyAliasEnv
+                keyPassword keyPass
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Require release signing, unless explicit local debug-signing fallback is enabled
+            if (allowLocalDebugSigning) {
+                println "[build] Using DEBUG signing for release build (local fallback enabled)"
+                signingConfig signingConfigs.debug
+            } else {
+                signingConfig signingConfigs.release
+            }
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
@@ -120,10 +165,35 @@ android {
     packagingOptions {
         jniLibs {
             useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
+            // Exclude simulator ABIs to avoid building/copying them
+            excludes += [
+                '**/x86/**',
+                '**/x86_64/**'
+            ]
         }
     }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+// Configure Gradle Play Publisher
+// Credentials: prefer environment variable ANDROID_PUBLISHER_CREDENTIALS with JSON key contents
+// Track: publish to internal testing by default; default to App Bundles for Play
+import com.github.triplet.gradle.androidpublisher.ReleaseStatus
+import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
+
+def HAS_GPP_CREDS = System.getenv('ANDROID_PUBLISHER_CREDENTIALS') != null
+play {
+    // Only enable GPP when credentials are present (e.g., on CI)
+    enabled.set(HAS_GPP_CREDS)
+    defaultToAppBundles.set(true)
+    track.set('internal')
+    // Ensure completed release on internal track
+    releaseStatus.set(ReleaseStatus.COMPLETED)
+    if (HAS_GPP_CREDS) {
+        // Auto-increment versionCode to avoid conflicts on CI
+        resolutionStrategy.set(ResolutionStrategy.AUTO)
     }
 }
 
@@ -174,4 +244,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Firebase BoM to align Firebase dependency versions
+    implementation platform('com.google.firebase:firebase-bom:34.1.0')
+    // Firebase Analytics (example; add others as needed)
+    implementation 'com.google.firebase:firebase-analytics'
 }

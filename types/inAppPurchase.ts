@@ -217,8 +217,9 @@ export const PRODUCT_IDS: ProductIdentifiers = {
     premiumPlus: 'com.aroosi.premiumplus.monthly'
   },
   android: {
-    premium: 'aroosi_premium_monthly',
-    premiumPlus: 'aroosi_premiumplus_monthly'
+  // Updated to match Google Play Console product IDs
+  premium: 'premium',
+  premiumPlus: 'premiumplus'
   }
 };
 

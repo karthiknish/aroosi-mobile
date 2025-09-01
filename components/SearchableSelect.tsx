@@ -70,7 +70,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           />
           <FlatList
             data={filteredOptions}
-            keyExtractor={(item) => item}
+            // Use a composite key to avoid duplicate-key warnings when options contain repeated strings
+            keyExtractor={(item, index) => `${item}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.optionItem}
@@ -93,7 +94,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: Colors.gray[700],
+    color: "#000",
     marginBottom: 4,
   },
   selector: {
@@ -105,10 +106,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   placeholderText: {
-    color: Colors.gray[400],
+    // Make placeholder text black for visibility as requested
+    color: "#000",
   },
   valueText: {
-    color: Colors.gray[800],
+    // Force solid black for better contrast/visibility
+    color: "#000",
   },
   modalContainer: {
     flex: 1,
@@ -131,7 +134,8 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-    color: Colors.gray[800],
+    // Ensure options list uses solid black for readability
+    color: "#000",
   },
 });
 

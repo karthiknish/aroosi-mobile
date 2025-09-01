@@ -75,8 +75,8 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       padding: spacing.xs,
     },
     headerTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg,
-      fontWeight: "600",
       color: Colors.text.primary,
     },
     headerRight: {
@@ -112,8 +112,8 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       borderColor: Colors.border.primary,
     },
     alternativeTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: Layout.typography.fontSize.base,
-      fontWeight: "600",
       color: Colors.text.primary,
       marginBottom: spacing.sm,
     },

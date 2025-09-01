@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  SafeAreaView,
   ScrollView,
   ScrollViewProps,
   Dimensions,
   StyleSheet,
   ViewStyle,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Colors } from "@constants";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 
@@ -18,6 +18,8 @@ interface ScreenContainerProps extends ScrollViewProps {
   containerStyle?: ViewStyle | ViewStyle[];
   /** Style applied to the ScrollView content container */
   contentStyle?: ViewStyle | ViewStyle[];
+  /** Optional sticky footer rendered below the scrollable content */
+  footer?: React.ReactNode;
 }
 
 /**
@@ -33,10 +35,14 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   containerStyle,
   contentStyle,
   showsVerticalScrollIndicator = false,
+  footer,
   ...scrollViewProps
 }) => {
   return (
-    <SafeAreaView style={[styles.safeArea, containerStyle] as any}>
+    <SafeAreaView
+      style={[styles.safeArea, containerStyle] as any}
+      edges={["top", "right", "left", "bottom"]}
+    >
       <GradientBackground
         colors={Colors.gradient.secondary as any}
         style={styles.gradient}
@@ -50,6 +56,7 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
         >
           {children}
         </ScrollView>
+        {footer ? footer : null}
       </GradientBackground>
     </SafeAreaView>
   );

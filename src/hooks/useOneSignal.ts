@@ -47,7 +47,9 @@ export const useOneSignal = (): UseOneSignalReturn => {
     initializationRef.current = true;
 
     try {
-      const appId = process.env.EXPO_PUBLIC_ONE_SIGNAL_APP_ID;
+  const appId =
+    process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ||
+    process.env.EXPO_PUBLIC_ONE_SIGNAL_APP_ID;
       if (!appId) {
         console.error("OneSignal App ID not found in environment variables");
         return;

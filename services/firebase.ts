@@ -1,7 +1,16 @@
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
-// Ensure auth component registers side-effects before any getAuth calls
-import 'firebase/auth';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, initializeAuth, type Auth } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// getReactNativePersistence is only available in RN build; require dynamically to avoid TS type resolution issues
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const getReactNativePersistence: ((storage: any) => any) | undefined = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('firebase/auth/react-native').getReactNativePersistence;
+  } catch {
+    return undefined;
+  }
+})();
 
 // We dynamically require initializeAuth + getReactNativePersistence to avoid
 // type export issues across firebase minor versions in RN/Expo.
@@ -27,29 +36,18 @@ export function initFirebase() {
     firebaseApp = getApps()[0]!;
   }
 
-  // Attempt enhanced RN-aware auth initialization once.
+  // Attempt enhanced RN-aware auth initialization once, using CJS requires consistently.
   if (!firebaseAuth && !triedEnhancedInit) {
     triedEnhancedInit = true;
     try {
-      // Load initializeAuth from web entry and RN persistence from RN-specific entry
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { initializeAuth }: any = require('firebase/auth');
-      let rnPersistence: any = null;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const { getReactNativePersistence }: any = require('firebase/auth/react-native');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-        rnPersistence = getReactNativePersistence?.(AsyncStorage) || null;
-      } catch {}
-
-      if (initializeAuth) {
-        firebaseAuth = rnPersistence
-          ? initializeAuth(firebaseApp!, { persistence: rnPersistence })
-          : initializeAuth(firebaseApp!);
-      }
-    } catch (e) {
-      // swallow and fallback
+      firebaseAuth = initializeAuth(firebaseApp!, {
+        persistence: getReactNativePersistence
+          ? getReactNativePersistence(AsyncStorage)
+          : undefined,
+      });
+    } catch {
+      // initializeAuth can throw if auth was already initialized; fallback to getAuth
+      firebaseAuth = getAuth(firebaseApp!);
     }
   }
   if (!firebaseAuth) {

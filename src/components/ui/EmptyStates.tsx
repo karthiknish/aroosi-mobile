@@ -50,8 +50,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       marginBottom: spacing.md,
     },
     title: {
+      fontFamily: "Boldonse-Regular",
       fontSize: fontSize["2xl"],
-      fontWeight: "600",
       textAlign: "center",
       marginBottom: spacing.sm + spacing.xs,
     },

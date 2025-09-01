@@ -64,6 +64,7 @@ export default function RootNavigator() {
   }
 
   // Force remount navigator when switching between auth/onboarding/main
+  // Unauthenticated users land on Auth (Login) after Get Started; Onboarding is still accessible via links
   const navState: "auth" | "onboarding" | "main" = !isAuthenticated
     ? "auth"
     : !hasProfile
@@ -85,7 +86,10 @@ export default function RootNavigator() {
       screenOptions={{ headerShown: false }}
     >
       {!isAuthenticated ? (
-        <Stack.Screen name="Auth" component={AuthNavigator} />
+        <>
+          <Stack.Screen name="Auth" component={AuthNavigator} />
+          <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
+        </>
       ) : !hasProfile ? (
         <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
       ) : (

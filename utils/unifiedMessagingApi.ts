@@ -298,7 +298,10 @@ export class UnifiedMessagingAPI implements MessagingAPI {
         .slice(2, 8)}`;
       return {
         success: true,
-        data: { uploadUrl: `${this.baseUrl}/voice-messages/upload`, storageId },
+        data: {
+          uploadUrl: `${this.baseUrl}/api/voice-messages/upload`,
+          storageId,
+        },
       };
     } catch (error: any) {
       const message =

@@ -159,8 +159,8 @@ export default function ProfileDetailScreen({
       borderRadius: spacing.xs * 3,
     },
     name: {
+      fontFamily: "Boldonse-Regular",
       fontSize: Layout.typography.fontSize["2xl"] + spacing.xs,
-      fontWeight: "bold",
       marginBottom: spacing.sm,
     },
     basicDetails: {
@@ -171,8 +171,8 @@ export default function ProfileDetailScreen({
       marginBottom: spacing.xs,
     },
     sectionTitle: {
+      fontFamily: "Boldonse-Regular",
       fontSize: Layout.typography.fontSize.xl,
-      fontWeight: "600",
       marginBottom: spacing.sm * 1.5,
     },
     sectionText: {

@@ -105,7 +105,7 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
       </View>
 
       <View style={styles.overlay}>
-        <TouchableOpacity onPress={onGetStarted} style={styles.button}>
+  <TouchableOpacity onPress={onGetStarted} style={styles.button}>
           <Text style={styles.buttonText}>Get Started</Text>
         </TouchableOpacity>
       </View>

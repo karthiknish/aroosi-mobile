@@ -522,7 +522,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       "Read receipts",
     ],
     appleProductId: "com.aroosi.premium.monthly",
-    googleProductId: "premium_monthly",
+    googleProductId: "premium",
     stripeProductId: "price_premium_monthly",
   },
   {
@@ -542,7 +542,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
       "Advanced matching algorithm",
     ],
     appleProductId: "com.aroosi.premiumplus.monthly",
-    googleProductId: "aroosi_premium_plus_monthly",
+    googleProductId: "premiumplus",
     stripeProductId: "price_premium_plus_monthly",
   },
 ];
