@@ -12,6 +12,7 @@ import {
   SubscriptionTier,
   MessagingFeatureUtils,
 } from "../../utils/messagingFeatures";
+import { Colors } from "@constants";
 
 interface FeatureGateModalProps {
   visible: boolean;
@@ -167,7 +168,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modal: {
-    backgroundColor: "white",
+    backgroundColor: Colors.background.primary,
     borderRadius: 16,
     padding: 24,
     width: Math.min(screenWidth - 40, 400),
@@ -184,13 +185,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1a1a1a",
+    color: Colors.text.primary,
     textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: "#666",
+    color: Colors.text.secondary,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -207,7 +208,7 @@ const styles = StyleSheet.create({
   },
   tierLabel: {
     fontSize: 12,
-    color: "#999",
+    color: Colors.neutral[500],
     marginBottom: 4,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -220,19 +221,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   currentTier: {
-    backgroundColor: "#f0f0f0",
-    color: "#666",
+    backgroundColor: Colors.background.secondary,
+    color: Colors.text.secondary,
   },
   requiredTier: {
-    backgroundColor: "#e3f2fd",
-    color: "#1976d2",
+    backgroundColor: Colors.info[50],
+    color: Colors.info[700],
   },
   arrow: {
     marginHorizontal: 16,
   },
   arrowText: {
     fontSize: 20,
-    color: "#999",
+    color: Colors.text.secondary,
   },
   benefitsSection: {
     marginBottom: 24,
@@ -240,7 +241,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#1a1a1a",
+    color: Colors.text.primary,
     marginBottom: 16,
   },
   benefitItem: {
@@ -250,14 +251,14 @@ const styles = StyleSheet.create({
   },
   benefitIcon: {
     fontSize: 16,
-    color: "#4caf50",
+    color: Colors.success[400],
     marginRight: 12,
     marginTop: 2,
   },
   benefitText: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    color: Colors.text.primary,
     lineHeight: 22,
   },
   actions: {
@@ -270,20 +271,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   upgradeButton: {
-    backgroundColor: "#1976d2",
+    backgroundColor: Colors.info[700],
   },
   upgradeButtonText: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
   },
   cancelButton: {
     backgroundColor: "transparent",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: Colors.border.primary,
   },
   cancelButtonText: {
-    color: "#666",
+    color: Colors.text.secondary,
     fontSize: 16,
     fontWeight: "500",
   },

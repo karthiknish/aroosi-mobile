@@ -13,6 +13,7 @@ import StartupScreen from "@screens/StartupScreen";
 
 // Import types
 import { RootStackParamList } from "./types";
+import { getScreenTransition } from "@/utils/navigationAnimations";
 
 // Loading screen
 import { View, ActivityIndicator } from "react-native";
@@ -83,7 +84,10 @@ export default function RootNavigator() {
     <Stack.Navigator
       id={undefined}
       key={navState}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        ...getScreenTransition("default"),
+      }}
     >
       {!isAuthenticated ? (
         <>
@@ -99,8 +103,8 @@ export default function RootNavigator() {
             name="ProfileDetail"
             component={ProfileDetailScreen}
             options={{
-              presentation: "modal",
               headerShown: false,
+              ...getScreenTransition("ProfileDetail"),
             }}
           />
         </>

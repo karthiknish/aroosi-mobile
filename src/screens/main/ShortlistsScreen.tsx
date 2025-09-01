@@ -25,6 +25,7 @@ import {
 } from "@/utils/engagementUtil";
 import { useToast } from "@/providers/ToastContext";
 import ScreenContainer from "@components/common/ScreenContainer";
+import { Colors } from "@constants";
 
 export function ShortlistsScreen() {
   const navigation = useNavigation();
@@ -210,8 +211,8 @@ export function ShortlistsScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            colors={["#ef4444"]}
-            tintColor="#ef4444"
+            colors={[Colors.primary[500]]}
+            tintColor={Colors.primary[500]}
           />
         }
       />
@@ -273,27 +274,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    backgroundColor: "#fff",
+    borderBottomColor: Colors.border.primary,
+    backgroundColor: "transparent",
   },
   headerTitle: {
     fontFamily: "Boldonse-Regular",
     fontSize: 24,
-    color: "#111827",
+    color: Colors.text.primary,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: "#6b7280",
+    color: Colors.text.secondary,
   },
   note: {
     fontSize: 12,
-    color: "#374151",
+    color: Colors.neutral[700],
     marginTop: 4,
   },
   notePlaceholder: {
     fontSize: 12,
-    color: "#9ca3af",
+    color: Colors.neutral[400],
     marginTop: 4,
     fontStyle: "italic",
   },
@@ -302,10 +303,10 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   item: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     borderRadius: 12,
     marginBottom: 8,
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: {
       width: 0,
       height: 1,
@@ -331,7 +332,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: Colors.neutral[100],
     alignItems: "center",
     justifyContent: "center",
   },
@@ -341,23 +342,23 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
+    color: Colors.text.primary,
     marginBottom: 2,
   },
   date: {
     fontSize: 12,
-    color: "#6b7280",
+    color: Colors.text.secondary,
   },
   removeButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: "#fef2f2",
+    backgroundColor: Colors.error[50],
   },
   noteButton: {
     padding: 8,
     marginLeft: 8,
     borderRadius: 20,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: Colors.neutral[100],
   },
   emptyContainer: {
     flex: 1,
@@ -368,13 +369,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontFamily: "Boldonse-Regular",
     fontSize: 20,
-    color: "#374151",
+    color: Colors.neutral[700],
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: "#6b7280",
+    color: Colors.text.secondary,
     textAlign: "center",
     maxWidth: 280,
   },
@@ -386,18 +387,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: "#ef4444",
+    color: Colors.error[500],
     marginBottom: 16,
     textAlign: "center",
   },
   retryButton: {
-    backgroundColor: "#ef4444",
+    backgroundColor: Colors.error[500],
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   retryText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -407,7 +408,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalCard: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     padding: 16,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
@@ -415,16 +416,16 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontFamily: "Boldonse-Regular",
     fontSize: 18,
-    color: "#111827",
+    color: Colors.text.primary,
     marginBottom: 12,
   },
   modalInput: {
     minHeight: 100,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
+    borderColor: Colors.border.primary,
     borderRadius: 8,
     padding: 12,
-    color: "#111827",
+    color: Colors.text.primary,
     textAlignVertical: "top",
   },
   modalActions: {
@@ -439,17 +440,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   modalCancel: {
-    backgroundColor: "#f3f4f6",
+    backgroundColor: Colors.neutral[100],
   },
   modalSave: {
-    backgroundColor: "#ef4444",
+    backgroundColor: Colors.error[500],
   },
   modalCancelText: {
-    color: "#374151",
+    color: Colors.neutral[700],
     fontWeight: "600",
   },
   modalSaveText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontWeight: "700",
   },
 });

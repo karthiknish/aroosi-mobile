@@ -12,6 +12,7 @@ import {
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 import { VoiceDurationIndicator } from "./VoiceDurationIndicator";
+import { Colors } from "@constants";
 
 interface VoiceRecorderProps {
   conversationId?: string;
@@ -282,7 +283,7 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: Colors.background.secondary,
   },
   durationIndicator: {
     marginBottom: 16,
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
   waveBar: {
     width: 4,
     borderRadius: 2,
-    backgroundColor: "#bdc3c7",
+    backgroundColor: Colors.neutral[300],
   },
   buttonContainer: {
     marginLeft: "auto",
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#e74c3c",
+    backgroundColor: Colors.error[500],
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -322,15 +323,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   recordingButton: {
-    backgroundColor: "#c0392b",
+    backgroundColor: Colors.error[700],
   },
   disabledButton: {
-    backgroundColor: "#bdc3c7",
+    backgroundColor: Colors.neutral[300],
   },
   stopIcon: {
     width: 20,
     height: 20,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     borderRadius: 2,
   },
   micIcon: {
@@ -340,18 +341,18 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   micBody: {
     width: 4,
     height: 15,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     marginTop: -2,
   },
   micBottom: {
     width: 16,
     height: 4,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     borderRadius: 2,
     marginTop: -2,
   },
@@ -363,28 +364,28 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.1)",
   },
   cancelText: {
-    color: "#7f8c8d",
+    color: Colors.text.secondary,
     fontWeight: "600",
   },
   errorText: {
-    color: "#e74c3c",
+    color: Colors.error[500],
     marginTop: 8,
     fontSize: 14,
   },
   permissionText: {
-    color: "#e67e22",
+    color: Colors.warning[600],
     marginTop: 8,
     fontSize: 14,
   },
   upgradeContainer: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: "rgba(52, 152, 219, 0.1)",
+    backgroundColor: Colors.info[50],
     borderRadius: 8,
     alignItems: "center",
   },
   upgradeText: {
-    color: "#3498db",
+    color: Colors.info[700],
     fontWeight: "600",
     fontSize: 14,
   },

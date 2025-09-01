@@ -36,12 +36,15 @@ import { useMessageSearch } from "@/hooks/useMessageSearch";
 import {
   useMessagingFeatures,
   useVoiceMessageLimits,
+  useDailyMessageLimit,
 } from "@/hooks/useMessagingFeatures";
 import MessagesList from "@components/chat/MessagesList";
 import { useApiClient } from "@/utils/api";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 // useSubscription imported above
 import { useSubscription } from "@/hooks/useSubscription";
+import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
+import UpgradePrompt from "@components/subscription/UpgradePrompt";
 
 interface ChatScreenProps {
   navigation: any;
@@ -102,6 +105,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
   const apiClient = useApiClient();
   const { usage, subscription } = useSubscription();
+  const subscriptionPlan = subscription?.plan || subscription?.tier || "free";
   const [receiptMap, setReceiptMap] = useState<Record<string, any[]>>({});
   const [reactionMap, setReactionMap] = useState<
     Record<string, { emoji: string; count: number }[]>
@@ -115,8 +119,21 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   >([]);
 
   // Messaging features for subscription checks
-  const { canSendVoiceMessage } = useMessagingFeatures();
+  const { canSendVoiceMessage, canSendTextMessage } = useMessagingFeatures();
   const { canSendVoice } = useVoiceMessageLimits();
+  const {
+    remainingMessages,
+    hasUnlimitedMessages,
+    isNearLimit,
+    hasReachedLimit,
+    recordMessage,
+  } = useDailyMessageLimit();
+
+  // Upgrade prompt modal state
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [recommendedTier, setRecommendedTier] = useState<
+    "premium" | "premiumPlus"
+  >("premium");
 
   // Real-time features
   const typingIndicator = useTypingIndicator({
@@ -344,24 +361,31 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           );
           return;
         }
+
+        // Check text messaging permissions and daily limits
+        const textPerm = canSendTextMessage();
+        if (!textPerm.allowed) {
+          setRecommendedTier("premium");
+          setUpgradeVisible(true);
+          return;
+        }
+        if (hasReachedLimit) {
+          setRecommendedTier("premium");
+          setUpgradeVisible(true);
+          return;
+        }
       }
 
       // Check subscription permissions for voice messages
       if (type === "voice") {
         const voicePermission = canSendVoiceMessage(metadata?.duration);
         if (!voicePermission.allowed) {
-          Alert.alert(
-            "Premium Feature",
-            voicePermission.reason ||
-              "Voice messages require a premium subscription",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Upgrade",
-                onPress: () => navigation.navigate("Subscription"),
-              },
-            ]
+          setRecommendedTier(
+            (voicePermission.reason || "").toLowerCase().includes("plus")
+              ? "premiumPlus"
+              : "premium"
           );
+          setUpgradeVisible(true);
           return;
         }
       }
@@ -399,6 +423,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         setInputText("");
         setIsTyping(false);
         if (replyContext) setReplyContext(null);
+        if (type === "text") {
+          // Track usage for daily limit bookkeeping
+          try {
+            recordMessage();
+          } catch {}
+        }
         // Haptics on successful send
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } else {
@@ -1003,6 +1033,23 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           </View>
         )}
 
+        {/* Near-limit inline upgrade banner */}
+        {subscriptionPlan === "free" && (isNearLimit || hasReachedLimit) && (
+          <View
+            style={{ paddingHorizontal: spacing.md, paddingTop: spacing.sm }}
+          >
+            <InlineUpgradeBanner
+              message={
+                hasReachedLimit
+                  ? "You've hit today's free message limit. Upgrade for unlimited messaging."
+                  : `You're near today's free message limit (${remainingMessages} left). Upgrade for unlimited messaging.`
+              }
+              ctaLabel="Upgrade"
+              onPress={() => setUpgradeVisible(true)}
+            />
+          </View>
+        )}
+
         {/* Messages */}
         {error ? (
           <EmptyState
@@ -1052,7 +1099,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                   ? "Limit reached — Upgrade for unlimited"
                   : `You're at ${pct}% — Upgrade for unlimited`;
               })()}
-              onPressUpgrade={() => navigation.navigate("Subscription")}
+              onPressUpgrade={() => setUpgradeVisible(true)}
             />
             {isSearchMode && searchResults.length === 0 && searchQuery && (
               <View style={styles.searchResultsEmpty}>
@@ -1111,17 +1158,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 onPress={() => {
                   // Check voice message permission first
                   if (!canSendVoice) {
-                    Alert.alert(
-                      "Premium Feature",
-                      "Voice messages require a premium subscription",
-                      [
-                        { text: "Cancel", style: "cancel" },
-                        {
-                          text: "Upgrade",
-                          onPress: () => navigation.navigate("Subscription"),
-                        },
-                      ]
-                    );
+                    setRecommendedTier("premium");
+                    setUpgradeVisible(true);
                     return;
                   }
 
@@ -1230,6 +1268,31 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             </TouchableOpacity>
           </View>
         </BottomSheet>
+
+        {/* Upgrade Prompt Modal */}
+        <UpgradePrompt
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          onUpgrade={(tier) => {
+            setUpgradeVisible(false);
+            navigation.navigate("Subscription", {
+              screen: "Subscription",
+              params: { tier },
+            } as any);
+          }}
+          currentTier={(subscriptionPlan as any) || "free"}
+          recommendedTier={recommendedTier}
+          title={
+            recommendedTier === "premiumPlus"
+              ? "Premium Plus required"
+              : "Upgrade required"
+          }
+          message={
+            recommendedTier === "premiumPlus"
+              ? "This feature is part of Premium Plus. Upgrade to unlock it."
+              : "Upgrade to Premium to unlock unlimited messaging and more."
+          }
+        />
       </KeyboardAvoidingView>
     </View>
   );

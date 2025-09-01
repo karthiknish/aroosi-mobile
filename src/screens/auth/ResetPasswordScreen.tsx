@@ -116,7 +116,7 @@ export default function ResetPasswordScreen() {
       padding: spacing.md,
       fontSize: fontSize.base,
       color: Colors.text.primary,
-      backgroundColor: "white",
+      backgroundColor: Colors.background.primary,
     },
     inputError: { borderColor: Colors.error[500] },
     button: {

@@ -6,6 +6,7 @@ import WelcomeScreen from "../screens/onboarding/WelcomeScreen";
 import ProfileSetupScreen from "../screens/onboarding/ProfileSetupScreen";
 import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
+import { getScreenTransition } from "@/utils/navigationAnimations";
 
 const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
   const Wrapped: React.FC<P> = (props) => {
@@ -29,6 +30,7 @@ export default function OnboardingNavigator() {
       id={undefined}
       screenOptions={{
         headerShown: false,
+        ...getScreenTransition("default"),
       }}
     >
       <Stack.Screen name="Welcome" component={WelcomeScreen} />

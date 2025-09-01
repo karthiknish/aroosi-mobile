@@ -4,6 +4,8 @@ import {
   TransitionPresets,
 } from "@react-navigation/stack";
 import { Easing } from "react-native";
+import { ANIMATION_DURATIONS, EASING_PRESETS } from "@/utils/animations";
+import { Colors } from "@constants";
 import type { StackCardInterpolatedStyle } from "@react-navigation/stack";
 
 // Custom transition configurations
@@ -25,15 +27,15 @@ export const navigationAnimations = {
       open: {
         animation: "timing",
         config: {
-          duration: 250,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeOut,
         },
       } as const,
       close: {
         animation: "timing",
         config: {
-          duration: 200,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.normal,
+          easing: EASING_PRESETS.easeIn,
         },
       } as const,
     },
@@ -63,15 +65,15 @@ export const navigationAnimations = {
       open: {
         animation: "timing",
         config: {
-          duration: 250,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeOut,
         },
       } as const,
       close: {
         animation: "timing",
         config: {
-          duration: 200,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.normal,
+          easing: EASING_PRESETS.easeIn,
         },
       } as const,
     },
@@ -95,15 +97,15 @@ export const navigationAnimations = {
       open: {
         animation: "timing",
         config: {
-          duration: 400,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.slow,
+          easing: EASING_PRESETS.easeOut,
         },
       } as const,
       close: {
         animation: "timing",
         config: {
-          duration: 300,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.normal,
+          easing: EASING_PRESETS.easeIn,
         },
       } as const,
     },
@@ -141,15 +143,15 @@ export const navigationAnimations = {
       open: {
         animation: "timing",
         config: {
-          duration: 350,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeOut,
         },
       } as const,
       close: {
         animation: "timing",
         config: {
-          duration: 250,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.normal,
+          easing: EASING_PRESETS.easeIn,
         },
       } as const,
     },
@@ -181,15 +183,15 @@ export const navigationAnimations = {
       open: {
         animation: "timing",
         config: {
-          duration: 250,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeOut,
         },
       } as const,
       close: {
         animation: "timing",
         config: {
-          duration: 200,
-          easing: Easing.linear,
+          duration: ANIMATION_DURATIONS.normal,
+          easing: EASING_PRESETS.easeIn,
         },
       } as const,
     },
@@ -275,12 +277,12 @@ export const tabBarAnimationConfig = {
     },
   },
   screenOptions: {
-    tabBarActiveTintColor: "#EC4899",
-    tabBarInactiveTintColor: "#999",
+    tabBarActiveTintColor: Colors.primary[500],
+    tabBarInactiveTintColor: Colors.neutral[500],
     tabBarStyle: {
-      backgroundColor: "#FFFFFF",
+      backgroundColor: Colors.background.primary,
       borderTopWidth: 1,
-      borderTopColor: "#E0E0E0",
+      borderTopColor: Colors.border.primary,
       paddingBottom: 5,
       paddingTop: 5,
       height: 60,

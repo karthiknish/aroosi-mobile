@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { View, TextInput, StyleSheet, TextInputProps } from "react-native";
+import { Colors } from "@constants";
 
 interface OtpInputProps {
   value: string;
@@ -103,8 +104,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: Colors.border.primary,
     borderRadius: 8,
-    backgroundColor: "white",
+    backgroundColor: Colors.background.primary,
   },
 });

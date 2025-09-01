@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigation } from "@react-navigation/native";
 import { useApiClient } from "@/utils/api";
-import { navigationAnimations } from "@/utils/navigationAnimations";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
@@ -33,6 +32,7 @@ import ChatScreen from "@screens/main/ChatScreen";
 import SettingsScreen from "@screens/settings/SettingsScreen";
 import IcebreakersScreen from "@screens/main/IcebreakersScreen";
 import ContactScreen from "@screens/support/ContactScreen";
+import AIChatbotScreen from "@screens/support/AIChatbotScreen";
 import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 import { TabBarProvider } from "@contexts/TabBarContext";
@@ -41,7 +41,6 @@ import { TabBarProvider } from "@contexts/TabBarContext";
 import { View, Text } from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useThemedStyles } from "@contexts/ThemeContext";
 
 const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
   const Wrapped: React.FC<P> = (props) => {
@@ -132,6 +131,11 @@ function ProfileStackNavigator() {
         name="Contact"
         component={withSC(ContactScreen)}
         options={getScreenTransition("Contact")}
+      />
+      <ProfileStack.Screen
+        name="AIChatbot"
+        component={withSC(AIChatbotScreen)}
+        options={getScreenTransition("default")}
       />
       <ProfileStack.Screen
         name="Shortlists"

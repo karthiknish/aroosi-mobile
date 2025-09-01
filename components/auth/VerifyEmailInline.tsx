@@ -44,6 +44,14 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
 
   if (!needsEmailVerification) return null;
 
+  // Auto-start polling when inline prompt is visible so it can auto-hide on verification.
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [startEmailVerificationPolling]);
+
   const doResend = async () => {
     if (sending || cooldown > 0) return;
     setSending(true);
@@ -95,7 +103,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={[styles.pillText, textStyle]}>
-              {cooldown > 0 ? `Verify Email (${cooldown}s)` : label || "Verify Email"}
+              {cooldown > 0
+                ? `Verify Email (${cooldown}s)`
+                : label || "Verify Email"}
             </Text>
           )}
         </TouchableOpacity>
@@ -123,7 +133,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
             {checking ? (
               <ActivityIndicator color={Colors.warning[600]} />
             ) : (
-              <Text style={[styles.linkText, textStyle]}>{label || "Unverified"}</Text>
+              <Text style={[styles.linkText, textStyle]}>
+                {label || "Unverified"}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
@@ -138,7 +150,10 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           <View style={styles.bannerActions}>
             <TouchableOpacity
               onPress={doResend}
-              style={[styles.bannerBtn, (sending || cooldown > 0) && styles.disabled]}
+              style={[
+                styles.bannerBtn,
+                (sending || cooldown > 0) && styles.disabled,
+              ]}
               disabled={sending || cooldown > 0}
             >
               {sending ? (
@@ -151,7 +166,11 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={doCheck}
-              style={[styles.bannerBtn, { backgroundColor: Colors.primary[600] }, checking && styles.disabled]}
+              style={[
+                styles.bannerBtn,
+                { backgroundColor: Colors.primary[600] },
+                checking && styles.disabled,
+              ]}
               disabled={checking}
             >
               {checking ? (

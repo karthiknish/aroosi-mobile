@@ -50,6 +50,10 @@ import { getProfileImages, setProfileImages } from "@/utils/imageCache";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { unifiedMessagingApi } from "@/utils/unifiedMessagingApi";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
+import UpgradePrompt from "@components/subscription/UpgradePrompt";
+import { useSubscription } from "@/hooks/useSubscription";
+import type { SubscriptionTier } from "@/types/subscription";
 
 interface MatchesScreenProps {
   navigation: any;
@@ -92,6 +96,13 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<UIMatch | null>(null);
+  // Subscription & upgrade state
+  const { subscription, usage, canUseFeatureNow, trackFeatureUsage } =
+    useSubscription();
+  const subscriptionPlan = subscription?.plan || ("free" as SubscriptionTier);
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [recommendedTier, setRecommendedTier] =
+    useState<SubscriptionTier>("premium");
 
   const { sentInterests, sendInterest, sending, isMutualInterest } =
     useInterests();
@@ -267,27 +278,6 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
       const cached = getProfileImages(m.userId);
       if (!hasUrls && !cached && !processedIdsRef.current.has(m.userId)) {
         pendingIdsRef.current.add(m.userId);
-        {
-          needsEmailVerification && (
-            <TouchableOpacity
-              onPress={async () => {
-                const res = await resendEmailVerification();
-                if (res.success) startEmailVerificationPolling?.();
-              }}
-              style={{
-                marginLeft: "auto",
-                backgroundColor: theme.colors.warning[500],
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: "#fff", fontWeight: "600" }}>
-                Verify Email
-              </Text>
-            </TouchableOpacity>
-          );
-        }
       }
     });
     if (pendingIdsRef.current.size) scheduleBatchFetch();
@@ -495,7 +485,9 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                     },
                   ]}
                 >
-                  <Text style={[styles.unreadText, { color: "#fff" }]}>
+                  <Text
+                    style={[styles.unreadText, { color: Colors.text.inverse }]}
+                  >
                     {match.unreadCount > 99 ? "99+" : String(match.unreadCount)}
                   </Text>
                 </View>
@@ -519,8 +511,27 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                 <TouchableOpacity
                   disabled={sending || hasSentInterestTo(match.userId)}
                   onPress={async () => {
+                    // Gate by interests usage limits
+                    try {
+                      const availability = await canUseFeatureNow(
+                        "interestsSent"
+                      );
+                      if (!availability.canUse) {
+                        setRecommendedTier(
+                          (availability.requiredPlan as SubscriptionTier) ||
+                            "premium"
+                        );
+                        setUpgradeVisible(true);
+                        return;
+                      }
+                    } catch {}
+
                     const ok = await sendInterest(match.userId);
                     if (ok) {
+                      // Track usage for analytics/quota UI
+                      try {
+                        await trackFeatureUsage("interestsSent");
+                      } catch {}
                       toast?.show?.("Interest sent", "success");
                     } else {
                       toast?.show?.("Could not send interest", "error");
@@ -673,6 +684,37 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           </View>
         </FadeInView>
 
+        {/* Inline upgrade banner for interests when near/at limit */}
+        {(() => {
+          const f = usage?.features?.find(
+            (x: any) => x.name === "interestsSent"
+          );
+          const pct = f?.percentageUsed ?? 0;
+          const remaining = f?.remaining ?? 0;
+          const near = pct >= 80 && pct < 100;
+          const reached = pct >= 100;
+          if (subscriptionPlan === "free" && (near || reached)) {
+            return (
+              <View style={{ paddingHorizontal: Layout.spacing.lg }}>
+                <InlineUpgradeBanner
+                  message={
+                    reached
+                      ? "You've hit this month's free interest limit. Upgrade for unlimited interests."
+                      : `You're near this month's free interest limit (${remaining} left). Upgrade for unlimited interests.`
+                  }
+                  ctaLabel="Upgrade"
+                  onPress={() => {
+                    setRecommendedTier("premium");
+                    setUpgradeVisible(true);
+                  }}
+                  style={{ marginTop: Layout.spacing.sm }}
+                />
+              </View>
+            );
+          }
+          return null;
+        })()}
+
         {/* Pending Interests Section */}
         {interestsError ? (
           <View style={styles.section}>
@@ -810,6 +852,32 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             </TouchableOpacity>
           </View>
         </BottomSheet>
+
+        {/* Upgrade Prompt Modal */}
+        <UpgradePrompt
+          visible={upgradeVisible}
+          onClose={() => setUpgradeVisible(false)}
+          onUpgrade={(tier) => {
+            setUpgradeVisible(false);
+            navigation.navigate("Subscription", {
+              screen: "Subscription",
+              params: { tier },
+            } as any);
+          }}
+          currentTier={subscriptionPlan}
+          recommendedTier={recommendedTier}
+          title={
+            recommendedTier === "premiumPlus"
+              ? "Premium Plus required"
+              : "Upgrade required"
+          }
+          message={
+            recommendedTier === "premiumPlus"
+              ? "This feature is part of Premium Plus. Upgrade to unlock it."
+              : "Upgrade to Premium to unlock unlimited interests and more."
+          }
+          feature="Interests"
+        />
       </ScreenContainer>
     </ErrorBoundary>
   );

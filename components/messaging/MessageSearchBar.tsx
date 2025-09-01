@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useMessageSearch } from "@/hooks/useMessageSearch";
 import { SearchResult } from "../../utils/messageSearch";
+import { Colors } from "@constants";
 
 interface MessageSearchBarProps {
   conversationId: string;
@@ -163,7 +164,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
     if (isSearching) {
       return (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="small" color="#007AFF" />
+          <ActivityIndicator size="small" color={Colors.info[500]} />
           <Text style={styles.emptyText}>Searching...</Text>
         </View>
       );
@@ -204,7 +205,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
           ref={inputRef}
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor="#999"
+          placeholderTextColor={Colors.text.secondary}
           value={query}
           onChangeText={handleTextChange}
           onFocus={handleFocus}
@@ -222,7 +223,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
 
         {isSearching && (
           <View style={styles.loadingIndicator}>
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color={Colors.info[500]} />
           </View>
         )}
       </View>
@@ -323,12 +324,12 @@ export const MessageSearchResults: React.FC<MessageSearchResultsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f0f0f0",
+    backgroundColor: Colors.background.secondary,
     borderRadius: 20,
     paddingHorizontal: 12,
     height: 40,
@@ -338,12 +339,12 @@ const styles = StyleSheet.create({
   },
   searchIconText: {
     fontSize: 16,
-    color: "#666",
+    color: Colors.text.secondary,
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: "#333",
+    color: Colors.text.primary,
     paddingVertical: 0,
   },
   clearButton: {
@@ -351,20 +352,20 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#ccc",
+    backgroundColor: Colors.neutral[300],
     alignItems: "center",
     justifyContent: "center",
   },
   clearButtonText: {
     fontSize: 12,
-    color: "#fff",
+    color: Colors.background.primary,
     fontWeight: "bold",
   },
   loadingIndicator: {
     marginLeft: 8,
   },
   resultsContainer: {
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
     borderRadius: 8,
     marginTop: 4,
     overflow: "hidden",
@@ -376,7 +377,7 @@ const styles = StyleSheet.create({
   },
   resultsContainerVisible: {
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: Colors.border.primary,
   },
   resultsList: {
     flex: 1,
@@ -387,30 +388,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: Colors.neutral[200],
   },
   suggestionIcon: {
     fontSize: 14,
     marginRight: 12,
-    color: "#666",
+    color: Colors.text.secondary,
   },
   suggestionText: {
     fontSize: 16,
-    color: "#333",
+    color: Colors.text.primary,
   },
   resultItem: {
     flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    borderBottomColor: Colors.neutral[200],
   },
   resultContent: {
     flex: 1,
   },
   resultText: {
     fontSize: 14,
-    color: "#333",
+    color: Colors.text.primary,
     lineHeight: 20,
     marginBottom: 4,
   },
@@ -421,25 +422,25 @@ const styles = StyleSheet.create({
   },
   resultTime: {
     fontSize: 12,
-    color: "#666",
+    color: Colors.text.secondary,
   },
   resultScoreContainer: {
     minWidth: 32,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 12,
-    backgroundColor: "#E6F0FF",
+    backgroundColor: Colors.info[50],
     alignItems: "center",
     justifyContent: "center",
   },
   resultScore: {
     fontSize: 12,
-    color: "#007AFF",
+    color: Colors.info[600],
     fontWeight: "500",
   },
   scoreText: {
     fontSize: 12,
-    color: "#007AFF",
+    color: Colors.info[600],
     fontWeight: "500",
   },
   emptyState: {
@@ -449,11 +450,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: "#666",
+    color: Colors.text.secondary,
     marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#999",
+    color: Colors.neutral[500],
   },
 });

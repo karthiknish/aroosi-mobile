@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Animated, Dimensions, Easing, Platform } from 'react-native';
+import { ANIMATION_DURATIONS, EASING_PRESETS } from "@/utils/animations";
 import {
   StackNavigationOptions,
   TransitionPresets,
@@ -86,15 +87,15 @@ export const NavigationTransitions = {
       open: {
         animation: "timing",
         config: {
-          duration: 300,
-          easing: Easing.out(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeOut,
         },
       },
       close: {
         animation: "timing",
         config: {
-          duration: 300,
-          easing: Easing.in(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.page,
+          easing: EASING_PRESETS.easeIn,
         },
       },
     },
@@ -159,15 +160,15 @@ export const NavigationTransitions = {
       open: {
         animation: "timing",
         config: {
-          duration: 600,
-          easing: Easing.out(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.slow,
+          easing: EASING_PRESETS.easeOut,
         },
       },
       close: {
         animation: "timing",
         config: {
-          duration: 600,
-          easing: Easing.in(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.slow,
+          easing: EASING_PRESETS.easeIn,
         },
       },
     },
@@ -197,15 +198,15 @@ export const NavigationTransitions = {
       open: {
         animation: "timing",
         config: {
-          duration: 400,
-          easing: Easing.out(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.slow,
+          easing: EASING_PRESETS.easeOut,
         },
       },
       close: {
         animation: "timing",
         config: {
-          duration: 400,
-          easing: Easing.in(Easing.poly(4)),
+          duration: ANIMATION_DURATIONS.slow,
+          easing: EASING_PRESETS.easeIn,
         },
       },
     },

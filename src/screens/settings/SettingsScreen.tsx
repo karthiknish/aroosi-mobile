@@ -16,6 +16,12 @@ import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
 import { useApiClient } from "@/utils/api";
 import VerifyEmailInline from "@components/auth/VerifyEmailInline";
+import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
+import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
+import UpgradePrompt from "@components/subscription/UpgradePrompt";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import type { SubscriptionTier } from "@/types/subscription";
 interface SettingsScreenProps {
   navigation: any;
 }
@@ -54,6 +60,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const apiClient = useApiClient();
   const [resendLoading, setResendLoading] = useState(false);
   const [checking, setChecking] = useState(false);
+  const { subscription } = useSubscription();
+  const { checkFeatureAccess } = useFeatureAccess();
+  const currentTier = (subscription?.plan as SubscriptionTier) || "free";
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [recommendedTier, setRecommendedTier] =
+    useState<SubscriptionTier>("premium");
+  const [lastUpgradeTap, setLastUpgradeTap] = useState<number>(0);
+  const debouncedUpgrade = (tier?: SubscriptionTier) => {
+    const now = Date.now();
+    if (now - lastUpgradeTap < 600) return; // 600ms debounce
+    setLastUpgradeTap(now);
+    setUpgradeVisible(true);
+    if (tier) setRecommendedTier(tier);
+  };
   const handleSignOut = () => {
     // Immediate sign-out flow with toast feedback; replace with ConfirmModal if desired
     const doSignOut = async () => {
@@ -151,14 +171,31 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Let others see when you're online",
           type: "toggle" as const,
           value: showOnlineStatus,
-          onToggle: setShowOnlineStatus,
+          onToggle: async (val: boolean) => {
+            // Treat hiding online status as Premium Plus (incognito) on web parity
+            const access = await checkFeatureAccess("canUseIncognitoMode");
+            if (!access.allowed) {
+              setRecommendedTier("premiumPlus");
+              setUpgradeVisible(true);
+              return;
+            }
+            setShowOnlineStatus(val);
+          },
         },
         {
           title: "Read Receipts",
           subtitle: "Let others see when you've read their messages",
           type: "toggle" as const,
           value: readReceipts,
-          onToggle: setReadReceipts,
+          onToggle: async (val: boolean) => {
+            const access = await checkFeatureAccess("canSeeReadReceipts");
+            if (!access.allowed) {
+              setRecommendedTier("premium");
+              setUpgradeVisible(true);
+              return;
+            }
+            setReadReceipts(val);
+          },
         },
         {
           title: "Blocked Users",
@@ -182,6 +219,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Get help from our support team",
           type: "navigation" as const,
           onPress: () => navigation.navigate("Contact"),
+        },
+        {
+          title: "AI Help Assistant",
+          subtitle: "Chat with our help bot powered by AI",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("AIChatbot" as any),
         },
         {
           title: "Terms of Service",
@@ -415,6 +458,23 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       {settingSections.map((section, sectionIndex) => (
         <View key={sectionIndex} style={styles.section}>
           <Text style={styles.sectionTitle}>{section.title}</Text>
+          {section.title === "Privacy" && currentTier === "free" && (
+            <PremiumFeatureGuard
+              feature="canSeeReadReceipts"
+              mode="inline"
+              message="Upgrade to unlock read receipts and incognito mode"
+              containerStyle={{
+                marginHorizontal: spacing.lg,
+                marginBottom: spacing.sm,
+              }}
+              onUpgrade={(tier) =>
+                navigation.navigate("Subscription", {
+                  screen: "Subscription",
+                  params: { tier },
+                } as any)
+              }
+            />
+          )}
           <View style={styles.sectionContent}>
             {section.items.map((item, itemIndex) =>
               renderSettingItem(item, itemIndex)
@@ -427,6 +487,31 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       <View style={styles.versionContainer}>
         <Text style={styles.versionText}>Aroosi Mobile v1.0.0</Text>
       </View>
+
+      {/* Upgrade Prompt Modal */}
+      <UpgradePrompt
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        onUpgrade={(tier) => {
+          setUpgradeVisible(false);
+          navigation.navigate("Subscription", {
+            screen: "Subscription",
+            params: { tier },
+          } as any);
+        }}
+        currentTier={currentTier}
+        recommendedTier={recommendedTier}
+        title={
+          recommendedTier === "premiumPlus"
+            ? "Premium Plus required"
+            : "Upgrade required"
+        }
+        message={
+          recommendedTier === "premiumPlus"
+            ? "Incognito mode is available on Premium Plus. Upgrade to unlock it."
+            : "Read receipts and more are available on Premium. Upgrade to unlock."
+        }
+      />
     </ScreenContainer>
   );
 }

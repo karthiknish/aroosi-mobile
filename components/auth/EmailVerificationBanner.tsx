@@ -6,7 +6,12 @@ import { Colors, Layout } from '@constants';
 import { useToast } from '@providers/ToastContext';
 
 export const EmailVerificationBanner: React.FC = () => {
-  const { needsEmailVerification, resendEmailVerification, verifyEmailCode, startEmailVerificationPolling } = useAuth() as any;
+  const {
+    needsEmailVerification,
+    resendEmailVerification,
+    verifyEmailCode,
+    startEmailVerificationPolling,
+  } = useAuth() as any;
   const toast = useToast();
   const [sending, setSending] = React.useState(false);
   const [checking, setChecking] = React.useState(false);
@@ -15,11 +20,21 @@ export const EmailVerificationBanner: React.FC = () => {
 
   React.useEffect(() => {
     if (cooldown <= 0 && cooldownRef.current) {
-      clearInterval(cooldownRef.current); cooldownRef.current = null;
+      clearInterval(cooldownRef.current);
+      cooldownRef.current = null;
     }
   }, [cooldown]);
 
   if (!needsEmailVerification) return null;
+
+  // Auto-start polling while the banner is visible so it auto-hides soon after user verifies via email link.
+  React.useEffect(() => {
+    // Debounce a bit to avoid spamming on fast mounts
+    const t = setTimeout(() => {
+      startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 }); // ~3 minutes
+    }, 300);
+    return () => clearTimeout(t);
+  }, [startEmailVerificationPolling]);
 
   const handleResend = async () => {
     if (sending || cooldown > 0) return;
@@ -27,18 +42,20 @@ export const EmailVerificationBanner: React.FC = () => {
     try {
       const res = await resendEmailVerification();
       if (res.success) {
-        toast.show('Verification email sent', 'info');
+        toast.show("Verification email sent", "info");
         setCooldown(60);
         if (!cooldownRef.current) {
           cooldownRef.current = setInterval(() => {
-            setCooldown(c => c - 1);
+            setCooldown((c) => c - 1);
           }, 1000);
         }
         startEmailVerificationPolling?.();
       } else {
-        toast.show(res.error || 'Failed to send email', 'error');
+        toast.show(res.error || "Failed to send email", "error");
       }
-    } finally { setSending(false); }
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleCheck = async () => {
@@ -47,11 +64,13 @@ export const EmailVerificationBanner: React.FC = () => {
     try {
       const res = await verifyEmailCode();
       if (res.success) {
-        toast.show('Email verified!', 'success');
+        toast.show("Email verified!", "success");
       } else {
-        toast.show(res.error || 'Still unverified', 'info');
+        toast.show(res.error || "Still unverified", "info");
       }
-    } finally { setChecking(false); }
+    } finally {
+      setChecking(false);
+    }
   };
 
   return (

@@ -140,14 +140,21 @@ export default function BlockedUsersScreen({
         >
           <View
             style={{
-              backgroundColor: "#fff",
+              backgroundColor: Colors.background.primary,
               borderRadius: 12,
               padding: 24,
               minWidth: 280,
               alignItems: "center",
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 16 }}>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "600",
+                marginBottom: 16,
+                color: Colors.text.primary,
+              }}
+            >
               {modalType === "confirm"
                 ? "Unblock User"
                 : modalType === "success"
@@ -157,7 +164,7 @@ export default function BlockedUsersScreen({
             <Text
               style={{
                 fontSize: 16,
-                color: "#333",
+                color: Colors.text.primary,
                 marginBottom: 24,
                 textAlign: "center",
               }}
@@ -169,7 +176,7 @@ export default function BlockedUsersScreen({
                 <>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: "#eee",
+                      backgroundColor: Colors.background.secondary,
                       paddingHorizontal: 20,
                       paddingVertical: 10,
                       borderRadius: 8,
@@ -177,13 +184,15 @@ export default function BlockedUsersScreen({
                     }}
                     onPress={() => setModalVisible(false)}
                   >
-                    <Text style={{ fontWeight: "600", color: "#333" }}>
+                    <Text
+                      style={{ fontWeight: "600", color: Colors.text.primary }}
+                    >
                       Cancel
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: "#4CAF50",
+                      backgroundColor: Colors.success[500],
                       paddingHorizontal: 20,
                       paddingVertical: 10,
                       borderRadius: 8,
@@ -191,7 +200,12 @@ export default function BlockedUsersScreen({
                     onPress={handleConfirmUnblock}
                     disabled={unblockUserMutation.isPending}
                   >
-                    <Text style={{ fontWeight: "600", color: "#fff" }}>
+                    <Text
+                      style={{
+                        fontWeight: "600",
+                        color: Colors.background.primary,
+                      }}
+                    >
                       {unblockUserMutation.isPending
                         ? "Unblocking..."
                         : "Unblock"}
@@ -202,27 +216,41 @@ export default function BlockedUsersScreen({
               {modalType === "success" && (
                 <TouchableOpacity
                   style={{
-                    backgroundColor: "#4CAF50",
+                    backgroundColor: Colors.success[500],
                     paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 8,
                   }}
                   onPress={() => setModalVisible(false)}
                 >
-                  <Text style={{ fontWeight: "600", color: "#fff" }}>OK</Text>
+                  <Text
+                    style={{
+                      fontWeight: "600",
+                      color: Colors.background.primary,
+                    }}
+                  >
+                    OK
+                  </Text>
                 </TouchableOpacity>
               )}
               {modalType === "error" && (
                 <TouchableOpacity
                   style={{
-                    backgroundColor: "#F44336",
+                    backgroundColor: Colors.error[500],
                     paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 8,
                   }}
                   onPress={() => setModalVisible(false)}
                 >
-                  <Text style={{ fontWeight: "600", color: "#fff" }}>OK</Text>
+                  <Text
+                    style={{
+                      fontWeight: "600",
+                      color: Colors.background.primary,
+                    }}
+                  >
+                    OK
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>

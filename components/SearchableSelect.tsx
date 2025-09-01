@@ -94,34 +94,32 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: "#000",
+    color: Colors.text.primary,
     marginBottom: 4,
   },
   selector: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: Colors.gray[300],
+    borderColor: Colors.border.primary,
     borderRadius: 4,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   placeholderText: {
-    // Make placeholder text black for visibility as requested
-    color: "#000",
+    color: Colors.text.secondary,
   },
   valueText: {
-    // Force solid black for better contrast/visibility
-    color: "#000",
+    color: Colors.text.primary,
   },
   modalContainer: {
     flex: 1,
     paddingTop: Platform.OS === "android" ? 40 : 60,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.background.primary,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: Colors.gray[300],
+    borderColor: Colors.border.primary,
     borderRadius: 4,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -130,12 +128,11 @@ const styles = StyleSheet.create({
   optionItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
+    borderBottomColor: Colors.border.primary,
   },
   optionText: {
     fontSize: 16,
-    // Ensure options list uses solid black for readability
-    color: "#000",
+    color: Colors.text.primary,
   },
 });
 

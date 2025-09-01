@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from "@constants";
 
 // Accessibility utilities
 export const AccessibilityUtils = {
@@ -185,16 +186,16 @@ export const SkipLink: React.FC<SkipLinkProps> = ({
       accessibilityLabel={`Skip to ${label}`}
       accessibilityHint="Double tap to skip to main content"
       style={{
-        position: 'absolute',
+        position: "absolute",
         top: -1000,
         left: 0,
-        backgroundColor: '#000',
+        backgroundColor: Colors.neutral[900],
         padding: 8,
         zIndex: 9999,
         ...style,
       }}
     >
-      <Text style={{ color: '#fff' }}>Skip to {label}</Text>
+      <Text style={{ color: Colors.background.primary }}>Skip to {label}</Text>
     </AccessibleTouchable>
   );
 };
@@ -277,7 +278,7 @@ export const AccessibleIconButton: React.FC<AccessibleIconButtonProps> = ({
   accessibilityLabel,
   accessibilityHint,
   size = 24,
-  color = '#000',
+  color = Colors.text.primary,
   disabled = false,
   style,
   hapticFeedback = true,
@@ -292,8 +293,8 @@ export const AccessibleIconButton: React.FC<AccessibleIconButtonProps> = ({
       style={{
         padding: 8,
         borderRadius: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
+        justifyContent: "center",
+        alignItems: "center",
         minWidth: 44,
         minHeight: 44,
         ...style,
@@ -303,7 +304,7 @@ export const AccessibleIconButton: React.FC<AccessibleIconButtonProps> = ({
       <Ionicons
         name={iconName}
         size={size}
-        color={disabled ? '#ccc' : color}
+        color={disabled ? Colors.neutral[300] : color}
       />
     </AccessibleTouchable>
   );
@@ -341,22 +342,24 @@ export const AccessibleProgress: React.FC<AccessibleProgressProps> = ({
       <View
         style={{
           height: 8,
-          backgroundColor: '#e0e0e0',
+          backgroundColor: Colors.neutral[200],
           borderRadius: 4,
-          overflow: 'hidden',
+          overflow: "hidden",
         }}
       >
         <View
           style={{
-            height: '100%',
+            height: "100%",
             width: `${percentage}%`,
-            backgroundColor: '#007AFF',
+            backgroundColor: Colors.info[500],
             borderRadius: 4,
           }}
         />
       </View>
       {showPercentage && (
-        <AccessibleText style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+        <AccessibleText
+          style={{ marginTop: 4, fontSize: 12, color: Colors.text.secondary }}
+        >
           {percentage}%
         </AccessibleText>
       )}
@@ -391,10 +394,10 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
         accessibilityRole="button"
         disabled={disabled}
         style={{
-          backgroundColor: '#fff',
+          backgroundColor: Colors.background.primary,
           borderRadius: 12,
           padding: 16,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
@@ -411,10 +414,10 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
     <View
       style={[
         {
-          backgroundColor: '#fff',
+          backgroundColor: Colors.background.primary,
           borderRadius: 12,
           padding: 16,
-          shadowColor: '#000',
+          shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/AnimatedComponents";
 import { SearchFilters, SearchResponse } from "@/types/profile";
 import PaywallModal from "@components/subscription/PaywallModal";
+import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { getPlans } from "@services/subscriptions";
 import SwipeDeck from "@components/search/SwipeDeck";
@@ -275,40 +276,12 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           { backgroundColor: theme.colors.background.primary },
         ]}
       >
-        {!advancedAllowed && (
-          <View
-            style={{
-              padding: 12,
-              borderRadius: 8,
-              marginBottom: 12,
-              borderWidth: 1,
-              borderColor: theme.colors.border.primary,
-              backgroundColor: theme.colors.background.secondary,
-            }}
-          >
-            <Text
-              style={{
-                color: theme.colors.text.primary,
-                marginBottom: 8,
-                fontWeight: "600",
-              }}
-            >
-              Advanced filters are a Premium feature
-            </Text>
-            <TouchableOpacity
-              style={{
-                alignSelf: "flex-start",
-                backgroundColor: theme.colors.primary[500],
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 6,
-              }}
-              onPress={() => setShowPaywall(true)}
-            >
-              <Text style={{ color: theme.colors.text.inverse }}>Upgrade</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <PremiumFeatureGuard
+          feature="canUseAdvancedFilters"
+          mode="inline"
+          message="Advanced filters are a Premium feature"
+          onUpgrade={() => setShowPaywall(true)}
+        />
         <Text
           style={[styles.filtersTitle, { color: theme.colors.text.primary }]}
         >

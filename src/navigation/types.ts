@@ -28,6 +28,7 @@ export type ProfileStackParamList = {
   Contact: undefined;
   Icebreakers: undefined;
   Shortlists: undefined;
+  AIChatbot: undefined;
 };
 
 export type ChatStackParamList = {

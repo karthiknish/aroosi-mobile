@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { useKeyboard, useKeyboardAnimation, dismissKeyboard, getKeyboardAvoidingViewBehavior } from '@utils/keyboardUtils';
-import { Colors } from '../../../constants/Colors';
+import { Colors } from "@constants";
 
 // KeyboardAwareScrollView - Automatically scrolls to focused input
 interface KeyboardAwareScrollViewProps extends ScrollViewProps {
@@ -236,7 +236,7 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
           borderRadius: 8,
           paddingHorizontal: 12,
           paddingVertical: 10,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: Colors.background.primary,
           transform: [{ scale: animatedScale }],
         },
         containerStyle,

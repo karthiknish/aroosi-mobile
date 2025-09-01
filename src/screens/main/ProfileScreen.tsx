@@ -62,6 +62,7 @@ import ScreenContainer from "@components/common/ScreenContainer";
 import ConfirmModal from "@components/ui/ConfirmModal";
 import VerifyEmailInline from "@components/auth/VerifyEmailInline";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
+import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
 
 const { width } = Dimensions.get("window");
 
@@ -369,7 +370,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     viewerItem: {
       paddingVertical: spacing.xs,
       paddingHorizontal: spacing.md,
-      backgroundColor: "#f0f0f0",
+      backgroundColor: theme.colors.background.secondary,
       borderRadius: 8,
     },
     viewerText: {},
@@ -1526,8 +1527,17 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </View>
         </View>
 
-        {/* Profile Viewers (Premium & above) */}
-        {canViewProfileViewers && (
+        {/* Profile Viewers (gated) */}
+        <PremiumFeatureGuard
+          feature="canViewProfileViewers"
+          mode="inline"
+          message="Unlock Profile Viewers and more with Premium"
+          onUpgrade={() => handleViewSubscription()}
+          containerStyle={{
+            marginHorizontal: spacing.md,
+            marginBottom: spacing.lg,
+          }}
+        >
           <View
             style={[
               styles.section,
@@ -1581,44 +1591,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               </Text>
             )}
           </View>
-        )}
-        {!canViewProfileViewers && (
-          <View
-            style={[
-              styles.section,
-              { backgroundColor: theme.colors.background.primary },
-            ]}
-          >
-            <Text
-              style={[
-                styles.sectionTitle,
-                { color: theme.colors.text.primary },
-              ]}
-            >
-              Who Viewed Your Profile
-            </Text>
-            <Text
-              style={[
-                styles.noDataText,
-                {
-                  color: theme.colors.text.secondary,
-                  marginBottom: spacing.sm,
-                },
-              ]}
-            >
-              Upgrade to Premium to see who viewed your profile.
-            </Text>
-            <GradientButton
-              title="Upgrade"
-              variant="primary"
-              size="medium"
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                handleViewSubscription();
-              }}
-            />
-          </View>
-        )}
+        </PremiumFeatureGuard>
 
         {/* Profile Stats */}
         <FadeInView delay={600}>

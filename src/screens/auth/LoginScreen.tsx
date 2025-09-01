@@ -145,7 +145,7 @@ export default function LoginScreen() {
     title: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize["2xl"],
-      color: "#BFA67A", // primary color
+      color: Colors.accent[700], // mapped from gold
       marginBottom: spacing.xs,
     },
     titleUnderline: {
@@ -155,7 +155,7 @@ export default function LoginScreen() {
       transform: [{ translateX: -50 }],
       width: 100,
       height: 3,
-      backgroundColor: "#FDA4AF", // pink accent
+      backgroundColor: Colors.primary[300], // soft pink accent
       borderRadius: 2,
     },
     subtitle: {
@@ -165,10 +165,10 @@ export default function LoginScreen() {
       marginTop: spacing.md,
     },
     formContainer: {
-      backgroundColor: "rgba(255, 255, 255, 0.9)", // white/90 equivalent
+      backgroundColor: Colors.background.primary,
       borderRadius: 16,
       padding: spacing.lg,
-      shadowColor: "#000",
+      shadowColor: Colors.neutral[900],
       shadowOffset: {
         width: 0,
         height: 4,
@@ -200,7 +200,7 @@ export default function LoginScreen() {
       padding: spacing.md,
       fontSize: fontSize.base,
       color: Colors.text.primary,
-      backgroundColor: "white",
+      backgroundColor: Colors.background.primary,
     },
     inputWithIcon: {
       paddingRight: spacing.xl * 2,
@@ -217,7 +217,7 @@ export default function LoginScreen() {
       alignItems: "center",
     },
     button: {
-      backgroundColor: "#BFA67A", // primary color
+      backgroundColor: Colors.accent[700],
       borderRadius: 8,
       padding: spacing.md,
       alignItems: "center",
@@ -236,7 +236,7 @@ export default function LoginScreen() {
       marginTop: spacing.md,
     },
     forgotPasswordText: {
-      color: "#FDA4AF", // pink accent
+      color: Colors.primary[400],
       fontSize: fontSize.sm,
       fontWeight: "500",
       textDecorationLine: "underline",
@@ -261,7 +261,7 @@ export default function LoginScreen() {
       alignItems: "center",
     },
     linkText: {
-      color: "#BFA67A", // primary color
+      color: Colors.accent[700],
       fontSize: fontSize.sm,
       fontWeight: "500",
     },
@@ -276,7 +276,7 @@ export default function LoginScreen() {
       textAlign: "center",
       marginBottom: spacing.md,
       padding: spacing.sm,
-      backgroundColor: "rgba(255, 0, 0, 0.1)",
+      backgroundColor: Colors.error[50],
       borderRadius: 4,
     },
   });

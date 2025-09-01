@@ -1,12 +1,13 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
-import { Layout } from "@constants";
+import { Colors, Layout } from "@constants";
 
 // Import auth screens
 import LoginScreen from "../screens/auth/LoginScreen";
 import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
 import ResetPasswordScreen from "../screens/auth/ResetPasswordScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
+import { getScreenTransition } from "@/utils/navigationAnimations";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -21,10 +22,11 @@ export default function AuthNavigator() {
     <Stack.Navigator
       id={undefined}
       screenOptions={{
+        ...getScreenTransition("default"),
         headerStyle: {
-          backgroundColor: "#f8f8f8",
+          backgroundColor: Colors.background.secondary,
         },
-        headerTintColor: "#333",
+        headerTintColor: Colors.text.primary,
         headerTitleStyle: {
           fontFamily: Layout.typography.fontFamily.serif,
         },
