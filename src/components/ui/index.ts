@@ -79,3 +79,6 @@ export {
 export {
   BottomSheet,
 } from './BottomSheet';
+
+// New UI exports
+export { default as VerificationBanner } from './VerificationBanner';

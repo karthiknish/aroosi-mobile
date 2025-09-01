@@ -58,16 +58,28 @@ import {
   RELIGION_OPTIONS,
   ETHNICITY_OPTIONS,
 } from "../../../constants/languages";
+import { VerificationBanner } from "@/components/ui";
 
 // Local component for Step 9: Create Account (signup embedded)
 function CreateAccountStep({
   missing,
   onBackToStart,
   navigation,
+  verification,
+  onVerificationStarted,
 }: {
   missing: string[];
   onBackToStart: () => void;
   navigation: any;
+  verification: {
+    awaiting: boolean;
+    secondsLeft: number;
+    resendLoading: boolean;
+    verifying: boolean;
+    onResend: () => void;
+    onIHaveVerified: () => void;
+  };
+  onVerificationStarted: (email: string) => void;
 }) {
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
@@ -75,10 +87,6 @@ function CreateAccountStep({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [awaitingEmailVerification, setAwaitingEmailVerification] =
-    useState(false);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(0);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const {
@@ -89,47 +97,14 @@ function CreateAccountStep({
   } = useAuth();
   const toastCtx = useToast();
 
-  useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setInterval(
-      () => setSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
-      1000
-    );
-    return () => clearInterval(timer);
-  }, [secondsLeft]);
-
-  const handleResend = async () => {
-    if (!awaitingEmailVerification || secondsLeft > 0) return;
-    setResendLoading(true);
-    try {
-      const resp = await resendEmailVerification?.();
-      if (!resp?.success) {
-        toastCtx.show(resp?.error || "Unable to resend email", "error");
-        return;
-      }
-      toastCtx.show("Verification email sent again", "info");
-      setSecondsLeft(60);
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  const handleIHaveVerified = async () => {
-    setLoading(true);
-    try {
-      const res = await verifyEmailCode?.();
-      if (res?.success) {
-        toastCtx.show("Email verified! Finalizing your profile...", "success");
-      } else {
-        toastCtx.show(
-          res?.error || "Still not verified. Try again shortly.",
-          "error"
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    awaiting,
+    secondsLeft,
+    resendLoading,
+    verifying,
+    onResend,
+    onIHaveVerified,
+  } = verification;
 
   const onCreateAccount = async () => {
     const errs: Record<string, string> = {};
@@ -179,12 +154,11 @@ function CreateAccountStep({
             "success"
           );
         } else {
-          setAwaitingEmailVerification(true);
           toastCtx.show(
             "Verification email sent. Please check your inbox.",
             "info"
           );
-          setSecondsLeft(60);
+          onVerificationStarted(normalizedEmail);
           startEmailVerificationPolling?.();
         }
       } else {
@@ -230,47 +204,6 @@ function CreateAccountStep({
               Go back to complete profile
             </Text>
           </TouchableOpacity>
-        </View>
-      ) : awaitingEmailVerification ? (
-        <View>
-          <Text style={styles.stepSubtitle}>
-            We sent a verification link to {emailAddress}. Once verified, tap
-            below.
-          </Text>
-          <TouchableOpacity
-            style={[styles.nextButton, loading && { opacity: 0.7 }]}
-            onPress={handleIHaveVerified}
-            disabled={loading}
-          >
-            <Text style={styles.nextButtonText}>
-              {loading ? "Checking..." : "I have verified"}
-            </Text>
-          </TouchableOpacity>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              marginTop: Layout.spacing.md,
-            }}
-          >
-            <Text style={{ color: Colors.text.secondary }}>
-              {secondsLeft > 0
-                ? `Resend available in ${secondsLeft}s`
-                : "Need a new email?"}
-            </Text>
-            <TouchableOpacity
-              disabled={secondsLeft > 0 || resendLoading || loading}
-              onPress={handleResend}
-            >
-              <Text style={{ color: Colors.primary[500], fontWeight: "500" }}>
-                {resendLoading
-                  ? "Resending..."
-                  : secondsLeft > 0
-                  ? "Waiting"
-                  : "Resend email"}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       ) : (
         <View>
@@ -433,7 +366,8 @@ export default function ProfileSetupScreen({
   navigation,
   route,
 }: ProfileSetupScreenProps) {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, resendEmailVerification, verifyEmailCode } =
+    useAuth();
   const apiClient = useApiClient();
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -446,6 +380,13 @@ export default function ProfileSetupScreen({
   const [heightFeet, setHeightFeet] = useState(5);
   const [heightInches, setHeightInches] = useState(6);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // Email verification banner state (lifted to screen level)
+  const [awaitingEmailVerification, setAwaitingEmailVerification] =
+    useState(false);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
 
   // Helpers for display vs stored values (capitalize labels while storing lowercase)
   const toTitleCase = (s: string) =>
@@ -525,6 +466,49 @@ export default function ProfileSetupScreen({
         }
       } catch {}
       handleInputChange("dateOfBirth", dateString);
+    }
+  };
+
+  // Banner countdown timer
+  useEffect(() => {
+    if (!awaitingEmailVerification || secondsLeft <= 0) return;
+    const timer = setInterval(
+      () => setSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
+      1000
+    );
+    return () => clearInterval(timer);
+  }, [awaitingEmailVerification, secondsLeft]);
+
+  const handleBannerResend = async () => {
+    if (!awaitingEmailVerification || secondsLeft > 0) return;
+    setResendLoading(true);
+    try {
+      const resp = await resendEmailVerification?.();
+      if (!resp?.success) {
+        toast.show(resp?.error || "Unable to resend email", "error");
+        return;
+      }
+      toast.show("Verification email sent again", "info");
+      setSecondsLeft(60);
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const handleBannerIHaveVerified = async () => {
+    setVerifying(true);
+    try {
+      const res = await verifyEmailCode?.();
+      if (res?.success) {
+        toast.show("Email verified! Finalizing your profile...", "success");
+      } else {
+        toast.show(
+          res?.error || "Still not verified. Try again shortly.",
+          "error"
+        );
+      }
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -655,6 +639,19 @@ export default function ProfileSetupScreen({
             missing={missing}
             onBackToStart={() => setCurrentStep(1)}
             navigation={navigation}
+            verification={{
+              awaiting: awaitingEmailVerification,
+              secondsLeft,
+              resendLoading,
+              verifying,
+              onResend: handleBannerResend,
+              onIHaveVerified: handleBannerIHaveVerified,
+            }}
+            onVerificationStarted={(email) => {
+              setVerificationEmail(email);
+              setAwaitingEmailVerification(true);
+              setSecondsLeft(60);
+            }}
           />
         );
       }
@@ -1751,6 +1748,19 @@ export default function ProfileSetupScreen({
         <Text style={styles.headerTitle}>Create Profile</Text>
         <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
       </View>
+
+      {/* Verification Banner */}
+      {awaitingEmailVerification && !!verificationEmail && (
+        <VerificationBanner
+          email={verificationEmail}
+          secondsLeft={secondsLeft}
+          resendLoading={resendLoading}
+          verifying={verifying}
+          onResend={handleBannerResend}
+          onIHaveVerified={handleBannerIHaveVerified}
+          onClose={() => setAwaitingEmailVerification(false)}
+        />
+      )}
 
       {/* Progress Bar */}
       {renderProgressBar()}
