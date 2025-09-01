@@ -38,7 +38,7 @@ export default function AuthNavigator() {
       <Stack.Screen
         name="ForgotPassword"
         component={withScreenContainer(ForgotPasswordScreen)}
-        options={{ headerShown: true, title: "Reset Password" }}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="ResetPassword"

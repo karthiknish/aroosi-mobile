@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from '@contexts/AuthProvider';
 import { Colors, Layout } from '@constants';
 import { useToast } from '@providers/ToastContext';
@@ -54,44 +55,72 @@ export const EmailVerificationBanner: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.message}>Please verify your email to unlock all features.</Text>
-      <View style={styles.actions}>
-        <TouchableOpacity style={[styles.button, (sending || cooldown>0) && styles.disabled]} disabled={sending || cooldown>0} onPress={handleResend}>
-          {sending ? <ActivityIndicator color={Colors.text.inverse} /> : <Text style={styles.buttonText}>{cooldown>0?`Resend (${cooldown}s)`: 'Resend'}</Text>}
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, checking && styles.disabled]} disabled={checking} onPress={handleCheck}>
-          {checking ? <ActivityIndicator color={Colors.text.inverse} /> : <Text style={styles.buttonText}>I Verified</Text>}
-        </TouchableOpacity>
+    <SafeAreaView edges={["top"]} style={styles.safeTop}>
+      <View style={styles.container}>
+        <Text style={styles.message}>
+          Please verify your email to unlock all features.
+        </Text>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[
+              styles.button,
+              (sending || cooldown > 0) && styles.disabled,
+            ]}
+            disabled={sending || cooldown > 0}
+            onPress={handleResend}
+          >
+            {sending ? (
+              <ActivityIndicator color={Colors.text.inverse} />
+            ) : (
+              <Text style={styles.buttonText}>
+                {cooldown > 0 ? `Resend (${cooldown}s)` : "Resend"}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, checking && styles.disabled]}
+            disabled={checking}
+            onPress={handleCheck}
+          >
+            {checking ? (
+              <ActivityIndicator color={Colors.text.inverse} />
+            ) : (
+              <Text style={styles.buttonText}>I Verified</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeTop: {
+    backgroundColor: "transparent",
+  },
   container: {
-    backgroundColor: Colors.warning?.[500] || '#f59e0b',
+    backgroundColor: Colors.warning?.[500] || "#f59e0b",
     paddingVertical: Layout?.spacing?.sm || 8,
     paddingHorizontal: Layout?.spacing?.md || 12,
   },
   message: {
-    color: Colors.text?.inverse || '#fff',
-    fontWeight: '600',
+    color: Colors.text?.inverse || "#fff",
+    fontWeight: "600",
     marginBottom: 6,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
   },
   button: {
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: "rgba(0,0,0,0.25)",
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
     marginRight: 8,
   },
   disabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  buttonText: { color: "#fff", fontWeight: "600" },
 });
 
 export default EmailVerificationBanner;

@@ -45,17 +45,24 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   ...scrollViewProps
 }) => {
   const insets = useSafeAreaInsets();
+  // Do not call bottom-tabs hook here (may be used outside tabs). Prop will be set by HOCs.
+  const detectedTabBarHeight = 0;
   const [footerHeight, setFooterHeight] = useState(0);
 
   const contentPaddingBottom = useMemo(() => {
     // Reserve space for footer height + bottom inset + small gap
-    return (
-      (footer ? footerHeight : 0) +
-      insets.bottom +
-      extraContentBottomPadding +
-      8
-    );
-  }, [footer, footerHeight, insets.bottom, extraContentBottomPadding]);
+    const extraPad =
+      typeof extraContentBottomPadding === "number"
+        ? extraContentBottomPadding
+        : detectedTabBarHeight;
+    return (footer ? footerHeight : 0) + insets.bottom + extraPad + 8;
+  }, [
+    footer,
+    footerHeight,
+    insets.bottom,
+    extraContentBottomPadding,
+    detectedTabBarHeight,
+  ]);
 
   return (
     <SafeAreaView
@@ -103,8 +110,8 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    // Ensure the top safe area isn't white if gradient doesn't paint behind insets
-    backgroundColor: Colors.background.primary,
+    // Keep transparent so the app-level gradient paints behind the top inset
+    backgroundColor: "transparent",
   },
   gradient: {
     flex: 1,

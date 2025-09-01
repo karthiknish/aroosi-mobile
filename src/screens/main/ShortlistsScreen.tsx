@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,17 +10,28 @@ import {
   Image,
   Alert,
   RefreshControl,
+  Modal,
+  TextInput,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { fetchShortlists, toggleShortlist, ShortlistEntry } from "@/utils/engagementUtil";
+import {
+  fetchShortlists,
+  toggleShortlist,
+  fetchNote,
+  setNote,
+  ShortlistEntry,
+} from "@/utils/engagementUtil";
 import { useToast } from "@/providers/ToastContext";
 import ScreenContainer from "@components/common/ScreenContainer";
 
 export function ShortlistsScreen() {
   const navigation = useNavigation();
   const toast = useToast();
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [draftNote, setDraftNote] = useState<string>("");
   const {
     data: shortlists = [],
     isLoading,
@@ -31,6 +42,26 @@ export function ShortlistsScreen() {
     queryKey: ["shortlists"],
     queryFn: () => fetchShortlists(),
   });
+
+  // Load notes for visible shortlist entries
+  useEffect(() => {
+    let canceled = false;
+    (async () => {
+      const updates: Record<string, string> = {};
+      for (const e of shortlists) {
+        try {
+          const n = await fetchNote(e.userId);
+          if (n?.note) updates[e.userId] = n.note;
+        } catch {}
+      }
+      if (!canceled && Object.keys(updates).length) {
+        setNotes((prev) => ({ ...prev, ...updates }));
+      }
+    })();
+    return () => {
+      canceled = true;
+    };
+  }, [shortlists.length]);
 
   const onRemove = async (userId: string, fullName?: string) => {
     Alert.alert(
@@ -62,7 +93,9 @@ export function ShortlistsScreen() {
   };
 
   const renderShortlistItem = ({ item }: { item: ShortlistEntry }) => {
-    const profileImage = Array.isArray(item.profileImageUrls) && item.profileImageUrls[0];
+    const profileImage =
+      Array.isArray(item.profileImageUrls) && item.profileImageUrls[0];
+    const note = notes[item.userId] || "";
 
     return (
       <TouchableOpacity
@@ -92,6 +125,13 @@ export function ShortlistsScreen() {
             <Text style={styles.date}>
               Added {new Date(item.createdAt).toLocaleDateString()}
             </Text>
+            {note ? (
+              <Text numberOfLines={2} style={styles.note}>
+                📝 {note}
+              </Text>
+            ) : (
+              <Text style={styles.notePlaceholder}>Add a note…</Text>
+            )}
           </View>
 
           <TouchableOpacity
@@ -100,6 +140,16 @@ export function ShortlistsScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="heart-dislike" size={20} color="#ef4444" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.noteButton}
+            onPress={() => {
+              setEditingUserId(item.userId);
+              setDraftNote(note);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="create-outline" size={20} color="#6b7280" />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -165,6 +215,55 @@ export function ShortlistsScreen() {
           />
         }
       />
+
+      {/* Edit Note Modal */}
+      <Modal
+        visible={!!editingUserId}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditingUserId(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Note</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Write a personal note about this user"
+              placeholderTextColor="#9ca3af"
+              multiline
+              value={draftNote}
+              onChangeText={setDraftNote}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setEditingUserId(null)}
+                style={[styles.modalButton, styles.modalCancel]}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!editingUserId) return;
+                  const ok = await setNote(editingUserId, draftNote.trim());
+                  if (ok) {
+                    setNotes((prev) => ({
+                      ...prev,
+                      [editingUserId]: draftNote.trim(),
+                    }));
+                    toast.show("Note saved", "success");
+                    setEditingUserId(null);
+                  } else {
+                    toast.show("Failed to save note", "error");
+                  }
+                }}
+                style={[styles.modalButton, styles.modalSave]}
+              >
+                <Text style={styles.modalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -186,6 +285,17 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: "#6b7280",
+  },
+  note: {
+    fontSize: 12,
+    color: "#374151",
+    marginTop: 4,
+  },
+  notePlaceholder: {
+    fontSize: 12,
+    color: "#9ca3af",
+    marginTop: 4,
+    fontStyle: "italic",
   },
   listContainer: {
     flexGrow: 1,
@@ -243,6 +353,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "#fef2f2",
   },
+  noteButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+  },
   emptyContainer: {
     flex: 1,
     alignItems: "center",
@@ -284,6 +400,57 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    padding: 16,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  modalTitle: {
+    fontFamily: "Boldonse-Regular",
+    fontSize: 18,
+    color: "#111827",
+    marginBottom: 12,
+  },
+  modalInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 12,
+    color: "#111827",
+    textAlignVertical: "top",
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 12,
+    gap: 8,
+  },
+  modalButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  modalCancel: {
+    backgroundColor: "#f3f4f6",
+  },
+  modalSave: {
+    backgroundColor: "#ef4444",
+  },
+  modalCancelText: {
+    color: "#374151",
+    fontWeight: "600",
+  },
+  modalSaveText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });
 

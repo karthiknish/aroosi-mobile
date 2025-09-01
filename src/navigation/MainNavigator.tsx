@@ -35,6 +35,7 @@ import IcebreakersScreen from "@screens/main/IcebreakersScreen";
 import ContactScreen from "@screens/support/ContactScreen";
 import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
+import { TabBarProvider } from "@contexts/TabBarContext";
 
 // Placeholder screens for now
 import { View, Text } from "react-native";
@@ -221,87 +222,91 @@ function MatchesStackNavigator() {
 
 export default function MainNavigator() {
   const insets = useSafeAreaInsets();
+  const baseHeight = 60;
+  const computedTabHeight = baseHeight + insets.bottom;
   return (
-    <Tab.Navigator
-      id={undefined}
-      screenOptions={({
-        route,
-      }: {
-        route: RouteProp<MainTabParamList, keyof MainTabParamList>;
-      }): BottomTabNavigationOptions => ({
-        tabBarIcon: ({
-          focused,
-          color,
-          size,
+    <TabBarProvider height={computedTabHeight}>
+      <Tab.Navigator
+        id={undefined}
+        screenOptions={({
+          route,
         }: {
-          focused: boolean;
-          color: string;
-          size: number;
-        }) => {
-          let iconName: keyof typeof Ionicons.glyphMap = "home";
+          route: RouteProp<MainTabParamList, keyof MainTabParamList>;
+        }): BottomTabNavigationOptions => ({
+          tabBarIcon: ({
+            focused,
+            color,
+            size,
+          }: {
+            focused: boolean;
+            color: string;
+            size: number;
+          }) => {
+            let iconName: keyof typeof Ionicons.glyphMap = "home";
 
-          if (route.name === "Search") {
-            iconName = focused ? "search" : "search-outline";
-          } else if (route.name === "Matches") {
-            iconName = focused ? "heart" : "heart-outline";
-          } else if (route.name === "Chat") {
-            iconName = focused ? "chatbubbles" : "chatbubbles-outline";
-          } else if (route.name === "ProfileTab") {
-            iconName = focused ? "person" : "person-outline";
-          } else if (route.name === "Premium") {
-            iconName = focused ? "star" : "star-outline";
-          }
+            if (route.name === "Search") {
+              iconName = focused ? "search" : "search-outline";
+            } else if (route.name === "Matches") {
+              iconName = focused ? "heart" : "heart-outline";
+            } else if (route.name === "Chat") {
+              iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+            } else if (route.name === "ProfileTab") {
+              iconName = focused ? "person" : "person-outline";
+            } else if (route.name === "Premium") {
+              iconName = focused ? "star" : "star-outline";
+            }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        ...tabBarAnimationConfig.screenOptions,
-        tabBarLabelStyle: {
-          ...tabBarAnimationConfig.screenOptions.tabBarLabelStyle,
-          fontWeight: "500",
-        },
-        tabBarStyle: {
-          ...tabBarAnimationConfig.screenOptions.tabBarStyle,
-          // Ensure the tab bar sits fully inside the safe area on devices with a home indicator
-          paddingBottom: (
-            tabBarAnimationConfig.screenOptions.tabBarStyle as any
-          )?.paddingBottom
-            ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
-                .paddingBottom + insets.bottom
-            : insets.bottom + 5,
-          height: (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
-            ?.height
-            ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any).height +
-              insets.bottom
-            : 60 + insets.bottom,
-        },
-        headerShown: false,
-      })}
-    >
-      <Tab.Screen
-        name="Search"
-        component={withSC(SearchScreen)}
-        options={{ title: "Browse" }}
-      />
-      <Tab.Screen
-        name="Matches"
-        component={MatchesStackNavigator}
-        options={{ title: "Matches" }}
-      />
-      <Tab.Screen
-        name="Chat"
-        component={ChatStackNavigator}
-        options={{ title: "Messages" }}
-      />
-      <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
-        options={{ title: "Profile" }}
-      />
-      <Tab.Screen
-        name="Premium"
-        component={withSC(SubscriptionScreen)}
-        options={{ title: "Premium" }}
-      />
-    </Tab.Navigator>
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          ...tabBarAnimationConfig.screenOptions,
+          tabBarLabelStyle: {
+            ...tabBarAnimationConfig.screenOptions.tabBarLabelStyle,
+            fontWeight: "500",
+          },
+          tabBarStyle: {
+            ...tabBarAnimationConfig.screenOptions.tabBarStyle,
+            // Ensure the tab bar sits fully inside the safe area on devices with a home indicator
+            paddingBottom: (
+              tabBarAnimationConfig.screenOptions.tabBarStyle as any
+            )?.paddingBottom
+              ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
+                  .paddingBottom + insets.bottom
+              : insets.bottom + 5,
+            height: (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
+              ?.height
+              ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
+                  .height + insets.bottom
+              : computedTabHeight,
+          },
+          headerShown: false,
+        })}
+      >
+        <Tab.Screen
+          name="Search"
+          component={withSC(SearchScreen)}
+          options={{ title: "Browse" }}
+        />
+        <Tab.Screen
+          name="Matches"
+          component={MatchesStackNavigator}
+          options={{ title: "Matches" }}
+        />
+        <Tab.Screen
+          name="Chat"
+          component={ChatStackNavigator}
+          options={{ title: "Messages" }}
+        />
+        <Tab.Screen
+          name="ProfileTab"
+          component={ProfileStackNavigator}
+          options={{ title: "Profile" }}
+        />
+        <Tab.Screen
+          name="Premium"
+          component={withSC(SubscriptionScreen)}
+          options={{ title: "Premium" }}
+        />
+      </Tab.Navigator>
+    </TabBarProvider>
   );
 }

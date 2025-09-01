@@ -1,6 +1,6 @@
 import React from "react";
 import ScreenContainer from "./ScreenContainer";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useTabBarHeight } from "@contexts/TabBarContext";
 
 /**
  * Higher-order component that wraps a screen in `ScreenContainer`.
@@ -14,7 +14,7 @@ export default function withScreenContainer<P extends object>(
   const { showsVerticalScrollIndicator = false } = options;
 
   const ComponentWithContainer: React.FC<P> = (props: P) => {
-    const tabBarHeight = useBottomTabBarHeight?.() || 0;
+    const tabBarHeight = useTabBarHeight();
     return (
       <ScreenContainer
         showsVerticalScrollIndicator={showsVerticalScrollIndicator}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchShortlists, toggleShortlist } from "@/utils/engagementUtil";
 import { useToast } from "@/providers/ToastContext";
@@ -11,10 +12,14 @@ interface ProfileActionsProps {
   onShortlistChange?: (isShortlisted: boolean) => void;
 }
 
-export function ProfileActions({ toUserId, onShortlistChange }: ProfileActionsProps) {
+export function ProfileActions({
+  toUserId,
+  onShortlistChange,
+}: ProfileActionsProps) {
   const [loading, setLoading] = useState(false);
   const [isShortlisted, setIsShortlisted] = useState<boolean | null>(null);
   const toast = useToast();
+  const navigation = useNavigation<any>();
 
   useEffect(() => {
     let mounted = true;
@@ -59,11 +64,18 @@ export function ProfileActions({ toUserId, onShortlistChange }: ProfileActionsPr
           "You've reached your shortlist limit for your plan. Upgrade to add more.",
           [
             { text: "Cancel", style: "cancel" },
-            { text: "Upgrade", onPress: () => {
-              // Navigate to subscription screen
-              // This would need to be implemented based on your navigation setup
-              console.log("Navigate to subscription");
-            }}
+            {
+              text: "Upgrade",
+              onPress: () => {
+                // Navigate to subscription / premium tab
+                try {
+                  navigation.navigate("Premium" as never);
+                } catch {
+                  // Fallback: log only
+                  console.log("Navigate to subscription");
+                }
+              },
+            },
           ]
         );
       } else {
@@ -74,14 +86,16 @@ export function ProfileActions({ toUserId, onShortlistChange }: ProfileActionsPr
     }
   };
 
-  const buttonText = isShortlisted ? "Remove from Shortlist" : "Add to Shortlist";
+  const buttonText = isShortlisted
+    ? "Remove from Shortlist"
+    : "Add to Shortlist";
   return (
     <View style={styles.container}>
       <TouchableOpacity
         style={[
           styles.button,
           isShortlisted && styles.buttonShortlisted,
-          loading && styles.buttonDisabled
+          loading && styles.buttonDisabled,
         ]}
         onPress={onToggleShortlist}
         disabled={loading}
@@ -93,10 +107,12 @@ export function ProfileActions({ toUserId, onShortlistChange }: ProfileActionsPr
             size={20}
             color={isShortlisted ? "#dc2626" : "#ef4444"}
           />
-          <Text style={[
-            styles.buttonText,
-            isShortlisted && styles.buttonTextShortlisted
-          ]}>
+          <Text
+            style={[
+              styles.buttonText,
+              isShortlisted && styles.buttonTextShortlisted,
+            ]}
+          >
             {loading ? "Updating..." : buttonText}
           </Text>
         </View>
