@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   ScrollView,
   ScrollViewProps,
@@ -6,7 +6,10 @@ import {
   StyleSheet,
   ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { Colors } from "@constants";
 import { GradientBackground } from "@/components/ui/GradientComponents";
 
@@ -38,10 +41,19 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   footer,
   ...scrollViewProps
 }) => {
+  const insets = useSafeAreaInsets();
+  const [footerHeight, setFooterHeight] = useState(0);
+
+  const contentPaddingBottom = useMemo(() => {
+    // Reserve space for footer height + bottom inset + small gap
+    return (footer ? footerHeight : 0) + insets.bottom + 8;
+  }, [footer, footerHeight, insets.bottom]);
+
   return (
     <SafeAreaView
       style={[styles.safeArea, containerStyle] as any}
-      edges={["top", "right", "left", "bottom"]}
+      // Handle top/left/right insets here; bottom inset will be applied to footer container
+      edges={["top", "right", "left"]}
     >
       <GradientBackground
         colors={Colors.gradient.secondary as any}
@@ -49,14 +61,32 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
       >
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={[styles.content, contentStyle] as any}
+          contentContainerStyle={
+            [
+              styles.content,
+              { paddingBottom: contentPaddingBottom },
+              contentStyle,
+            ] as any
+          }
           showsVerticalScrollIndicator={showsVerticalScrollIndicator}
           keyboardShouldPersistTaps="handled"
           {...scrollViewProps}
         >
           {children}
         </ScrollView>
-        {footer ? footer : null}
+
+        {footer ? (
+          <SafeAreaView
+            // Only apply bottom inset here so the footer hugs the safe edge
+            edges={["bottom"]}
+            style={
+              [styles.footerOverlay, { paddingBottom: insets.bottom }] as any
+            }
+            onLayout={(e) => setFooterHeight(e.nativeEvent.layout.height)}
+          >
+            {footer}
+          </SafeAreaView>
+        ) : null}
       </GradientBackground>
     </SafeAreaView>
   );
@@ -65,7 +95,8 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "transparent",
+    // Ensure the top safe area isn't white if gradient doesn't paint behind insets
+    backgroundColor: Colors.background.primary,
   },
   gradient: {
     flex: 1,
@@ -75,6 +106,13 @@ const styles = StyleSheet.create({
   },
   content: {
     minHeight: height,
+  },
+  footerOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // Let the provided footer style dictate visuals; this just positions it
   },
 });
 

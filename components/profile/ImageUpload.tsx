@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -63,9 +63,10 @@ export default function ImageUpload({
   const local = useLocalPhotoManagement();
   const isLocal = mode === "local";
 
-  const images = (isLocal
-    ? (local.images as any)
-    : (remote.images as any)) as (ProfileImage | LocalImageType)[];
+  const images = (isLocal ? (local.images as any) : (remote.images as any)) as (
+    | ProfileImage
+    | LocalImageType
+  )[];
   const isLoading = isLocal ? false : remote.isLoading;
   const isUploading = isLocal ? local.uploading : remote.isUploading;
   const uploadProgress = isLocal ? 0 : remote.uploadProgress;
@@ -84,32 +85,58 @@ export default function ImageUpload({
   const [currentTempId, setCurrentTempId] = useState<string | null>(null);
   const toast = useToast();
 
-  // Notify parent component of image changes
-  React.useEffect(() => {
-    // Only pass remote-compatible shape to parent to avoid type mismatch
-    if (!onImagesChange) return;
+  // Normalize images and notify parent only when actual content changes to avoid loops
+  const normalizedForParent: ProfileImage[] = useMemo(() => {
     if (isLocal) {
-      // Map LocalImageType to minimal ProfileImage shape expected elsewhere
-      const mapped = (images as LocalImageType[]).map((img) => ({
+      return (images as LocalImageType[]).map((img) => ({
         _id: img.id,
         id: img.id,
         url: img.url,
         storageId: img.storageId,
       })) as unknown as ProfileImage[];
-      onImagesChange(mapped);
-    } else {
-      onImagesChange(images as ProfileImage[]);
     }
-  }, [images, onImagesChange, isLocal]);
+    return images as ProfileImage[];
+  }, [images, isLocal]);
+
+  const imagesSignature = useMemo(() => {
+    // Signature based on length + ids + first/last urls to avoid heavy JSON, good enough to detect changes
+    const ids = normalizedForParent.map((i) => getImageId(i)).join("|");
+    const first = normalizedForParent[0]?.url ?? "";
+    const last = normalizedForParent[normalizedForParent.length - 1]?.url ?? "";
+    return `${normalizedForParent.length}#${ids}#${first}#${last}`;
+  }, [normalizedForParent]);
+
+  const lastSignatureRef = useRef<string>("");
+  const onImagesChangeRef = useRef<typeof onImagesChange>(onImagesChange);
+
+  // Keep a stable ref to the callback so the effect doesn't re-run on every new function instance
+  useEffect(() => {
+    onImagesChangeRef.current = onImagesChange;
+  }, [onImagesChange]);
+
+  useEffect(() => {
+    if (!onImagesChange) return;
+    if (lastSignatureRef.current === imagesSignature) return;
+    lastSignatureRef.current = imagesSignature;
+    onImagesChangeRef.current?.(normalizedForParent);
+    // Intentionally exclude onImagesChange from deps to avoid effect firing due to changing callback ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesSignature, normalizedForParent]);
 
   // Reflect global uploadProgress on most recent local tile
   useEffect(() => {
     if (!currentTempId) return;
-    setLocalUploads((prev) =>
-      prev.map((u) =>
-        u.id === currentTempId ? { ...u, progress: uploadProgress } : u
-      )
-    );
+    let changed = false;
+    setLocalUploads((prev) => {
+      const next = prev.map((u) => {
+        if (u.id === currentTempId && u.progress !== uploadProgress) {
+          changed = true;
+          return { ...u, progress: uploadProgress };
+        }
+        return u;
+      });
+      return changed ? next : prev;
+    });
   }, [uploadProgress, currentTempId]);
 
   const handleImagePicker = () => {
@@ -260,7 +287,9 @@ export default function ImageUpload({
       }
     }
     // Fallback: reorder
-    const ids = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
+    const ids = (images as ProfileImage[]).map((img: ProfileImage) =>
+      getImageId(img)
+    );
     const [picked] = ids.splice(idx, 1);
     const newOrder = [picked, ...ids];
     await remote.reorderImages(newOrder);
@@ -277,7 +306,9 @@ export default function ImageUpload({
       await local.reorderPhotos(next);
       return;
     }
-    const ids = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
+    const ids = (images as ProfileImage[]).map((img: ProfileImage) =>
+      getImageId(img)
+    );
     const [moved] = ids.splice(fromIdx, 1);
     ids.splice(toIdx, 0, moved);
     await remote.reorderImages(ids);
@@ -298,7 +329,9 @@ export default function ImageUpload({
         .filter((it) => it.type === "image")
         .map((it) => getImageId((it as any).image as ProfileImage));
       // Only call if order actually changed
-      const currentOrder = (images as ProfileImage[]).map((img: ProfileImage) => getImageId(img));
+      const currentOrder = (images as ProfileImage[]).map((img: ProfileImage) =>
+        getImageId(img)
+      );
       const changed =
         newOrder.length === currentOrder.length &&
         newOrder.some((id, i) => id !== currentOrder[i]);
@@ -307,13 +340,14 @@ export default function ImageUpload({
         PlatformHaptics.success();
       }
     } catch (e) {
-      console.error("Drag reorder failed", e);
+      // swallow reorder error; hook or API layer should surface failures as needed
     }
   };
 
   type GridItem =
     | { key: string; type: "upload"; uri: string; progress: number }
-    | { key: string; type: "image"; image: ProfileImage };
+    | { key: string; type: "image"; image: ProfileImage }
+    | { key: "add"; type: "add" };
 
   const gridData: GridItem[] = useMemo(() => {
     const uploads = localUploads.map(
@@ -326,9 +360,12 @@ export default function ImageUpload({
         } as GridItem)
     );
     const imgs = images.map(
-      (img: any) => ({ key: getImageId(img as any), type: "image", image: img } as GridItem)
+      (img: any) =>
+        ({ key: getImageId(img as any), type: "image", image: img } as GridItem)
     );
-    return [...uploads, ...imgs];
+    const canAdd = images.length + localUploads.length < maxImages;
+    const addTile: GridItem[] = canAdd ? [{ key: "add", type: "add" }] : [];
+    return [...uploads, ...imgs, ...addTile];
   }, [localUploads, images]);
 
   const renderGridTile = (
@@ -337,6 +374,13 @@ export default function ImageUpload({
     drag?: () => void,
     isActive?: boolean
   ) => {
+    if (item.type === "add") {
+      return (
+        <View key={item.key} style={styles.imageContainer}>
+          {renderAddButton()}
+        </View>
+      );
+    }
     if (item.type === "upload") {
       return (
         <View key={item.key} style={styles.imageContainer}>
@@ -408,7 +452,7 @@ export default function ImageUpload({
     <TouchableOpacity
       style={styles.addButton}
       onPress={handleImagePicker}
-      disabled={isUploading || images.length >= maxImages}
+      disabled={isUploading || images.length + localUploads.length >= maxImages}
     >
       {isUploading ? (
         <View style={styles.uploadingContainer}>
@@ -479,7 +523,6 @@ export default function ImageUpload({
           contentContainerStyle={styles.imageList}
         >
           {gridData.map((item, idx) => renderGridTile(item, idx))}
-          {images.length + localUploads.length < maxImages && renderAddButton()}
         </ScrollView>
       )}
 
@@ -536,6 +579,26 @@ export default function ImageUpload({
       {required && images.length === 0 && (
         <Text style={styles.errorText}>At least one photo is required</Text>
       )}
+
+      {/* Delete confirmations */}
+      <ConfirmModal
+        visible={confirmVisible}
+        title="Delete photo?"
+        message="This action cannot be undone."
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+        confirmLabel="Delete"
+        destructive
+      />
+      <ConfirmModal
+        visible={batchConfirmVisible}
+        title="Delete selected photos?"
+        message="This action cannot be undone."
+        onCancel={() => setBatchConfirmVisible(false)}
+        onConfirm={confirmBatchDelete}
+        confirmLabel="Delete"
+        destructive
+      />
     </View>
   );
 }
