@@ -148,6 +148,7 @@ export interface SearchFilters {
 
   // Pagination
   pageSize?: number;
+  cursor?: string;
 }
 
 export interface ProfileSearchResult {
@@ -172,6 +173,7 @@ export interface SearchResponse {
   total: number;
   hasMore: boolean;
   nextPage?: number | null;
+  nextCursor?: string | null;
 }
 
 // Interest system types (aligned with auto-matching)

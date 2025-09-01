@@ -1,5 +1,13 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Modal,
+} from "react-native";
 import { Colors } from "@constants";
 
 type ToastType = "success" | "error" | "info";
@@ -159,25 +167,37 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children, maxVisib
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {/* Toast Portal (Top overlay) */}
-      <View pointerEvents="box-none" style={StyleSheet.absoluteFill} >
-        <View pointerEvents="box-none" style={styles.portalTop}>
-          {current && (
-            <Animated.View
-              style={[
-                styles.toast,
-                stylesByType(current.type),
-                { opacity, transform: [{ translateY }] },
-              ]}
-            >
-              <Text style={styles.toastText}>{current.text}</Text>
-              <TouchableOpacity onPress={hide} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={styles.toastAction}>Dismiss</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
+      {/* Toast Portal (Top overlay) - use Modal so it appears above other Modals (e.g., BottomSheet) */}
+      <Modal
+        visible={!!current}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        // presentationStyle keeps iOS behavior consistent
+        presentationStyle="overFullScreen"
+      >
+        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          <View pointerEvents="box-none" style={styles.portalTop}>
+            {current && (
+              <Animated.View
+                style={[
+                  styles.toast,
+                  stylesByType(current.type),
+                  { opacity, transform: [{ translateY }] },
+                ]}
+              >
+                <Text style={styles.toastText}>{current.text}</Text>
+                <TouchableOpacity
+                  onPress={hide}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.toastAction}>Dismiss</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+          </View>
         </View>
-      </View>
+      </Modal>
     </ToastContext.Provider>
   );
 };

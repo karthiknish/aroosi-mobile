@@ -325,18 +325,31 @@ class ApiClient {
     if (filters.heightMin) params.append("heightMin", filters.heightMin);
     if (filters.heightMax) params.append("heightMax", filters.heightMax);
 
+    // Cursor-based pagination preferred by web API
+    if (filters.cursor) params.append("cursor", String(filters.cursor));
     const response = await this.request(`/search?${params}`);
 
     if (response.success && response.data) {
       const base: any = response.data as any;
       const envelope = base?.data ?? base;
+      const profiles = Array.isArray(envelope?.profiles)
+        ? envelope.profiles
+        : [];
+      const total = typeof envelope?.total === "number" ? envelope.total : 0;
+      const nextCursor = envelope?.nextCursor ?? null;
+      const nextPage = envelope?.nextPage ?? null;
+      const hasMore =
+        typeof nextCursor === "string"
+          ? nextCursor.length > 0
+          : !!envelope?.hasMore;
       return {
         success: true,
         data: {
-          profiles: Array.isArray(envelope?.profiles) ? envelope.profiles : [],
-          total: typeof envelope?.total === "number" ? envelope.total : 0,
-          hasMore: !!envelope?.hasMore,
-          nextPage: envelope?.nextPage ?? null,
+          profiles,
+          total,
+          hasMore,
+          nextPage,
+          nextCursor,
         },
       };
     }

@@ -281,6 +281,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
               clearInterval(emailPollIntervalRef.current);
               emailPollIntervalRef.current = null;
             }
+            // Force-refresh ID token so any backend relying on token state/claims gets latest
+            try {
+              await current.getIdToken(true);
+            } catch {}
             await refreshUser();
             return;
           }

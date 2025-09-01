@@ -607,15 +607,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
         contentStyle={styles.contentStyle}
       >
-        <View
-          style={[
-            styles.header,
-            {
-              backgroundColor: theme.colors.background.primary,
-              borderBottomColor: theme.colors.border.primary,
-            },
-          ]}
-        >
+        <View style={styles.header}>
           <Text
             style={[styles.headerTitle, { color: theme.colors.text.primary }]}
           >
@@ -667,15 +659,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
       >
         {/* Header */}
         <FadeInView>
-          <View
-            style={[
-              styles.header,
-              {
-                backgroundColor: theme.colors.background.primary,
-                borderBottomColor: theme.colors.border.primary,
-              },
-            ]}
-          >
+          <View style={styles.header}>
             <SlideInView direction="left" delay={100}>
               <Text
                 style={[
@@ -835,12 +819,13 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
-    backgroundColor: Colors.background.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
+    // Make header background transparent to avoid white box at top
+    backgroundColor: "transparent",
+    borderBottomWidth: 0,
   },
   headerTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
+    // Use Boldonse font for the title
+    fontFamily: "Boldonse-Regular",
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,

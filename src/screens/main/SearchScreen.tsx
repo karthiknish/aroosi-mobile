@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { useApiClient } from "@/utils/api";
 import { useAuth } from "@contexts/AuthProvider";
 import { Colors, Layout } from "@constants";
@@ -20,7 +20,7 @@ import {
   SlideInView,
   AnimatedButton,
 } from "@/components/ui/AnimatedComponents";
-import { SearchFilters } from "@/types/profile";
+import { SearchFilters, SearchResponse } from "@/types/profile";
 import PaywallModal from "@components/subscription/PaywallModal";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { getPlans } from "@services/subscriptions";
@@ -112,7 +112,6 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   const [ethnicity, setEthnicity] = useState("any");
   const [motherTongue, setMotherTongue] = useState("any");
   const [language, setLanguage] = useState("any");
-  const [page, setPage] = useState(0);
   const [pageSize] = useState(12);
   const [showFilters, setShowFilters] = useState(false);
   // const [refreshing, setRefreshing] = useState(false);
@@ -183,30 +182,46 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   );
 
   const {
-    data: searchResults,
+    data: infiniteData,
     isLoading,
     error,
     refetch,
     isFetching,
-  } = useQuery({
-    queryKey: ["searchProfiles", filters, page, pageSize],
-    queryFn: async () => {
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<
+    SearchResponse,
+    Error,
+    InfiniteData<SearchResponse, string | undefined>,
+    (string | number | SearchFilters)[],
+    string | undefined
+  >({
+    queryKey: ["searchProfiles", filters, pageSize],
+    queryFn: async ({ pageParam }) => {
       const response = await apiClient.searchProfiles(
-        { ...filters, pageSize },
-        page
+        { ...filters, pageSize, cursor: pageParam as any },
+        0
       );
       if (response.success && response.data) {
         return response.data;
       }
       throw new Error("Failed to fetch search results");
     },
+    getNextPageParam: (lastPage) => lastPage?.nextCursor || undefined,
+    initialPageParam: undefined,
     enabled: !!userId,
     retry: 2,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
-  const { profiles = [], total = 0 } = searchResults || {};
-  const totalPages = Math.ceil(total / pageSize);
+  const profiles = useMemo(
+    () =>
+      (infiniteData?.pages || []).flatMap((p: SearchResponse) =>
+        Array.isArray(p?.profiles) ? p.profiles : []
+      ),
+    [infiniteData]
+  );
 
   // Locally track uninterested profiles to avoid resurfacing within session
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
@@ -221,7 +236,6 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   // };
 
   const handleFilterChange = (field: string, value: string) => {
-    setPage(0);
     switch (field) {
       case "city":
         setCity(value);
@@ -683,9 +697,8 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           <SwipeDeck
             data={filteredProfiles}
             onEnd={() => {
-              if (!isFetching && page < totalPages - 1) {
-                setPage((p) => p + 1);
-                refetch();
+              if (!isFetchingNextPage && hasNextPage) {
+                fetchNextPage();
               }
             }}
             onOpenProfile={(id) => handleProfilePress(id)}
@@ -729,7 +742,6 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                   setEthnicity("any");
                   setMotherTongue("any");
                   setLanguage("any");
-                  setPage(0);
                   refetch();
                 }}
               />

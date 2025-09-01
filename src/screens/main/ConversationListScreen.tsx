@@ -73,14 +73,12 @@ export default function ConversationListScreen({
   };
 
   const handleConversationPress = (conversation: NormalizedConversation) => {
-    // Since participants is string[], find the participant that is not the current user
-    const otherParticipantId = conversation.participants?.find(
-      (p) => p !== userId
-    );
+    const { id: otherParticipantId, name: otherParticipantName } =
+      getOtherParticipantInfo(conversation, userId as any);
 
     navigation.navigate("Chat", {
       conversationId: (conversation as any)._id || (conversation as any).id,
-      partnerName: otherParticipantId || "Unknown",
+      partnerName: otherParticipantName || otherParticipantId || "Unknown",
       partnerId: otherParticipantId,
     });
   };
@@ -105,9 +103,11 @@ export default function ConversationListScreen({
   };
 
   const renderConversation = (conversation: NormalizedConversation) => {
-    const otherParticipantId = conversation.participants?.find(
-      (p) => p !== userId
-    );
+    const {
+      id: otherParticipantId,
+      name: otherParticipantName,
+      initial,
+    } = getOtherParticipantInfo(conversation, userId as any);
 
     const unreadCount = (conversation as any).unreadCount || 0;
     const hasUnread = unreadCount > 0;
@@ -129,9 +129,7 @@ export default function ConversationListScreen({
       >
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {otherParticipantId?.charAt(0) || "?"}
-            </Text>
+            <Text style={styles.avatarText}>{initial}</Text>
           </View>
           {hasUnread && <View style={styles.unreadDot} />}
         </View>
@@ -144,7 +142,7 @@ export default function ConversationListScreen({
                 hasUnread && styles.unreadParticipantName,
               ]}
             >
-              {otherParticipantId || "Unknown User"}
+              {otherParticipantName || otherParticipantId || "Unknown User"}
             </Text>
 
             {lastMessage && (
@@ -275,6 +273,53 @@ export default function ConversationListScreen({
       </ScreenContainer>
     </ErrorBoundary>
   );
+}
+
+function getOtherParticipantInfo(
+  conversation: any,
+  currentUserId?: string
+): { id?: string; name?: string; initial: string } {
+  // Participants array may be string[] of userIds
+  const participants: any[] = Array.isArray(conversation?.participants)
+    ? conversation.participants
+    : [];
+  const otherId: any = participants.find((p) => p && p !== currentUserId);
+
+  // Profiles array might carry names
+  const profiles: any[] = Array.isArray(conversation?.profiles)
+    ? conversation.profiles
+    : [];
+  const profileForOther = profiles.find(
+    (p) => p?.userId === otherId || p?.id === otherId
+  );
+  const nameFromProfile = profileForOther?.fullName || profileForOther?.name;
+
+  // Some APIs may embed a 'partner' object
+  const partner = conversation?.partner || conversation?.otherParticipant;
+  const partnerName =
+    partner?.fullName || partner?.name || partner?.email?.split("@")[0];
+
+  const name: string | undefined =
+    typeof nameFromProfile === "string"
+      ? nameFromProfile
+      : typeof partnerName === "string"
+      ? partnerName
+      : typeof otherId === "string"
+      ? otherId
+      : undefined;
+
+  const initial =
+    typeof name === "string" && name.length > 0
+      ? name.trim().charAt(0).toUpperCase()
+      : typeof otherId === "string" && otherId.length > 0
+      ? otherId.trim().charAt(0).toUpperCase()
+      : "?";
+
+  return {
+    id: typeof otherId === "string" ? otherId : undefined,
+    name,
+    initial,
+  };
 }
 
 const styles = StyleSheet.create({
