@@ -23,6 +23,8 @@ interface ScreenContainerProps extends ScrollViewProps {
   contentStyle?: ViewStyle | ViewStyle[];
   /** Optional sticky footer rendered below the scrollable content */
   footer?: React.ReactNode;
+  /** Extra bottom padding (e.g., tab bar height) added below safe-area + footer */
+  extraContentBottomPadding?: number;
 }
 
 /**
@@ -39,6 +41,7 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   contentStyle,
   showsVerticalScrollIndicator = false,
   footer,
+  extraContentBottomPadding = 0,
   ...scrollViewProps
 }) => {
   const insets = useSafeAreaInsets();
@@ -46,8 +49,13 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
 
   const contentPaddingBottom = useMemo(() => {
     // Reserve space for footer height + bottom inset + small gap
-    return (footer ? footerHeight : 0) + insets.bottom + 8;
-  }, [footer, footerHeight, insets.bottom]);
+    return (
+      (footer ? footerHeight : 0) +
+      insets.bottom +
+      extraContentBottomPadding +
+      8
+    );
+  }, [footer, footerHeight, insets.bottom, extraContentBottomPadding]);
 
   return (
     <SafeAreaView

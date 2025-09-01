@@ -91,6 +91,7 @@
     "axios": "^1.7.9",
     "eventemitter3": "^5.0.1",
     "expo": "53.0.22",
+    "expo-apple-authentication": "~7.2.4",
     "expo-application": "~6.1.5",
     "expo-audio": "~0.4.9",
     "expo-auth-session": "~6.2.1",
@@ -98,6 +99,7 @@
     "expo-calendar": "~14.1.4",
     "expo-constants": "~17.1.7",
     "expo-contacts": "~14.2.5",
+    "expo-crypto": "~14.1.5",
     "expo-dev-client": "5.2.4",
     "expo-device": "~7.1.4",
     "expo-font": "~13.3.2",
@@ -122,6 +124,7 @@
     "react-dom": "19.0.0",
     "react-hook-form": "^7.54.0",
     "react-native": "0.79.5",
+    "react-native-deck-swiper": "^2.0.19",
     "react-native-draggable-flatlist": "^4.0.3",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-iap": "^12.16.3",
@@ -133,9 +136,7 @@
     "react-native-svg": "15.11.2",
     "react-native-toast-message": "^2.3.3",
     "rn-emoji-keyboard": "^1.7.0",
-    "zod": "^3.24.1",
-    "expo-apple-authentication": "~7.2.4",
-    "expo-crypto": "~14.1.5"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -57,7 +57,9 @@ export async function getPlans(): Promise<Plan[]> {
   const startedAt = Date.now();
   console.info('[SUBS] plans:load:start', { scope, correlationId });
   try {
-    const { data } = await http.get<PlansResponse>('/api/subscriptions/plans', { withCredentials: true });
+  const { data } = await http.get<PlansResponse>("/api/stripe/plans", {
+    withCredentials: true,
+  });
     const plans = (data as any)?.plans ?? data ?? [];
     if (!Array.isArray(plans) || plans.length === 0)
       throw new Error("Empty plans response");

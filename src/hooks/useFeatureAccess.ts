@@ -208,8 +208,7 @@ function getFeatureUpgradeMessage(feature: keyof SubscriptionFeatures): string {
       "Upgrade to Premium for monthly boosts or Premium Plus for unlimited boosts",
     // Align with web: profile viewers available starting at Premium
     canViewProfileViewers: "Upgrade to Premium to see who viewed your profile",
-    canUseAdvancedFilters:
-      "Upgrade to Premium Plus for advanced search filters",
+    canUseAdvancedFilters: "Upgrade to Premium for advanced search filters",
     canUseIncognitoMode: "Upgrade to Premium Plus for incognito browsing",
     canAccessPrioritySupport:
       "Upgrade to Premium for priority customer support",

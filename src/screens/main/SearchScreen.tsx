@@ -4,21 +4,14 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   TextInput,
-  RefreshControl,
-  ScrollView,
-  FlatList,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useApiClient } from "@/utils/api";
 import { useAuth } from "@contexts/AuthProvider";
 import { Colors, Layout } from "@constants";
 import { useTheme } from "@contexts/ThemeContext";
-import {
-  FullScreenLoading,
-  ProfileCardSkeleton,
-} from "@/components/ui/LoadingStates";
+import { ProfileCardSkeleton } from "@/components/ui/LoadingStates";
 import { NoSearchResults } from "@/components/ui/EmptyStates";
 import { ErrorBoundary } from "@/components/ui/ErrorHandling";
 import {
@@ -31,6 +24,7 @@ import { SearchFilters } from "@/types/profile";
 import PaywallModal from "@components/subscription/PaywallModal";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { getPlans } from "@services/subscriptions";
+import SwipeDeck from "@components/search/SwipeDeck";
 
 interface SearchScreenProps {
   navigation: any;
@@ -102,13 +96,7 @@ const languageOptions = [
   "Turkish",
 ];
 
-function getAge(dateOfBirth: string): number {
-  if (!dateOfBirth) return 0;
-  const dob = new Date(dateOfBirth);
-  const diff = Date.now() - dob.getTime();
-  const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-  return isNaN(age) ? 0 : age;
-}
+// Age calculated inside SwipeDeck cards when needed
 
 export default function SearchScreen({ navigation }: SearchScreenProps) {
   const { user } = useAuth();
@@ -127,7 +115,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   const [page, setPage] = useState(0);
   const [pageSize] = useState(12);
   const [showFilters, setShowFilters] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  // const [refreshing, setRefreshing] = useState(false);
 
   // Entitlement gating for advanced search
   const { checkFeatureAccess } = useFeatureAccess();
@@ -220,12 +208,17 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
   const { profiles = [], total = 0 } = searchResults || {};
   const totalPages = Math.ceil(total / pageSize);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setPage(0);
-    await refetch();
-    setRefreshing(false);
-  };
+  // Locally track uninterested profiles to avoid resurfacing within session
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  const filteredProfiles = useMemo(
+    () => profiles.filter((p: any) => !dismissedIds.includes(p.userId)),
+    [profiles, dismissedIds]
+  );
+
+  // const handleRefresh = async () => {
+  //   setPage(0);
+  //   await refetch();
+  // };
 
   const handleFilterChange = (field: string, value: string) => {
     setPage(0);
@@ -258,86 +251,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
     navigation.navigate("ProfileDetail", { profileId });
   };
 
-  const renderProfile = ({
-    item: profileResult,
-    index,
-  }: {
-    item: any;
-    index: number;
-  }) => {
-    const age = getAge(profileResult.profile?.dateOfBirth || "");
-
-    return (
-      <FadeInView key={profileResult.userId} delay={index * 100} duration={300}>
-        <ScaleInView delay={index * 50}>
-          <AnimatedButton
-            style={[
-              styles.profileCard,
-              {
-                backgroundColor: theme.colors.background.primary,
-                borderColor: theme.colors.border.primary,
-              },
-            ]}
-            onPress={() => handleProfilePress(profileResult.userId)}
-            animationType="scale"
-            scaleValue={0.98}
-          >
-            <View style={styles.profileImageContainer}>
-              {profileResult.profile?.profileImageUrls?.length > 0 ? (
-                <ScaleInView delay={200 + index * 50} fromScale={0.5}>
-                  <View
-                    style={[
-                      styles.profileImagePlaceholder,
-                      { backgroundColor: theme.colors.neutral[100] },
-                    ]}
-                  >
-                    <Text style={styles.profileImageText}>📷</Text>
-                  </View>
-                </ScaleInView>
-              ) : (
-                <ScaleInView delay={200 + index * 50} fromScale={0.5}>
-                  <View
-                    style={[
-                      styles.profileImagePlaceholder,
-                      { backgroundColor: theme.colors.neutral[100] },
-                    ]}
-                  >
-                    <Text style={styles.profileImageText}>👤</Text>
-                  </View>
-                </ScaleInView>
-              )}
-            </View>
-            <View style={styles.profileInfo}>
-              <Text
-                style={[
-                  styles.profileName,
-                  { color: theme.colors.text.primary },
-                ]}
-              >
-                {profileResult.profile?.fullName || "Unknown"}
-              </Text>
-              <Text
-                style={[
-                  styles.profileAge,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                {age > 0 ? `${age} years old` : "Age not specified"}
-              </Text>
-              <Text
-                style={[
-                  styles.profileLocation,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                {profileResult.profile?.city || "Location not specified"}
-              </Text>
-            </View>
-          </AnimatedButton>
-        </ScaleInView>
-      </FadeInView>
-    );
-  };
+  // List rendering removed (replaced by SwipeDeck)
 
   const renderFilters = () => (
     <SlideInView direction="down" duration={300}>
@@ -365,7 +279,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                 fontWeight: "600",
               }}
             >
-              Advanced filters are a Premium Plus feature
+              Advanced filters are a Premium feature
             </Text>
             <TouchableOpacity
               style={{
@@ -626,39 +540,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
     </SlideInView>
   );
 
-  const renderPagination = () => {
-    if (totalPages <= 1) return null;
-
-    return (
-      <View style={styles.paginationContainer}>
-        <TouchableOpacity
-          style={[
-            styles.paginationButton,
-            page === 0 && styles.paginationButtonDisabled,
-          ]}
-          onPress={() => setPage(Math.max(0, page - 1))}
-          disabled={page === 0}
-        >
-          <Text style={styles.paginationButtonText}>Previous</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.paginationText}>
-          Page {page + 1} of {totalPages}
-        </Text>
-
-        <TouchableOpacity
-          style={[
-            styles.paginationButton,
-            page >= totalPages - 1 && styles.paginationButtonDisabled,
-          ]}
-          onPress={() => setPage(Math.min(totalPages - 1, page + 1))}
-          disabled={page >= totalPages - 1}
-        >
-          <Text style={styles.paginationButtonText}>Next</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+  // Pagination handled by deck end
 
   if (isLoading) {
     return (
@@ -796,24 +678,27 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </View>
         )}
 
-        {/* Content */}
-        <FlatList
-          data={profiles}
-          renderItem={renderProfile}
-          keyExtractor={(item) => item.userId}
-          contentContainerStyle={styles.profilesList}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[theme.colors.primary[500]]}
-              tintColor={theme.colors.primary[500]}
-            />
-          }
-          ListEmptyComponent={
-            error ? (
-              <View style={{ padding: 20, alignItems: "center" }}>
+        {/* Content: Swipe deck */}
+        {filteredProfiles?.length ? (
+          <SwipeDeck
+            data={filteredProfiles}
+            onEnd={() => {
+              if (!isFetching && page < totalPages - 1) {
+                setPage((p) => p + 1);
+                refetch();
+              }
+            }}
+            onOpenProfile={(id) => handleProfilePress(id)}
+            onUninterested={(id) => {
+              setDismissedIds((prev) =>
+                prev.includes(id) ? prev : [...prev, id]
+              );
+            }}
+          />
+        ) : (
+          <View style={{ padding: 20, alignItems: "center" }}>
+            {error ? (
+              <>
                 <Text
                   style={{
                     color: theme.colors.text.secondary,
@@ -833,7 +718,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                 >
                   <Text style={{ color: "white" }}>Retry</Text>
                 </TouchableOpacity>
-              </View>
+              </>
             ) : (
               <NoSearchResults
                 onActionPress={() => {
@@ -848,10 +733,9 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                   refetch();
                 }}
               />
-            )
-          }
-          ListFooterComponent={renderPagination}
-        />
+            )}
+          </View>
+        )}
         {/* Paywall for advanced search */}
         <PaywallModal
           visible={showPaywall}
@@ -997,54 +881,6 @@ const styles = StyleSheet.create({
     color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.base,
     fontWeight: Layout.typography.fontWeight.medium,
-  },
-  profilesList: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  profileCard: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: Layout.radius.lg,
-    padding: Layout.spacing.lg,
-    marginBottom: Layout.spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-  },
-  profileImageContainer: {
-    marginRight: Layout.spacing.md,
-  },
-  profileImagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.neutral[100],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  profileImageText: {
-    fontSize: Layout.typography.fontSize["2xl"],
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.xs,
-  },
-  profileAge: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
-  },
-  profileLocation: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
   },
   paginationContainer: {
     flexDirection: "row",

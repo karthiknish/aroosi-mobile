@@ -6,7 +6,7 @@ import {
   NavigationContainer,
   NavigationContainerRef,
 } from "@react-navigation/native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 
 // Import navigation and providers
@@ -68,7 +68,9 @@ export default function App() {
                     <NavigationContainer ref={navigationRef}>
                       <NotificationProvider navigationRef={navigationRef}>
                         <StatusBar style="auto" />
-                        <EmailVerificationBanner />
+                        <SafeAreaView edges={["top"]}>
+                          <EmailVerificationBanner />
+                        </SafeAreaView>
                         <RootNavigator />
                       </NotificationProvider>
                     </NavigationContainer>

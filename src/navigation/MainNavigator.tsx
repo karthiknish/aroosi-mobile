@@ -39,6 +39,7 @@ import withScreenContainer from "@components/common/withScreenContainer";
 // Placeholder screens for now
 import { View, Text } from "react-native";
 import { RouteProp } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useThemedStyles } from "@contexts/ThemeContext";
 
 const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
@@ -219,6 +220,7 @@ function MatchesStackNavigator() {
 }
 
 export default function MainNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       id={undefined}
@@ -256,6 +258,21 @@ export default function MainNavigator() {
         tabBarLabelStyle: {
           ...tabBarAnimationConfig.screenOptions.tabBarLabelStyle,
           fontWeight: "500",
+        },
+        tabBarStyle: {
+          ...tabBarAnimationConfig.screenOptions.tabBarStyle,
+          // Ensure the tab bar sits fully inside the safe area on devices with a home indicator
+          paddingBottom: (
+            tabBarAnimationConfig.screenOptions.tabBarStyle as any
+          )?.paddingBottom
+            ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
+                .paddingBottom + insets.bottom
+            : insets.bottom + 5,
+          height: (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
+            ?.height
+            ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any).height +
+              insets.bottom
+            : 60 + insets.bottom,
         },
         headerShown: false,
       })}
