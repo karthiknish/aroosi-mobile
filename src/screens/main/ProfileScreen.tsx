@@ -136,12 +136,13 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   }, [subscription]);
 
   const { data: profileViewers = [] } = useQuery<any[]>({
-    queryKey: ["profileViewers"],
+    queryKey: ["profileViewers", profile?._id],
     queryFn: async () => {
-      const response = await apiClient.getProfileViewers(userId as string);
+      if (!profile?._id) return [] as any[];
+      const response = await apiClient.getProfileViewers(profile._id as string);
       return response.success ? (response.data as any[]) : [];
     },
-    enabled: !!userId && canViewProfileViewers,
+    enabled: !!profile?._id && canViewProfileViewers,
   });
 
   // Delete profile mutation
@@ -693,12 +694,17 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               }}
             >
               {profileImages.map((image: any, index: number) => (
-                <View key={image.id || index} style={styles.imageContainer}>
+                <View
+                  key={(image && (image.id || image._id)) || index}
+                  style={styles.imageContainer}
+                >
                   <Image
-                    source={{ uri: image.url }}
+                    source={{
+                      uri: typeof image === "string" ? image : image?.url,
+                    }}
                     style={styles.profileImage}
                   />
-                  {image.isMain && (
+                  {image?.isMain && (
                     <View
                       style={[
                         styles.mainBadge,

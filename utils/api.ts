@@ -169,7 +169,11 @@ class ApiClient {
 
   // Profile APIs
   async getProfile(): Promise<ApiResponse<Profile>> {
-    return this.request<Profile>("/profile");
+    const res = await this.request<any>("/profile");
+    if (!res.success) return res as ApiResponse<Profile>;
+    const payload = res.data as any;
+    const profile: any = payload?.profile ?? payload?.data?.profile ?? payload;
+    return { success: true, data: profile as Profile };
   }
 
   // Unified User Profile APIs (parity with web /api/user/profile)
@@ -238,7 +242,11 @@ class ApiClient {
   }
 
   async getProfileById(profileId: string): Promise<ApiResponse<Profile>> {
-    return this.request<Profile>(`/profile-detail/${profileId}`);
+  const res = await this.request<any>(`/profile-detail/${profileId}`);
+  if (!res.success) return res as ApiResponse<Profile>;
+  const payload = res.data as any;
+  const profile: any = payload?.profile ?? payload?.data?.profile ?? payload;
+  return { success: true, data: profile as Profile };
   }
 
   async createProfile(
@@ -915,11 +923,61 @@ class ApiClient {
 
   async getProfileImages(userId?: string) {
     const params = userId ? `?userId=${userId}` : "";
-    return this.request(`/profile-images${params}`);
+    const res = await this.request<any>(`/profile-images${params}`);
+    if (!res.success) return res;
+    const payload = res.data as any;
+    const images = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.images)
+      ? payload.images
+      : Array.isArray(payload?.data?.images)
+      ? payload.data.images
+      : [];
+    return { success: true, data: images } as ApiResponse<any>;
   }
 
-  async getBatchProfileImages(userIds: string[]) {
-    return this.request(`/profile-images/batch?userIds=${userIds.join(",")}`);
+  async getBatchProfileImages(
+    userIds: string[]
+  ): Promise<ApiResponse<Record<string, string[]>>> {
+    const res = await this.request<any>(
+      `/profile-images/batch?userIds=${userIds.join(",")}`
+    );
+    if (!res.success) return res as ApiResponse<Record<string, string[]>>;
+
+    const raw = res.data;
+    let mapping: Record<string, string[]> = {};
+
+    // Common shapes:
+    // 1) { data: { <userId>: string[] } }
+    // 2) { <userId>: string[] }
+    // 3) [{ userId|id|profileId, urls|profileImageUrls|imageUrls }]
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const maybeData = (raw as any).data;
+      if (
+        maybeData &&
+        typeof maybeData === "object" &&
+        !Array.isArray(maybeData)
+      ) {
+        mapping = maybeData as Record<string, string[]>;
+      } else {
+        mapping = raw as Record<string, string[]>;
+      }
+    } else if (Array.isArray(raw)) {
+      raw.forEach((entry: any) => {
+        const id = entry.userId || entry.id || entry.profileId;
+        if (!id) return;
+        const urls =
+          entry.urls || entry.profileImageUrls || entry.imageUrls || [];
+        if (Array.isArray(urls) && urls.length) mapping[id] = urls;
+      });
+    }
+
+    // Ensure only array values
+    Object.entries(mapping).forEach(([k, v]) => {
+      if (!Array.isArray(v)) delete mapping[k];
+    });
+
+    return { success: true, data: mapping };
   }
 
   async setMainProfileImage(imageId: string) {
@@ -1119,7 +1177,17 @@ class ApiClient {
     if (typeof opts.limit === "number") params.set("limit", String(opts.limit));
     if (typeof opts.offset === "number")
       params.set("offset", String(opts.offset));
-    return this.request(`/profile/view?${params.toString()}`);
+    const res = await this.request<any>(`/profile/view?${params.toString()}`);
+    if (!res.success) return res;
+    const payload = res.data as any;
+    const viewers = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.viewers)
+      ? payload.viewers
+      : Array.isArray(payload?.data?.viewers)
+      ? payload.data.viewers
+      : [];
+    return { success: true, data: viewers } as ApiResponse<any[]>;
   }
 
   // User management
@@ -1253,7 +1321,28 @@ class ApiClient {
   }
 
   async getProfileDetailImages(profileId: string) {
-    return this.request(`/profile-detail/${profileId}/images`);
+    const res = await this.request<any>(`/profile-detail/${profileId}/images`);
+    if (!res.success) return res as ApiResponse<any>;
+    const payload = res.data as any;
+    let images: any[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.images)
+      ? payload.images
+      : Array.isArray(payload?.data?.images)
+      ? payload.data.images
+      : [];
+    // Normalize to objects with url
+    images = images.map((img: any, idx: number) => {
+      if (typeof img === "string") return { id: String(idx), url: img };
+      if (img && typeof img === "object") {
+        const id = img._id || img.id || img.storageId || String(idx);
+        const url = img.url || img.imageUrl || img.src || "";
+        const isMain = !!(img.isMain || img.main || img.primary);
+        return { id, url, isMain };
+      }
+      return { id: String(idx), url: "" };
+    });
+    return { success: true, data: images } as ApiResponse<any>;
   }
 
   // Search - Extended

@@ -242,8 +242,12 @@ export default function ProfileDetailScreen({
   const { data: profileImages = [] } = useQuery({
     queryKey: ["profileImages", profileId],
     queryFn: async () => {
-      const response = await apiClient.getBatchProfileImages([profileId]);
-      return response.success ? (response.data as any)[profileId] || [] : [];
+      // Prefer detail-specific endpoint which is now normalized
+      const response = await apiClient.getProfileDetailImages(profileId);
+      if (response.success) return (response.data as any[]) || [];
+      // Fallback to batch mapping if needed
+      const batch = await apiClient.getBatchProfileImages([profileId]);
+      return batch.success ? (batch.data as any)[profileId] || [] : [];
     },
     enabled: !!profileId,
   });
@@ -524,13 +528,17 @@ export default function ProfileDetailScreen({
                 setCurrentImageIndex(newIndex);
               }}
             >
-              {profileImages.map((image: any, index: number) => (
-                <Image
-                  key={image.id || index}
-                  source={{ uri: image.url }}
-                  style={styles.profileImage}
-                />
-              ))}
+              {profileImages.map((image: any, index: number) => {
+                const uri = typeof image === "string" ? image : image?.url;
+                const key = (image && (image.id || image._id)) || index;
+                return (
+                  <Image
+                    key={key}
+                    source={{ uri }}
+                    style={styles.profileImage}
+                  />
+                );
+              })}
             </ScrollView>
 
             {profileImages.length > 1 && (

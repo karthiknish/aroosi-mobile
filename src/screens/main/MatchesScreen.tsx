@@ -236,37 +236,10 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         try {
           const response: any = await apiClient.getBatchProfileImages(userIds);
           if (response?.success) {
-            const raw = response.data;
-            // Possible shapes: { userId: string[] }, [{ userId, urls|profileImageUrls|imageUrls }], { data: mapping }
-            let mapping: Record<string, string[]> = {};
-            if (raw && !Array.isArray(raw) && typeof raw === "object") {
-              // If nested data property (defensive)
-              const maybeData = (raw as any).data;
-              if (
-                maybeData &&
-                typeof maybeData === "object" &&
-                !Array.isArray(maybeData)
-              ) {
-                mapping = maybeData as Record<string, string[]>;
-              } else {
-                mapping = raw as Record<string, string[]>;
-              }
-            } else if (Array.isArray(raw)) {
-              raw.forEach((entry: any) => {
-                const id = entry.userId || entry.id || entry.profileId;
-                if (!id) return;
-                const urls =
-                  entry.urls || entry.profileImageUrls || entry.imageUrls || [];
-                if (Array.isArray(urls) && urls.length) mapping[id] = urls;
-              });
-            }
-            // Validate: ensure arrays
-            Object.entries(mapping).forEach(([uid, arr]) => {
-              if (!Array.isArray(arr)) delete mapping[uid];
-            });
-            // Store in cache
+            const mapping: Record<string, string[]> = response.data || {};
             Object.entries(mapping).forEach(([uid, urls]) => {
-              if (urls && urls.length) setProfileImages(uid, urls);
+              if (Array.isArray(urls) && urls.length)
+                setProfileImages(uid, urls);
               processedIdsRef.current.add(uid);
             });
             success = true;

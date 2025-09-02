@@ -110,7 +110,7 @@ function ProfileStackNavigator() {
     >
       <ProfileStack.Screen
         name="Profile"
-        component={withSC(ProfileScreen)}
+        component={withSC(ProfileScreen, { useScrollView: false })}
         options={getScreenTransition("Profile")}
       />
       <ProfileStack.Screen

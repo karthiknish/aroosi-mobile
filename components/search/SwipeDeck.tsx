@@ -6,6 +6,8 @@ import { useTheme } from "@contexts/ThemeContext";
 import { useInterests } from "@/hooks/useInterests";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+// Local placeholder image for profiles without photos
+const PLACEHOLDER_IMAGE = require("../../assets/placeholder.png");
 
 export interface SwipeDeckProfile {
   userId: string;
@@ -61,25 +63,45 @@ export default function SwipeDeck({ data, onEnd, onOpenProfile, onUninterested }
     const age = getAge(item.profile?.dateOfBirth || undefined);
     return (
       <TouchableWithoutFeedback onPress={() => onOpenProfile?.(item.userId)}>
-        <View style={[styles.card, { backgroundColor: theme.colors.background.primary, borderColor: theme.colors.border.primary }]}
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: theme.colors.background.primary,
+              borderColor: theme.colors.border.primary,
+            },
+          ]}
           testID={`card-${item.userId}`}
         >
           <View style={styles.imageContainer}>
             {img ? (
-              <Image source={{ uri: img }} style={styles.image} resizeMode="cover" />
+              <Image
+                source={{ uri: img }}
+                style={styles.image}
+                resizeMode="cover"
+              />
             ) : (
-              <View style={[styles.imagePlaceholder, { backgroundColor: theme.colors.neutral[200] }]}>
-                <Text style={{ fontSize: 48 }}>👤</Text>
-              </View>
+              <Image
+                source={PLACEHOLDER_IMAGE}
+                style={styles.image}
+                resizeMode="cover"
+              />
             )}
           </View>
           <View style={styles.metaContainer}>
-            <Text style={[styles.nameText, { color: theme.colors.text.primary }]}>
+            <Text
+              style={[styles.nameText, { color: theme.colors.text.primary }]}
+            >
               {item.profile?.fullName || "Unknown"}
               {age ? `, ${age}` : ""}
             </Text>
             {!!item.profile?.city && (
-              <Text style={[styles.cityText, { color: theme.colors.text.secondary }]}>
+              <Text
+                style={[
+                  styles.cityText,
+                  { color: theme.colors.text.secondary },
+                ]}
+              >
                 {item.profile.city}
               </Text>
             )}
@@ -154,11 +176,6 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-  },
-  imagePlaceholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
   },
   metaContainer: {
     padding: Layout.spacing.md,
