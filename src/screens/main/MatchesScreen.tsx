@@ -54,6 +54,8 @@ import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import UpgradePrompt from "@components/subscription/UpgradePrompt";
 import { useSubscription } from "@/hooks/useSubscription";
 import type { SubscriptionTier } from "@/types/subscription";
+import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import ReportUserModal from "@components/safety/ReportUserModal";
 
 interface MatchesScreenProps {
   navigation: any;
@@ -96,6 +98,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(new Set());
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<UIMatch | null>(null);
+  const [safetyVisible, setSafetyVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
   // Subscription & upgrade state
   const { subscription, usage, canUseFeatureNow, trackFeatureUsage } =
     useSubscription();
@@ -898,6 +902,15 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionItem}
+              onPress={() => {
+                setActionSheetVisible(false);
+                setSafetyVisible(true);
+              }}
+            >
+              <Text style={styles.actionLabel}>Safety options</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionItem}
               onPress={() => setActionSheetVisible(false)}
             >
               <Text style={styles.actionLabel}>Cancel</Text>
@@ -916,6 +929,24 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
             </TouchableOpacity>
           </View>
         </BottomSheet>
+
+        {/* Safety Action Sheet and Report Modal */}
+        <SafetyActionSheet
+          visible={safetyVisible && !!selectedMatch}
+          onClose={() => setSafetyVisible(false)}
+          userId={selectedMatch?.userId || ""}
+          userName={selectedMatch?.fullName || "User"}
+          onReport={() => {
+            setSafetyVisible(false);
+            setReportVisible(true);
+          }}
+        />
+        <ReportUserModal
+          visible={reportVisible && !!selectedMatch}
+          userId={selectedMatch?.userId || ""}
+          userName={selectedMatch?.fullName || "User"}
+          onClose={() => setReportVisible(false)}
+        />
 
         {/* Upgrade Prompt Modal */}
         <UpgradePrompt

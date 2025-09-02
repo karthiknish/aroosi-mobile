@@ -156,11 +156,20 @@ export function useBlockStatus(userId: string | null) {
 export function useReportUser() {
   const apiClient = useApiClient();
   return useMutation({
-    mutationFn: async (request: ReportUserRequest): Promise<SafetyApiResponse> => {
-      return (await apiClient.reportUser(request)) as SafetyApiResponse;
+    mutationFn: async (
+      request: ReportUserRequest
+    ): Promise<SafetyApiResponse> => {
+      const res = await apiClient.reportUser(request);
+      if (!res.success) {
+        const message = (res as any)?.error?.message || "Failed to report user";
+        throw new Error(message);
+      }
+      return { success: true, data: res.data } as SafetyApiResponse;
     },
     onSuccess: () => {
-      showSuccessToast("User reported successfully. Our team will review this report.");
+      showSuccessToast(
+        "User reported successfully. Our team will review this report."
+      );
     },
     onError: (error: any) => {
       showErrorToast(error?.message || "Failed to report user");
@@ -173,14 +182,24 @@ export function useBlockUser() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (request: BlockUserRequest): Promise<SafetyApiResponse> => {
-      return (await apiClient.blockUser(request)) as SafetyApiResponse;
+    mutationFn: async (
+      request: BlockUserRequest
+    ): Promise<SafetyApiResponse> => {
+      const res = await apiClient.blockUser(request);
+      if (!res.success) {
+        const message = (res as any)?.error?.message || "Failed to block user";
+        throw new Error(message);
+      }
+      return { success: true, data: res.data } as SafetyApiResponse;
     },
     onSuccess: (_d, variables) => {
       showSuccessToast("User blocked successfully");
       queryClient.invalidateQueries({ queryKey: ["blockedUsers"] });
-      queryClient.invalidateQueries({ queryKey: ["blockStatus", variables.blockedUserId] });
+      queryClient.invalidateQueries({
+        queryKey: ["blockStatus", variables.blockedUserId],
+      });
       queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
       queryClient.invalidateQueries({ queryKey: ["searchProfiles"] });
     },
     onError: (error: any) => {
@@ -194,13 +213,25 @@ export function useUnblockUser() {
   const apiClient = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (request: UnblockUserRequest): Promise<SafetyApiResponse> => {
-      return (await apiClient.unblockUser(request)) as SafetyApiResponse;
+    mutationFn: async (
+      request: UnblockUserRequest
+    ): Promise<SafetyApiResponse> => {
+      const res = await apiClient.unblockUser(request);
+      if (!res.success) {
+        const message =
+          (res as any)?.error?.message || "Failed to unblock user";
+        throw new Error(message);
+      }
+      return { success: true, data: res.data } as SafetyApiResponse;
     },
     onSuccess: (_d, variables) => {
       showSuccessToast("User unblocked successfully");
       queryClient.invalidateQueries({ queryKey: ["blockedUsers"] });
-      queryClient.invalidateQueries({ queryKey: ["blockStatus", variables.blockedUserId] });
+      queryClient.invalidateQueries({
+        queryKey: ["blockStatus", variables.blockedUserId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["matches"] });
+      queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (error: any) => {
       showErrorToast(error?.message || "Failed to unblock user");

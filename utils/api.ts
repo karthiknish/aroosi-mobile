@@ -519,6 +519,16 @@ class ApiClient {
     }) as unknown as ApiResponse<void>;
   }
 
+  /**
+   * Explicitly set presence status (e.g., "offline" on logout)
+   */
+  async setPresence(status: "online" | "offline"): Promise<ApiResponse<void>> {
+    return this.request(`/presence`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    }) as unknown as ApiResponse<void>;
+  }
+
   // Message Reactions
   /**
    * Toggle a reaction for a message (adds if not present by user, removes otherwise)

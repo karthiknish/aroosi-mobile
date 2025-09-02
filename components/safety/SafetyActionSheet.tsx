@@ -12,7 +12,6 @@ import {
   Modal,
   Alert,
 } from "react-native";
-import { showSuccessToast, showErrorToast } from "@utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Colors, Layout } from "../../constants";
@@ -77,11 +76,9 @@ export default function SafetyActionSheet({
               if (!userId) return;
               await blockUserMutation.mutateAsync({ blockedUserId: userId });
               await PlatformHaptics.success();
-              showSuccessToast("User blocked successfully");
             } catch (error) {
               console.error("Error blocking user:", error);
               await PlatformHaptics.error();
-              showErrorToast("Failed to block user. Please try again.");
             }
           },
         },
@@ -106,11 +103,9 @@ export default function SafetyActionSheet({
               if (!userId) return;
               await unblockUserMutation.mutateAsync({ blockedUserId: userId });
               await PlatformHaptics.success();
-              showSuccessToast("User unblocked successfully");
             } catch (error) {
               console.error("Error unblocking user:", error);
               await PlatformHaptics.error();
-              showErrorToast("Failed to unblock user. Please try again.");
             }
           },
         },

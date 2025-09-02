@@ -12,7 +12,6 @@ import {
 import { Colors, Layout } from '../../constants';
 import { rgbaHex } from "@utils/color";
 import { useBlockUser, useUnblockUser } from "@/hooks/useSafety";
-import { showSuccessToast, showErrorToast } from "@utils/toast";
 import PlatformHaptics from "@utils/PlatformHaptics";
 
 interface BlockUserModalProps {
@@ -40,12 +39,10 @@ export default function BlockUserModal({
     try {
       await blockUserMutation.mutateAsync({ blockedUserId: userId });
       await PlatformHaptics.success();
-      showSuccessToast("User blocked successfully");
       onClose();
     } catch (error) {
       console.error("Error blocking user:", error);
       await PlatformHaptics.error();
-      showErrorToast("Failed to block user. Please try again.");
     }
   };
 
@@ -53,12 +50,10 @@ export default function BlockUserModal({
     try {
       await unblockUserMutation.mutateAsync({ blockedUserId: userId });
       await PlatformHaptics.success();
-      showSuccessToast("User unblocked successfully");
       onClose();
     } catch (error) {
       console.error("Error unblocking user:", error);
       await PlatformHaptics.error();
-      showErrorToast("Failed to unblock user. Please try again.");
     }
   };
 

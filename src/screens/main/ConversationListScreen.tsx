@@ -16,6 +16,8 @@ import { NoMessages } from "@/components/ui/EmptyStates";
 import { ErrorBoundary, ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 import { Conversation } from "@/types/profile";
 import ScreenContainer from "@components/common/ScreenContainer";
+import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import ReportUserModal from "@components/safety/ReportUserModal";
 
 interface ConversationListScreenProps {
   navigation: any;
@@ -32,6 +34,12 @@ export default function ConversationListScreen({
     Record<string, { isOnline: boolean; lastSeen: number }>
   >({});
   const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [safetyVisible, setSafetyVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState<{
+    id: string;
+    name?: string;
+  } | null>(null);
 
   type NormalizedConversation = Conversation & {
     id?: string;
@@ -187,6 +195,15 @@ export default function ConversationListScreen({
           hasUnread && styles.unreadConversationCard,
         ]}
         onPress={() => handleConversationPress(conversation)}
+        onLongPress={() => {
+          if (otherParticipantId) {
+            setSelectedPartner({
+              id: otherParticipantId,
+              name: otherParticipantName,
+            });
+            setSafetyVisible(true);
+          }
+        }}
       >
         <View style={styles.avatarContainer}>
           <View style={styles.avatar}>
@@ -336,6 +353,23 @@ export default function ConversationListScreen({
           </View>
         )}
       </ScreenContainer>
+      {/* Safety Action Sheet and Report Modal */}
+      <SafetyActionSheet
+        visible={safetyVisible && !!selectedPartner}
+        onClose={() => setSafetyVisible(false)}
+        userId={selectedPartner?.id || ""}
+        userName={selectedPartner?.name || "User"}
+        onReport={() => {
+          setSafetyVisible(false);
+          setReportVisible(true);
+        }}
+      />
+      <ReportUserModal
+        visible={reportVisible && !!selectedPartner}
+        userId={selectedPartner?.id || ""}
+        userName={selectedPartner?.name || "User"}
+        onClose={() => setReportVisible(false)}
+      />
     </ErrorBoundary>
   );
 }

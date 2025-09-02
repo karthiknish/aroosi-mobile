@@ -45,6 +45,8 @@ import { BottomSheet } from "@/components/ui/BottomSheet";
 import { useSubscription } from "@/hooks/useSubscription";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import UpgradePrompt from "@components/subscription/UpgradePrompt";
+import SafetyActionSheet from "@components/safety/SafetyActionSheet";
+import ReportUserModal from "@components/safety/ReportUserModal";
 
 interface ChatScreenProps {
   navigation: any;
@@ -199,6 +201,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [recommendedTier, setRecommendedTier] = useState<
     "premium" | "premiumPlus"
   >("premium");
+  const [safetyVisible, setSafetyVisible] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
 
   // Real-time features
   const typingIndicator = useTypingIndicator({
@@ -1075,6 +1079,12 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               <Text style={styles.actionButtonText}>🔍</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() => setSafetyVisible(true)}
+            >
+              <Text style={styles.actionButtonText}>⚠️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={styles.profileButton}
               onPress={() =>
                 partnerId &&
@@ -1427,6 +1437,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               ? "This feature is part of Premium Plus. Upgrade to unlock it."
               : "Upgrade to Premium to unlock unlimited messaging and more."
           }
+        />
+
+        {/* Safety Action Sheet and Report Modal */}
+        <SafetyActionSheet
+          visible={safetyVisible}
+          onClose={() => setSafetyVisible(false)}
+          userId={partnerId || ""}
+          userName={partnerName || "User"}
+          onReport={() => {
+            setSafetyVisible(false);
+            setReportVisible(true);
+          }}
+        />
+        <ReportUserModal
+          visible={reportVisible}
+          userId={partnerId || ""}
+          userName={partnerName || "User"}
+          onClose={() => setReportVisible(false)}
         />
       </KeyboardAvoidingView>
     </View>

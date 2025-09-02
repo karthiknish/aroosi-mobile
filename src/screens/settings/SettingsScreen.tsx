@@ -74,17 +74,32 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     setUpgradeVisible(true);
     if (tier) setRecommendedTier(tier);
   };
+  const [signingOut, setSigningOut] = useState(false);
   const handleSignOut = () => {
-    // Immediate sign-out flow with toast feedback; replace with ConfirmModal if desired
-    const doSignOut = async () => {
-      try {
-        await signOut();
-        navigation.navigate("Auth");
-      } catch (error) {
-        toast.show("Failed to sign out. Please try again.", "error");
-      }
-    };
-    doSignOut();
+    Alert.alert(
+      "Sign out?",
+      "We'll stop notifications and clear your online status.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign Out",
+          style: "destructive",
+          onPress: async () => {
+            if (signingOut) return;
+            setSigningOut(true);
+            try {
+              await signOut();
+              // Reset navigation so user can't go back into authed screens
+              navigation.reset({ index: 0, routes: [{ name: "Auth" }] });
+            } catch (error) {
+              toast.show("Failed to sign out. Please try again.", "error");
+            } finally {
+              setSigningOut(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteAccount = () => {

@@ -4,6 +4,10 @@ import { AppState, AppStateStatus, Platform } from "react-native";
 import { Profile } from '../types/profile';
 import { API_BASE_URL } from '../constants';
 import { getFirebaseAuth, initFirebase } from '../services/firebase';
+import { OneSignal } from "react-native-onesignal";
+import { apiClient } from "@/utils/api";
+import { NotificationPermissionsManager } from "@/utils/notificationPermissions";
+import { NotificationHandler } from "@/utils/notificationHandler";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -531,8 +535,36 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const signOut = useCallback(async () => {
+    // Bump logout version so any inflight refreshUser is ignored
     logoutVersionRef.current += 1;
     try {
+      // 1) Best-effort: mark presence offline on server
+      try {
+        await apiClient.setPresence("offline");
+      } catch {}
+
+      // 2) Best-effort: unregister push with backend using current OneSignal ID
+      try {
+        const onesignalId = await OneSignal.User.getOnesignalId();
+        if (onesignalId) {
+          await apiClient.unregisterFromPushNotifications({
+            playerId: onesignalId,
+          });
+        }
+      } catch {}
+
+      // 3) Logout from OneSignal (clears external user id)
+      try {
+        OneSignal.logout();
+      } catch {}
+
+      // 4) Clear notifications/badges locally
+      try {
+        await NotificationHandler.clearAll();
+        await NotificationPermissionsManager.clearBadge();
+      } catch {}
+
+      // 5) Firebase sign out
       await firebaseSignOut(getFirebaseAuth());
     } catch (e) {
       console.error("Sign out failed", e);
