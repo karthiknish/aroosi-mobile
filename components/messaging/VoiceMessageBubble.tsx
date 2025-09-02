@@ -1,13 +1,15 @@
-import React, { useState, useCallback } from 'react';
+import { rgbaHex } from "@utils/color";
+import { Colors } from "../../constants";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-} from 'react-native';
-import { VoicePlayer } from './VoicePlayer';
-import { VoiceMessageManager } from '../../services/voiceMessageManager';
+} from "react-native";
+import { VoicePlayer } from "./VoicePlayer";
+import { VoiceMessageManager } from "../../services/voiceMessageManager";
 import { useApiClient } from "@utils/api";
 import { MessagingAPI } from "../../types/messaging";
 import { formatTime } from "@utils/timeUtils";
@@ -167,7 +169,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
 
   // Get text color based on ownership
   const getTextColor = () => {
-    return isOwn ? "#ffffff" : "#333333";
+    return isOwn ? Colors.text.inverse : Colors.text.primary;
   };
 
   return (
@@ -205,7 +207,11 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
             onPlaybackError={onError}
             style={[
               styles.voicePlayer,
-              { backgroundColor: isOwn ? "rgba(255,255,255,0.1)" : "#f0f0f0" },
+              {
+                backgroundColor: isOwn
+                  ? rgbaHex(Colors.text.inverse, 0.1)
+                  : Colors.background.secondary,
+              },
             ]}
           />
         )}
@@ -255,12 +261,12 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   ownBubble: {
-    backgroundColor: "#007AFF",
+    backgroundColor: Colors.primary[500],
     alignSelf: "flex-end",
     borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: "#E5E5EA",
+    backgroundColor: Colors.background.secondary,
     alignSelf: "flex-start",
     borderBottomLeftRadius: 4,
   },
@@ -292,7 +298,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: rgbaHex(Colors.text.inverse, 0.2),
   },
   retryText: {
     fontSize: 12,

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
+import { rgbaHex } from "@utils/color";
 import { SubscriptionTier } from '../../types/subscription';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -169,9 +170,9 @@ export default function UpgradePrompt({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: rgbaHex(Colors.text.primary, 0.6),
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Layout.spacing.lg,
   },
 
@@ -179,14 +180,14 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.xl,
     width: Math.min(screenWidth - Layout.spacing.lg * 2, 400),
-    maxHeight: '80%',
-    overflow: 'hidden',
+    maxHeight: "80%",
+    overflow: "hidden",
   },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     padding: Layout.spacing.lg,
     paddingBottom: Layout.spacing.md,
   },
@@ -196,8 +197,8 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: Colors.primary[50],
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   closeButton: {
@@ -213,14 +214,14 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.xl,
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Layout.spacing.md,
   },
 
   featureBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Layout.spacing.sm,
     backgroundColor: Colors.warning[100],
     paddingHorizontal: Layout.spacing.md,
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
   message: {
     fontSize: Layout.typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
     marginBottom: Layout.spacing.lg,
   },
@@ -253,9 +254,9 @@ const styles = StyleSheet.create({
   },
 
   planHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: Layout.spacing.md,
   },
 
@@ -276,8 +277,8 @@ const styles = StyleSheet.create({
   },
 
   featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Layout.spacing.sm,
   },
 
@@ -288,15 +289,15 @@ const styles = StyleSheet.create({
   },
 
   benefitsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     paddingVertical: Layout.spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.border.primary,
   },
 
   benefitItem: {
-    alignItems: 'center',
+    alignItems: "center",
     gap: Layout.spacing.xs,
   },
 
@@ -315,9 +316,9 @@ const styles = StyleSheet.create({
 
   upgradeButton: {
     backgroundColor: Colors.primary[500],
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: Layout.spacing.sm,
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
@@ -339,7 +340,7 @@ const styles = StyleSheet.create({
 
   alternativeButton: {
     backgroundColor: Colors.background.secondary,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
     borderWidth: 1,
@@ -353,7 +354,7 @@ const styles = StyleSheet.create({
   },
 
   cancelButton: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Layout.spacing.sm,
   },
 

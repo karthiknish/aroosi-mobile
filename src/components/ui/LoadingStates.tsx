@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from "react-native";
 import { useTheme } from "@contexts/ThemeContext";
+import { Colors } from "@constants";
 
 const { width } = Dimensions.get("window");
 
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderRadius: 12,
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -300,6 +301,6 @@ const styles = StyleSheet.create({
   actionButtonSkeleton: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
+    borderTopColor: Colors.border.primary,
   },
 });

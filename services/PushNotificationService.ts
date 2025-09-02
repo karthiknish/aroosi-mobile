@@ -83,7 +83,9 @@ class PushNotificationService {
               name: "Default",
               importance: this.notificationsModule.AndroidImportance.MAX,
               vibrationPattern: [0, 250, 250, 250],
-              lightColor: "#FF231F7C",
+              lightColor: (Platform.OS === "android"
+                ? "#FF231F7C"
+                : undefined) as any,
               enableVibrate: true,
               showBadge: true,
             }

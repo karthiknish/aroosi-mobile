@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Layout } from '../../constants';
+import { rgbaHex } from "@utils/color";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import PlatformHaptics from '../../utils/PlatformHaptics';
 
@@ -104,7 +105,7 @@ export default function OfflineBanner({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     zIndex: 1000,
@@ -123,9 +124,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.warning[600],
     borderRadius: Layout.radius.md,
     padding: Layout.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     shadowColor: Colors.neutral[900],
     shadowOffset: {
       width: 0,
@@ -137,8 +138,8 @@ const styles = StyleSheet.create({
   },
 
   messageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     gap: Layout.spacing.sm,
   },
@@ -151,9 +152,9 @@ const styles = StyleSheet.create({
   },
 
   retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
     paddingHorizontal: Layout.spacing.sm,
     paddingVertical: Layout.spacing.xs,
     borderRadius: Layout.radius.sm,

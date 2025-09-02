@@ -1005,7 +1005,7 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
   },
   actionDestructive: {
-    color: (Colors as any).error?.[600] || "#b00020",
+    color: Colors.error[600],
   },
   interestCard: {
     backgroundColor: Colors.background.primary,

@@ -896,7 +896,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       opacity: 0.5,
     },
     actionDestructive: {
-      color: (Colors as any).error?.[600] || "#b00020",
+      color: Colors.error[600],
     },
     // Search functionality styles
     headerActions: {

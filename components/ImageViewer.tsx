@@ -28,6 +28,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors } from "../constants/Colors";
+import { rgbaHex } from "@utils/color";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -50,7 +51,7 @@ export function ImageViewer({
   onDelete,
   onShare,
   showControls = true,
-  backgroundColor = "black",
+  backgroundColor = Colors.neutral[900],
 }: ImageViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -240,7 +241,7 @@ export function ImageViewer({
                 onPress={handleClose}
                 style={styles.closeButton}
               >
-                <Ionicons name="close" size={24} color="white" />
+                <Ionicons name="close" size={24} color={Colors.text.inverse} />
               </TouchableOpacity>
 
               <Text style={styles.counter}>
@@ -253,7 +254,11 @@ export function ImageViewer({
                     onPress={handleShare}
                     style={styles.actionButton}
                   >
-                    <Ionicons name="share-outline" size={24} color="white" />
+                    <Ionicons
+                      name="share-outline"
+                      size={24}
+                      color={Colors.text.inverse}
+                    />
                   </TouchableOpacity>
                 )}
                 {onDelete && (
@@ -261,7 +266,11 @@ export function ImageViewer({
                     onPress={handleDelete}
                     style={styles.actionButton}
                   >
-                    <Ionicons name="trash-outline" size={24} color="white" />
+                    <Ionicons
+                      name="trash-outline"
+                      size={24}
+                      color={Colors.text.inverse}
+                    />
                   </TouchableOpacity>
                 )}
               </View>
@@ -316,7 +325,9 @@ export function ImageViewer({
                 <Ionicons
                   name="chevron-back"
                   size={24}
-                  color={currentIndex === 0 ? Colors.gray[500] : "white"}
+                  color={
+                    currentIndex === 0 ? Colors.gray[500] : Colors.text.inverse
+                  }
                 />
               </TouchableOpacity>
 
@@ -348,7 +359,7 @@ export function ImageViewer({
                   color={
                     currentIndex === images.length - 1
                       ? Colors.gray[500]
-                      : "white"
+                      : Colors.text.inverse
                   }
                 />
               </TouchableOpacity>
@@ -378,13 +389,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
   },
   closeButton: {
     padding: 8,
   },
   counter: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "500",
     fontFamily: "NunitoSans-Medium",
@@ -427,7 +438,7 @@ const styles = StyleSheet.create({
     bottom: Platform.OS === "ios" ? 34 : 24,
     left: 0,
     right: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
   },
   navButton: {
     padding: 8,
@@ -443,11 +454,11 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.5),
     marginHorizontal: 4,
   },
   activeDot: {
-    backgroundColor: "white",
+    backgroundColor: Colors.text.inverse,
     width: 10,
     height: 10,
     borderRadius: 5,

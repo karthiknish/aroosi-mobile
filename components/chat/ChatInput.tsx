@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
+import { rgbaHex } from "@utils/color";
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import VoiceRecorder from "./VoiceRecorder";
 import PlatformHaptics from "../../utils/PlatformHaptics";
@@ -419,7 +420,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.1),
     justifyContent: "center",
     alignItems: "center",
     borderRadius: Layout.radius.md,
@@ -442,9 +443,9 @@ const styles = StyleSheet.create({
     marginHorizontal: Layout.spacing.sm,
     paddingVertical: Layout.spacing.sm,
     paddingHorizontal: Layout.spacing.md,
-    backgroundColor: Colors.error[50] || "rgba(220, 38, 38, 0.1)",
+    backgroundColor: Colors.error[50],
     borderWidth: 1,
-    borderColor: Colors.error[200] || "rgba(220,38,38,0.3)",
+    borderColor: Colors.error[200],
     borderRadius: Layout.radius.md,
     flexDirection: "row",
     alignItems: "center",
@@ -453,17 +454,17 @@ const styles = StyleSheet.create({
   },
   errorBannerText: {
     flex: 1,
-    color: Colors.error[600] || "#b91c1c",
+    color: Colors.error[600],
     fontSize: Layout.typography.fontSize.xs,
   },
   errorRetryBtn: {
     paddingVertical: Layout.spacing.xs,
     paddingHorizontal: Layout.spacing.sm,
     borderRadius: Layout.radius.sm,
-    backgroundColor: Colors.error[100] || "rgba(220,38,38,0.15)",
+    backgroundColor: Colors.error[100],
   },
   errorRetryText: {
-    color: Colors.error[700] || "#991b1b",
+    color: Colors.error[700],
     fontSize: Layout.typography.fontSize.xs,
     fontWeight: Layout.typography.fontWeight.medium,
   },

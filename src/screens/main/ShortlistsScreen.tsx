@@ -26,6 +26,7 @@ import {
 import { useToast } from "@/providers/ToastContext";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { Colors } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 export function ShortlistsScreen() {
   const navigation = useNavigation();
@@ -114,7 +115,7 @@ export function ShortlistsScreen() {
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={24} color="#9ca3af" />
+                <Ionicons name="person" size={24} color={Colors.neutral[400]} />
               </View>
             )}
           </View>
@@ -140,7 +141,11 @@ export function ShortlistsScreen() {
             onPress={() => onRemove(item.userId, item.fullName || undefined)}
             activeOpacity={0.7}
           >
-            <Ionicons name="heart-dislike" size={20} color="#ef4444" />
+            <Ionicons
+              name="heart-dislike"
+              size={20}
+              color={Colors.error[500]}
+            />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.noteButton}
@@ -150,7 +155,11 @@ export function ShortlistsScreen() {
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="create-outline" size={20} color="#6b7280" />
+            <Ionicons
+              name="create-outline"
+              size={20}
+              color={Colors.neutral[500]}
+            />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -159,7 +168,7 @@ export function ShortlistsScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="heart" size={48} color="#e5e7eb" />
+      <Ionicons name="heart" size={48} color={Colors.neutral[200]} />
       <Text style={styles.emptyTitle}>No Shortlists Yet</Text>
       <Text style={styles.emptyText}>
         Start adding people you're interested in to your shortlist
@@ -230,7 +239,7 @@ export function ShortlistsScreen() {
             <TextInput
               style={styles.modalInput}
               placeholder="Write a personal note about this user"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={Colors.neutral[400]}
               multiline
               value={draftNote}
               onChangeText={setDraftNote}
@@ -404,7 +413,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.4),
     justifyContent: "flex-end",
   },
   modalCard: {

@@ -13,6 +13,7 @@ import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 import { VoiceDurationIndicator } from "./VoiceDurationIndicator";
 import { Colors } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 interface VoiceRecorderProps {
   conversationId?: string;
@@ -172,7 +173,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             {
               height: animatedHeight,
               opacity: isRecording ? 1 : 0.5,
-              backgroundColor: isRecording ? "#e74c3c" : "#bdc3c7",
+              backgroundColor: isRecording
+                ? Colors.error[500]
+                : Colors.neutral[300],
             },
           ]}
         />
@@ -187,7 +190,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (recordingState === "processing") {
       return (
         <View style={styles.recordButton}>
-          <ActivityIndicator color="#fff" size="small" />
+          <ActivityIndicator color={Colors.text.inverse} size="small" />
         </View>
       );
     }
@@ -316,7 +319,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.error[500],
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: "rgba(0, 0, 0, 0.1)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.1),
   },
   cancelText: {
     color: Colors.text.secondary,

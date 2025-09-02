@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { Colors, Layout } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 interface VerificationBannerProps {
   email: string;
@@ -26,29 +27,45 @@ export default function VerificationBanner({
       <View style={styles.row}>
         <Text style={styles.title}>Verify your email</Text>
         {onClose && (
-          <TouchableOpacity style={styles.closeBtn} onPress={onClose} accessibilityLabel="Dismiss">
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={onClose}
+            accessibilityLabel="Dismiss"
+          >
             <Text style={styles.closeText}>×</Text>
           </TouchableOpacity>
         )}
       </View>
       <Text style={styles.message}>
-        We sent a verification link to <Text style={styles.bold}>{email}</Text>. Please verify to continue.
+        We sent a verification link to <Text style={styles.bold}>{email}</Text>.
+        Please verify to continue.
       </Text>
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[styles.secondaryBtn, (secondsLeft > 0 || resendLoading) && styles.disabled]}
+          style={[
+            styles.secondaryBtn,
+            (secondsLeft > 0 || resendLoading) && styles.disabled,
+          ]}
           onPress={onResend}
           disabled={secondsLeft > 0 || !!resendLoading}
         >
           <Text style={styles.secondaryText}>
-            {resendLoading ? "Resending..." : secondsLeft > 0 ? `Resend in ${secondsLeft}s` : "Resend email"}
+            {resendLoading
+              ? "Resending..."
+              : secondsLeft > 0
+              ? `Resend in ${secondsLeft}s`
+              : "Resend email"}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.primaryBtn, verifying && styles.disabled]} onPress={onIHaveVerified} disabled={!!verifying}>
+        <TouchableOpacity
+          style={[styles.primaryBtn, verifying && styles.disabled]}
+          onPress={onIHaveVerified}
+          disabled={!!verifying}
+        >
           {verifying ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={Colors.text.inverse} />
           ) : (
             <Text style={styles.primaryText}>I have verified</Text>
           )}
@@ -61,9 +78,9 @@ export default function VerificationBanner({
 const styles = StyleSheet.create({
   container: {
     borderRadius: Layout.radius.md,
-    backgroundColor: "#FEF3C7", // amber-100
+    backgroundColor: Colors.warning?.[100] ?? Colors.background.secondary,
     borderWidth: 1,
-    borderColor: "#FDE68A", // amber-200
+    borderColor: Colors.warning?.[200] ?? Colors.border.primary,
     padding: Layout.spacing.md,
     marginHorizontal: Layout.spacing.lg,
     marginTop: Layout.spacing.sm,
@@ -110,7 +127,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary[500],
   },
   primaryText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontWeight: "700",
   },
   closeBtn: {
@@ -119,7 +136,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.06)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.06),
   },
   closeText: {
     color: Colors.text.primary,

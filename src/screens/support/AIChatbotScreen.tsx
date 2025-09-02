@@ -140,7 +140,11 @@ export default function AIChatbotScreen() {
       contentStyle={{ flexGrow: 1 }}
     >
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text.primary }]}>Help Assistant</Text>
+        <Text
+          style={[styles.headerTitle, { color: theme.colors.text.primary }]}
+        >
+          Help Assistant
+        </Text>
       </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -179,12 +183,19 @@ export default function AIChatbotScreen() {
           <TouchableOpacity
             style={[
               styles.sendBtn,
-              { backgroundColor: theme.colors.primary[500], opacity: sending ? 0.7 : 1 },
+              {
+                backgroundColor: theme.colors.primary[500],
+                opacity: sending ? 0.7 : 1,
+              },
             ]}
             disabled={sending}
             onPress={send}
           >
-            <Text style={{ color: "#fff", fontWeight: "600" }}>Send</Text>
+            <Text
+              style={{ color: theme.colors.text.inverse, fontWeight: "600" }}
+            >
+              Send
+            </Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

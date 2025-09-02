@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Colors, Layout } from '../../constants';
+import { rgbaHex } from "../../utils/color";
 
 type Plan = {
   id: string;
@@ -114,8 +115,8 @@ export default function PaywallModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: '#00000088',
-    justifyContent: 'flex-end',
+    backgroundColor: rgbaHex(Colors.neutral[900], 0.5),
+    justifyContent: "flex-end",
   },
   container: {
     backgroundColor: Colors.background.primary,
@@ -124,25 +125,25 @@ const styles = StyleSheet.create({
     paddingBottom: Layout.spacing.xl,
     borderTopLeftRadius: Layout.radius.xl,
     borderTopRightRadius: Layout.radius.xl,
-    maxHeight: '85%',
+    maxHeight: "85%",
   },
   title: {
     fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize['2xl'],
+    fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
     color: Colors.text.primary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Layout.spacing.sm,
   },
   subtitle: {
     fontSize: Layout.typography.fontSize.base,
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Layout.spacing.lg,
   },
   loadingBox: {
     paddingVertical: Layout.spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
   },
   loadingText: {
     marginTop: Layout.spacing.sm,
@@ -152,12 +153,12 @@ const styles = StyleSheet.create({
   emptyBox: {
     paddingVertical: Layout.spacing.lg,
     paddingHorizontal: Layout.spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyText: {
     color: Colors.text.secondary,
-    textAlign: 'center',
+    textAlign: "center",
     fontSize: Layout.typography.fontSize.base,
   },
   plansList: {
@@ -171,16 +172,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background.primary,
   },
   planCardRecommended: {
-    shadowColor: Colors.primary[500],
+    shadowColor: Colors.neutral[900],
     shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   planName: {
     fontSize: Layout.typography.fontSize.lg,
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary[100],
     color: Colors.primary[700],
     fontSize: Layout.typography.fontSize.xs,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   planPrice: {
     marginTop: Layout.spacing.xs,
@@ -213,7 +214,7 @@ const styles = StyleSheet.create({
   upgradeButton: {
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   upgradeText: {
     color: Colors.text.inverse,
@@ -221,7 +222,7 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     marginTop: Layout.spacing.md,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Layout.spacing.sm,
   },
   closeText: {

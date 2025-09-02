@@ -412,8 +412,8 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <Switch
           value={item.value}
           onValueChange={item.onToggle}
-          trackColor={{ false: "#767577", true: "#007AFF" }}
-          thumbColor="#fff"
+          trackColor={{ false: Colors.gray[300], true: Colors.primary[500] }}
+          thumbColor={item.value ? Colors.background.primary : Colors.gray[100]}
         />
       )}
 

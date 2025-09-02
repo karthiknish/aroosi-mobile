@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useOfflineMessagingHealth } from "@/hooks/useOfflineMessaging";
 import { useToast } from "../../contexts/ToastContext";
-import { Layout } from "@constants";
+import { Colors, Layout } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 interface OfflineMessageStatusProps {
   style?: any;
@@ -23,13 +24,13 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
   const getStatusColor = () => {
     switch (healthStatus.status) {
       case "healthy":
-        return "#4CAF50"; // Green
+        return Colors.success[500];
       case "warning":
-        return "#FF9800"; // Orange
+        return Colors.warning[500];
       case "error":
-        return "#F44336"; // Red
+        return Colors.error[500];
       default:
-        return "#757575"; // Gray
+        return Colors.neutral[500];
     }
   };
 
@@ -55,19 +56,20 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
       if (typeof (toast as any)?.add === "function") {
         // @ts-ignore
         (toast as any).add({ message: msg, type: "success" });
-      // @ts-ignore
+        // @ts-ignore
       } else if (typeof (toast as any)?.notify === "function") {
         // @ts-ignore
         (toast as any).notify({ message: msg, type: "success" });
       }
     } catch (error: any) {
-      const errMsg = typeof error === "string" ? error : error?.message || "Unknown error";
+      const errMsg =
+        typeof error === "string" ? error : error?.message || "Unknown error";
       const msg = `Failed to ${action.label.toLowerCase()}: ${errMsg}`;
       // @ts-ignore
       if (typeof (toast as any)?.add === "function") {
         // @ts-ignore
         (toast as any).add({ message: msg, type: "danger" });
-      // @ts-ignore
+        // @ts-ignore
       } else if (typeof (toast as any)?.notify === "function") {
         // @ts-ignore
         (toast as any).notify({ message: msg, type: "danger" });
@@ -92,7 +94,9 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
       >
         <Text style={styles.statusIcon}>{getStatusIcon()}</Text>
         <Text style={styles.statusText}>{healthStatus.message}</Text>
-        <Text style={styles.detailsText}>{expanded ? "Hide details" : "Tap for details"}</Text>
+        <Text style={styles.detailsText}>
+          {expanded ? "Hide details" : "Tap for details"}
+        </Text>
       </TouchableOpacity>
 
       {availableActions.length > 0 && (
@@ -112,10 +116,18 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
       {expanded && (
         <View style={styles.detailsContainer}>
           <Text style={styles.detailItem}>• Status: {healthStatus.status}</Text>
-          <Text style={styles.detailItem}>• Online: {stats.isOnline ? "Yes" : "No"}</Text>
-          <Text style={styles.detailItem}>• Failed Messages: {stats.failedMessages}</Text>
-          <Text style={styles.detailItem}>• Optimistic Messages: {stats.optimisticMessages}</Text>
-          <Text style={styles.detailItem}>• Sync In Progress: {stats.syncInProgress ? "Yes" : "No"}</Text>
+          <Text style={styles.detailItem}>
+            • Online: {stats.isOnline ? "Yes" : "No"}
+          </Text>
+          <Text style={styles.detailItem}>
+            • Failed Messages: {stats.failedMessages}
+          </Text>
+          <Text style={styles.detailItem}>
+            • Optimistic Messages: {stats.optimisticMessages}
+          </Text>
+          <Text style={styles.detailItem}>
+            • Sync In Progress: {stats.syncInProgress ? "Yes" : "No"}
+          </Text>
           {stats.lastSyncTime > 0 && (
             <Text style={styles.detailItem}>
               • Last Sync: {new Date(stats.lastSyncTime).toLocaleTimeString()}
@@ -135,7 +147,7 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#f5f5f5",
+    backgroundColor: Colors.background.secondary,
     borderRadius: 8,
     margin: 8,
     overflow: "hidden",
@@ -147,19 +159,19 @@ const styles = StyleSheet.create({
   },
   statusIcon: {
     fontSize: Layout.typography.fontSize.base,
-    color: "white",
+    color: Colors.text.inverse,
     fontWeight: "bold",
     marginRight: 8,
   },
   statusText: {
     flex: 1,
     fontSize: Layout.typography.fontSize.sm,
-    color: "white",
+    color: Colors.text.inverse,
     fontWeight: "500",
   },
   detailsText: {
     fontSize: Layout.typography.fontSize.xs,
-    color: "rgba(255, 255, 255, 0.8)",
+    color: Colors.text.inverse,
     fontStyle: "italic",
   },
   actionsContainer: {
@@ -168,25 +180,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    backgroundColor: "#2196F3",
+    backgroundColor: Colors.info[600],
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
     flex: 1,
   },
   actionText: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.xs,
     fontWeight: "500",
     textAlign: "center",
   },
   detailsContainer: {
     padding: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.05),
   },
   detailItem: {
     fontSize: Layout.typography.fontSize.xs,
-    color: "#666",
+    color: Colors.text.secondary,
     marginBottom: 2,
   },
 });

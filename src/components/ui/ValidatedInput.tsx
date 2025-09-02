@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '500',
+    fontWeight: "500",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
@@ -85,14 +85,14 @@ const styles = StyleSheet.create({
     borderColor: Colors.border.primary,
     borderRadius: Layout.radius.md,
     backgroundColor: Colors.background.secondary,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   inputWrapperError: {
     borderColor: Colors.error[500],
   },
   inputWrapperValid: {
-    borderColor: Colors.success?.[500] ?? '#22c55e',
+    borderColor: Colors.success[500],
   },
   input: {
     flex: 1,

@@ -702,7 +702,9 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                   }}
                   onPress={() => refetch()}
                 >
-                  <Text style={{ color: "white" }}>Retry</Text>
+                  <Text style={{ color: theme.colors.text.inverse }}>
+                    Retry
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (

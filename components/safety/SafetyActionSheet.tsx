@@ -16,6 +16,7 @@ import { showSuccessToast, showErrorToast } from "@utils/toast";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Colors, Layout } from "../../constants";
+import { rgbaHex } from "@utils/color";
 import PlatformHaptics from "../../utils/PlatformHaptics";
 
 interface SafetyActionSheetProps {
@@ -282,7 +283,7 @@ export default function SafetyActionSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "flex-end",
   },
 

@@ -11,6 +11,7 @@ import {
   TextStyle,
 } from "react-native";
 import { PlatformDesign, PlatformUtils, Colors, Layout } from "../../constants";
+import { rgbaHex } from "@utils/color";
 
 interface PlatformButtonProps {
   title: string;
@@ -201,7 +202,9 @@ export default function PlatformButton({
   if (Platform.OS === "android" && !disabled) {
     const background = TouchableNativeFeedback.Ripple(
       rippleColor ||
-        (variant === "primary" ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.1)"),
+        (variant === "primary"
+          ? rgbaHex(Colors.background.primary, 0.3)
+          : rgbaHex(Colors.text.primary, 0.1)),
       false
     );
 

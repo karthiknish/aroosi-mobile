@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Colors } from "@constants/Colors";
+import { rgbaHex } from "@utils/color";
 
 // Gradient Button Component
 interface GradientButtonProps extends TouchableOpacityProps {
@@ -38,7 +39,11 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
       case "primary":
         return [Colors.primary[500], Colors.primary[600], Colors.primary[700]];
       case "secondary":
-        return [Colors.secondary[500], Colors.secondary[600], Colors.secondary[700]];
+        return [
+          Colors.secondary[500],
+          Colors.secondary[600],
+          Colors.secondary[700],
+        ];
       case "success":
         return [Colors.success[500], Colors.success[600], Colors.success[700]];
       case "error":
@@ -125,7 +130,7 @@ export const GlassmorphismCard: React.FC<GlassmorphismCardProps> = ({
   tint = "light",
   borderRadius = 16,
   borderWidth = 1,
-  borderColor = "rgba(255,255,255,0.2)",
+  borderColor = rgbaHex(Colors.background.primary, 0.2),
   style,
   ...props
 }) => {
@@ -251,8 +256,11 @@ interface FloatingGradientCardProps extends ViewProps {
 export const FloatingGradientCard: React.FC<FloatingGradientCardProps> = ({
   children,
   elevation = 8,
-  shadowColor = "#000",
-  gradientColors = ["rgba(255,255,255,0.9)", "rgba(255,255,255,0.7)"],
+  shadowColor = Colors.neutral[900],
+  gradientColors = [
+    rgbaHex(Colors.background.primary, 0.9),
+    rgbaHex(Colors.background.primary, 0.7),
+  ],
   style,
   ...props
 }) => {
@@ -296,9 +304,9 @@ export const Shimmer: React.FC<ShimmerProps> = ({
   height = 20,
   borderRadius = 4,
   colors = [
-    "rgba(255,255,255,0.1)",
-    "rgba(255,255,255,0.3)",
-    "rgba(255,255,255,0.1)",
+    rgbaHex(Colors.background.primary, 0.1),
+    rgbaHex(Colors.background.primary, 0.3),
+    rgbaHex(Colors.background.primary, 0.1),
   ],
   style,
   ...props
@@ -341,14 +349,14 @@ const styles = StyleSheet.create({
   },
   glassmorphismContainer: {
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.1),
   },
   blurView: {
     flex: 1,
   },
   glassmorphismContent: {
     flex: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.1),
   },
   gradientBackground: {
     flex: 1,

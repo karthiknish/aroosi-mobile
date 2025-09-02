@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Colors, Layout } from "../../constants";
+import { rgbaHex } from "@utils/color";
 import { ProfileImage } from "../../types/image";
 import PlatformHaptics from "../../utils/PlatformHaptics";
 import { useToast } from "@providers/ToastContext";
@@ -459,7 +460,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.7),
     justifyContent: "center",
     alignItems: "center",
   },
@@ -471,7 +472,7 @@ const styles = StyleSheet.create({
   },
 
   actionButton: {
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.7),
     borderRadius: 12,
     width: 24,
     height: 24,
@@ -500,7 +501,7 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "flex-end",
   },
 
@@ -552,7 +553,7 @@ const styles = StyleSheet.create({
   // Full screen modal
   fullScreenModal: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.9),
   },
 
   fullScreenBackdrop: {

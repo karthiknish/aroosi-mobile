@@ -9,6 +9,7 @@ import {
   Image,
 } from "react-native";
 import { Colors } from "@constants/Colors";
+import { rgbaHex } from "@utils/color";
 import { Layout } from "@constants/Layout";
 import {
   useResponsiveSpacing,
@@ -38,7 +39,7 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: "rgba(0, 0, 0, 0.4)",
+      backgroundColor: rgbaHex(Colors.neutral[900], 0.4),
     },
     overlay: {
       width: "100%",
@@ -46,13 +47,13 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
       paddingBottom: spacing.xl * 2,
     },
     button: {
-      backgroundColor: Colors.primary[500] || "#ff3366",
+      backgroundColor: Colors.primary[500],
       paddingVertical: spacing.md,
       borderRadius: spacing.xs * 3,
       alignItems: "center",
     },
     buttonText: {
-      color: Colors.text?.inverse || "#ffffff",
+      color: Colors.text.inverse,
       fontSize: fontSize.lg,
       fontWeight: "600",
     },
@@ -66,11 +67,11 @@ export default function StartupScreen({ onGetStarted }: StartupScreenProps) {
       width: spacing.xl * 3.75, // 120px equivalent
       height: spacing.xl * 3.75, // 120px equivalent
       marginBottom: spacing.md,
-      backgroundColor: "white",
+      backgroundColor: Colors.background.primary,
     },
     heading: {
       fontFamily: Layout.typography.fontFamily.serif,
-      color: Colors.text?.inverse || "#ffffff",
+      color: Colors.text.inverse,
       fontSize: fontSize["2xl"],
       fontWeight: "800",
       textAlign: "center",

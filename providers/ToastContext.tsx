@@ -242,11 +242,11 @@ const styles = StyleSheet.create({
 function stylesByType(type: ToastType) {
   switch (type) {
     case "success":
-      return { backgroundColor: Colors?.success?.[500] ?? "#16a34a" };
+  return { backgroundColor: Colors.success[500] };
     case "error":
-      return { backgroundColor: Colors?.error?.[500] ?? "#dc2626" };
+  return { backgroundColor: Colors.error[500] };
     default:
-      return { backgroundColor: Colors?.neutral?.[900] ?? "#111827" };
+  return { backgroundColor: Colors.neutral[900] };
   }
 }
 

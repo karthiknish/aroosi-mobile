@@ -10,12 +10,17 @@ import {
   Dimensions,
 } from "react-native";
 
-import { pickFromCamera, pickFromLibrary } from "../../utils/imagePicker";
+import {
+  pickFromCamera,
+  pickFromLibrary,
+  requestPermissions as requestImagePermissions,
+} from "../../utils/imagePicker";
 
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, Colors, Layout } from "../../constants";
 import PlatformButton from "./PlatformButton";
 import { useToast } from "../../providers/ToastContext";
+import { rgbaHex } from "@utils/color";
 
 interface PlatformPhotoPickerProps {
   onImageSelected: (uri: string) => void;
@@ -48,8 +53,8 @@ export default function PlatformPhotoPicker({
   const toast = useToast();
 
   const requestPermissions = async () => {
-    // Permissions are handled inside utils/imagePicker; keep stub for UI messages
-    return { camera: true, media: true };
+    const granted = await requestImagePermissions();
+    return { camera: granted, media: granted };
   };
 
   const openCamera = async () => {
@@ -74,7 +79,10 @@ export default function PlatformPhotoPicker({
     try {
       const permissions = await requestPermissions();
       if (!permissions.media) {
-        toast.show("Media library permission is required to select photos.", "error");
+        toast.show(
+          "Media library permission is required to select photos.",
+          "error"
+        );
         return;
       }
 
@@ -233,7 +241,7 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "center",
     alignItems: "center",
   },

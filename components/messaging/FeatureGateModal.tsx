@@ -13,6 +13,7 @@ import {
   MessagingFeatureUtils,
 } from "../../utils/messagingFeatures";
 import { Colors } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 interface FeatureGateModalProps {
   visible: boolean;
@@ -162,7 +163,7 @@ export const FeatureGateModal: React.FC<FeatureGateModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "center",
     alignItems: "center",
     padding: 20,

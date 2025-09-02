@@ -63,6 +63,7 @@ import ConfirmModal from "@components/ui/ConfirmModal";
 import VerifyEmailInline from "@components/auth/VerifyEmailInline";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
+import { rgbaHex } from "@utils/color";
 
 const { width } = Dimensions.get("window");
 
@@ -231,7 +232,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       borderRadius: 12,
     },
     emailBadgeText: {
-      color: "#fff",
+      color: Colors.text.inverse,
       fontWeight: "600",
     },
     actionButtonsRow: {
@@ -248,7 +249,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       alignItems: "center",
     },
     actionBtnText: {
-      color: "#fff",
+      color: Colors.text.inverse,
       fontWeight: "600",
       textAlign: "center",
     },
@@ -257,7 +258,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       marginBottom: spacing.lg,
       padding: spacing.md,
       borderRadius: 12,
-      shadowColor: "#000",
+      shadowColor: Colors.neutral[900],
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
       shadowRadius: 8,
@@ -293,7 +294,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       borderRadius: 12,
     },
     mainBadgeText: {
-      color: "#fff",
+      color: Colors.text.inverse,
       fontWeight: "600",
     },
     imageIndicators: {
@@ -326,7 +327,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       fontWeight: "500",
     },
     premiumBadge: {
-      color: "#007AFF",
+      color: Colors.primary[500],
       fontWeight: "bold",
     },
     aboutText: {
@@ -356,7 +357,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       alignItems: "center",
     },
     subscriptionButtonText: {
-      color: "#fff",
+      color: Colors.text.inverse,
       fontWeight: "600",
     },
     boostButton: {
@@ -408,7 +409,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       marginTop: spacing.lg,
       paddingTop: spacing.md,
       borderTopWidth: 1,
-      borderTopColor: "rgba(255,255,255,0.1)",
+      borderTopColor: rgbaHex(Colors.background.primary, 0.1),
     },
     contentStyle: {
       flexGrow: 1,
@@ -827,7 +828,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                         borderRadius: 10,
                       }}
                     >
-                      <Text style={{ color: "#fff", fontWeight: "600" }}>
+                      <Text
+                        style={{
+                          color: Colors.text.inverse,
+                          fontWeight: "600",
+                        }}
+                      >
                         Verified
                       </Text>
                     </View>
@@ -1598,7 +1604,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           <GlassmorphismCard
             style={[styles.section, { backgroundColor: "transparent" }]}
             intensity={60}
-            borderColor="rgba(255,255,255,0.1)"
+            borderColor={rgbaHex(Colors.background.primary, 0.1)}
           >
             <Text
               style={[

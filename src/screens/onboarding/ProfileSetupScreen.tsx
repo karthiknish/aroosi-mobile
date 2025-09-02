@@ -179,8 +179,8 @@ function CreateAccountStep({
       {missing.length > 0 ? (
         <View
           style={{
-            backgroundColor: "#FEF2F2",
-            borderColor: "#FECACA",
+            backgroundColor: Colors.error[50],
+            borderColor: Colors.error[200],
             borderWidth: 1,
             borderRadius: 8,
             padding: Layout.spacing.md,
@@ -188,14 +188,20 @@ function CreateAccountStep({
           }}
         >
           <Text
-            style={{ color: "#DC2626", fontWeight: "600", marginBottom: 4 }}
+            style={{
+              color: Colors.error[600],
+              fontWeight: "600",
+              marginBottom: 4,
+            }}
           >
             Cannot create account - Profile incomplete
           </Text>
-          <Text style={{ color: "#EF4444", marginBottom: 8 }}>
+          <Text style={{ color: Colors.error[500], marginBottom: 8 }}>
             You must complete all profile sections before creating an account.
           </Text>
-          <Text style={{ color: "#F87171", fontSize: 12, marginBottom: 8 }}>
+          <Text
+            style={{ color: Colors.error[300], fontSize: 12, marginBottom: 8 }}
+          >
             Missing: {missing.slice(0, 5).join(", ")}
             {missing.length > 5 ? ` and ${missing.length - 5} more fields` : ""}
           </Text>
@@ -821,8 +827,8 @@ export default function ProfileSetupScreen({
         {missing.length > 0 ? (
           <View
             style={{
-              backgroundColor: "#FEF2F2",
-              borderColor: "#FECACA",
+              backgroundColor: Colors.error[50],
+              borderColor: Colors.error[200],
               borderWidth: 1,
               borderRadius: 8,
               padding: Layout.spacing.md,
@@ -830,14 +836,24 @@ export default function ProfileSetupScreen({
             }}
           >
             <Text
-              style={{ color: "#DC2626", fontWeight: "600", marginBottom: 4 }}
+              style={{
+                color: Colors.error[600],
+                fontWeight: "600",
+                marginBottom: 4,
+              }}
             >
               Cannot create account - Profile incomplete
             </Text>
-            <Text style={{ color: "#EF4444", marginBottom: 8 }}>
+            <Text style={{ color: Colors.error[500], marginBottom: 8 }}>
               You must complete all profile sections before creating an account.
             </Text>
-            <Text style={{ color: "#F87171", fontSize: 12, marginBottom: 8 }}>
+            <Text
+              style={{
+                color: Colors.error[300],
+                fontSize: 12,
+                marginBottom: 8,
+              }}
+            >
               Missing: {missing.slice(0, 5).join(", ")}
               {missing.length > 5
                 ? ` and ${missing.length - 5} more fields`
@@ -1733,7 +1749,7 @@ export default function ProfileSetupScreen({
               disabled={createProfileMutation.isPending}
             >
               {createProfileMutation.isPending ? (
-                <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.nextButtonText}>Next</Text>
               )}
@@ -1906,7 +1922,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
-    color: "#000",
+    color: Colors.text.primary,
   },
   heightSliders: {
     flexDirection: "row",
@@ -1964,7 +1980,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    color: "white",
+    color: Colors.text.inverse,
     fontWeight: "600",
   },
   photoGuidelines: {

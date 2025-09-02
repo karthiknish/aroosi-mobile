@@ -100,7 +100,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           disabled={sending || cooldown > 0}
         >
           {sending ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={Colors.text.inverse} />
           ) : (
             <Text style={[styles.pillText, textStyle]}>
               {cooldown > 0
@@ -118,7 +118,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           disabled={sending || cooldown > 0}
         >
           {sending ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={Colors.text.inverse} />
           ) : (
             <Text style={[styles.badgeText, textStyle]}>
               {cooldown > 0 ? `Verify (${cooldown}s)` : label || "Verify Email"}
@@ -157,7 +157,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
               disabled={sending || cooldown > 0}
             >
               {sending ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.bannerBtnText}>
                   {cooldown > 0 ? `Resend (${cooldown}s)` : "Resend Email"}
@@ -174,7 +174,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
               disabled={checking}
             >
               {checking ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={Colors.text.inverse} />
               ) : (
                 <Text style={styles.bannerBtnText}>I've Verified</Text>
               )}
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.lg,
   },
   bannerText: {
-    color: Colors.warning[900] || "#92400e",
+    color: Colors.warning[900],
     marginBottom: Layout.spacing.sm,
     fontWeight: "500",
   },
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.spacing.md,
     borderRadius: Layout.radius.sm,
   },
-  bannerBtnText: { color: "#fff", fontWeight: "600" },
+  bannerBtnText: { color: Colors.text.inverse, fontWeight: "600" },
 
   // Pill variant (header small)
   pill: {
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
   },
-  pillText: { color: "#fff", fontWeight: "600", fontSize: 12 },
+  pillText: { color: Colors.text.inverse, fontWeight: "600", fontSize: 12 },
 
   // Badge variant (compact rectangular)
   badge: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  badgeText: { color: "#fff", fontWeight: "600" },
+  badgeText: { color: Colors.text.inverse, fontWeight: "600" },
 
   // Link variant (inline text action)
   linkText: { color: Colors.warning[600], fontWeight: "600" },

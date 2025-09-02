@@ -9,6 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from "@constants";
 
 interface PullToRefreshProps {
   children: React.ReactNode;
@@ -27,10 +28,10 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   children,
   onRefresh,
   refreshing = false,
-  colors = ['#667eea', '#764ba2'],
-  tintColor = '#667eea',
-  backgroundColor = 'transparent',
-  size = 'default',
+  colors = Colors.gradient.primary,
+  tintColor = Colors.info[500],
+  backgroundColor = "transparent",
+  size = "default",
   enabled = true,
   hapticFeedback = true,
   customIndicator,
@@ -48,7 +49,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
     if (isRefreshing || !enabled) return;
 
     setIsRefreshing(true);
-    
+
     if (hapticFeedback) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
@@ -89,15 +90,15 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
       if (!enabled || isRefreshing) return;
 
       const { translationY, velocityY } = event;
-      
+
       if (translationY > 0 && velocityY > 0) {
         const distance = Math.min(translationY * 0.5, MAX_PULL_DISTANCE);
         const progress = Math.min(distance / PULL_THRESHOLD, 1);
-        
+
         pullDistance.setValue(distance);
         scaleValue.setValue(progress);
         opacityValue.setValue(progress);
-        
+
         // Rotate icon based on pull progress
         rotateValue.setValue(progress * 180);
 
@@ -112,7 +113,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
 
       const { translationY } = event;
       const distance = Math.min(translationY * 0.5, MAX_PULL_DISTANCE);
-      
+
       if (distance >= PULL_THRESHOLD) {
         handleRefresh();
       } else {
@@ -139,12 +140,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         style={{
           transform: [
             { scale: scaleValue },
-            { 
+            {
               rotate: rotateValue.interpolate({
                 inputRange: [0, 180],
-                outputRange: ['0deg', '180deg'],
-              })
-            }
+                outputRange: ["0deg", "180deg"],
+              }),
+            },
           ],
           opacity: opacityValue,
         }}
@@ -152,12 +153,12 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         <LinearGradient
           colors={colors as any}
           style={{
-            width: size === 'large' ? 50 : 40,
-            height: size === 'large' ? 50 : 40,
-            borderRadius: size === 'large' ? 25 : 20,
-            justifyContent: 'center',
-            alignItems: 'center',
-            shadowColor: '#000',
+            width: size === "large" ? 50 : 40,
+            height: size === "large" ? 50 : 40,
+            borderRadius: size === "large" ? 25 : 20,
+            justifyContent: "center",
+            alignItems: "center",
+            shadowColor: Colors.neutral[900],
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.25,
             shadowRadius: 4,
@@ -165,9 +166,9 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
           }}
         >
           <Ionicons
-            name={isRefreshing ? 'refresh' : 'arrow-down'}
-            size={size === 'large' ? 24 : 20}
-            color="white"
+            name={isRefreshing ? "refresh" : "arrow-down"}
+            size={size === "large" ? 24 : 20}
+            color={Colors.text.inverse}
           />
         </LinearGradient>
       </Animated.View>
@@ -232,18 +233,18 @@ export const EnhancedRefreshControl: React.FC<{
   colors?: string[];
   tintColor?: string;
   backgroundColor?: string;
-  size?: 'default' | 'large';
+  size?: "default" | "large";
   title?: string;
   titleColor?: string;
 }> = ({
   refreshing,
   onRefresh,
-  colors = ['#667eea', '#764ba2'],
-  tintColor = '#667eea',
-  backgroundColor = 'transparent',
-  size = 'default',
+  colors = Colors.gradient.primary,
+  tintColor = Colors.info[500],
+  backgroundColor = "transparent",
+  size = "default",
   title,
-  titleColor = '#666',
+  titleColor = Colors.text.secondary,
 }) => {
   return (
     <RefreshControl

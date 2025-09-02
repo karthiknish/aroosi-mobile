@@ -13,6 +13,7 @@ import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
+import { rgbaHex } from "@utils/color";
 
 interface Option {
   value: string;
@@ -105,7 +106,7 @@ export function FormSelect({
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      backgroundColor: rgbaHex(Colors.text.primary, 0.5),
       justifyContent: "flex-end",
     },
     modalContent: {

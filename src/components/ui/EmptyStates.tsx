@@ -68,7 +68,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       minWidth: spacing.xl * 3.75,
     },
     actionButtonText: {
-      color: "#fff",
+      color: theme.colors.text.inverse,
       fontSize: fontSize.base,
       fontWeight: "600",
       textAlign: "center",

@@ -113,7 +113,7 @@ const DefaultErrorFallback: React.FC<{
       minWidth: spacing.xl * 3.75,
     },
     retryButtonText: {
-      color: "#fff",
+      color: theme.colors.text.inverse,
       fontSize: fontSize.base,
       fontWeight: "600",
       textAlign: "center",
@@ -174,7 +174,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       padding: spacing.md,
       borderRadius: spacing.sm + spacing.xs,
       borderLeftWidth: 4,
-      borderLeftColor: "#B45E5E",
+      borderLeftColor: theme.colors.error[500],
     },
     errorDisplayTitle: {
       fontSize: font2.lg,
@@ -197,7 +197,7 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       flex: 1,
     },
     errorActionText: {
-      color: "#fff",
+      color: theme.colors.text.inverse,
       fontSize: font2.sm,
       fontWeight: "600",
       textAlign: "center",
@@ -309,14 +309,13 @@ export const showErrorAlert = (
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const toastUtil = require("@/utils/toast");
     const titleLower = (title || "").toLowerCase();
-    const variant =
-      titleLower.includes("error")
-        ? "error"
-        : titleLower.includes("success")
-        ? "success"
-        : titleLower.includes("warning")
-        ? "warning"
-        : "info";
+    const variant = titleLower.includes("error")
+      ? "error"
+      : titleLower.includes("success")
+      ? "success"
+      : titleLower.includes("warning")
+      ? "warning"
+      : "info";
 
     if (toastUtil?.showToast) {
       toastUtil.showToast({ message, title, variant });
@@ -380,7 +379,7 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
       minWidth: spacing.xl * 3.75,
     },
     retryButtonText: {
-      color: "#fff",
+      color: theme.colors.text.inverse,
       fontSize: font3.base,
       fontWeight: "600",
       textAlign: "center",
@@ -424,7 +423,9 @@ export const NetworkErrorDisplay: React.FC<{ onRetry?: () => void }> = ({
 };
 
 // Validation Error Component
-export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({ errors }) => {
+export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({
+  errors,
+}) => {
   const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
   const { fontSize: font4 } = useResponsiveTypography();
@@ -437,7 +438,7 @@ export const ValidationErrorDisplay: React.FC<{ errors: string[] }> = ({ errors 
       padding: spacing.md,
       borderRadius: spacing.sm,
       borderWidth: 1,
-      borderColor: "#B45E5E",
+      borderColor: theme.colors.error[500],
     },
     validationTitle: {
       fontSize: font4.base,

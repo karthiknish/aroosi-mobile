@@ -33,6 +33,7 @@ import {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
 import { Responsive } from "@constants/responsive";
+import { rgbaHex } from "@utils/color";
 
 interface VoiceMessageProps {
   audioUri?: string;
@@ -199,7 +200,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       width: spacing.xl * 2,
       height: spacing.xl * 2,
       borderRadius: spacing.xl,
-      backgroundColor: "rgba(255,255,255,0.2)",
+      backgroundColor: rgbaHex(Colors.background.primary, 0.2),
       justifyContent: "center",
       alignItems: "center",
       marginRight: spacing.sm,
@@ -219,12 +220,12 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: "rgba(255,255,255,0.2)",
+      backgroundColor: rgbaHex(Colors.background.primary, 0.2),
       borderRadius: spacing.xl,
     },
     waveformProgress: {
       height: "100%",
-      backgroundColor: "rgba(255,255,255,0.4)",
+      backgroundColor: rgbaHex(Colors.background.primary, 0.4),
       borderRadius: spacing.xl,
     },
     waveform: {

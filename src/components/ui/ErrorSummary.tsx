@@ -36,15 +36,15 @@ export const ErrorSummary: React.FC<ErrorSummaryProps> = ({ errors, title = 'Ple
 const styles = StyleSheet.create({
   container: {
     borderWidth: 1,
-    borderColor: Colors.error[300] ?? '#fca5a5',
-    backgroundColor: Colors.error[50] ?? '#fef2f2',
+    borderColor: Colors.error[300],
+    backgroundColor: Colors.error[50],
     borderRadius: Layout.radius.md,
     padding: Layout.spacing.md,
     marginBottom: Layout.spacing.lg,
   },
   title: {
-    color: Colors.error[700] ?? '#b91c1c',
-    fontWeight: '600',
+    color: Colors.error[700],
+    fontWeight: "600",
     marginBottom: Layout.spacing.xs,
     fontSize: Layout.typography?.fontSize?.base ?? 14,
   },
@@ -52,11 +52,11 @@ const styles = StyleSheet.create({
     gap: Layout.spacing.xs,
   },
   item: {
-    color: Colors.error[700] ?? '#b91c1c',
+    color: Colors.error[700],
     fontSize: Layout.typography?.fontSize?.sm ?? 12,
   },
   more: {
-    color: Colors.error[600] ?? '#dc2626',
+    color: Colors.error[600],
     marginTop: Layout.spacing.xs,
     fontSize: Layout.typography?.fontSize?.sm ?? 12,
   },

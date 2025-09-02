@@ -14,6 +14,7 @@ import { BlockedUserWithProfile } from "@/types/safety";
 import LoadingState from "@components/ui/LoadingState";
 import EmptyState from "@components/ui/EmptyState";
 import ScreenContainer from "@components/common/ScreenContainer";
+import { rgbaHex } from "@utils/color";
 
 interface BlockedUsersScreenProps {
   navigation: any;
@@ -135,7 +136,7 @@ export default function BlockedUsersScreen({
             flex: 1,
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: "rgba(0,0,0,0.3)",
+            backgroundColor: rgbaHex(Colors.text.primary, 0.3),
           }}
         >
           <View

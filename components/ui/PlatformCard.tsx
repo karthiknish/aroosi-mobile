@@ -8,6 +8,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { PlatformDesign, PlatformUtils, Colors } from '../../constants';
+import { rgbaHex } from "@utils/color";
 
 interface PlatformCardProps {
   children: React.ReactNode;
@@ -75,14 +76,15 @@ export default function PlatformCard({
     // Android Material Design with ripple
     if (Platform.OS === 'android' && rippleEffect) {
       return (
-        <View style={[cardStyle, { overflow: 'hidden' }]}>
+        <View style={[cardStyle, { overflow: "hidden" }]}>
           <TouchableNativeFeedback
             onPress={onPress}
-            background={TouchableNativeFeedback.Ripple('rgba(0,0,0,0.1)', false)}
+            background={TouchableNativeFeedback.Ripple(
+              rgbaHex(Colors.text.primary, 0.1),
+              false
+            )}
           >
-            <View style={styles.cardContent}>
-              {children}
-            </View>
+            <View style={styles.cardContent}>{children}</View>
           </TouchableNativeFeedback>
         </View>
       );

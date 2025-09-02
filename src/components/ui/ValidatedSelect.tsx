@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '500',
+    fontWeight: "500",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.error[500],
   },
   selectWrapperValid: {
-    borderColor: Colors.success?.[500] ?? '#22c55e',
+    borderColor: Colors.success[500],
   },
   selectWrapperDisabled: {
     opacity: 0.6,

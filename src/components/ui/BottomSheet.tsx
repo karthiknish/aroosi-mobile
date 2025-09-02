@@ -17,6 +17,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import { Colors, Layout } from "../../../constants";
+import { rgbaHex } from "@utils/color";
 import * as Haptics from "expo-haptics";
 
 const { height: screenHeight } = Dimensions.get("window");
@@ -134,13 +135,13 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
   },
   sheet: {
     backgroundColor: Colors.background.primary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 16,

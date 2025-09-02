@@ -8,6 +8,7 @@ import {
   Pressable,
 } from "react-native";
 import { Colors, Layout } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 type ConfirmModalProps = {
   visible: boolean;
@@ -76,7 +77,7 @@ const CARD_WIDTH = 320;
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.45),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -87,18 +88,18 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     borderRadius: Layout.radius.lg ?? 12,
     padding: Layout.spacing.lg ?? 16,
-    backgroundColor: Colors?.background?.primary ?? "#fff",
+    backgroundColor: Colors.background.primary,
   },
   title: {
     fontFamily: Layout.typography?.fontFamily?.serif,
     fontSize: Layout.typography?.fontSize?.lg ?? 18,
     fontWeight: "700",
-    color: Colors?.text?.primary ?? "#111",
+    color: Colors.text.primary,
     marginBottom: Layout.spacing?.xs ?? 6,
   },
   message: {
     fontSize: Layout.typography?.fontSize?.base ?? 16,
-    color: Colors?.text?.secondary ?? "#333",
+    color: Colors.text.secondary,
     marginBottom: Layout.spacing?.lg ?? 16,
   },
   buttonsRow: {
@@ -112,24 +113,24 @@ const styles = StyleSheet.create({
     borderRadius: Layout.radius?.md ?? 8,
   },
   cancelButton: {
-    backgroundColor: Colors?.background?.secondary ?? "#eee",
+    backgroundColor: Colors.background.secondary,
     borderWidth: 1,
-    borderColor: Colors?.border?.primary ?? "#ddd",
+    borderColor: Colors.border.primary,
   },
   primaryButton: {
-    backgroundColor: Colors?.primary?.[500] ?? "#6b5b95",
+    backgroundColor: Colors.primary[500],
   },
   destructiveButton: {
-    backgroundColor: Colors?.error?.[500] ?? "#e11d48",
+    backgroundColor: Colors.error[500],
   },
   buttonText: {
     fontWeight: "600",
   },
   cancelText: {
-    color: Colors?.text?.primary ?? "#111",
+    color: Colors.text.primary,
   },
   confirmText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontWeight: "700",
   },
 });

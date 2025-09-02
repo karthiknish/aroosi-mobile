@@ -17,6 +17,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Colors, Layout } from "@constants";
+import { rgbaHex } from "@utils/color";
 import * as Haptics from "expo-haptics";
 import {
   useResponsiveSpacing,
@@ -146,11 +147,11 @@ export const Toast: React.FC<ToastProps> = ({
   };
 
   const actionButtonStyle = {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: (typeof spacing?.md === "number" ? spacing.md : 16),
-    paddingVertical: ((typeof spacing?.xs === "number" ? spacing.xs : 4) + 2),
-    borderRadius: (typeof spacing?.md === "number" ? spacing.md : 16),
-    marginLeft: (typeof spacing?.sm === "number" ? spacing.sm : 8),
+    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+    paddingHorizontal: typeof spacing?.md === "number" ? spacing.md : 16,
+    paddingVertical: (typeof spacing?.xs === "number" ? spacing.xs : 4) + 2,
+    borderRadius: typeof spacing?.md === "number" ? spacing.md : 16,
+    marginLeft: typeof spacing?.sm === "number" ? spacing.sm : 8,
   };
 
   const actionTextStyle = {
@@ -161,13 +162,13 @@ export const Toast: React.FC<ToastProps> = ({
   };
 
   const closeButtonStyle = {
-    width: (typeof spacing?.lg === "number" ? spacing.lg : 24),
-    height: (typeof spacing?.lg === "number" ? spacing.lg : 24),
-    borderRadius: (typeof spacing?.md === "number" ? spacing.md : 12),
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: typeof spacing?.lg === "number" ? spacing.lg : 24,
+    height: typeof spacing?.lg === "number" ? spacing.lg : 24,
+    borderRadius: typeof spacing?.md === "number" ? spacing.md : 12,
+    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
     justifyContent: "center" as const,
     alignItems: "center" as const,
-    marginLeft: (typeof spacing?.xs === "number" ? spacing.xs : 4),
+    marginLeft: typeof spacing?.xs === "number" ? spacing.xs : 4,
   };
 
   const closeTextStyle = {
@@ -189,7 +190,11 @@ export const Toast: React.FC<ToastProps> = ({
     >
       <BlurView intensity={80} style={styles.blurContainer}>
         <LinearGradient
-          colors={[config.colors[0], config.colors[1], "rgba(255,255,255,0.1)"]}
+          colors={[
+            config.colors[0],
+            config.colors[1],
+            rgbaHex(Colors.background.primary, 0.1),
+          ]}
           style={styles.gradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -361,7 +366,7 @@ const styles = StyleSheet.create({
     color: Colors.background.primary,
   },
   actionButton: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
   },
   actionText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
@@ -369,7 +374,7 @@ const styles = StyleSheet.create({
     color: Colors.background.primary,
   },
   closeButton: {
-    backgroundColor: "rgba(255,255,255,0.2)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
     justifyContent: "center",
     alignItems: "center",
   },

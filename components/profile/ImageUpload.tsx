@@ -32,6 +32,7 @@ import { ProfileImage, IMAGE_VALIDATION } from "../../types/image";
 import { Colors, Layout } from "../../constants";
 import { useToast } from "../../providers/ToastContext";
 import ConfirmModal from "../../components/ui/ConfirmModal";
+import { rgbaHex } from "@utils/color";
 
 function getImageId(image: ProfileImage): string {
   return (
@@ -659,7 +660,7 @@ const styles = StyleSheet.create({
     gap: Layout.spacing.xs,
   },
   makeMainBtn: {
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.6),
     borderRadius: Layout.radius.sm,
     paddingHorizontal: Layout.spacing.xs,
     paddingVertical: 2,
@@ -669,7 +670,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   reorderBtnText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontWeight: "700",
   },
   arrowRow: {
@@ -677,7 +678,7 @@ const styles = StyleSheet.create({
     gap: Layout.spacing.xs,
   },
   reorderArrow: {
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.6),
     borderRadius: Layout.radius.sm,
     paddingHorizontal: Layout.spacing.xs,
     paddingVertical: 2,
@@ -690,7 +691,7 @@ const styles = StyleSheet.create({
   },
   progressOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.35),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -710,7 +711,7 @@ const styles = StyleSheet.create({
   },
   mainBadgeText: {
     fontSize: Layout.typography.fontSize.xs,
-    color: "white",
+    color: Colors.text.inverse,
     fontWeight: "600",
   },
   deleteButton: {
@@ -725,7 +726,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   deleteButtonText: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.base,
     fontWeight: "bold",
     lineHeight: 16,
@@ -737,12 +738,12 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.7),
     alignItems: "center",
     justifyContent: "center",
   },
   indexText: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.xs,
     fontWeight: "600",
   },
@@ -753,12 +754,12 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 4,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxText: {
-    color: "#fff",
+    color: Colors.text.inverse,
     fontWeight: "700",
   },
   addButton: {

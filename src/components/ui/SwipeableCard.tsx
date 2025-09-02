@@ -24,6 +24,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Colors, Layout } from "@constants";
+import { rgbaHex } from "@utils/color";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 const CARD_WIDTH = screenWidth * 0.9;
@@ -62,12 +63,12 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
   const rotate = useSharedValue(0);
   const scale = useSharedValue(isTopCard ? 1 : 0.95);
   const opacity = useSharedValue(isTopCard ? 1 : 0.8);
-  
+
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
 
   const images = profile.images || [];
-  const mainImage = images.find(img => img.isMain) || images[0];
+  const mainImage = images.find((img) => img.isMain) || images[0];
 
   const triggerHaptic = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -83,7 +84,9 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
     const toValue = direction === "right" ? screenWidth : -screenWidth;
     translateX.value = withTiming(toValue, { duration: 300 });
     translateY.value = withTiming(-100, { duration: 300 });
-    rotate.value = withTiming(direction === "right" ? 30 : -30, { duration: 300 });
+    rotate.value = withTiming(direction === "right" ? 30 : -30, {
+      duration: 300,
+    });
     opacity.value = withTiming(0, { duration: 300 });
 
     setTimeout(() => {
@@ -173,7 +176,7 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
           {currentImage && (
             <Image source={{ uri: currentImage.url }} style={styles.image} />
           )}
-          
+
           {/* Image Navigation Areas */}
           <TouchableOpacity
             style={styles.imageNavLeft}
@@ -198,7 +201,7 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
                       backgroundColor:
                         index === currentImageIndex
                           ? Colors.background.primary
-                          : "rgba(255,255,255,0.5)",
+                          : rgbaHex(Colors.background.primary, 0.5),
                     },
                   ]}
                 />
@@ -207,9 +210,14 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
           )}
 
           {/* Swipe Overlays */}
-          <Animated.View style={[styles.overlay, styles.likeOverlay, likeOverlayStyle]}>
+          <Animated.View
+            style={[styles.overlay, styles.likeOverlay, likeOverlayStyle]}
+          >
             <LinearGradient
-              colors={["rgba(76, 217, 100, 0.8)", "rgba(76, 217, 100, 0.6)"]}
+              colors={[
+                rgbaHex(Colors.success[500], 0.8),
+                rgbaHex(Colors.success[500], 0.6),
+              ]}
               style={styles.overlayGradient}
             >
               <Text style={styles.overlayText}>LIKE</Text>
@@ -217,9 +225,14 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
             </LinearGradient>
           </Animated.View>
 
-          <Animated.View style={[styles.overlay, styles.passOverlay, passOverlayStyle]}>
+          <Animated.View
+            style={[styles.overlay, styles.passOverlay, passOverlayStyle]}
+          >
             <LinearGradient
-              colors={["rgba(255, 59, 48, 0.8)", "rgba(255, 59, 48, 0.6)"]}
+              colors={[
+                rgbaHex(Colors.error[500], 0.8),
+                rgbaHex(Colors.error[500], 0.6),
+              ]}
               style={styles.overlayGradient}
             >
               <Text style={styles.overlayText}>PASS</Text>
@@ -231,7 +244,10 @@ export const SwipeableCard: React.FC<SwipeableCardProps> = ({
         {/* Card Info */}
         <BlurView intensity={80} style={styles.infoContainer}>
           <LinearGradient
-            colors={["rgba(255,255,255,0.9)", "rgba(255,255,255,0.7)"]}
+            colors={[
+              rgbaHex(Colors.background.primary, 0.9),
+              rgbaHex(Colors.background.primary, 0.7),
+            ]}
             style={styles.infoGradient}
           >
             <View style={styles.basicInfo}>
@@ -297,7 +313,7 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     borderRadius: 20,
     backgroundColor: Colors.background.primary,
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
@@ -343,7 +359,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     marginHorizontal: 2,
-    backgroundColor: "rgba(255,255,255,0.5)",
+    backgroundColor: rgbaHex(Colors.background.primary, 0.5),
   },
   overlay: {
     position: "absolute",
@@ -366,7 +382,7 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.8)",
+    borderColor: rgbaHex(Colors.background.primary, 0.8),
   },
   overlayText: {
     fontFamily: Layout.typography.fontFamily.serif,
@@ -415,7 +431,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   pill: {
-    backgroundColor: "rgba(0,0,0,0.1)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.1),
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 15,
@@ -438,7 +454,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

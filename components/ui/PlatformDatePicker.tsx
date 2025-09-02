@@ -14,6 +14,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { PlatformDesign, PlatformUtils, Colors, Layout } from "../../constants";
 import PlatformButton from "./PlatformButton";
+import { rgbaHex } from "@utils/color";
 
 interface PlatformDatePickerProps {
   value?: Date;
@@ -227,7 +228,7 @@ const styles = StyleSheet.create({
   // iOS Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "flex-end",
   },
 

@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Layout } from '../../constants';
+import { rgbaHex } from "@utils/color";
 import { useBlockUser, useUnblockUser } from "@/hooks/useSafety";
 import { showSuccessToast, showErrorToast } from "@utils/toast";
 import PlatformHaptics from "@utils/PlatformHaptics";
@@ -210,24 +211,24 @@ export default function BlockUserModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: Layout.spacing.lg,
   },
   modal: {
     backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.xl,
-    width: '100%',
-    maxHeight: '80%',
-    shadowColor: '#000',
+    width: "100%",
+    maxHeight: "80%",
+    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 10,
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: Layout.spacing.xl,
     paddingHorizontal: Layout.spacing.lg,
     borderBottomWidth: 1,
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Layout.typography.fontSize.xl,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
   },
   alternativesTitle: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.text.primary,
     marginBottom: Layout.spacing.sm,
   },
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.xs,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.lg,
     borderTopWidth: 1,
@@ -323,18 +324,18 @@ const styles = StyleSheet.create({
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
     backgroundColor: Colors.background.secondary,
-    alignItems: 'center',
+    alignItems: "center",
   },
   cancelButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '500',
+    fontWeight: "500",
     color: Colors.text.primary,
   },
   actionButton: {
     flex: 1,
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionButtonDisabled: {
     opacity: 0.6,
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: Layout.typography.fontSize.base,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   blockButtonText: {
     color: Colors.background.primary,

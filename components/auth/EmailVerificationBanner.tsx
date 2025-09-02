@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from '@contexts/AuthProvider';
 import { Colors, Layout } from '@constants';
 import { useToast } from '@providers/ToastContext';
+import { rgbaHex } from "@utils/color";
 
 export const EmailVerificationBanner: React.FC = () => {
   const {
@@ -118,12 +119,12 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   container: {
-    backgroundColor: Colors.warning?.[500] || "#f59e0b",
+    backgroundColor: Colors.warning[500],
     paddingVertical: Layout?.spacing?.sm || 8,
     paddingHorizontal: Layout?.spacing?.md || 12,
   },
   message: {
-    color: Colors.text?.inverse || "#fff",
+    color: Colors.text.inverse,
     fontWeight: "600",
     marginBottom: 6,
   },
@@ -132,14 +133,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   button: {
-    backgroundColor: "rgba(0,0,0,0.25)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.25),
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 6,
     marginRight: 8,
   },
   disabled: { opacity: 0.6 },
-  buttonText: { color: "#fff", fontWeight: "600" },
+  buttonText: { color: Colors.text.inverse, fontWeight: "600" },
 });
 
 export default EmailVerificationBanner;

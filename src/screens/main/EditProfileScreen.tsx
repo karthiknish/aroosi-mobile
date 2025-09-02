@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary[500],
   },
   checkmark: {
-    color: "white",
+    color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.base,
     fontWeight: "bold",
   },

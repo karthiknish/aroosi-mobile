@@ -28,6 +28,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { Colors } from "../../../constants/Colors";
+import { rgbaHex } from "@utils/color";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
@@ -149,7 +150,11 @@ const ZoomableImage: React.FC<ZoomableImageProps> = ({
   return (
     <GestureDetector gesture={composedGesture}>
       <Animated.View style={[styles.zoomableContainer, animatedStyle]}>
-        <Image source={{ uri }} style={styles.zoomableImage} resizeMode="contain" />
+        <Image
+          source={{ uri }}
+          style={styles.zoomableImage}
+          resizeMode="contain"
+        />
       </Animated.View>
     </GestureDetector>
   );
@@ -173,7 +178,9 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   const toggleControls = () => {
     const newShowControls = !showControls;
     setShowControls(newShowControls);
-    controlsOpacity.value = withTiming(newShowControls ? 1 : 0, { duration: 300 });
+    controlsOpacity.value = withTiming(newShowControls ? 1 : 0, {
+      duration: 300,
+    });
   };
 
   const handlePhotoChange = (index: number) => {
@@ -221,7 +228,13 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     </View>
   );
 
-  const renderThumbnail = ({ item, index }: { item: PhotoItem; index: number }) => (
+  const renderThumbnail = ({
+    item,
+    index,
+  }: {
+    item: PhotoItem;
+    index: number;
+  }) => (
     <TouchableOpacity
       style={[
         styles.thumbnail,
@@ -254,7 +267,12 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       <View style={styles.galleryContainer}>
         {/* Background */}
         <BlurView intensity={100} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.9)" }]} />
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: rgbaHex(Colors.text.primary, 0.9) },
+          ]}
+        />
 
         {/* Main Photo */}
         <FlatList
@@ -267,7 +285,9 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={initialIndex}
           onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / screenWidth);
+            const index = Math.round(
+              event.nativeEvent.contentOffset.x / screenWidth
+            );
             handlePhotoChange(index);
           }}
           getItemLayout={(_, index) => ({
@@ -282,14 +302,17 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           {/* Header */}
           <SafeAreaView style={styles.header}>
             <LinearGradient
-              colors={["rgba(0,0,0,0.8)", "transparent"]}
+              colors={[rgbaHex(Colors.text.primary, 0.8), "transparent"]}
               style={styles.headerGradient}
             >
               <View style={styles.headerContent}>
-                <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={handleClose}
+                >
                   <Text style={styles.closeButtonText}>✕</Text>
                 </TouchableOpacity>
-                
+
                 <View style={styles.photoInfo}>
                   <Text style={styles.photoCounter}>
                     {currentIndex + 1} of {photos.length}
@@ -310,7 +333,10 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
 
           {/* Navigation Arrows */}
           {currentIndex > 0 && (
-            <TouchableOpacity style={styles.navButtonLeft} onPress={goToPrevious}>
+            <TouchableOpacity
+              style={styles.navButtonLeft}
+              onPress={goToPrevious}
+            >
               <View style={styles.navButtonBackground}>
                 <Text style={styles.navButtonText}>‹</Text>
               </View>
@@ -329,7 +355,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           {photos.length > 1 && (
             <View style={styles.bottomControls}>
               <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.8)"]}
+                colors={["transparent", rgbaHex(Colors.text.primary, 0.8)]}
                 style={styles.bottomGradient}
               >
                 <FlatList
@@ -406,7 +432,7 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
 const styles = StyleSheet.create({
   galleryContainer: {
     flex: 1,
-    backgroundColor: "black",
+    backgroundColor: Colors.background.primary,
   },
   photoContainer: {
     width: screenWidth,
@@ -449,7 +475,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "center",
     alignItems: "center",
   },
@@ -479,7 +505,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "center",
     alignItems: "center",
   },
@@ -504,7 +530,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
     justifyContent: "center",
     alignItems: "center",
   },

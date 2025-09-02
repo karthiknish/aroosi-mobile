@@ -4,6 +4,7 @@ import {
   PixelRatio,
   Platform,
 } from "react-native";
+import { Colors } from "@constants";
 
 /**
  * Canonical responsive hooks expected by consumers:
@@ -176,41 +177,44 @@ export const useResponsive = () => {
   }), [scale, config.isTablet]);
 
   // Shadows
-  const shadows = useMemo(() => ({
-    small: Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: scale.radius(2),
-      },
-      android: {
-        elevation: scale.spacing(2),
-      },
+  const shadows = useMemo(
+    () => ({
+      small: Platform.select({
+        ios: {
+          shadowColor: Colors.neutral[900],
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.1,
+          shadowRadius: scale.radius(2),
+        },
+        android: {
+          elevation: scale.spacing(2),
+        },
+      }),
+      medium: Platform.select({
+        ios: {
+          shadowColor: Colors.neutral[900],
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: scale.radius(4),
+        },
+        android: {
+          elevation: scale.spacing(4),
+        },
+      }),
+      large: Platform.select({
+        ios: {
+          shadowColor: Colors.neutral[900],
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.15,
+          shadowRadius: scale.radius(8),
+        },
+        android: {
+          elevation: scale.spacing(8),
+        },
+      }),
     }),
-    medium: Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: scale.radius(4),
-      },
-      android: {
-        elevation: scale.spacing(4),
-      },
-    }),
-    large: Platform.select({
-      ios: {
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: scale.radius(8),
-      },
-      android: {
-        elevation: scale.spacing(8),
-      },
-    }),
-  }), [scale]);
+    [scale]
+  );
 
   // Utility functions
   const utils = useMemo(() => ({
