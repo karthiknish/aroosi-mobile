@@ -21,9 +21,8 @@ import {
   sendPasswordResetEmail,
   verifyPasswordResetCode,
   confirmPasswordReset,
-} from 'firebase/auth';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from "expo-web-browser";
+} from "firebase/auth";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 
@@ -107,8 +106,6 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   // Synchronous initialize (will no-op after first call)
   initFirebase();
-  // Ensure AuthSession flows can close their browser windows/popups
-  WebBrowser.maybeCompleteAuthSession();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -366,84 +363,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = useCallback(async () => {
     try {
-      // Prefer platform-specific client IDs, fall back to a generic one if provided
+      // Configure Google Sign-In once (idempotent). Prefer platform client IDs.
       const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
       const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
       const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-      const genericClientId =
-        process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
-        process.env.GOOGLE_OAUTH_CLIENT_ID;
 
-      const clientId =
-        Platform.OS === "ios"
-          ? iosClientId || genericClientId
-          : Platform.OS === "android"
-          ? androidClientId || genericClientId
-          : webClientId || genericClientId;
-
-      if (!clientId)
-        return { success: false, error: "Missing Google client id" };
-
-      // Build discovery and request config (Authorization Code with PKCE by default)
-      const discovery = await AuthSession.fetchDiscoveryAsync(
-        "https://accounts.google.com"
-      );
-
-      // Use makeRedirectUri which respects your app scheme in dev builds
-      const redirectUri = AuthSession.makeRedirectUri();
-
-      // Load an AuthRequest programmatically (equivalent to useAuthRequest)
-      const request = await AuthSession.loadAsync(
-        {
-          clientId,
-          scopes: ["openid", "email", "profile"],
-          // ResponseType.Code is default; using PKCE for security
-          redirectUri,
-        },
-        discovery
-      );
-
-      // Prompt the user; returns AuthSessionResult
-      const response = await request.promptAsync(discovery, {
-        // you can pass presentation options if desired
+      // Accept either individual client IDs or a single webClientId fallback for profile fetching scopes
+      GoogleSignin.configure({
+        iosClientId: iosClientId,
+        webClientId: webClientId,
+        // Force refresh to ensure we get idToken on Android too
+        offlineAccess: true,
       });
 
-      if (response.type !== "success") {
-        return { success: false, error: "Google auth canceled" };
+      // Prompt user with native Google account picker
+      await GoogleSignin.hasPlayServices({
+        showPlayServicesUpdateDialog: true,
+      }).catch(() => {});
+      const result = await GoogleSignin.signIn();
+      if (result.type !== "success") {
+        return { success: false, error: "Canceled" };
+      }
+      // Retrieve tokens after a successful sign in
+      const tokens = await GoogleSignin.getTokens();
+      const idToken = tokens?.idToken;
+      const accessToken = tokens?.accessToken;
+      if (!idToken && !accessToken) {
+        return { success: false, error: "Google sign-in failed: no tokens" };
       }
 
-      // Either response.authentication (implicit) or response.params.code (auth code)
-      // By default with PKCE, we should have an auth code to exchange.
-      const code = (response as any).params?.code as string | undefined;
-      const accessToken = (response as any).authentication?.accessToken as
-        | string
-        | undefined;
+      const credential = idToken
+        ? GoogleAuthProvider.credential(idToken)
+        : GoogleAuthProvider.credential(undefined, accessToken!);
 
-      let tokenToUse: string | undefined = accessToken;
-
-      if (!tokenToUse && code) {
-        // Exchange the code for tokens on-device (no client secret)
-        const tokenResponse = await AuthSession.exchangeCodeAsync(
-          {
-            clientId,
-            code,
-            redirectUri,
-          },
-          discovery
-        );
-        tokenToUse = tokenResponse.accessToken ?? undefined;
-      }
-
-      if (!tokenToUse) {
-        return { success: false, error: "No access token returned by Google" };
-      }
-
-      // Sign into Firebase using Google access token
-      const credential = GoogleAuthProvider.credential(undefined, tokenToUse);
       await signInWithCredential(getFirebaseAuth(), credential);
       await refreshUser();
       return { success: true };
     } catch (e: any) {
+      const code = e?.code || "";
+      if (
+        code === "12501" ||
+        code === "12502" ||
+        code === "ERR_CANCELED" ||
+        code === "CANCELED"
+      ) {
+        return { success: false, error: "Canceled" };
+      }
       return { success: false, error: e?.message || "Google sign-in failed" };
     }
   }, [refreshUser]);

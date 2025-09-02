@@ -21,6 +21,7 @@ import {
   validateUpdateProfile as validateProfileData,
 } from "./profileValidation";
 import { getAuthToken } from "../services/authToken";
+import { MessageValidator } from "./messageValidation";
 
 // Base URL must be provided via environment
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL as string;
@@ -242,11 +243,11 @@ class ApiClient {
   }
 
   async getProfileById(profileId: string): Promise<ApiResponse<Profile>> {
-  const res = await this.request<any>(`/profile-detail/${profileId}`);
-  if (!res.success) return res as ApiResponse<Profile>;
-  const payload = res.data as any;
-  const profile: any = payload?.profile ?? payload?.data?.profile ?? payload;
-  return { success: true, data: profile as Profile };
+    const res = await this.request<any>(`/profile-detail/${profileId}`);
+    if (!res.success) return res as ApiResponse<Profile>;
+    const payload = res.data as any;
+    const profile: any = payload?.profile ?? payload?.data?.profile ?? payload;
+    return { success: true, data: profile as Profile };
   }
 
   async createProfile(
@@ -356,10 +357,54 @@ class ApiClient {
     if (response.success && response.data) {
       const base: any = response.data as any;
       const envelope = base?.data ?? base;
-      const profiles = Array.isArray(envelope?.profiles)
+      const rawProfiles: any[] = Array.isArray(envelope?.profiles)
         ? envelope.profiles
+        : Array.isArray(envelope)
+        ? envelope
         : [];
-      const total = typeof envelope?.total === "number" ? envelope.total : 0;
+
+      // Normalize each profile item to ProfileSearchResult shape
+      const profiles = rawProfiles.map((item: any) => {
+        // Derive a consistent userId
+        const userId =
+          item?.userId || item?.id || item?._id || item?.profileId || "";
+
+        // Determine nested profile object
+        const nested =
+          item?.profile && typeof item.profile === "object"
+            ? item.profile
+            : undefined;
+
+        // Collect top-level fields that should live under profile
+        const top = {
+          fullName: item?.fullName || item?.name || nested?.fullName || "",
+          city: item?.city || nested?.city,
+          dateOfBirth: item?.dateOfBirth || item?.dob || nested?.dateOfBirth,
+          profileImageUrls:
+            (Array.isArray(item?.profileImageUrls) && item.profileImageUrls) ||
+            (Array.isArray(item?.images) && item.images) ||
+            (Array.isArray(item?.profile?.profileImageUrls) &&
+              item.profile.profileImageUrls) ||
+            [],
+        } as any;
+
+        // Ensure array type for profileImageUrls
+        if (!Array.isArray(top.profileImageUrls)) {
+          top.profileImageUrls = [];
+        }
+
+        return {
+          userId,
+          email: item?.email,
+          profile: {
+            ...nested,
+            ...top,
+          },
+        };
+      });
+
+      const total =
+        typeof envelope?.total === "number" ? envelope.total : profiles.length;
       const nextCursor = envelope?.nextCursor ?? null;
       const nextPage = envelope?.nextPage ?? null;
       const hasMore =
@@ -608,7 +653,6 @@ class ApiClient {
     options?: { limit?: number; before?: number }
   ): Promise<ApiResponse<Message[]>> {
     // Validate conversation ID
-    const { MessageValidator } = await import("./messageValidation");
     const validation = MessageValidator.validateConversationId(conversationId);
     if (!validation.valid) {
       return {
@@ -654,7 +698,6 @@ class ApiClient {
     };
   }): Promise<ApiResponse<Message>> {
     // Validate message data
-    const { MessageValidator } = await import("./messageValidation");
     const validation = MessageValidator.validateMessageSendData(data);
     if (!validation.valid) {
       return {

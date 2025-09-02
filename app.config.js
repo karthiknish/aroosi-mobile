@@ -7,19 +7,24 @@ module.exports = () => {
 
   return {
     ...base,
+    plugins: [
+      ...(base.plugins || []),
+      // Enable native Google Sign-In config plugin
+      "@react-native-google-signin/google-signin",
+    ],
     ios: {
       ...base.ios,
       googleServicesFile:
         process.env.GOOGLE_SERVICE_INFO_PLIST ??
         base.ios?.googleServicesFile ??
-        './ios/Aroosi/GoogleService-Info.plist',
+        "./ios/Aroosi/GoogleService-Info.plist",
     },
     android: {
       ...base.android,
       googleServicesFile:
         process.env.GOOGLE_SERVICES_JSON ??
         base.android?.googleServicesFile ??
-        './android/app/google-services.json',
+        "./android/app/google-services.json",
     },
   };
 };
