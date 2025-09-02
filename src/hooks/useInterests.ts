@@ -18,10 +18,7 @@ export interface UseInterestsResult {
   loadSentInterests: () => Promise<void>;
   loadReceivedInterests: () => Promise<void>;
   sendInterest: (toUserId: string) => Promise<boolean>;
-  /**
-   * @deprecated Manual interest responses are not supported in auto-matching system
-   * This method is kept for backward compatibility but will always return false
-   */
+  // Parity with web: respondToInterest available but may be no-op depending on backend
   respondToInterest: (
     interestId: string,
     response: "accept" | "reject"
@@ -139,21 +136,24 @@ export function useInterests(): UseInterestsResult {
     [user, sending, apiClient, loadSentInterests]
   );
 
-  // Respond to interest (accept/reject)
-  // @deprecated - Auto-matching system handles interest responses automatically
+  // Respond to interest (accept/reject) - mirrors web endpoint
   const respondToInterest = useCallback(
     async (
       interestId: string,
       response: "accept" | "reject"
     ): Promise<boolean> => {
-      console.warn(
-        "respondToInterest is deprecated. Auto-matching system handles interest responses automatically when mutual interest is detected."
-      );
-      
-      // Return false to indicate this action is not supported
-      return false;
+      try {
+        const res = await apiClient.respondToInterest(
+          interestId,
+          response === "accept" ? "accepted" : "rejected"
+        );
+        return !!res.success;
+      } catch (e) {
+        console.error("respondToInterest failed", e);
+        return false;
+      }
     },
-    []
+    [apiClient]
   );
 
   // Remove interest - matches main project behavior

@@ -428,49 +428,48 @@ class ApiClient {
 
   // Interest APIs (Auto-matching system)
   async sendInterest(toUserId: string): Promise<ApiResponse<Interest>> {
+    // Parity with web: POST /api/interests with action payload
     return this.request("/interests", {
       method: "POST",
-      body: JSON.stringify({ toUserId }),
+      body: JSON.stringify({ action: "send", toUserId }),
     });
   }
 
   async removeInterest(toUserId: string): Promise<ApiResponse<void>> {
+    // Parity with web: POST /api/interests with action remove
     return this.request("/interests", {
-      method: "DELETE",
-      body: JSON.stringify({ toUserId }),
-    });
+      method: "POST",
+      body: JSON.stringify({ action: "remove", toUserId }),
+    }) as unknown as ApiResponse<void>;
   }
 
   // Get sent interests - returns interests with profile enrichment
   async getSentInterests(userId?: string): Promise<ApiResponse<Interest[]>> {
-    const params = userId ? `?userId=${userId}` : "";
-    return this.request(`/interests${params}`);
+    // Parity with web: GET /api/interests (auth determines current user)
+    // userId is ignored (backward compatibility with existing call sites)
+    return this.request(`/interests`);
   }
 
   // Get received interests - returns interests with profile enrichment
   async getReceivedInterests(
     userId?: string
   ): Promise<ApiResponse<Interest[]>> {
-    const params = userId ? `?userId=${userId}` : "";
-    return this.request(`/interests/received${params}`);
+    // Parity with web: GET /api/interests/received (auth determines current user)
+    // userId is ignored (backward compatibility)
+    return this.request(`/interests/received`);
   }
 
   // Interest response not available via API - auto-matching system
   // When both users send interests to each other, they automatically match
-  async respondToInterest(): Promise<ApiResponse<never>> {
-    console.warn(
-      "respondToInterest: Auto-matching system - interests automatically match when mutual"
-    );
-    return {
-      success: false,
-      error: {
-        code: "AUTO_MATCHING_SYSTEM",
-        message:
-          "Auto-matching system - interests automatically match when both users express interest",
-        details:
-          "Manual interest responses are not supported. Matches are created automatically when mutual interest is detected.",
-      },
-    };
+  async respondToInterest(
+    interestId: string,
+    status: "accepted" | "rejected"
+  ): Promise<ApiResponse<{ success?: boolean }>> {
+    // Parity with web: POST /api/interests with action respond
+    return this.request(`/interests`, {
+      method: "POST",
+      body: JSON.stringify({ action: "respond", interestId, status }),
+    });
   }
 
   // Messaging Image Upload (parity with web /api/messages/upload-image)
@@ -499,12 +498,43 @@ class ApiClient {
   }
 
   async getInterestStatus(
-    fromUserId: string,
+    _fromUserId: string,
     toUserId: string
-  ): Promise<ApiResponse<{ status: string; hasInterest: boolean }>> {
-    return this.request(
-      `/interests/status?fromUserId=${fromUserId}&toUserId=${toUserId}`
+  ): Promise<ApiResponse<{ status: string; hasInterest?: boolean }>> {
+    // Parity with web: primary endpoint /api/interests/status?targetUserId=...
+    // Fallback: /api/interests?mode=status&userId=...
+    // Note: _fromUserId is ignored; server infers from auth.
+    // Try primary endpoint
+    const primary = await this.request<any>(
+      `/interests/status?targetUserId=${encodeURIComponent(String(toUserId))}`
     );
+    if (primary.success) {
+      const payload = primary.data as any;
+      // Some servers return { success, data: { status } }, normalize
+      const status = payload?.status ?? payload?.data?.status;
+      if (status) {
+        return { success: true, data: { status } } as any;
+      }
+    }
+    // Fallback
+    const fallback = await this.request<any>(
+      `/interests?mode=status&userId=${encodeURIComponent(String(toUserId))}`
+    );
+    if (fallback.success) {
+      const payload = fallback.data as any;
+      const status = payload?.status ?? payload?.data?.status;
+      if (status) {
+        return { success: true, data: { status } } as any;
+      }
+    }
+    return {
+      success: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "Interest status unavailable",
+        details: null,
+      },
+    } as any;
   }
 
   // Safety APIs
