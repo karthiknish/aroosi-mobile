@@ -30,11 +30,15 @@ import InterestsScreen from "@screens/main/InterestsScreen";
 import ConversationListScreen from "@screens/main/ConversationListScreen";
 import ChatScreen from "@screens/main/ChatScreen";
 import SettingsScreen from "@screens/settings/SettingsScreen";
+import PrivacySettingsScreen from "@screens/settings/PrivacySettingsScreen";
 import IcebreakersScreen from "@screens/main/IcebreakersScreen";
 import ContactScreen from "@screens/support/ContactScreen";
 import AIChatbotScreen from "@screens/support/AIChatbotScreen";
 import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import QuickPicksScreen from "@screens/main/QuickPicksScreen";
+import NotificationSettingsScreen from "@screens/settings/NotificationSettingsScreen";
+import BlockedUsersScreen from "@screens/settings/BlockedUsersScreen";
+import SafetyGuidelinesScreen from "@screens/settings/SafetyGuidelinesScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 import { TabBarProvider } from "@contexts/TabBarContext";
 
@@ -119,6 +123,11 @@ function ProfileStackNavigator() {
         options={getScreenTransition("Settings")}
       />
       <ProfileStack.Screen
+        name="Privacy"
+        component={withSC(PrivacySettingsScreen)}
+        options={getScreenTransition("default")}
+      />
+      <ProfileStack.Screen
         name="Subscription"
         component={withSC(SubscriptionScreen)}
         options={getScreenTransition("Subscription")}
@@ -141,6 +150,21 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen
         name="Shortlists"
         component={withSC(ShortlistsScreen)}
+        options={getScreenTransition("default")}
+      />
+      <ProfileStack.Screen
+        name="NotificationSettings"
+        component={withSC(NotificationSettingsScreen)}
+        options={getScreenTransition("default")}
+      />
+      <ProfileStack.Screen
+        name="BlockedUsers"
+        component={withSC(BlockedUsersScreen)}
+        options={getScreenTransition("default")}
+      />
+      <ProfileStack.Screen
+        name="Safety"
+        component={withSC(SafetyGuidelinesScreen)}
         options={getScreenTransition("default")}
       />
     </ProfileStack.Navigator>

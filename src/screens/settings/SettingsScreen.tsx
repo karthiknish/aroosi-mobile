@@ -16,6 +16,7 @@ import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
 import { useApiClient } from "@/utils/api";
 import VerifyEmailInline from "@components/auth/VerifyEmailInline";
+import * as Linking from "expo-linking";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
 import UpgradePrompt from "@components/subscription/UpgradePrompt";
@@ -56,6 +57,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
+  const [hideFromFreeUsers, setHideFromFreeUsers] = useState<boolean>(false);
   const toast = useToast();
   const apiClient = useApiClient();
   const [resendLoading, setResendLoading] = useState(false);
@@ -133,7 +135,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     );
   };
 
-  // Email verification actions handled by VerifyEmailInline component
+  // Hydrate settings from server
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await apiClient.getUserProfile();
+      if (!cancelled && res.success && (res.data as any)?.data) {
+        const profile = (res.data as any).data;
+        setHideFromFreeUsers(!!profile?.hideFromFreeUsers);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiClient]);
 
   const settingSections = [
     {
@@ -150,6 +165,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Manage your premium features",
           type: "navigation" as const,
           onPress: () => navigation.navigate("Subscription"),
+        },
+        {
+          title: "Notifications",
+          subtitle: "Choose which alerts you receive",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("NotificationSettings" as any),
         },
         {
           title: "Privacy Settings",
@@ -181,6 +202,22 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     {
       title: "Privacy",
       items: [
+        {
+          title: "Hide from free users",
+          subtitle: "Only paid members can view your profile",
+          type: "toggle" as const,
+          value: hideFromFreeUsers,
+          onToggle: async (val: boolean) => {
+            const access = await checkFeatureAccess("canHideFromFreeUsers");
+            if (!access.allowed) {
+              setRecommendedTier("premium");
+              setUpgradeVisible(true);
+              return;
+            }
+            setHideFromFreeUsers(val);
+            await apiClient.updateUserProfile({ hideFromFreeUsers: val });
+          },
+        },
         {
           title: "Show Online Status",
           subtitle: "Let others see when you're online",
@@ -221,6 +258,49 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       ],
     },
     {
+      title: "Premium Quick Actions",
+      items: [
+        {
+          title: "Boost Profile",
+          subtitle: "Get more visibility for 24 hours",
+          type: "action" as const,
+          onPress: async () => {
+            const access = await checkFeatureAccess("canBoostProfile");
+            if (!access.allowed) {
+              setRecommendedTier("premium");
+              setUpgradeVisible(true);
+              return;
+            }
+            const res = await apiClient.boostProfile();
+            if ((res as any)?.success === false) {
+              toast.show((res as any)?.error || "Failed to boost", "error");
+            } else {
+              toast.show("Boost activated", "success");
+            }
+          },
+        },
+        {
+          title: "Activate Spotlight",
+          subtitle: "Show spotlight badge (Premium Plus)",
+          type: "action" as const,
+          onPress: async () => {
+            const access = await checkFeatureAccess("canUseIncognitoMode");
+            if (!access.allowed) {
+              setRecommendedTier("premiumPlus");
+              setUpgradeVisible(true);
+              return;
+            }
+            const res = await apiClient.activateSpotlight();
+            if ((res as any)?.success === false) {
+              toast.show((res as any)?.error || "Failed to activate", "error");
+            } else {
+              toast.show("Spotlight activated", "success");
+            }
+          },
+        },
+      ],
+    },
+    {
       title: "Safety & Support",
       items: [
         {
@@ -246,7 +326,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Read our terms and conditions",
           type: "action" as const,
           onPress: () => {
-            toast.show("Opening Terms of Service in browser…", "info");
+            try {
+              const origin = new URL((apiClient as any).baseUrl || "").origin;
+              Linking.openURL(`${origin}/terms`);
+            } catch {
+              Linking.openURL("/terms");
+            }
           },
         },
         {
@@ -254,7 +339,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Learn how we protect your data",
           type: "action" as const,
           onPress: () => {
-            toast.show("Opening Privacy Policy in browser…", "info");
+            try {
+              const origin = new URL((apiClient as any).baseUrl || "").origin;
+              Linking.openURL(`${origin}/privacy`);
+            } catch {
+              Linking.openURL("/privacy");
+            }
           },
         },
       ],
@@ -273,6 +363,31 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           type: "action" as const,
           onPress: handleDeleteAccount,
           destructive: true,
+        },
+      ],
+    },
+    {
+      title: "Usage",
+      items: [
+        {
+          title: "Usage Summary",
+          subtitle: "View remaining boosts and daily limits",
+          type: "action" as const,
+          onPress: async () => {
+            const res = await apiClient.getUsageStats();
+            if (!res.success) {
+              toast.show(
+                res.error?.message || "Failed to fetch usage",
+                "error"
+              );
+            } else {
+              const u: any = res.data;
+              const msg = `Likes today: ${u?.likesUsed ?? 0}/${
+                u?.likesLimit ?? "-"
+              }\nBoosts remaining: ${u?.boostsRemaining ?? 0}`;
+              toast.show(msg, "info");
+            }
+          },
         },
       ],
     },

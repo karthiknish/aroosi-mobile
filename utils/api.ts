@@ -172,6 +172,22 @@ class ApiClient {
     return this.request<Profile>("/profile");
   }
 
+  // Unified User Profile APIs (parity with web /api/user/profile)
+  async getUserProfile(): Promise<ApiResponse<any>> {
+    // Returns { success: true, data: UserProfile }
+    return this.request<any>("/user/profile");
+  }
+
+  async updateUserProfile(
+    updates: Record<string, any>
+  ): Promise<ApiResponse<any>> {
+    // PUT partial updates, server will strip protected fields
+    return this.request<any>("/user/profile", {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  }
+
   // Engagement: Icebreakers
   async fetchIcebreakers(): Promise<ApiResponse<Icebreaker[]>> {
     const res = await this.request<Icebreaker[]>("/icebreakers");
@@ -1018,6 +1034,13 @@ class ApiClient {
   // Profile boost
   async boostProfile() {
     return this.request("/profile/boost", {
+      method: "POST",
+    });
+  }
+
+  // Spotlight badge (Premium Plus)
+  async activateSpotlight() {
+    return this.request("/profile/spotlight", {
       method: "POST",
     });
   }

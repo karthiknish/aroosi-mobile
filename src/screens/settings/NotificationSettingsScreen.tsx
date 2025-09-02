@@ -13,6 +13,7 @@ import {
   Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useApiClient } from "@/utils/api";
 import { useOneSignal } from "@/hooks/useOneSignal";
 import { NotificationPermissionsManager } from "@utils/notificationPermissions";
 import { NotificationHandler } from "@utils/notificationHandler";
@@ -76,6 +77,7 @@ export default function NotificationSettingsScreen() {
     unregisterFromPushNotifications,
   } = useOneSignal();
 
+  const api = useApiClient();
   const [preferences, setPreferences] = useState<NotificationPreferences>(
     defaultNotificationPreferences
   );
@@ -85,9 +87,9 @@ export default function NotificationSettingsScreen() {
   const [systemPermissionStatus, setSystemPermissionStatus] =
     useState<NotificationPermissionStatus>("undetermined");
 
-  // Load preferences on mount
+  // Load preferences on mount (hydrate from server, fallback to local)
   useEffect(() => {
-    loadPreferences();
+    hydratePreferences();
     checkSystemPermissions();
   }, []);
 
@@ -99,15 +101,51 @@ export default function NotificationSettingsScreen() {
   /**
    * Load notification preferences from storage
    */
-  const loadPreferences = async (): Promise<void> => {
+  const hydratePreferences = async (): Promise<void> => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsedPreferences = JSON.parse(stored);
-        setPreferences({
+      // Try server first
+      const res = await api.getUserProfile();
+      if (res.success && (res.data as any)?.data?.notificationPreferences) {
+        const webPrefs = (res.data as any).data.notificationPreferences as {
+          messages?: boolean;
+          likes?: boolean;
+          matches?: boolean;
+          profileViews?: boolean;
+          promotions?: boolean;
+        };
+        const mapped: NotificationPreferences = {
           ...defaultNotificationPreferences,
-          ...parsedPreferences,
-        });
+          newMessages: !!webPrefs.messages,
+          newInterests: !!webPrefs.likes,
+          newMatches: !!webPrefs.matches,
+          profileViews: !!webPrefs.profileViews,
+          subscriptionUpdates: !!webPrefs.promotions,
+          systemNotifications: true, // not modeled on web; keep enabled by default
+          // Preserve local-only settings if present in storage
+          sound: defaultNotificationPreferences.sound,
+          vibration: defaultNotificationPreferences.vibration,
+        };
+        try {
+          const stored = await AsyncStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            mapped.sound = parsed?.sound ?? mapped.sound;
+            mapped.vibration = parsed?.vibration ?? mapped.vibration;
+            mapped.doNotDisturbStart = parsed?.doNotDisturbStart;
+            mapped.doNotDisturbEnd = parsed?.doNotDisturbEnd;
+          }
+        } catch {}
+        setPreferences(mapped);
+      } else {
+        // Fallback to local cache
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsedPreferences = JSON.parse(stored);
+          setPreferences({
+            ...defaultNotificationPreferences,
+            ...parsedPreferences,
+          });
+        }
       }
     } catch (error) {
       console.error("Error loading notification preferences:", error);
@@ -125,6 +163,17 @@ export default function NotificationSettingsScreen() {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newPreferences));
       setPreferences(newPreferences);
+      // Persist to server (map to web schema)
+      const webPrefs = {
+        notificationPreferences: {
+          messages: !!newPreferences.newMessages,
+          likes: !!newPreferences.newInterests,
+          matches: !!newPreferences.newMatches,
+          profileViews: !!newPreferences.profileViews,
+          promotions: !!newPreferences.subscriptionUpdates,
+        },
+      };
+      await api.updateUserProfile(webPrefs);
       toast.show("Notification preferences saved", "success");
     } catch (error) {
       console.error("Error saving notification preferences:", error);

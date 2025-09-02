@@ -29,6 +29,10 @@ export type ProfileStackParamList = {
   Icebreakers: undefined;
   Shortlists: undefined;
   AIChatbot: undefined;
+  Privacy: undefined;
+  NotificationSettings: undefined;
+  BlockedUsers: undefined;
+  Safety: undefined;
 };
 
 export type ChatStackParamList = {
