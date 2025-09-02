@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "scheme": "aroosi",
     "description": "Find your perfect match in the Afghan community. Connect with like-minded individuals for meaningful relationships and marriage.",
     "platforms": ["ios", "android"],

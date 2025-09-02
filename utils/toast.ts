@@ -1,5 +1,5 @@
 import { Alert, Platform } from "react-native";
-import Toast from "react-native-toast-message";
+import { Toast } from "@providers/ToastContext";
 
 export interface ToastConfig {
   type: "success" | "error" | "info" | "warning";
@@ -16,19 +16,12 @@ export function showSuccessToast(
   title?: string,
   duration = 3000
 ) {
+  const combined = title ? `${title}: ${message}` : message;
   if (Platform.OS === "web") {
-    // Fallback for web
     Alert.alert(title || "Success", message);
     return;
   }
-
-  Toast.show({
-    type: "success",
-    text1: title || "Success",
-    text2: message,
-    visibilityTime: duration,
-    position: "top",
-  });
+  Toast.success(combined, duration);
 }
 
 export function showErrorToast(
@@ -36,19 +29,13 @@ export function showErrorToast(
   title?: string,
   duration = 4000
 ) {
+  const combined = title ? `${title}: ${message}` : message;
   if (Platform.OS === "web") {
-    // Fallback for web
     Alert.alert(title || "Error", message);
     return;
   }
-
-  Toast.show({
-    type: "error",
-    text1: title || "Error",
-    text2: message,
-    visibilityTime: duration,
-    position: "top",
-  });
+  // Use centralized error humanization + dedupe
+  Toast.error(combined, undefined, duration);
 }
 
 export function showInfoToast(
@@ -56,19 +43,12 @@ export function showInfoToast(
   title?: string,
   duration = 3000
 ) {
+  const combined = title ? `${title}: ${message}` : message;
   if (Platform.OS === "web") {
-    // Fallback for web
     Alert.alert(title || "Info", message);
     return;
   }
-
-  Toast.show({
-    type: "info",
-    text1: title || "Info",
-    text2: message,
-    visibilityTime: duration,
-    position: "top",
-  });
+  Toast.info(combined, duration);
 }
 
 export function showWarningToast(
@@ -76,35 +56,29 @@ export function showWarningToast(
   title?: string,
   duration = 3500
 ) {
+  const combined = title ? `${title}: ${message}` : message;
   if (Platform.OS === "web") {
-    // Fallback for web
     Alert.alert(title || "Warning", message);
     return;
   }
-
-  Toast.show({
-    type: "warning",
-    text1: title || "Warning",
-    text2: message,
-    visibilityTime: duration,
-    position: "top",
-  });
+  Toast.warning(combined, duration);
 }
 
 export function showCustomToast(config: ToastConfig) {
   if (Platform.OS === "web") {
-    // Fallback for web
     Alert.alert(config.title || "Notification", config.message);
     return;
   }
-
-  Toast.show({
+  const text = config.title
+    ? `${config.title}: ${config.message}`
+    : config.message;
+  Toast.show(text, {
     type: config.type,
-    text1: config.title || getDefaultTitle(config.type),
-    text2: config.message,
-    visibilityTime: config.duration || 3000,
-    position: config.position || "top",
-    onPress: config.onPress,
+    durationMs: config.duration ?? 3000,
+    position: config.position ?? "top",
+    action: config.onPress
+      ? { label: "Open", onPress: config.onPress }
+      : undefined,
   });
 }
 

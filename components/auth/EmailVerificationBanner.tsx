@@ -26,16 +26,28 @@ export const EmailVerificationBanner: React.FC = () => {
     }
   }, [cooldown]);
 
-  if (!needsEmailVerification) return null;
-
   // Auto-start polling while the banner is visible so it auto-hides soon after user verifies via email link.
   React.useEffect(() => {
     // Debounce a bit to avoid spamming on fast mounts
     const t = setTimeout(() => {
-      startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 }); // ~3 minutes
+      if (needsEmailVerification) {
+        startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 }); // ~3 minutes
+      }
     }, 300);
     return () => clearTimeout(t);
-  }, [startEmailVerificationPolling]);
+  }, [startEmailVerificationPolling, needsEmailVerification]);
+
+  // Cleanup interval on unmount
+  React.useEffect(() => {
+    return () => {
+      if (cooldownRef.current) {
+        clearInterval(cooldownRef.current);
+        cooldownRef.current = null;
+      }
+    };
+  }, []);
+
+  if (!needsEmailVerification) return null;
 
   const handleResend = async () => {
     if (sending || cooldown > 0) return;

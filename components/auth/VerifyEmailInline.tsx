@@ -42,15 +42,28 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
     }
   }, [cooldown]);
 
-  if (!needsEmailVerification) return null;
-
   // Auto-start polling when inline prompt is visible so it can auto-hide on verification.
   React.useEffect(() => {
+    // keep hook order consistent; guard inside effect instead of skipping the hook entirely
     const t = setTimeout(() => {
-      startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 });
+      if (needsEmailVerification) {
+        startEmailVerificationPolling?.({ intervalMs: 5000, maxAttempts: 36 });
+      }
     }, 300);
     return () => clearTimeout(t);
-  }, [startEmailVerificationPolling]);
+  }, [startEmailVerificationPolling, needsEmailVerification]);
+
+  // Cleanup: clear cooldown interval on unmount to avoid leaks
+  React.useEffect(() => {
+    return () => {
+      if (cooldownRef.current) {
+        clearInterval(cooldownRef.current);
+        cooldownRef.current = null;
+      }
+    };
+  }, []);
+
+  if (!needsEmailVerification) return null;
 
   const doResend = async () => {
     if (sending || cooldown > 0) return;
