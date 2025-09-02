@@ -47,9 +47,15 @@ import { View, Text } from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
+// Helper: wrap screens with ScreenContainer; allow opting out of ScrollView for list hosts
+const withSC = <P extends object>(
+  Comp: React.ComponentType<P>,
+  options?: { useScrollView?: boolean }
+) => {
   const Wrapped: React.FC<P> = (props) => {
-    const C = withScreenContainer(Comp);
+    const C = withScreenContainer(Comp, {
+      useScrollView: options?.useScrollView ?? true,
+    });
     return <C {...props} />;
   };
   return Wrapped;
@@ -114,7 +120,7 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="EditProfile"
-        component={withSC(EditProfileScreen)}
+        component={withSC(EditProfileScreen, { useScrollView: false })}
         options={getScreenTransition("EditProfile")}
       />
       <ProfileStack.Screen
@@ -149,7 +155,7 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="Shortlists"
-        component={withSC(ShortlistsScreen)}
+        component={withSC(ShortlistsScreen, { useScrollView: false })}
         options={getScreenTransition("default")}
       />
       <ProfileStack.Screen
@@ -159,7 +165,7 @@ function ProfileStackNavigator() {
       />
       <ProfileStack.Screen
         name="BlockedUsers"
-        component={withSC(BlockedUsersScreen)}
+        component={withSC(BlockedUsersScreen, { useScrollView: false })}
         options={getScreenTransition("default")}
       />
       <ProfileStack.Screen
@@ -214,12 +220,12 @@ function ChatStackNavigator() {
     >
       <ChatStack.Screen
         name="ConversationList"
-        component={withSC(ConversationListScreen)}
+        component={withSC(ConversationListScreen, { useScrollView: false })}
         options={getScreenTransition("ConversationList")}
       />
       <ChatStack.Screen
         name="Chat"
-        component={withSC(ChatScreen)}
+        component={withSC(ChatScreen, { useScrollView: false })}
         options={getScreenTransition("Chat")}
       />
     </ChatStack.Navigator>
@@ -237,12 +243,12 @@ function MatchesStackNavigator() {
     >
       <MatchesStack.Screen
         name="MatchesMain"
-        component={withSC(MatchesScreen)}
+        component={withSC(MatchesScreen, { useScrollView: false })}
         options={getScreenTransition("MatchesMain")}
       />
       <MatchesStack.Screen
         name="Interests"
-        component={withSC(InterestsScreen)}
+        component={withSC(InterestsScreen, { useScrollView: false })}
         options={getScreenTransition("Interests")}
       />
       <MatchesStack.Screen

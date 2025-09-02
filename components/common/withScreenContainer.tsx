@@ -9,9 +9,14 @@ import { useTabBarHeight } from "@contexts/TabBarContext";
  */
 export default function withScreenContainer<P extends object>(
   Wrapped: React.ComponentType<P>,
-  options: { showsVerticalScrollIndicator?: boolean } = {}
+  options: {
+    showsVerticalScrollIndicator?: boolean;
+    /** When false, render a non-scrollable container (View) to host lists safely */
+    useScrollView?: boolean;
+  } = {}
 ): React.ComponentType<P> {
-  const { showsVerticalScrollIndicator = false } = options;
+  const { showsVerticalScrollIndicator = false, useScrollView = true } =
+    options;
 
   const ComponentWithContainer: React.FC<P> = (props: P) => {
     const tabBarHeight = useTabBarHeight();
@@ -19,6 +24,7 @@ export default function withScreenContainer<P extends object>(
       <ScreenContainer
         showsVerticalScrollIndicator={showsVerticalScrollIndicator}
         extraContentBottomPadding={tabBarHeight}
+        useScrollView={useScrollView}
       >
         <Wrapped {...props} />
       </ScreenContainer>

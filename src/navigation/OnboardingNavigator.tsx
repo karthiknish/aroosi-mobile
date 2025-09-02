@@ -8,9 +8,14 @@ import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteSc
 import withScreenContainer from "@components/common/withScreenContainer";
 import { getScreenTransition } from "@/utils/navigationAnimations";
 
-const withSC = <P extends object>(Comp: React.ComponentType<P>) => {
+const withSC = <P extends object>(
+  Comp: React.ComponentType<P>,
+  options?: { useScrollView?: boolean }
+) => {
   const Wrapped: React.FC<P> = (props) => {
-    const C = withScreenContainer(Comp);
+    const C = withScreenContainer(Comp, {
+      useScrollView: options?.useScrollView ?? true,
+    });
     return <C {...props} />;
   };
   return Wrapped;
@@ -36,7 +41,7 @@ export default function OnboardingNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen
         name="ProfileSetup"
-        component={withSC(ProfileSetupScreen)}
+        component={withSC(ProfileSetupScreen, { useScrollView: false })}
       />
       <Stack.Screen
         name="OnboardingComplete"
