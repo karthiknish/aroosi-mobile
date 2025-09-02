@@ -106,6 +106,23 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
   const { sentInterests, sendInterest, sending, isMutualInterest } =
     useInterests();
+  // Fetch today's icebreakers to show unanswered badge on Quick Picks CTA
+  const { data: iceQs } = useQuery({
+    queryKey: ["icebreakers", "today"],
+    queryFn: async () => {
+      const res = await apiClient.fetchIcebreakers();
+      if (res.success) return (res.data as any[]) || [];
+      return [] as any[];
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+  const iceTotal = Array.isArray(iceQs) ? iceQs.length : 0;
+  const iceAnswered = Array.isArray(iceQs)
+    ? iceQs.filter(
+        (q: any) => !!(q?.answered && String(q?.answer || "").trim())
+      ).length
+    : 0;
+  const iceUnanswered = Math.max(0, iceTotal - iceAnswered);
   const hasSentInterestTo = useMemo(
     () => (otherUserId: string) =>
       sentInterests.some((i: any) => i.toUserId === otherUserId),
@@ -681,6 +698,53 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                 Matches
               </Text>
             </SlideInView>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("QuickPicks" as never)}
+              style={{
+                position: "absolute",
+                right: Layout.spacing.lg,
+                top: Layout.spacing.md,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 14,
+                backgroundColor: theme.colors.primary[50],
+                borderWidth: 1,
+                borderColor: theme.colors.primary[200],
+              }}
+              accessibilityLabel="Go to Daily Quick Picks"
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text
+                  style={{
+                    color: theme.colors.primary[700],
+                    fontWeight: "600",
+                  }}
+                >
+                  Quick Picks →
+                </Text>
+                {iceUnanswered > 0 && (
+                  <View
+                    style={{
+                      marginLeft: 6,
+                      backgroundColor: theme.colors.primary[600],
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 10,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: Colors.text.inverse,
+                        fontSize: 12,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {iceUnanswered}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
           </View>
         </FadeInView>
 

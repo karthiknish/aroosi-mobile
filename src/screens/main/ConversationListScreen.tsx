@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -28,6 +28,10 @@ export default function ConversationListScreen({
   const { theme } = useTheme();
   const apiClient = useApiClient();
   const [refreshing, setRefreshing] = useState(false);
+  const [presenceMap, setPresenceMap] = useState<
+    Record<string, { isOnline: boolean; lastSeen: number }>
+  >({});
+  const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   type NormalizedConversation = Conversation & {
     id?: string;
@@ -71,6 +75,63 @@ export default function ConversationListScreen({
     await refetch();
     setRefreshing(false);
   };
+
+  // Derive unique partner IDs from conversations
+  const partnerIds = useMemo(() => {
+    if (!conversations) return [] as string[];
+    const ids = new Set<string>();
+    for (const conv of conversations as NormalizedConversation[]) {
+      const info = getOtherParticipantInfo(conv as any, userId as any);
+      if (info.id) ids.add(info.id);
+    }
+    return Array.from(ids);
+  }, [conversations, userId]);
+
+  // Fetch presence for partner IDs and keep polling
+  useEffect(() => {
+    let canceled = false;
+    if (!partnerIds.length) return;
+
+    const fetchPresence = async () => {
+      if (!partnerIds.length) return;
+      try {
+        const results = await Promise.allSettled(
+          partnerIds.map(async (pid) => ({
+            pid,
+            res: await apiClient.getPresence(pid),
+          }))
+        );
+        if (canceled) return;
+        const next: Record<string, { isOnline: boolean; lastSeen: number }> =
+          {};
+        for (const r of results) {
+          if (r.status === "fulfilled") {
+            const { pid, res } = r.value as any;
+            if (res?.success && res.data) {
+              next[pid] = {
+                isOnline: !!res.data.isOnline,
+                lastSeen: Number(res.data.lastSeen || 0),
+              };
+            }
+          }
+        }
+        setPresenceMap((prev) => ({ ...prev, ...next }));
+      } catch {
+        // best-effort, ignore errors
+      }
+    };
+
+    // Initial fetch and interval
+    fetchPresence();
+    if (presenceIntervalRef.current) clearInterval(presenceIntervalRef.current);
+    presenceIntervalRef.current = setInterval(fetchPresence, 30000);
+
+    return () => {
+      canceled = true;
+      if (presenceIntervalRef.current)
+        clearInterval(presenceIntervalRef.current);
+    };
+  }, [apiClient, partnerIds.join("|")]);
 
   const handleConversationPress = (conversation: NormalizedConversation) => {
     const { id: otherParticipantId, name: otherParticipantName } =
@@ -131,6 +192,10 @@ export default function ConversationListScreen({
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initial}</Text>
           </View>
+          {/* Online dot */}
+          {otherParticipantId && presenceMap[otherParticipantId]?.isOnline && (
+            <View style={styles.onlineIndicator} />
+          )}
           {hasUnread && <View style={styles.unreadDot} />}
         </View>
 

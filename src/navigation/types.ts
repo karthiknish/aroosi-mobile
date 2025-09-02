@@ -55,6 +55,7 @@ export type MatchesStackParamList = {
     userId?: string;
   };
   Interests: undefined;
+  QuickPicks: undefined;
 };
 
 // Global navigation helper types

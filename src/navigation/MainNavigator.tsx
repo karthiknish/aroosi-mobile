@@ -34,6 +34,7 @@ import IcebreakersScreen from "@screens/main/IcebreakersScreen";
 import ContactScreen from "@screens/support/ContactScreen";
 import AIChatbotScreen from "@screens/support/AIChatbotScreen";
 import ShortlistsScreen from "@screens/main/ShortlistsScreen";
+import QuickPicksScreen from "@screens/main/QuickPicksScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 import { TabBarProvider } from "@contexts/TabBarContext";
 
@@ -219,6 +220,11 @@ function MatchesStackNavigator() {
         name="Interests"
         component={withSC(InterestsScreen)}
         options={getScreenTransition("Interests")}
+      />
+      <MatchesStack.Screen
+        name="QuickPicks"
+        component={withSC(QuickPicksScreen)}
+        options={getScreenTransition("default")}
       />
     </MatchesStack.Navigator>
   );

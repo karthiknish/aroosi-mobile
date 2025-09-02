@@ -104,6 +104,71 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   } = useConversationMessaging(conversationId);
 
   const apiClient = useApiClient();
+  // Presence state for partner
+  const [partnerPresence, setPartnerPresence] = useState<{
+    isOnline: boolean;
+    lastSeen: number;
+  }>({ isOnline: false, lastSeen: 0 });
+  const presenceIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Compute last seen label similar to web
+  const lastSeenLabel = useMemo(() => {
+    if (partnerPresence.isOnline) return "Online";
+    const ts = partnerPresence.lastSeen;
+    if (!ts) return "Offline";
+    const d = new Date(ts);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffMinutes < 1) return "Last seen just now";
+    if (diffMinutes < 60) return `Last seen ${diffMinutes}m ago`;
+    if (diffHours < 24) return `Last seen ${diffHours}h ago`;
+    if (diffDays < 7) return `Last seen ${diffDays}d ago`;
+    return `Last seen ${d.toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    })}`;
+  }, [partnerPresence.isOnline, partnerPresence.lastSeen]);
+
+  // Presence polling + heartbeat
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        // Heartbeat current user
+        await apiClient.heartbeat();
+        if (partnerId) {
+          const res = await apiClient.getPresence(partnerId);
+          if (mounted && res.success) {
+            const payload: any = (res.data as any)?.data ?? res.data;
+            // web returns { data: { isOnline, lastSeen } } or direct shape depending on envelope
+            const presence =
+              payload?.isOnline !== undefined && payload?.lastSeen !== undefined
+                ? payload
+                : res.data;
+            setPartnerPresence({
+              isOnline: !!(presence as any).isOnline,
+              lastSeen: Number((presence as any).lastSeen) || 0,
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    // initial fetch
+    poll();
+    // start interval every 10s (parity with web)
+    presenceIntervalRef.current = setInterval(poll, 10000);
+    return () => {
+      mounted = false;
+      if (presenceIntervalRef.current)
+        clearInterval(presenceIntervalRef.current);
+      presenceIntervalRef.current = null;
+    };
+  }, [apiClient, partnerId]);
   const { usage, subscription } = useSubscription();
   const subscriptionPlan = subscription?.plan || subscription?.tier || "free";
   const [receiptMap, setReceiptMap] = useState<Record<string, any[]>>({});
@@ -987,7 +1052,18 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
 
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{partnerName || "Chat"}</Text>
-            {isOnline && <Text style={styles.connectionStatus}>Online</Text>}
+            <Text
+              style={[
+                styles.connectionStatus,
+                {
+                  color: partnerPresence.isOnline
+                    ? Colors.success[500]
+                    : Colors.text.secondary,
+                },
+              ]}
+            >
+              {lastSeenLabel}
+            </Text>
             {isTyping && <Text style={styles.typingStatus}>Typing...</Text>}
           </View>
 
@@ -1069,9 +1145,68 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               currentUserId={userId || ""}
               typingVisible={typingIndicator.isAnyoneElseTyping}
               typingText={typingIndicator.isAnyoneElseTyping ? "Typing..." : ""}
-              onLongPressMessage={openMessageActions}
               onToggleReaction={handleToggleReaction}
               getReactionsForMessage={getReactionsForMessage}
+              onReplyMessage={(m: any) => {
+                setReplyContext({
+                  messageId: m._id,
+                  text: m.text,
+                  type: m.type,
+                  fromUserId: m.fromUserId,
+                });
+              }}
+              onEditMessage={(m: any) => {
+                if (!canEdit(m)) return;
+                setEditingMessageId(m._id);
+                setInputText(m.text || "");
+              }}
+              onDeleteMessage={(m: any) => {
+                if (!canDelete(m)) return;
+                const targetId = m._id;
+                Alert.alert(
+                  "Delete message?",
+                  "This will delete the message for everyone.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          setOptimisticDeleted((prev) => ({
+                            ...prev,
+                            [targetId]: true,
+                          }));
+                          const res = await apiClient.deleteMessage(targetId);
+                          if (!res?.success) {
+                            setOptimisticDeleted((prev) => {
+                              const { [targetId]: _omit, ...rest } = prev;
+                              return rest;
+                            });
+                            if (toast)
+                              toast.show(
+                                "Delete failed. Please try again.",
+                                "error"
+                              );
+                          } else {
+                            loadMessages();
+                          }
+                        } catch (e) {
+                          setOptimisticDeleted((prev) => {
+                            const { [targetId]: _omit, ...rest } = prev;
+                            return rest;
+                          });
+                          if (toast)
+                            toast.show(
+                              "Delete failed. Please try again.",
+                              "error"
+                            );
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
               onFetchOlder={async () => {
                 const beforeTs = messages?.[0]?.createdAt;
                 if (beforeTs) await loadMessages({ before: beforeTs });

@@ -64,9 +64,20 @@ interface MessagesListProps {
   refreshing?: boolean;
   // Actions
   onLongPressMessage?: (message: BaseMessage) => void;
+  // New explicit action callbacks to align with web: reply/edit/delete
+  onReplyMessage?: (message: BaseMessage) => void;
+  onEditMessage?: (message: BaseMessage) => void;
+  onDeleteMessage?: (message: BaseMessage) => void;
   onToggleReaction?: (messageId: string, emoji: string) => void;
   // Get reactions for a message (returns reactions with user info)
-  getReactionsForMessage?: (messageId: string) => Array<{ emoji: string; count: number; reactedByMe: boolean; userIds: string[] }>;
+  getReactionsForMessage?: (
+    messageId: string
+  ) => Array<{
+    emoji: string;
+    count: number;
+    reactedByMe: boolean;
+    userIds: string[];
+  }>;
   // Upgrade chip props
   showUpgradeChip?: boolean;
   upgradeChipText?: string;
@@ -89,6 +100,9 @@ export default function MessagesList({
   onRefresh,
   refreshing = false,
   onLongPressMessage,
+  onReplyMessage,
+  onEditMessage,
+  onDeleteMessage,
   onToggleReaction,
   getReactionsForMessage,
   showUpgradeChip = false,
@@ -111,7 +125,11 @@ export default function MessagesList({
   const quickReactionEmojis = ["👍", "❤️", "😂", "😮", "🙏"];
 
   // Enhanced reaction toolbar component
-  const QuickReactionToolbar = ({ messageId, position, onClose }: {
+  const QuickReactionToolbar = ({
+    messageId,
+    position,
+    onClose,
+  }: {
     messageId: string;
     position: { x: number; y: number };
     onClose: () => void;
@@ -139,14 +157,17 @@ export default function MessagesList({
     return (
       <View style={styles.reactionOverlay}>
         <Pressable style={styles.reactionOverlayBackground} onPress={onClose} />
-        <Animated.View 
+        <Animated.View
           style={[
             styles.quickReactionToolbar,
             {
               top: position.y - 60,
-              left: Math.max(10, Math.min(position.x - 100, Dimensions.get('window').width - 210)),
+              left: Math.max(
+                10,
+                Math.min(position.x - 100, Dimensions.get("window").width - 210)
+              ),
               transform: [{ scale: scaleAnim }],
-            }
+            },
           ]}
         >
           {quickReactionEmojis.map((emoji) => (
@@ -165,15 +186,19 @@ export default function MessagesList({
   };
 
   // Enhanced context menu component
-  const ContextMenu = ({ messageId, position, onClose }: {
+  const ContextMenu = ({
+    messageId,
+    position,
+    onClose,
+  }: {
     messageId: string;
     position: { x: number; y: number };
     onClose: () => void;
   }) => {
-    const message = messages.find(m => m._id === messageId);
+    const message = messages.find((m) => m._id === messageId);
     const isMine = message?.fromUserId === currentUserId;
     const reactions = getReactionsForMessage?.(messageId) || [];
-    const myReactions = reactions.filter(r => r.reactedByMe);
+    const myReactions = reactions.filter((r) => r.reactedByMe);
 
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -200,15 +225,21 @@ export default function MessagesList({
 
     return (
       <View style={styles.reactionOverlay}>
-        <Pressable style={styles.reactionOverlayBackground} onPress={handleClose} />
-        <Animated.View 
+        <Pressable
+          style={styles.reactionOverlayBackground}
+          onPress={handleClose}
+        />
+        <Animated.View
           style={[
             styles.contextMenu,
             {
               top: position.y,
-              left: Math.max(10, Math.min(position.x, Dimensions.get('window').width - 180)),
+              left: Math.max(
+                10,
+                Math.min(position.x, Dimensions.get("window").width - 180)
+              ),
               opacity: fadeAnim,
-            }
+            },
           ]}
         >
           {/* Quick reactions section */}
@@ -229,7 +260,12 @@ export default function MessagesList({
 
           {/* My reactions section */}
           {myReactions.length > 0 && (
-            <View style={[styles.contextMenuSection, styles.contextMenuSectionBorder]}>
+            <View
+              style={[
+                styles.contextMenuSection,
+                styles.contextMenuSectionBorder,
+              ]}
+            >
               <Text style={styles.contextMenuTitle}>Your reactions</Text>
               <View style={styles.contextMenuReactions}>
                 {myReactions.map((reaction) => (
@@ -238,7 +274,9 @@ export default function MessagesList({
                     style={styles.contextMenuRemoveButton}
                     onPress={() => handleReaction(reaction.emoji)}
                   >
-                    <Text style={styles.contextMenuReactionEmoji}>{reaction.emoji}</Text>
+                    <Text style={styles.contextMenuReactionEmoji}>
+                      {reaction.emoji}
+                    </Text>
                     <Text style={styles.removeText}>Remove</Text>
                   </TouchableOpacity>
                 ))}
@@ -247,16 +285,43 @@ export default function MessagesList({
           )}
 
           {/* Message actions */}
-          {isMine && message?.type !== "voice" && (
-            <View style={[styles.contextMenuSection, styles.contextMenuSectionBorder]}>
-              <TouchableOpacity style={styles.contextMenuAction}>
-                <Text style={styles.contextMenuActionText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.contextMenuAction}>
-                <Text style={styles.contextMenuActionText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <View
+            style={[styles.contextMenuSection, styles.contextMenuSectionBorder]}
+          >
+            {/* Reply is available for any message */}
+            <TouchableOpacity
+              style={styles.contextMenuAction}
+              onPress={() => {
+                if (message && onReplyMessage) onReplyMessage(message);
+                handleClose();
+              }}
+            >
+              <Text style={styles.contextMenuActionText}>Reply</Text>
+            </TouchableOpacity>
+            {/* Edit/Delete only for own, non-voice messages */}
+            {isMine && message?.type !== "voice" && (
+              <>
+                <TouchableOpacity
+                  style={styles.contextMenuAction}
+                  onPress={() => {
+                    if (message && onEditMessage) onEditMessage(message);
+                    handleClose();
+                  }}
+                >
+                  <Text style={styles.contextMenuActionText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.contextMenuAction}
+                  onPress={() => {
+                    if (message && onDeleteMessage) onDeleteMessage(message);
+                    handleClose();
+                  }}
+                >
+                  <Text style={styles.contextMenuActionText}>Delete</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
         </Animated.View>
       </View>
     );
@@ -361,25 +426,22 @@ export default function MessagesList({
             delayLongPress={250}
             onLongPress={(event) => {
               const { pageX, pageY } = event.nativeEvent;
-              
-              // Show quick reaction toolbar on long press
-              if (onToggleReaction) {
-                setQuickReactionState({
-                  messageId: item._id,
-                  position: { x: pageX, y: pageY },
-                  visible: true,
-                });
-              } else if (onLongPressMessage) {
-                onLongPressMessage(item);
-              }
+              // Align with web: long-press opens a context menu with React/Reply/Edit/Delete
+              setContextMenuState({
+                messageId: item._id,
+                position: { x: pageX, y: pageY },
+                visible: true,
+              });
+              // Still notify parent if provided
+              if (onLongPressMessage) onLongPressMessage(item);
             }}
             onPress={(event) => {
-              // Double tap to show context menu (alternative to long press)
+              // Double tap to show quick reaction toolbar for speed
               const now = Date.now();
               const lastTap = (event.target as any).__lastTap || 0;
-              if (now - lastTap < 300) {
+              if (now - lastTap < 300 && onToggleReaction) {
                 const { pageX, pageY } = event.nativeEvent;
-                setContextMenuState({
+                setQuickReactionState({
                   messageId: item._id,
                   position: { x: pageX, y: pageY },
                   visible: true,
@@ -478,37 +540,47 @@ export default function MessagesList({
             )}
 
             {/* Enhanced Reactions row */}
-            {Array.isArray((item as any).reactions) && (item as any).reactions.length > 0 && (
-              <View style={styles.reactionsRow}>
-                {(item as any).reactions.map((r: { emoji: string; count: number }) => {
-                  // Check if current user reacted with this emoji
-                  const userReacted = getReactionsForMessage?.(item._id)
-                    ?.find(reaction => reaction.emoji === r.emoji)?.reactedByMe || false;
-                  
-                  return (
-                    <TouchableOpacity
-                      key={`${item._id}_${r.emoji}`}
-                      style={[
-                        styles.enhancedReactionChip,
-                        userReacted && styles.enhancedReactionChipActive,
-                      ]}
-                      onPress={() => onToggleReaction?.(item._id, r.emoji)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.enhancedReactionEmoji}>{r.emoji}</Text>
-                      {r.count > 1 && (
-                        <Text style={[
-                          styles.enhancedReactionCount,
-                          userReacted && styles.enhancedReactionCountActive,
-                        ]}>
-                          {r.count}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
+            {Array.isArray((item as any).reactions) &&
+              (item as any).reactions.length > 0 && (
+                <View style={styles.reactionsRow}>
+                  {(item as any).reactions.map(
+                    (r: { emoji: string; count: number }) => {
+                      // Check if current user reacted with this emoji
+                      const userReacted =
+                        getReactionsForMessage?.(item._id)?.find(
+                          (reaction) => reaction.emoji === r.emoji
+                        )?.reactedByMe || false;
+
+                      return (
+                        <TouchableOpacity
+                          key={`${item._id}_${r.emoji}`}
+                          style={[
+                            styles.enhancedReactionChip,
+                            userReacted && styles.enhancedReactionChipActive,
+                          ]}
+                          onPress={() => onToggleReaction?.(item._id, r.emoji)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.enhancedReactionEmoji}>
+                            {r.emoji}
+                          </Text>
+                          {r.count > 1 && (
+                            <Text
+                              style={[
+                                styles.enhancedReactionCount,
+                                userReacted &&
+                                  styles.enhancedReactionCountActive,
+                              ]}
+                            >
+                              {r.count}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    }
+                  )}
+                </View>
+              )}
 
             {/* Meta row: time + ticks */}
             <View

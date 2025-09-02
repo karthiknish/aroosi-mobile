@@ -499,6 +499,26 @@ class ApiClient {
     return this.request(path);
   }
 
+  // Presence APIs (parity with web)
+  async getPresence(
+    userId: string
+  ): Promise<ApiResponse<{ isOnline: boolean; lastSeen: number }>> {
+    if (!userId) {
+      return {
+        success: false,
+        error: { code: "VALIDATION_ERROR", message: "userId is required" },
+      } as any;
+    }
+    return this.request(`/presence?userId=${encodeURIComponent(userId)}`);
+  }
+
+  async heartbeat(): Promise<ApiResponse<void>> {
+    return this.request(`/presence`, {
+      method: "POST",
+      body: JSON.stringify({ status: "online" }),
+    }) as unknown as ApiResponse<void>;
+  }
+
   // Message Reactions
   /**
    * Toggle a reaction for a message (adds if not present by user, removes otherwise)
@@ -1207,6 +1227,29 @@ class ApiClient {
   async searchImages(params: any) {
     const searchParams = new URLSearchParams(params);
     return this.request(`/search-images?${searchParams}`);
+  }
+
+  // Engagement: Quick Picks (parity with web)
+  async getQuickPicks(dayKey?: string): Promise<
+    ApiResponse<{
+      userIds: string[];
+      profiles: import("../src/types/engagement").QuickPickProfile[];
+    }>
+  > {
+    const url = dayKey
+      ? `/engagement/quick-picks?day=${encodeURIComponent(dayKey)}`
+      : "/engagement/quick-picks";
+    return this.request(url);
+  }
+
+  async actOnQuickPick(
+    toUserId: string,
+    action: "like" | "skip"
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request("/engagement/quick-picks", {
+      method: "POST",
+      body: JSON.stringify({ toUserId, action }),
+    });
   }
 }
 
