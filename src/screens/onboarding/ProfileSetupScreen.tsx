@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
+  KeyboardAvoidingView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -60,6 +61,7 @@ import {
   ETHNICITY_OPTIONS,
 } from "../../../constants/languages";
 import { VerificationBanner } from "@/components/ui";
+import SocialAuthButtons from "@components/auth/SocialAuthButtons";
 
 // Local component for Step 9: Create Account (signup embedded)
 function CreateAccountStep({
@@ -177,6 +179,16 @@ function CreateAccountStep({
       <Text style={styles.stepTitle}>Create Account</Text>
       <Text style={styles.stepSubtitle}>Finish and create your account</Text>
 
+      {/* Social sign-in options */}
+      <View style={{ marginBottom: Layout.spacing.lg }}>
+        <SocialAuthButtons />
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or use email</Text>
+          <View style={styles.dividerLine} />
+        </View>
+      </View>
+
       {missing.length > 0 ? (
         <View
           style={{
@@ -216,6 +228,9 @@ function CreateAccountStep({
         <View>
           <View style={styles.formGroup}>
             <Text style={styles.label}>Email</Text>
+            <Text style={styles.helperText}>
+              We'll send a verification link.
+            </Text>
             <TextInput
               style={[
                 styles.input,
@@ -240,6 +255,10 @@ function CreateAccountStep({
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Password</Text>
+            <Text style={styles.helperText}>
+              At least 12 characters, including upper, lower, number, and
+              symbol.
+            </Text>
             <View style={{ position: "relative" }}>
               <TextInput
                 style={[
@@ -280,6 +299,7 @@ function CreateAccountStep({
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Confirm Password</Text>
+            <Text style={styles.helperText}>Must match your password.</Text>
             <View style={{ position: "relative" }}>
               <TextInput
                 style={[
@@ -538,6 +558,17 @@ export default function ProfileSetupScreen({
     return false;
   };
 
+  // Determine if current step is optional (allow Skip)
+  // Skipping steps disabled
+
+  // Live validity for enabling/disabling Next
+  const isCurrentStepValid = React.useMemo(() => {
+    const schema = (StepValidationSchemas as any)[currentStep];
+    if (!schema) return true;
+    const partialData = normalizeForSchema(formData as any);
+    return schema.safeParse(partialData).success;
+  }, [currentStep, formData]);
+
   const handleNext = () => {
     if (validateCurrentStep()) {
       if (currentStep < STEPS.length) {
@@ -590,16 +621,53 @@ export default function ProfileSetupScreen({
     }
   };
 
-  const renderProgressBar = () => (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressBar}>
-        <View
-          style={[
-            styles.progressFill,
-            { width: `${(currentStep / STEPS.length) * 100}%` },
-          ]}
-        />
-      </View>
+  const renderStepper = () => (
+    <View style={styles.stepperContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.stepperScroll}
+      >
+        {STEPS.map((s) => {
+          const status =
+            s.id === currentStep
+              ? "active"
+              : s.id < currentStep
+              ? "done"
+              : "upcoming";
+          return (
+            <View key={s.id} style={styles.stepperItem}>
+              <View
+                style={[
+                  styles.stepCircle,
+                  status === "active" && styles.stepCircleActive,
+                  status === "done" && styles.stepCircleDone,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.stepCircleText,
+                    (status === "active" || status === "done") && {
+                      color: Colors.text.inverse,
+                    },
+                  ]}
+                >
+                  {s.id}
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.stepperLabel,
+                  status === "active" && styles.stepperLabelActive,
+                ]}
+              >
+                {s.title}
+              </Text>
+            </View>
+          );
+        })}
+      </ScrollView>
       <Text style={styles.progressText}>
         Step {currentStep} of {STEPS.length}
       </Text>
@@ -1746,9 +1814,10 @@ export default function ProfileSetupScreen({
               style={[
                 styles.nextButton,
                 currentStep === 1 && styles.nextButtonFull,
+                !isCurrentStepValid && { opacity: 0.6 },
               ]}
               onPress={handleNext}
-              disabled={createProfileMutation.isPending}
+              disabled={createProfileMutation.isPending || !isCurrentStepValid}
             >
               {createProfileMutation.isPending ? (
                 <ActivityIndicator size="small" color={Colors.text.inverse} />
@@ -1766,7 +1835,9 @@ export default function ProfileSetupScreen({
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Create Profile</Text>
-            <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
+            <Text style={styles.headerSubtitle}>
+              {currentStepData.subtitle}
+            </Text>
           </View>
 
           {/* Verification Banner */}
@@ -1782,43 +1853,51 @@ export default function ProfileSetupScreen({
             />
           )}
 
-          {/* Progress Bar */}
-          {renderProgressBar()}
+          {/* Stepper */}
+          {renderStepper()}
 
           {/* Content (no outer ScrollView to avoid nesting FlatList) */}
           <View style={styles.content}>{renderStepContent()}</View>
         </View>
       ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.contentStyle}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
         >
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Create Profile</Text>
-            <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
-          </View>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.contentStyle}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Create Profile</Text>
+              <Text style={styles.headerSubtitle}>
+                {currentStepData.subtitle}
+              </Text>
+            </View>
 
-          {/* Verification Banner */}
-          {awaitingEmailVerification && !!verificationEmail && (
-            <VerificationBanner
-              email={verificationEmail}
-              secondsLeft={secondsLeft}
-              resendLoading={resendLoading}
-              verifying={verifying}
-              onResend={handleBannerResend}
-              onIHaveVerified={handleBannerIHaveVerified}
-              onClose={() => setAwaitingEmailVerification(false)}
-            />
-          )}
+            {/* Verification Banner */}
+            {awaitingEmailVerification && !!verificationEmail && (
+              <VerificationBanner
+                email={verificationEmail}
+                secondsLeft={secondsLeft}
+                resendLoading={resendLoading}
+                verifying={verifying}
+                onResend={handleBannerResend}
+                onIHaveVerified={handleBannerIHaveVerified}
+                onClose={() => setAwaitingEmailVerification(false)}
+              />
+            )}
 
-          {/* Progress Bar */}
-          {renderProgressBar()}
+            {/* Stepper */}
+            {renderStepper()}
 
-          {/* Content */}
-          <View style={styles.content}>{renderStepContent()}</View>
-        </ScrollView>
+            {/* Content */}
+            <View style={styles.content}>{renderStepContent()}</View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       {/* Date Picker Modal */}
@@ -1868,6 +1947,52 @@ const styles = StyleSheet.create({
   progressContainer: {
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
+  },
+  stepperContainer: {
+    paddingHorizontal: Layout.spacing.lg,
+    paddingVertical: Layout.spacing.md,
+  },
+  stepperScroll: {
+    alignItems: "center",
+    gap: Layout.spacing.md,
+    paddingVertical: Layout.spacing.xs,
+  },
+  stepperItem: {
+    alignItems: "center",
+    width: 80,
+  },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: Colors.border.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background.secondary,
+  },
+  stepCircleActive: {
+    backgroundColor: Colors.primary[500],
+    borderColor: Colors.primary[500],
+  },
+  stepCircleDone: {
+    backgroundColor: Colors.primary[400],
+    borderColor: Colors.primary[400],
+  },
+  stepCircleText: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    fontWeight: "600",
+  },
+  stepperLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    color: Colors.text.secondary,
+    textAlign: "center",
+  },
+  stepperLabelActive: {
+    color: Colors.text.primary,
+    fontWeight: "600",
   },
   progressBar: {
     height: 4,
@@ -2033,5 +2158,25 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: Layout.spacing.lg,
+  },
+  helperText: {
+    fontSize: Layout.typography.fontSize.sm,
+    color: Colors.text.tertiary,
+    marginBottom: Layout.spacing.xs,
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Layout.spacing.md,
+    marginTop: Layout.spacing.md,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.border.primary,
+  },
+  dividerText: {
+    color: Colors.text.secondary,
+    fontSize: Layout.typography.fontSize.sm,
   },
 });

@@ -41,13 +41,11 @@ if (typeof global.URL === "undefined") {
 if (typeof global.Response === "undefined") {
   try {
     // Prefer undici if available in Node 18+
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Response } = require("undici");
     // @ts-ignore
     global.Response = Response;
   } catch {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { Response } = require("node-fetch");
       // @ts-ignore
       global.Response = Response;

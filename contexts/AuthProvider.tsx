@@ -365,45 +365,60 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       // Configure Google Sign-In once (idempotent). Prefer platform client IDs.
       const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-      const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
       const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-      // Accept either individual client IDs or a single webClientId fallback for profile fetching scopes
       GoogleSignin.configure({
-        iosClientId: iosClientId,
-        webClientId: webClientId,
-        // Force refresh to ensure we get idToken on Android too
+        iosClientId: iosClientId || undefined,
+        webClientId: webClientId || undefined, // required on Android to receive idToken
         offlineAccess: true,
+        forceCodeForRefreshToken: false,
       });
 
-      // Prompt user with native Google account picker
-      await GoogleSignin.hasPlayServices({
-        showPlayServicesUpdateDialog: true,
-      }).catch(() => {});
-      const result = await GoogleSignin.signIn();
-      if (result.type !== "success") {
+      // Ensure Play Services (Android)
+      try {
+        await GoogleSignin.hasPlayServices({
+          showPlayServicesUpdateDialog: true,
+        });
+      } catch {}
+
+      // Native Google account picker
+      const signInRes = await GoogleSignin.signIn();
+      if (signInRes?.type !== "success") {
         return { success: false, error: "Canceled" };
       }
-      // Retrieve tokens after a successful sign in
-      const tokens = await GoogleSignin.getTokens();
-      const idToken = tokens?.idToken;
-      const accessToken = tokens?.accessToken;
+
+      // Extract tokens from response; idToken may be null on some configs
+      let idToken: string | undefined =
+        (signInRes as any)?.data?.idToken ?? undefined;
+      let accessToken: string | undefined = undefined;
+
+      // Always try to get tokens to ensure we have accessToken and possibly idToken
+      try {
+        const tokens = await GoogleSignin.getTokens();
+        if (!idToken && tokens?.idToken) idToken = tokens.idToken;
+        if (tokens?.accessToken) accessToken = tokens.accessToken;
+      } catch {}
+
       if (!idToken && !accessToken) {
-        return { success: false, error: "Google sign-in failed: no tokens" };
+        return {
+          success: false,
+          error: "Google sign-in failed: missing tokens",
+        };
       }
 
-      const credential = idToken
-        ? GoogleAuthProvider.credential(idToken)
-        : GoogleAuthProvider.credential(undefined, accessToken!);
-
+      const credential = GoogleAuthProvider.credential(
+        idToken || undefined,
+        accessToken || undefined
+      );
       await signInWithCredential(getFirebaseAuth(), credential);
       await refreshUser();
       return { success: true };
     } catch (e: any) {
       const code = e?.code || "";
+      // Common cancellation codes across platforms
       if (
-        code === "12501" ||
-        code === "12502" ||
+        code === "12501" || // sign in cancelled
+        code === "12502" || // in progress
         code === "ERR_CANCELED" ||
         code === "CANCELED"
       ) {

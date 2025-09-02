@@ -1,3 +1,5 @@
+/* eslint-env jest */
+/* global jest */
 module.exports = {
   getItemAsync: jest.fn(async (key) => {
     if (key === "auth_token") return "mock.jwt.token.for.testing";

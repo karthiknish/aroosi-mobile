@@ -10,7 +10,9 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "ENVIRONMENT": "development"
+        "ENVIRONMENT": "development",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       },
       "ios": {
         "simulator": true
@@ -28,7 +30,9 @@
       "distribution": "internal",
       "channel": "staging",
       "env": {
-        "ENVIRONMENT": "staging"
+        "ENVIRONMENT": "staging",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       },
       "android": {
         "buildType": "apk"
@@ -42,7 +46,9 @@
       "channel": "production",
       "distribution": "store",
       "env": {
-        "ENVIRONMENT": "production"
+        "ENVIRONMENT": "production",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": ""
       },
       "android": {
         "buildType": "app-bundle",
