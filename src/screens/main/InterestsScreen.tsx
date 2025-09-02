@@ -136,15 +136,8 @@ export default function InterestsScreen() {
     <ErrorBoundary>
       <ScreenContainer
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
-        contentStyle={{ flexGrow: 1 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[theme.colors.primary[500]]}
-            tintColor={theme.colors.primary[500]}
-          />
-        }
+  contentStyle={{ flexGrow: 1 }}
+  useScrollView={false}
       >
         <View
           style={[
@@ -198,6 +191,14 @@ export default function InterestsScreen() {
 
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: Layout.spacing.lg }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary[500]]}
+              tintColor={theme.colors.primary[500]}
+            />
+          }
         >
           {(activeTab === "received" ? received : sent).map((item) =>
             renderInterestRow(item, activeTab)

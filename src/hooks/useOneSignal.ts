@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 import { OneSignal } from "react-native-onesignal";
+import { logger } from "@utils/logger";
 import { useAuth } from "@contexts/AuthProvider";
 import { useApiClient } from "@utils/api";
 import {
@@ -47,11 +48,11 @@ export const useOneSignal = (): UseOneSignalReturn => {
     initializationRef.current = true;
 
     try {
-  const appId =
-    process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ||
-    process.env.EXPO_PUBLIC_ONE_SIGNAL_APP_ID;
+      const appId =
+        process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ||
+        process.env.EXPO_PUBLIC_ONE_SIGNAL_APP_ID;
       if (!appId) {
-        console.error("OneSignal App ID not found in environment variables");
+        logger.error("ONESIGNAL", "App ID not found in environment variables");
         return;
       }
 
@@ -73,9 +74,9 @@ export const useOneSignal = (): UseOneSignalReturn => {
       }
 
       setIsInitialized(true);
-      console.log("OneSignal initialized successfully");
+      logger.debug("ONESIGNAL", "Initialized successfully");
     } catch (error) {
-      console.error("Failed to initialize OneSignal:", error);
+      logger.error("ONESIGNAL", "Failed to initialize OneSignal", error);
     }
   }, []);
 
@@ -85,14 +86,18 @@ export const useOneSignal = (): UseOneSignalReturn => {
     OneSignal.Notifications.addEventListener(
       "foregroundWillDisplay",
       (event: any) => {
-        console.log("Notification received in foreground:", event.notification);
+        logger.debug(
+          "ONESIGNAL",
+          "Notification received in foreground",
+          event.notification
+        );
         handleNotificationReceived(event as NotificationReceivedEvent);
       }
     );
 
     // Handle notification opened/clicked
     OneSignal.Notifications.addEventListener("click", (event: any) => {
-      console.log("Notification clicked:", event.notification);
+      logger.debug("ONESIGNAL", "Notification clicked", event.notification);
       handleNotificationOpened(event as unknown as NotificationOpenedEvent);
     });
 
@@ -100,7 +105,9 @@ export const useOneSignal = (): UseOneSignalReturn => {
     OneSignal.Notifications.addEventListener(
       "permissionChange",
       (granted: boolean) => {
-        console.log("Notification permission changed:", granted);
+        logger.debug("ONESIGNAL", "Notification permission changed", {
+          granted,
+        });
         setPermissionStatus(granted ? "granted" : "denied");
       }
     );
@@ -111,7 +118,7 @@ export const useOneSignal = (): UseOneSignalReturn => {
         .onesignalId;
       if (newPlayerId && newPlayerId !== playerId) {
         setPlayerId(newPlayerId);
-        console.log("Player ID updated:", newPlayerId);
+        logger.debug("ONESIGNAL", "Player ID updated", { newPlayerId });
       }
     });
   }, [playerId]);
@@ -123,7 +130,9 @@ export const useOneSignal = (): UseOneSignalReturn => {
 
       // You can customize foreground notification display here
       // For now, we'll let the default behavior handle it
-      console.log("Processing foreground notification:", notification.title);
+      logger.debug("ONESIGNAL", "Processing foreground notification", {
+        title: notification.title || "",
+      });
     },
     []
   );
@@ -143,14 +152,14 @@ export const useOneSignal = (): UseOneSignalReturn => {
           handleNotificationNavigation(navigationData);
         }
 
-        console.log("Notification opened:", {
+        logger.debug("ONESIGNAL", "Notification opened", {
           title: notification.title,
           actionType: action.type,
           actionId: action.actionId,
           navigationData,
         });
       } catch (error) {
-        console.error("Error handling notification opened:", error);
+        logger.error("ONESIGNAL", "Error handling notification opened", error);
       }
     },
     []
@@ -161,7 +170,10 @@ export const useOneSignal = (): UseOneSignalReturn => {
     (navigationData: NotificationNavigationData) => {
       // This would integrate with your navigation system
       // For now, we'll just log the intended navigation
-      console.log("Navigate to:", navigationData.screen, navigationData.params);
+      logger.debug("ONESIGNAL", "Navigate to", {
+        screen: navigationData.screen,
+        params: navigationData.params,
+      });
 
       // Example navigation logic:
       // navigation.navigate(navigationData.screen, navigationData.params);
@@ -176,7 +188,11 @@ export const useOneSignal = (): UseOneSignalReturn => {
       setPermissionStatus(granted ? "granted" : "denied");
       return granted;
     } catch (error) {
-      console.error("Error requesting notification permission:", error);
+      logger.error(
+        "ONESIGNAL",
+        "Error requesting notification permission",
+        error
+      );
       return false;
     }
   }, []);
@@ -185,7 +201,7 @@ export const useOneSignal = (): UseOneSignalReturn => {
   const registerForPushNotifications =
     useCallback(async (): Promise<boolean> => {
       if (!userId || !playerId) {
-        console.warn("Cannot register: missing userId or playerId");
+        logger.warn("ONESIGNAL", "Cannot register: missing userId or playerId");
         return false;
       }
 
@@ -193,7 +209,7 @@ export const useOneSignal = (): UseOneSignalReturn => {
         // Get auth token - using userId as placeholder since getToken isn't available
         const token = userId; // In a real implementation, you'd get the actual token
         if (!token) {
-          console.error("No auth token available for registration");
+          logger.error("ONESIGNAL", "No auth token available for registration");
           return false;
         }
 
@@ -218,17 +234,25 @@ export const useOneSignal = (): UseOneSignalReturn => {
 
         if (response.success) {
           setIsRegistered(true);
-          console.log("Successfully registered for push notifications");
+          logger.debug(
+            "ONESIGNAL",
+            "Successfully registered for push notifications"
+          );
           return true;
         } else {
-          console.error(
-            "Failed to register for push notifications:",
+          logger.error(
+            "ONESIGNAL",
+            "Failed to register for push notifications",
             response.data
           );
           return false;
         }
       } catch (error) {
-        console.error("Error registering for push notifications:", error);
+        logger.error(
+          "ONESIGNAL",
+          "Error registering for push notifications",
+          error
+        );
         return false;
       }
     }, [userId, playerId, apiClient]);
@@ -237,7 +261,10 @@ export const useOneSignal = (): UseOneSignalReturn => {
   const unregisterFromPushNotifications =
     useCallback(async (): Promise<boolean> => {
       if (!userId || !playerId) {
-        console.warn("Cannot unregister: missing userId or playerId");
+        logger.warn(
+          "ONESIGNAL",
+          "Cannot unregister: missing userId or playerId"
+        );
         return false;
       }
 
@@ -254,17 +281,25 @@ export const useOneSignal = (): UseOneSignalReturn => {
 
         if (response.success) {
           setIsRegistered(false);
-          console.log("Successfully unregistered from push notifications");
+          logger.debug(
+            "ONESIGNAL",
+            "Successfully unregistered from push notifications"
+          );
           return true;
         } else {
-          console.error(
-            "Failed to unregister from push notifications:",
+          logger.error(
+            "ONESIGNAL",
+            "Failed to unregister from push notifications",
             response.data
           );
           return false;
         }
       } catch (error) {
-        console.error("Error unregistering from push notifications:", error);
+        logger.error(
+          "ONESIGNAL",
+          "Error unregistering from push notifications",
+          error
+        );
         return false;
       }
     }, [userId, playerId, apiClient]);
@@ -272,25 +307,25 @@ export const useOneSignal = (): UseOneSignalReturn => {
   // Set external user ID (for targeting)
   const setExternalUserId = useCallback((externalUserId: string) => {
     OneSignal.login(externalUserId);
-    console.log("Set external user ID:", externalUserId);
+    logger.debug("ONESIGNAL", "Set external user ID", { externalUserId });
   }, []);
 
   // Clear external user ID
   const clearExternalUserId = useCallback(() => {
     OneSignal.logout();
-    console.log("Cleared external user ID");
+    logger.debug("ONESIGNAL", "Cleared external user ID");
   }, []);
 
   // Add tags for targeting
   const addTags = useCallback((tags: Record<string, string>) => {
     OneSignal.User.addTags(tags);
-    console.log("Added tags:", tags);
+    logger.debug("ONESIGNAL", "Added tags", tags);
   }, []);
 
   // Remove tags
   const removeTags = useCallback((tagKeys: string[]) => {
     OneSignal.User.removeTags(tagKeys);
-    console.log("Removed tags:", tagKeys);
+    logger.debug("ONESIGNAL", "Removed tags", { tagKeys });
   }, []);
 
   // Initialize OneSignal on mount

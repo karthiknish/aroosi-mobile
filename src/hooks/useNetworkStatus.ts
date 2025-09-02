@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { networkManager, NetworkState } from '@utils/NetworkManager';
+import { logger } from "@utils/logger";
 
 export interface UseNetworkStatusResult {
   isOnline: boolean;
@@ -22,7 +23,7 @@ export function useNetworkStatus(): UseNetworkStatusResult {
     // Force a network check and process any queued requests
     if (networkManager.isOnline()) {
       // Process any queued requests
-      console.log('Retrying network operations...');
+      logger.debug("NETWORK", "Retrying network operations...");
     }
   };
 

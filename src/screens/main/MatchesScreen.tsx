@@ -682,14 +682,6 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
         contentStyle={styles.contentStyle}
         useScrollView={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[theme.colors.primary[500]]}
-            tintColor={theme.colors.primary[500]}
-          />
-        }
       >
         {/* Header */}
         <FadeInView>
@@ -854,6 +846,14 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                 onEndReached={() => {
                   if (hasNextPage && !isFetchingNextPage) fetchNextPage();
                 }}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    colors={[theme.colors.primary[500]]}
+                    tintColor={theme.colors.primary[500]}
+                  />
+                }
                 ListFooterComponent={
                   hasNextPage ? (
                     <View

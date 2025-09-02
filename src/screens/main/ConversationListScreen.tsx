@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  FlatList,
 } from "react-native";
 import { useAuth } from "@contexts/AuthProvider";
 import { useQuery } from "@tanstack/react-query";
@@ -269,6 +270,7 @@ export default function ConversationListScreen({
       <ScreenContainer
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
         contentStyle={styles.contentStyle}
+  useScrollView={false}
       >
         <View
           style={[
@@ -303,15 +305,8 @@ export default function ConversationListScreen({
     <ErrorBoundary>
       <ScreenContainer
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
-        contentStyle={styles.contentStyle}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[theme.colors.primary[500]]}
-            tintColor={theme.colors.primary[500]}
-          />
-        }
+  contentStyle={styles.contentStyle}
+  useScrollView={false}
       >
         {/* Header */}
         <View
@@ -346,11 +341,22 @@ export default function ConversationListScreen({
           (conversations as NormalizedConversation[]).length === 0 ? (
           <NoMessages onActionPress={() => navigation.navigate("Search")} />
         ) : (
-          <View style={styles.conversationsList}>
-            {(conversations as NormalizedConversation[]).map(
-              renderConversation
-            )}
-          </View>
+          <FlatList
+            data={conversations as NormalizedConversation[]}
+            keyExtractor={(item) =>
+              ((item as any)._id || (item as any).id || Math.random().toString(36)) as string
+            }
+            renderItem={({ item }) => renderConversation(item)}
+            contentContainerStyle={styles.conversationsList}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[theme.colors.primary[500]]}
+                tintColor={theme.colors.primary[500]}
+              />
+            }
+          />
         )}
       </ScreenContainer>
       {/* Safety Action Sheet and Report Modal */}

@@ -308,6 +308,7 @@ export default function BlockedUsersScreen({
       <ScreenContainer
         containerStyle={styles.container}
         contentStyle={styles.contentStyle}
+        useScrollView={false}
       >
         <LoadingState message="Loading blocked users..." />
       </ScreenContainer>
@@ -319,6 +320,7 @@ export default function BlockedUsersScreen({
       <ScreenContainer
         containerStyle={styles.container}
         contentStyle={styles.contentStyle}
+        useScrollView={false}
       >
         <EmptyState
           title="Unable to load blocked users"
