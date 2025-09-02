@@ -638,6 +638,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
       <ScreenContainer
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
         contentStyle={styles.contentStyle}
+        useScrollView={false}
       >
         <View style={styles.header}>
           <Text
@@ -680,6 +681,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
       <ScreenContainer
         containerStyle={{ backgroundColor: theme.colors.background.secondary }}
         contentStyle={styles.contentStyle}
+        useScrollView={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

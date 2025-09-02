@@ -191,7 +191,7 @@ export function ShortlistsScreen() {
 
   if (isError) {
     return (
-      <ScreenContainer>
+      <ScreenContainer useScrollView={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>My Shortlists</Text>
         </View>
@@ -201,7 +201,7 @@ export function ShortlistsScreen() {
   }
 
   return (
-    <ScreenContainer>
+    <ScreenContainer useScrollView={false}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Shortlists</Text>
         <Text style={styles.headerSubtitle}>

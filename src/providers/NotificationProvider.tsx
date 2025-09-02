@@ -81,7 +81,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       // Initialize notification handler
       NotificationHandler.initialize();
 
-      console.log("Notification system initialized");
+  // initialized
     } catch (error) {
       console.error("Error initializing notification system:", error);
     }
@@ -92,7 +92,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignIn = async (): Promise<void> => {
     try {
-      console.log("User signed in, setting up notifications...");
+  // user signed in
 
       // Optional: Show permission rationale if first time
       const permissionStatus =
@@ -121,7 +121,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignOut = async (): Promise<void> => {
     try {
-      console.log("User signed out, cleaning up notifications...");
+  // user signed out
 
       // Clear external user ID
       oneSignalData.clearExternalUserId();

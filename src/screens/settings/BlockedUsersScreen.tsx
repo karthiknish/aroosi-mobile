@@ -334,6 +334,7 @@ export default function BlockedUsersScreen({
     <ScreenContainer
       containerStyle={styles.container}
       contentStyle={styles.contentStyle}
+      useScrollView={false}
     >
       {/* Header */}
       <View style={styles.header}>

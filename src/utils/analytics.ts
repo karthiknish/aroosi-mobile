@@ -8,16 +8,17 @@ type AnalyticsEvent =
 
 interface EventPayload { [k: string]: any }
 
-let enabled = true;
+let enabled = false; // default off in production
 try {
-  enabled = process.env.EXPO_PUBLIC_ENABLE_ANALYTICS !== "false";
+  // Only enable when explicitly opted-in
+  enabled = process.env.EXPO_PUBLIC_ENABLE_ANALYTICS === "true";
 } catch {}
 
 export function track(event: AnalyticsEvent, data: EventPayload = {}) {
   if (!enabled) return;
   try {
-    console.log(`[analytics] ${event}`, { platform: Platform.OS, ...data });
-    // TODO: integrate Firebase Analytics or Segment here.
+  // Integrate Firebase Analytics or Segment here.
+  // No console logging in production by default.
   } catch {}
 }
 

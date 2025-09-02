@@ -43,16 +43,9 @@ export default function RootNavigator() {
   const hasProfile = !!profile;
   const isProfileLoading = !!userId && isLoading && !profile;
 
-  // Debug navigation state
-  console.log("🧭 Navigation state:", {
-    userId: !!userId,
-    isProfileLoading,
-    hasProfile,
-    // profileId omitted since not on type
-  });
+  // Debug navigation state removed for production
 
   if (isLoading || (userId && isProfileLoading)) {
-    console.log("⏳ Showing loading screen");
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" color={Colors.primary[500]} />
@@ -72,13 +65,7 @@ export default function RootNavigator() {
     ? "onboarding"
     : "main";
 
-  if (!isAuthenticated) {
-    console.log("🔐 Showing Auth screens");
-  } else if (!hasProfile) {
-    console.log("📝 Showing Onboarding screens - hasProfile:", hasProfile);
-  } else {
-    console.log("🏠 Showing Main screens (Search should be default)");
-  }
+  // Removed navigation state logs for production
 
   return (
     <Stack.Navigator

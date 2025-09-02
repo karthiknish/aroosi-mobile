@@ -138,6 +138,7 @@ export default function AIChatbotScreen() {
     <ScreenContainer
       containerStyle={{ backgroundColor: theme.colors.background.secondary }}
       contentStyle={{ flexGrow: 1 }}
+      useScrollView={false}
     >
       <View style={styles.header}>
         <Text

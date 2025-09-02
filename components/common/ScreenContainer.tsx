@@ -5,6 +5,7 @@ import {
   Dimensions,
   StyleSheet,
   ViewStyle,
+  View,
 } from "react-native";
 import {
   SafeAreaView,
@@ -25,6 +26,8 @@ interface ScreenContainerProps extends ScrollViewProps {
   footer?: React.ReactNode;
   /** Extra bottom padding (e.g., tab bar height) added below safe-area + footer */
   extraContentBottomPadding?: number;
+  /** When false, renders a non-scrollable container (View) to host VirtualizedLists */
+  useScrollView?: boolean;
 }
 
 /**
@@ -42,6 +45,7 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   showsVerticalScrollIndicator = false,
   footer,
   extraContentBottomPadding = 0,
+  useScrollView = true,
   ...scrollViewProps
 }) => {
   const insets = useSafeAreaInsets();
@@ -74,21 +78,34 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
         colors={Colors.gradient.secondary as any}
         style={styles.gradient}
       >
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={
-            [
+        {useScrollView ? (
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={
+              [
+                styles.content,
+                { paddingBottom: contentPaddingBottom },
+                contentStyle,
+              ] as any
+            }
+            showsVerticalScrollIndicator={showsVerticalScrollIndicator}
+            keyboardShouldPersistTaps="handled"
+            {...scrollViewProps}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          <View
+            style={[
+              styles.scroll,
               styles.content,
               { paddingBottom: contentPaddingBottom },
               contentStyle,
-            ] as any
-          }
-          showsVerticalScrollIndicator={showsVerticalScrollIndicator}
-          keyboardShouldPersistTaps="handled"
-          {...scrollViewProps}
-        >
-          {children}
-        </ScrollView>
+            ] as any}
+          >
+            {children}
+          </View>
+        )}
 
         {footer ? (
           <SafeAreaView
