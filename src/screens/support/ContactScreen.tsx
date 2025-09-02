@@ -12,6 +12,7 @@ import useResponsiveSpacing, { useResponsiveTypography } from "@/hooks/useRespon
 import ContactForm from "@components/contact/ContactForm";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
+import { logger } from "@utils/logger";
 
 interface ContactScreenProps {
   navigation: any;
@@ -45,7 +46,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
         }
       })
       .catch((err) => {
-        console.error("Error opening email:", err);
+        logger.error("CONTACT", "Error opening email", err);
         toast.show(`Email app not available. Please email: ${email}`, "error");
       });
   };

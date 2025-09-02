@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  ScrollView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -1731,6 +1732,7 @@ export default function ProfileSetupScreen({
       containerStyle={styles.container}
       contentStyle={styles.contentStyle}
       showsVerticalScrollIndicator={false}
+      useScrollView={false}
       footer={
         <View style={styles.navigationContainer}>
           {currentStep > 1 && (
@@ -1759,30 +1761,65 @@ export default function ProfileSetupScreen({
         </View>
       }
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Create Profile</Text>
-        <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
-      </View>
+      {currentStep === 8 ? (
+        <View>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Create Profile</Text>
+            <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
+          </View>
 
-      {/* Verification Banner */}
-      {awaitingEmailVerification && !!verificationEmail && (
-        <VerificationBanner
-          email={verificationEmail}
-          secondsLeft={secondsLeft}
-          resendLoading={resendLoading}
-          verifying={verifying}
-          onResend={handleBannerResend}
-          onIHaveVerified={handleBannerIHaveVerified}
-          onClose={() => setAwaitingEmailVerification(false)}
-        />
+          {/* Verification Banner */}
+          {awaitingEmailVerification && !!verificationEmail && (
+            <VerificationBanner
+              email={verificationEmail}
+              secondsLeft={secondsLeft}
+              resendLoading={resendLoading}
+              verifying={verifying}
+              onResend={handleBannerResend}
+              onIHaveVerified={handleBannerIHaveVerified}
+              onClose={() => setAwaitingEmailVerification(false)}
+            />
+          )}
+
+          {/* Progress Bar */}
+          {renderProgressBar()}
+
+          {/* Content (no outer ScrollView to avoid nesting FlatList) */}
+          <View style={styles.content}>{renderStepContent()}</View>
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.contentStyle}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Create Profile</Text>
+            <Text style={styles.headerSubtitle}>{currentStepData.subtitle}</Text>
+          </View>
+
+          {/* Verification Banner */}
+          {awaitingEmailVerification && !!verificationEmail && (
+            <VerificationBanner
+              email={verificationEmail}
+              secondsLeft={secondsLeft}
+              resendLoading={resendLoading}
+              verifying={verifying}
+              onResend={handleBannerResend}
+              onIHaveVerified={handleBannerIHaveVerified}
+              onClose={() => setAwaitingEmailVerification(false)}
+            />
+          )}
+
+          {/* Progress Bar */}
+          {renderProgressBar()}
+
+          {/* Content */}
+          <View style={styles.content}>{renderStepContent()}</View>
+        </ScrollView>
       )}
-
-      {/* Progress Bar */}
-      {renderProgressBar()}
-
-      {/* Content */}
-      <View style={styles.content}>{renderStepContent()}</View>
 
       {/* Date Picker Modal */}
       {showDatePicker && (

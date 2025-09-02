@@ -8,6 +8,7 @@ import { NavigationContainerRef } from '@react-navigation/native';
 import { useAuth } from "@contexts/AuthProvider";
 // import { useOneSignal } from '../../hooks/useOneSignal'; // Temporarily disabled
 import { NotificationHandler } from "@utils/notificationHandler";
+import { logger } from "@utils/logger";
 import { NotificationPermissionsManager } from "@utils/notificationPermissions";
 
 interface NotificationContextType {
@@ -81,9 +82,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       // Initialize notification handler
       NotificationHandler.initialize();
 
-  // initialized
+      // initialized
     } catch (error) {
-      console.error("Error initializing notification system:", error);
+      logger.error(
+        "NOTIFICATIONS",
+        "Error initializing notification system",
+        error
+      );
     }
   };
 
@@ -92,7 +97,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignIn = async (): Promise<void> => {
     try {
-  // user signed in
+      // user signed in
 
       // Optional: Show permission rationale if first time
       const permissionStatus =
@@ -112,7 +117,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         oneSignalData.setExternalUserId(userId);
       }
     } catch (error) {
-      console.error("Error handling user sign in for notifications:", error);
+      logger.error("NOTIFICATIONS", "Error on user sign in", error);
     }
   };
 
@@ -121,7 +126,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
    */
   const handleUserSignOut = async (): Promise<void> => {
     try {
-  // user signed out
+      // user signed out
 
       // Clear external user ID
       oneSignalData.clearExternalUserId();
@@ -132,7 +137,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       // Clear notification badge
       await NotificationPermissionsManager.clearBadge();
     } catch (error) {
-      console.error("Error handling user sign out for notifications:", error);
+      logger.error("NOTIFICATIONS", "Error on user sign out", error);
     }
   };
 

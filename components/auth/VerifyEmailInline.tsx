@@ -36,10 +36,10 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
   const cooldownRef = React.useRef<NodeJS.Timeout | null>(null);
 
   React.useEffect(() => {
-    if (cooldown <= 0 && cooldownRef.current) {
-      clearInterval(cooldownRef.current);
-      cooldownRef.current = null;
-    }
+  if (cooldown <= 0 && cooldownRef.current) {
+    clearInterval(cooldownRef.current);
+    cooldownRef.current = null;
+  }
   }, [cooldown]);
 
   // Auto-start polling when inline prompt is visible so it can auto-hide on verification.
@@ -75,7 +75,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
         setCooldown(60);
         if (!cooldownRef.current) {
           cooldownRef.current = setInterval(() => {
-            setCooldown((c) => c - 1);
+            setCooldown((c) => Math.max(c - 1, 0));
           }, 1000);
         }
         startEmailVerificationPolling?.();
@@ -111,6 +111,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           onPress={doResend}
           style={[styles.pill, style]}
           disabled={sending || cooldown > 0}
+          accessibilityRole="button"
+          accessibilityLabel="Verify Email"
+          testID="verify-email-pill"
         >
           {sending ? (
             <ActivityIndicator color={Colors.text.inverse} />
@@ -129,6 +132,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           onPress={doResend}
           style={[styles.badge, style]}
           disabled={sending || cooldown > 0}
+          accessibilityRole="button"
+          accessibilityLabel="Verify Email"
+          testID="verify-email-badge"
         >
           {sending ? (
             <ActivityIndicator color={Colors.text.inverse} />
@@ -142,7 +148,13 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
     case "link":
       return (
         <View style={[{ flexDirection: "row", alignItems: "center" }, style]}>
-          <TouchableOpacity onPress={doCheck} disabled={checking}>
+          <TouchableOpacity
+            onPress={doCheck}
+            disabled={checking}
+            accessibilityRole="button"
+            accessibilityLabel="I have verified my email"
+            testID="verify-email-link"
+          >
             {checking ? (
               <ActivityIndicator color={Colors.warning[600]} />
             ) : (
@@ -168,6 +180,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
                 (sending || cooldown > 0) && styles.disabled,
               ]}
               disabled={sending || cooldown > 0}
+              accessibilityRole="button"
+              accessibilityLabel="Resend verification email"
+              testID="verify-email-resend"
             >
               {sending ? (
                 <ActivityIndicator color={Colors.text.inverse} />
@@ -185,6 +200,9 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
                 checking && styles.disabled,
               ]}
               disabled={checking}
+              accessibilityRole="button"
+              accessibilityLabel="I have verified"
+              testID="verify-email-check"
             >
               {checking ? (
                 <ActivityIndicator color={Colors.text.inverse} />
