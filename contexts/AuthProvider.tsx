@@ -415,6 +415,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return { success: true };
     } catch (e: any) {
       const code = e?.code || "";
+      const msg = e?.message || "Google sign-in failed";
       // Common cancellation codes across platforms
       if (
         code === "12501" || // sign in cancelled
@@ -424,7 +425,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       ) {
         return { success: false, error: "Canceled" };
       }
-      return { success: false, error: e?.message || "Google sign-in failed" };
+      // Helpful guidance when native module isn't linked (Expo Go or outdated dev client)
+      if (
+        /RNGoogleSignin/i.test(String(msg)) ||
+        /native module|null/i.test(String(msg))
+      ) {
+        return {
+          success: false,
+          error:
+            "Google Sign-In native module not found. Use a custom dev client and rebuild: npm run ios:devbuild or npm run android:devbuild.",
+        };
+      }
+      return { success: false, error: msg };
     }
   }, [refreshUser]);
 

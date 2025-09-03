@@ -6,20 +6,41 @@ This project includes Gradle Play Publisher (GPP) and a small helper to publish 
 
 Prerequisites:
 
-- First upload and enroll in Play App Signing via the Play Console.
-- Create a service account with Android Publisher API and grant access to your app.
-- Provide credentials to the build:
 	- EITHER export `ANDROID_PUBLISHER_CREDENTIALS` in your shell (raw JSON or base64 JSON)
 	- OR put base64 JSON into `../aroosi/.env.local` as `ANDROID_PUBLISHER_CREDENTIALS=...` (the helper will decode it)
 
 Commands:
 
-- Build + publish to Internal track: `npm run publish:internal`
-- Build + upload to Internal App Sharing (download URL): `npm run share:internal`
-- Dry-run (no upload): `npm run publish:internal:dry`
 
 Notes:
 
-- Internal App Sharing uses debug signing automatically to avoid keystore requirements.
-- For track publishing, ensure your Play signing is set up and that your upload key/keystore is configured if needed.
-- See `CI_PLAY_PUBLISHING.md` for CI setup.
+
+
+## Development
+
+### Dev build on a physical device (Expo development client)
+
+1) Configure Google services and client IDs
+- Place iOS `GoogleService-Info.plist` at `ios/Aroosi/GoogleService-Info.plist` and Android `google-services.json` at `android/app/google-services.json`.
+- Or set env paths in `.env`:
+	- `GOOGLE_SERVICE_INFO_PLIST=./path/to/GoogleService-Info.plist`
+	- `GOOGLE_SERVICES_JSON=./path/to/google-services.json`
+- Optionally set:
+	- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` and `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID`
+
+2) Build and run a dev client
+- iOS (physical device):
+	- Ensure device is registered: `eas device:create`
+	- Build + start bundler: `npm run ios:devbuild`
+	- After build: `eas build:run -p ios --profile development-device --latest` (or install from EAS page)
+- Android:
+	- Build + start bundler: `npm run android:devbuild`
+	- Or install the latest: `eas build:run -p android --profile development --latest`
+
+3) Start the dev server (with tunnel for reliability)
+- `npm run start:tunnel`
+- Open the dev client app on your phone and scan the QR in the terminal.
+
+Notes
+- Expo Go will not work for Google Sign-In (native module). Always use the dev client.
+- Rebuild the dev client after adding/removing native modules or changing config plugins.

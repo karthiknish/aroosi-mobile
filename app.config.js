@@ -1,4 +1,6 @@
 // Dynamic Expo app config to support secret file variables for Firebase config
+// Load environment variables from .env for local development
+require('dotenv').config();
 // - Uses GOOGLE_SERVICE_INFO_PLIST (iOS) and GOOGLE_SERVICES_JSON (Android) when provided by EAS
 // - Falls back to the checked-in paths for local development
 
