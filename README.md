@@ -44,3 +44,9 @@ Notes:
 Notes
 - Expo Go will not work for Google Sign-In (native module). Always use the dev client.
 - Rebuild the dev client after adding/removing native modules or changing config plugins.
+
+## Notifications
+
+- We use `expo-notifications` with the config plugin. No custom sounds are configured by default.
+- If you want a custom sound, add the file under `assets/sounds/` (e.g., `assets/sounds/notification.wav`) and add the relative path to the `sounds` array in the `expo-notifications` plugin in `app.config.js`.
+- After changing sounds, you must rebuild the native app. If a sound is listed but the file is missing, iOS prebuild will fail when the plugin tries to copy it.

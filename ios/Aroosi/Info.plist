@@ -27,7 +27,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.3</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleURLTypes</key>
@@ -42,12 +42,18 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
+          <string>com.googleusercontent.apps.762041256503-uc9qopr13761ictkgj53ba4gomtkvbha</string>
+        </array>
+      </dict>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
           <string>exp+aroosi</string>
         </array>
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -77,6 +83,10 @@
     <string>Aroosi can save photos shared by your matches to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Aroosi needs access to your photo library to upload beautiful profile pictures that help you find your perfect match.</string>
+    <key>NSUserActivityTypes</key>
+    <array>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
+    </array>
     <key>NSUserNotificationsUsageDescription</key>
     <string>Aroosi sends notifications about new matches, messages, and important updates.</string>
     <key>SKAdNetworkItems</key>
