@@ -7,6 +7,10 @@ apply plugin: 'com.google.gms.google-services'
 apply plugin: 'com.github.triplet.play'
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+// Local flag to speed up builds by targeting a single ABI (arm64-v8a)
+def localSingleAbi = (
+    System.getenv('LOCAL_SINGLE_ABI') ?: (findProperty('LOCAL_SINGLE_ABI') ?: "false")
+).toString().toBoolean()
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -98,9 +102,13 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
     versionCode 4
     versionName "1.0.3"
-        // Build only ARM ABIs for release to reduce build size and disk usage
+        // Build only ARM ABIs; allow single-ABI for faster local builds
         ndk {
-            abiFilters "arm64-v8a", "armeabi-v7a"
+            if (localSingleAbi) {
+                abiFilters "arm64-v8a"
+            } else {
+                abiFilters "arm64-v8a", "armeabi-v7a"
+            }
         }
     // Prefer the Play store flavor for libraries that define a 'store' dimension (e.g. react-native-iap)
     missingDimensionStrategy 'store', 'play'
