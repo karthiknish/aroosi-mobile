@@ -20,6 +20,55 @@ export class VoiceMessageManager {
   // Recording is handled by useVoiceRecording hook via expo-audio. This service keeps upload/storage helpers.
 
   /**
+   * Starts a cancellable upload and returns a handle. On completion, the promise resolves to sendMessage result.
+   */
+  beginUploadVoiceMessage(
+    audioUri: string,
+    conversationId: string,
+    fromUserId: string,
+    toUserId: string,
+    duration: number,
+    options?: {
+      onProgress?: (progress: number) => void;
+      peaks?: number[];
+      mimeType?: string;
+      fileSize?: number;
+    }
+  ): {
+    promise: Promise<ApiResponse<any>>;
+    cancel: () => void;
+  } {
+    const handle = this.storage.beginUploadVoiceMessage(
+      audioUri,
+      { duration, fileSize: options?.fileSize, mimeType: options?.mimeType },
+      options?.onProgress
+    );
+
+    const promise = (async () => {
+      const uploadResult = await handle.promise;
+      if (!uploadResult.success || !uploadResult.data)
+        return uploadResult as any;
+      const { storageId } = uploadResult.data;
+
+      return this.apiClient.sendMessage({
+        conversationId,
+        fromUserId,
+        toUserId,
+        type: "voice",
+        audioStorageId: storageId,
+        duration,
+        fileSize: options?.fileSize,
+        mimeType: options?.mimeType || "audio/m4a",
+        ...(Array.isArray(options?.peaks) && options?.peaks.length
+          ? { peaks: options?.peaks }
+          : {}),
+      });
+    })();
+
+    return { promise, cancel: handle.cancel };
+  }
+
+  /**
    * Uploads a voice message
    */
   async uploadVoiceMessage(
@@ -27,7 +76,11 @@ export class VoiceMessageManager {
     conversationId: string,
     fromUserId: string,
     toUserId: string,
-    duration: number
+    duration: number,
+    options?: {
+      onProgress?: (progress: number) => void;
+      peaks?: number[];
+    }
   ): Promise<ApiResponse<any>> {
     try {
       let audioUri: string;
@@ -48,11 +101,15 @@ export class VoiceMessageManager {
       }
 
       // Upload using storage service
-      const uploadResult = await this.storage.uploadVoiceMessage(audioUri, {
-        duration,
-        fileSize,
-        mimeType,
-      });
+      const uploadResult = await this.storage.uploadVoiceMessage(
+        audioUri,
+        {
+          duration,
+          fileSize,
+          mimeType,
+        },
+        options?.onProgress
+      );
 
       if (!uploadResult.success || !uploadResult.data) {
         return uploadResult as any;
@@ -70,6 +127,10 @@ export class VoiceMessageManager {
         duration,
         fileSize,
         mimeType,
+        // pass through peaks if available so server can store for clients
+        ...(Array.isArray(options?.peaks) && options?.peaks.length
+          ? { peaks: options?.peaks }
+          : {}),
       });
     } catch (error) {
       console.error("Voice upload error:", error);
@@ -160,7 +221,7 @@ export class VoiceMessageManager {
    */
   async stopAllPlayback(): Promise<void> {
     try {
-          // expo-audio does not provide global toggle; this is a no-op here.
+      // expo-audio does not provide global toggle; this is a no-op here.
     } catch (error) {
       console.error("Failed to stop audio playback:", error);
     }

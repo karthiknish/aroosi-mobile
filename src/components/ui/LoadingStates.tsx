@@ -8,7 +8,6 @@ import {
   ViewStyle,
 } from "react-native";
 import { useTheme } from "@contexts/ThemeContext";
-import { Colors } from "@constants";
 
 const { width } = Dimensions.get("window");
 
@@ -109,7 +108,10 @@ export const ProfileCardSkeleton: React.FC<ProfileCardSkeletonProps> = ({
           key={index}
           style={[
             styles.profileCardSkeleton,
-            { backgroundColor: theme.colors.background.secondary },
+            {
+              backgroundColor: theme.colors.background.secondary,
+              shadowColor: theme.colors.neutral[900],
+            },
           ]}
         >
           {/* Image placeholder */}
@@ -263,7 +265,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderRadius: 12,
-    shadowColor: Colors.neutral[900],
+    // shadowColor will be set inline with theme
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -301,6 +303,6 @@ const styles = StyleSheet.create({
   actionButtonSkeleton: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
+    // borderTopColor set inline via theme
   },
 });

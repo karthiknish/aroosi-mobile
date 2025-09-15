@@ -9,14 +9,19 @@ import Animated, {
   withSequence,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
 
 // Create responsive styles function
-const createResponsiveStyles = (spacing: any, fontSize: any) =>
+const createResponsiveStyles = (
+  spacing: any,
+  fontSize: any,
+  themeColors: any
+) =>
   StyleSheet.create({
     circularProgressContainer: {
       justifyContent: "center",
@@ -48,12 +53,12 @@ const createResponsiveStyles = (spacing: any, fontSize: any) =>
     },
     progressLabel: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: themeColors.text.secondary,
       fontWeight: "500",
     },
     progressPercentage: {
       fontSize: fontSize.sm,
-      color: Colors.text.primary,
+      color: themeColors.text.primary,
       fontWeight: "600",
     },
     progressTrack: {
@@ -96,7 +101,7 @@ const createResponsiveStyles = (spacing: any, fontSize: any) =>
       zIndex: 1,
     },
     stepNumber: {
-      color: Colors.background.primary,
+      color: themeColors.text.inverse,
       fontSize: fontSize.sm,
       fontWeight: "600",
     },
@@ -143,31 +148,39 @@ interface CircularProgressProps {
   animated?: boolean;
   duration?: number;
   children?: React.ReactNode;
+  respectReduceMotion?: boolean;
 }
 
 export const CircularProgress: React.FC<CircularProgressProps> = ({
   progress,
   size = 120,
   strokeWidth = 8,
-  color = Colors.primary[500],
-  backgroundColor = Colors.neutral[200],
+  color,
+  backgroundColor,
   showPercentage = true,
   animated = true,
   duration = 1000,
   children,
+  respectReduceMotion = true,
 }) => {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const styles = createResponsiveStyles(spacing, fontSize);
+  const { theme } = useTheme();
+  const styles = createResponsiveStyles(spacing, fontSize, theme.colors);
   const animatedProgress = useSharedValue(0);
+  const strokeColor = color ?? theme.colors.primary[500];
+  const bgColor = backgroundColor ?? theme.colors.neutral[200];
+
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = animated && !(respectReduceMotion && reduceMotion);
 
   useEffect(() => {
-    if (animated) {
+    if (shouldAnimate) {
       animatedProgress.value = withTiming(progress, { duration });
     } else {
       animatedProgress.value = progress;
     }
-  }, [progress, animated, duration]);
+  }, [progress, shouldAnimate, duration]);
 
   const progressStyle = useAnimatedStyle(() => {
     const rotation = animatedProgress.value * 360;
@@ -195,7 +208,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
             height: size,
             borderRadius: size / 2,
             borderWidth: strokeWidth,
-            borderColor: backgroundColor,
+            borderColor: bgColor,
           },
         ]}
       />
@@ -209,7 +222,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
             height: size,
             borderRadius: size / 2,
             borderWidth: strokeWidth,
-            borderColor: color,
+            borderColor: strokeColor,
             borderTopColor: "transparent",
             borderRightColor: "transparent",
             borderBottomColor: "transparent",
@@ -222,7 +235,7 @@ export const CircularProgress: React.FC<CircularProgressProps> = ({
         {children ||
           (showPercentage && (
             <Animated.View style={percentageStyle}>
-              <Text style={[styles.percentageText, { color }]}>
+              <Text style={[styles.percentageText, { color: strokeColor }]}>
                 {Math.round(progress * 100)}%
               </Text>
             </Animated.View>
@@ -243,31 +256,42 @@ interface LinearProgressProps {
   showLabel?: boolean;
   label?: string;
   style?: any;
+  respectReduceMotion?: boolean;
 }
 
 export const LinearProgress: React.FC<LinearProgressProps> = ({
   progress,
   height = 8,
-  backgroundColor = Colors.neutral[200],
-  colors = [Colors.primary[500], Colors.primary[600]],
+  backgroundColor,
+  colors,
   animated = true,
   duration = 1000,
   showLabel = false,
   label,
   style,
+  respectReduceMotion = true,
 }) => {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const styles = createResponsiveStyles(spacing, fontSize);
+  const { theme } = useTheme();
+  const styles = createResponsiveStyles(spacing, fontSize, theme.colors);
+  const trackColor = backgroundColor ?? theme.colors.neutral[200];
+  const gradientColors = colors ?? [
+    theme.colors.primary[500],
+    theme.colors.primary[600],
+  ];
   const animatedProgress = useSharedValue(0);
 
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = animated && !(respectReduceMotion && reduceMotion);
+
   useEffect(() => {
-    if (animated) {
+    if (shouldAnimate) {
       animatedProgress.value = withTiming(progress, { duration });
     } else {
       animatedProgress.value = progress;
     }
-  }, [progress, animated, duration]);
+  }, [progress, shouldAnimate, duration]);
 
   const progressStyle = useAnimatedStyle(() => {
     return {
@@ -288,16 +312,12 @@ export const LinearProgress: React.FC<LinearProgressProps> = ({
       <View
         style={[
           styles.progressTrack,
-          {
-            height,
-            backgroundColor,
-            borderRadius: height / 2,
-          },
+          { height, backgroundColor: trackColor, borderRadius: height / 2 },
         ]}
       >
         <Animated.View style={[styles.progressFill, progressStyle]}>
           <LinearGradient
-            colors={colors as any}
+            colors={gradientColors as any}
             style={[styles.progressGradient, { borderRadius: height / 2 }]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -318,26 +338,38 @@ interface StepProgressProps {
   }>;
   orientation?: "horizontal" | "vertical";
   style?: any;
+  respectReduceMotion?: boolean;
 }
 
 export const StepProgress: React.FC<StepProgressProps> = ({
   steps,
   orientation = "horizontal",
   style,
+  respectReduceMotion = true,
 }) => {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const styles = createResponsiveStyles(spacing, fontSize);
+  const { theme } = useTheme();
+  const styles = createResponsiveStyles(spacing, fontSize, theme.colors);
 
   const renderStep = (step: any, index: number) => {
     const isLast = index === steps.length - 1;
     const scale = useSharedValue(step.completed ? 1 : 0.8);
     const opacity = useSharedValue(step.completed ? 1 : 0.5);
 
+    const { reduceMotion } = useReduceMotion();
+    const shouldAnimate = !(respectReduceMotion && reduceMotion);
+
     useEffect(() => {
-      scale.value = withSpring(step.completed || step.active ? 1 : 0.8);
-      opacity.value = withTiming(step.completed || step.active ? 1 : 0.5);
-    }, [step.completed, step.active]);
+      if (shouldAnimate) {
+        scale.value = withSpring(step.completed || step.active ? 1 : 0.8);
+        opacity.value = withTiming(step.completed || step.active ? 1 : 0.5);
+      } else {
+        // Set final states without animation
+        scale.value = step.completed || step.active ? 1 : 0.9;
+        opacity.value = step.completed || step.active ? 1 : 0.7;
+      }
+    }, [step.completed, step.active, shouldAnimate]);
 
     const animatedStepStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],
@@ -358,10 +390,10 @@ export const StepProgress: React.FC<StepProgressProps> = ({
               styles.stepIndicator,
               {
                 backgroundColor: step.completed
-                  ? Colors.success[500]
+                  ? theme.colors.success[500]
                   : step.active
-                  ? Colors.primary[500]
-                  : Colors.neutral[300],
+                  ? theme.colors.primary[500]
+                  : theme.colors.neutral[300],
               },
               animatedStepStyle,
             ]}
@@ -380,8 +412,8 @@ export const StepProgress: React.FC<StepProgressProps> = ({
                   : styles.horizontalConnector,
                 {
                   backgroundColor: step.completed
-                    ? Colors.success[500]
-                    : Colors.neutral[300],
+                    ? theme.colors.success[500]
+                    : theme.colors.neutral[300],
                 },
               ]}
             />
@@ -394,8 +426,8 @@ export const StepProgress: React.FC<StepProgressProps> = ({
             {
               color:
                 step.completed || step.active
-                  ? Colors.text.primary
-                  : Colors.text.secondary,
+                  ? theme.colors.text.primary
+                  : theme.colors.text.secondary,
             },
           ]}
         >
@@ -424,43 +456,55 @@ interface LoadingDotsProps {
   color?: string;
   count?: number;
   style?: any;
+  respectReduceMotion?: boolean;
 }
 
 export const LoadingDots: React.FC<LoadingDotsProps> = ({
   size = 8,
-  color = Colors.primary[500],
+  color,
   count = 3,
   style,
+  respectReduceMotion = true,
 }) => {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const styles = createResponsiveStyles(spacing, fontSize);
+  const { theme } = useTheme();
+  const styles = createResponsiveStyles(spacing, fontSize, theme.colors);
+  const dotColor = color ?? theme.colors.primary[500];
+
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = !(respectReduceMotion && reduceMotion);
 
   const dots = Array.from({ length: count }, (_, index) => {
     const scale = useSharedValue(1);
     const opacity = useSharedValue(0.3);
 
     useEffect(() => {
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 0 }),
-          withTiming(1.5, { duration: 400 }),
-          withTiming(1, { duration: 400 })
-        ),
-        -1,
-        false
-      );
+      if (shouldAnimate) {
+        scale.value = withRepeat(
+          withSequence(
+            withTiming(1, { duration: 0 }),
+            withTiming(1.4, { duration: 400 }),
+            withTiming(1, { duration: 400 })
+          ),
+          -1,
+          false
+        );
 
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.3, { duration: 0 }),
-          withTiming(1, { duration: 400 }),
-          withTiming(0.3, { duration: 400 })
-        ),
-        -1,
-        false
-      );
-    }, []);
+        opacity.value = withRepeat(
+          withSequence(
+            withTiming(0.5, { duration: 0 }),
+            withTiming(1, { duration: 400 }),
+            withTiming(0.5, { duration: 400 })
+          ),
+          -1,
+          false
+        );
+      } else {
+        scale.value = 1;
+        opacity.value = 1;
+      }
+    }, [shouldAnimate]);
 
     const animatedDotStyle = useAnimatedStyle(() => ({
       transform: [{ scale: scale.value }],
@@ -476,7 +520,7 @@ export const LoadingDots: React.FC<LoadingDotsProps> = ({
             width: size,
             height: size,
             borderRadius: size / 2,
-            backgroundColor: color,
+            backgroundColor: dotColor,
             marginHorizontal: size / 4,
           },
           animatedDotStyle,
@@ -494,6 +538,7 @@ interface PulseProps {
   scale?: number;
   duration?: number;
   style?: any;
+  respectReduceMotion?: boolean;
 }
 
 export const Pulse: React.FC<PulseProps> = ({
@@ -501,19 +546,26 @@ export const Pulse: React.FC<PulseProps> = ({
   scale = 1.1,
   duration = 1000,
   style,
+  respectReduceMotion = true,
 }) => {
   const pulseScale = useSharedValue(1);
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = !(respectReduceMotion && reduceMotion);
 
   useEffect(() => {
-    pulseScale.value = withRepeat(
-      withSequence(
-        withTiming(scale, { duration: duration / 2 }),
-        withTiming(1, { duration: duration / 2 })
-      ),
-      -1,
-      true
-    );
-  }, [scale, duration]);
+    if (shouldAnimate) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(scale, { duration: duration / 2 }),
+          withTiming(1, { duration: duration / 2 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseScale.value = 1;
+    }
+  }, [scale, duration, shouldAnimate]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],

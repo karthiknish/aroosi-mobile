@@ -16,14 +16,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 import * as Haptics from "expo-haptics";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
-
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
@@ -40,28 +40,28 @@ interface ToastProps {
   position?: "top" | "bottom";
 }
 
-const toastConfig = {
+const toastConfig = (theme: ReturnType<typeof useTheme>["theme"]) => ({
   success: {
     icon: "✅",
-    colors: [Colors.success[500], Colors.success[600]],
+    colors: [theme.colors.success[500], theme.colors.success[600]],
     haptic: Haptics.ImpactFeedbackStyle.Light,
   },
   error: {
     icon: "❌",
-    colors: [Colors.error[500], Colors.error[600]],
+    colors: [theme.colors.error[500], theme.colors.error[600]],
     haptic: Haptics.ImpactFeedbackStyle.Heavy,
   },
   warning: {
     icon: "⚠️",
-    colors: [Colors.warning[500], Colors.warning[600]],
+    colors: [theme.colors.warning[500], theme.colors.warning[600]],
     haptic: Haptics.ImpactFeedbackStyle.Medium,
   },
   info: {
     icon: "ℹ️",
-    colors: [Colors.primary[500], Colors.primary[600]],
+    colors: [theme.colors.primary[500], theme.colors.primary[600]],
     haptic: Haptics.ImpactFeedbackStyle.Light,
   },
-};
+});
 
 export const Toast: React.FC<ToastProps> = ({
   visible,
@@ -72,13 +72,14 @@ export const Toast: React.FC<ToastProps> = ({
   action,
   position = "top",
 }) => {
+  const { theme } = useTheme();
   const translateY = useSharedValue(position === "top" ? -100 : 100);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
 
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
-  const config = toastConfig[type];
+  const config = toastConfig(theme)[type];
 
   const triggerHaptic = () => {
     Haptics.impactAsync(config.haptic);
@@ -142,12 +143,12 @@ export const Toast: React.FC<ToastProps> = ({
     flex: 1,
     fontSize: fontSize.base as number,
     fontWeight: "500" as const,
-    color: Colors.background.primary,
+    color: theme.colors.text.inverse,
     lineHeight: (fontSize.base as number) * 1.4,
   };
 
   const actionButtonStyle = {
-    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+    backgroundColor: rgbaHex(theme.colors.text.inverse, 0.2),
     paddingHorizontal: typeof spacing?.md === "number" ? spacing.md : 16,
     paddingVertical: (typeof spacing?.xs === "number" ? spacing.xs : 4) + 2,
     borderRadius: typeof spacing?.md === "number" ? spacing.md : 16,
@@ -158,14 +159,14 @@ export const Toast: React.FC<ToastProps> = ({
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: fontSize.sm as number,
     fontWeight: "600" as const,
-    color: Colors.background.primary,
+    color: theme.colors.text.inverse,
   };
 
   const closeButtonStyle = {
     width: typeof spacing?.lg === "number" ? spacing.lg : 24,
     height: typeof spacing?.lg === "number" ? spacing.lg : 24,
     borderRadius: typeof spacing?.md === "number" ? spacing.md : 12,
-    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+    backgroundColor: rgbaHex(theme.colors.text.inverse, 0.2),
     justifyContent: "center" as const,
     alignItems: "center" as const,
     marginLeft: typeof spacing?.xs === "number" ? spacing.xs : 4,
@@ -174,7 +175,7 @@ export const Toast: React.FC<ToastProps> = ({
   const closeTextStyle = {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: fontSize.xs as number,
-    color: Colors.background.primary,
+    color: theme.colors.text.inverse,
     fontWeight: "600" as const,
   };
 
@@ -193,7 +194,7 @@ export const Toast: React.FC<ToastProps> = ({
           colors={[
             config.colors[0],
             config.colors[1],
-            rgbaHex(Colors.background.primary, 0.1),
+            rgbaHex(theme.colors.text.inverse, 0.1),
           ]}
           style={styles.gradient}
           start={{ x: 0, y: 0 }}
@@ -363,24 +364,24 @@ const styles = StyleSheet.create({
   message: {
     flex: 1,
     fontWeight: "500",
-    color: Colors.background.primary,
+    // Color provided inline per theme
   },
   actionButton: {
-    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+    // Background provided inline per theme
   },
   actionText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontWeight: "600",
-    color: Colors.background.primary,
+    // Color provided inline per theme
   },
   closeButton: {
-    backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+    // Background provided inline per theme
     justifyContent: "center",
     alignItems: "center",
   },
   closeText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    color: Colors.background.primary,
+    // Color provided inline per theme
     fontWeight: "600",
   },
   toastContainer: {

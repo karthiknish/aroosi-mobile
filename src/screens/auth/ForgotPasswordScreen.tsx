@@ -11,7 +11,8 @@ import {
   ScrollView,
 } from "react-native";
 import { useAuth } from "@contexts/AuthProvider";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
@@ -27,6 +28,7 @@ type ForgotPasswordScreenNavigationProp = StackNavigationProp<
 >;
 
 export default function ForgotPasswordScreen() {
+  const { theme } = useTheme();
   const { sendPasswordReset } = useAuth();
   const navigation = useNavigation<ForgotPasswordScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
@@ -78,42 +80,42 @@ export default function ForgotPasswordScreen() {
     title: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize["2xl"],
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs,
     },
-    subtitle: { fontSize: fontSize.base, color: Colors.text.secondary },
+    subtitle: { fontSize: fontSize.base, color: theme.colors.text.secondary },
     form: { width: "100%" },
     inputContainer: { marginBottom: spacing.lg },
     label: {
       fontSize: fontSize.sm,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs,
       fontWeight: "500",
     },
     input: {
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       borderRadius: 8,
       padding: spacing.md,
       fontSize: fontSize.base,
-      color: Colors.text.primary,
-      backgroundColor: Colors.background.primary,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.background.primary,
     },
-    inputError: { borderColor: Colors.error[500] },
+    inputError: { borderColor: theme.colors.error[500] },
     button: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       borderRadius: 8,
       padding: spacing.md,
       alignItems: "center",
       marginTop: spacing.lg,
     },
     buttonText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: fontSize.base,
       fontWeight: "600",
     },
     errorText: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
       fontSize: fontSize.sm,
       marginTop: spacing.xs,
     },
@@ -121,7 +123,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <GradientBackground
-      colors={Colors.gradient.secondary as any}
+      colors={theme.colors.gradient.secondary as any}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -148,7 +150,7 @@ export default function ForgotPasswordScreen() {
                   <TextInput
                     style={[styles.input, !!fieldError && styles.inputError]}
                     placeholder="Enter your email"
-                    placeholderTextColor={Colors.text.secondary}
+                    placeholderTextColor={theme.colors.text.secondary}
                     value={email}
                     onChangeText={(v) => {
                       setEmail(v);

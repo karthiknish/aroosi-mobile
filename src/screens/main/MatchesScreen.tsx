@@ -22,7 +22,7 @@ import {
 } from "@tanstack/react-query";
 import { useApiClient } from "@/utils/api";
 import { useAuth } from "@contexts/AuthProvider";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
 import { useTheme } from "@contexts/ThemeContext";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -40,6 +40,8 @@ import {
   StaggeredList,
 } from "@/components/ui/AnimatedComponents";
 import ScreenContainer from "@components/common/ScreenContainer";
+import AppHeader from "@/components/common/AppHeader";
+import Avatar from "@/components/common/Avatar";
 import { Profile } from "@/types/profile";
 import { useToast } from "@/providers/ToastContext";
 import { useInterests } from "@/hooks/useInterests";
@@ -56,6 +58,9 @@ import { useSubscription } from "@/hooks/useSubscription";
 import type { SubscriptionTier } from "@/types/subscription";
 import SafetyActionSheet from "@components/safety/SafetyActionSheet";
 import ReportUserModal from "@components/safety/ReportUserModal";
+import * as Haptics from "expo-haptics";
+import HintPopover from "@/components/ui/HintPopover";
+import HapticPressable from "@/components/ui/HapticPressable";
 
 interface MatchesScreenProps {
   navigation: any;
@@ -70,6 +75,8 @@ type UIMatch = {
   matchedAt?: number;
   lastActivity?: number;
   unreadCount?: number;
+  lastMessageText?: string | null;
+  lastMessageFromUserId?: string | null;
 };
 
 interface Interest {
@@ -101,7 +108,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
   const [safetyVisible, setSafetyVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   // Subscription & upgrade state
-  const { subscription, usage, canUseFeatureNow, trackFeatureUsage } =
+  const { subscription, usage, features, canUseFeatureNow, trackFeatureUsage } =
     useSubscription();
   const subscriptionPlan = subscription?.plan || ("free" as SubscriptionTier);
   const [upgradeVisible, setUpgradeVisible] = useState(false);
@@ -146,6 +153,27 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         const other = (c.participants || []).find(
           (p: any) => p?.userId !== userId
         );
+        // Try to extract last message preview in a tolerant way
+        const lastMsg =
+          c?.lastMessage ||
+          c?.last_msg ||
+          c?.last_message ||
+          c?.recentMessage ||
+          c?.recent_message ||
+          null;
+        const lastMessageText =
+          lastMsg?.text ||
+          lastMsg?.content ||
+          lastMsg?.body ||
+          c?.lastMessageText ||
+          c?.last_text ||
+          null;
+        const lastMessageFromUserId =
+          lastMsg?.fromUserId ||
+          lastMsg?.senderId ||
+          lastMsg?.userId ||
+          c?.lastMessageFromUserId ||
+          null;
         return {
           userId: other?.userId || "",
           fullName: other?.firstName || other?.fullName || other?.userId || "",
@@ -154,6 +182,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           matchedAt: c.createdAt,
           lastActivity: c.lastActivity || c.lastMessageAt,
           unreadCount: typeof c.unreadCount === "number" ? c.unreadCount : 0,
+          lastMessageText,
+          lastMessageFromUserId,
         };
       });
       // Filter archived
@@ -189,6 +219,10 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     () => (matchesPages?.pages || []).flatMap((p: any) => p.items),
     [matchesPages]
   );
+
+  // ---------------- Typing indicators per conversation ----------------
+  const [typingMap, setTypingMap] = useState<Record<string, number>>({});
+  const TYPING_TTL_MS = 6000; // 6 seconds after last event
 
   // ---------------- Prefetch Next Page Near List End ----------------
   const PREFETCH_THRESHOLD = 6; // items from end to trigger
@@ -332,6 +366,22 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     onNewMessage: () =>
       queryClient.invalidateQueries({ queryKey: ["matches"] }),
     onNewMatch: () => queryClient.invalidateQueries({ queryKey: ["matches"] }),
+    onTypingIndicator: (evt: any) => {
+      try {
+        const convId = evt?.conversationId || evt?.convId || evt?.id;
+        const action = (evt?.action || evt?.status || "start").toString();
+        if (!convId) return;
+        setTypingMap((prev) => {
+          const next = { ...prev };
+          if (action === "stop") {
+            delete next[convId];
+          } else {
+            next[convId] = Date.now() + TYPING_TTL_MS;
+          }
+          return next;
+        });
+      } catch {}
+    },
   });
 
   // Prefetch next page if initial page small (heuristic)
@@ -372,12 +422,16 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     await persistArchived(next);
     queryClient.invalidateQueries({ queryKey: ["matches"] });
     toast?.show?.("Conversation archived", "info");
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   };
 
   const deleteConversation = async (convId: string) => {
     const res = await unifiedMessagingApi.deleteConversation(convId);
     if (res.success) {
       toast?.show?.("Conversation deleted", "success");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
+        () => {}
+      );
       const next = new Set(archivedIds);
       if (next.delete(convId)) await persistArchived(next);
       queryClient.invalidateQueries({ queryKey: ["matches"] });
@@ -388,6 +442,17 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
 
   const renderMatch = ({ item, index }: ListRenderItemInfo<UIMatch>) => {
     const match = item;
+    const isTyping =
+      !!typingMap[match.conversationId] &&
+      typingMap[match.conversationId] > Date.now();
+    const previewBase = (match.lastMessageText || "").trim();
+    const mine =
+      match.lastMessageFromUserId && match.lastMessageFromUserId === userId;
+    const previewFull = previewBase
+      ? `${mine ? "You: " : ""}${previewBase}`
+      : "";
+    const preview =
+      previewFull.length > 60 ? `${previewFull.slice(0, 57)}…` : previewFull;
     return (
       <FadeInView key={`${match.conversationId}-${index}`} delay={index * 60}>
         <AnimatedButton
@@ -398,6 +463,8 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
               borderColor: theme.colors.border.primary,
             },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Open chat with ${match.fullName || "match"}`}
           onPress={() => handleMatchPress(match)}
           onLongPress={() => handleMatchLongPress(match)}
           animationType="scale"
@@ -410,25 +477,23 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                   match.profileImageUrls && match.profileImageUrls.length
                     ? match.profileImageUrls
                     : cached;
-                if (urls && urls.length) {
-                  return (
-                    <Image
-                      source={{ uri: urls[0] }}
-                      style={styles.matchAvatar}
-                      resizeMode="cover"
-                      onError={() => setProfileImages(match.userId, [])}
-                    />
-                  );
-                }
+                const lastTs =
+                  Number(match.lastActivity) ||
+                  (match.lastActivity
+                    ? Date.parse(String(match.lastActivity))
+                    : 0);
+                const isOnline =
+                  !!lastTs && Date.now() - lastTs < 5 * 60 * 1000;
                 return (
-                  <View
-                    style={[
-                      styles.matchImagePlaceholder,
-                      { backgroundColor: theme.colors.neutral[100] },
-                    ]}
-                  >
-                    <Text style={styles.matchImageText}>👤</Text>
-                  </View>
+                  <Avatar
+                    uri={urls && urls.length ? urls[0] : undefined}
+                    name={match.fullName || ""}
+                    fallback={match.fullName?.[0] || "?"}
+                    size="lg"
+                    showPresence
+                    isOnline={isOnline}
+                    accessibilityLabel={`${match.fullName || "Unknown"} avatar`}
+                  />
                 );
               })()}
             </View>
@@ -449,7 +514,11 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                   { color: theme.colors.text.secondary },
                 ]}
               >
-                {match.lastActivity
+                {isTyping
+                  ? "Typing…"
+                  : preview
+                  ? preview
+                  : match.lastActivity
                   ? formatTimeAgo(String(match.lastActivity))
                   : "Say hello!"}
               </Text>
@@ -480,7 +549,10 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                   ]}
                 >
                   <Text
-                    style={[styles.unreadText, { color: Colors.text.inverse }]}
+                    style={[
+                      styles.unreadText,
+                      { color: theme.colors.text.inverse },
+                    ]}
                   >
                     {match.unreadCount > 99 ? "99+" : String(match.unreadCount)}
                   </Text>
@@ -527,6 +599,9 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                         await trackFeatureUsage("interestsSent");
                       } catch {}
                       toast?.show?.("Interest sent", "success");
+                      Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                      ).catch(() => {});
                     } else {
                       toast?.show?.("Could not send interest", "error");
                     }
@@ -541,6 +616,12 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                       opacity: sending ? 0.6 : 1,
                     },
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    hasSentInterestTo(match.userId)
+                      ? `Interest already sent to ${match.fullName || "user"}`
+                      : `Send interest to ${match.fullName || "user"}`
+                  }
                 >
                   <Ionicons
                     name={
@@ -557,6 +638,25 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
                   />
                 </TouchableOpacity>
               )}
+
+              {/* Inline hint when interest sending is gated */}
+              {(() => {
+                const f = usage?.features?.find(
+                  (x: any) => x.name === "interestsSent"
+                );
+                const reached = (f?.percentageUsed ?? 0) >= 100;
+                if (reached && !hasSentInterestTo(match.userId)) {
+                  return (
+                    <HintPopover
+                      label="Why?"
+                      hint={
+                        "You've reached this month's free interest limit. Upgrade to continue sending interests."
+                      }
+                    />
+                  );
+                }
+                return null;
+              })()}
             </View>
           </ScaleInView>
         </AnimatedButton>
@@ -571,16 +671,21 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         onPress={() => handleInterestPress(interest)}
       >
         <View style={styles.interestImageContainer}>
-          {interest.fromProfile?.profileImageUrls &&
-          interest.fromProfile.profileImageUrls.length > 0 ? (
-            <View style={styles.interestImagePlaceholder}>
-              <Text style={styles.interestImageText}>�</Text>
-            </View>
-          ) : (
-            <View style={styles.interestImagePlaceholder}>
-              <Text style={styles.interestImageText}>�👤</Text>
-            </View>
-          )}
+          <Avatar
+            uri={
+              interest.fromProfile?.profileImageUrls &&
+              interest.fromProfile.profileImageUrls.length > 0
+                ? interest.fromProfile.profileImageUrls[0]
+                : undefined
+            }
+            name={interest.fromProfile?.fullName || ""}
+            fallback={(interest.fromProfile?.fullName || "?").charAt(0)}
+            size="md"
+            showPresence={false}
+            accessibilityLabel={`${
+              interest.fromProfile?.fullName || "Someone"
+            } avatar`}
+          />
         </View>
 
         <View style={styles.interestInfo}>
@@ -613,13 +718,7 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
         contentStyle={styles.contentStyle}
         useScrollView={false}
       >
-        <View style={styles.header}>
-          <Text
-            style={[styles.headerTitle, { color: theme.colors.text.primary }]}
-          >
-            Matches
-          </Text>
-        </View>
+        <AppHeader title="Matches" />
         <ProfileCardSkeleton count={2} />
         <View style={{ paddingHorizontal: Layout.spacing.lg }}>
           <SkeletonLoading
@@ -658,65 +757,55 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
       >
         {/* Header */}
         <FadeInView>
-          <View style={styles.header}>
-            <SlideInView direction="left" delay={100}>
-              <Text
-                style={[
-                  styles.headerTitle,
-                  { color: theme.colors.text.primary },
-                ]}
+          <AppHeader
+            title="Matches"
+            rightActions={
+              <HapticPressable
+                onPress={() => navigation.navigate("QuickPicks" as never)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 14,
+                  backgroundColor: theme.colors.primary[50],
+                  borderWidth: 1,
+                  borderColor: theme.colors.primary[200],
+                }}
+                accessibilityLabel="Go to Daily Quick Picks"
               >
-                Matches
-              </Text>
-            </SlideInView>
-            <TouchableOpacity
-              onPress={() => navigation.navigate("QuickPicks" as never)}
-              style={{
-                position: "absolute",
-                right: Layout.spacing.lg,
-                top: Layout.spacing.md,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 14,
-                backgroundColor: theme.colors.primary[50],
-                borderWidth: 1,
-                borderColor: theme.colors.primary[200],
-              }}
-              accessibilityLabel="Go to Daily Quick Picks"
-            >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text
-                  style={{
-                    color: theme.colors.primary[700],
-                    fontWeight: "600",
-                  }}
-                >
-                  Quick Picks →
-                </Text>
-                {iceUnanswered > 0 && (
-                  <View
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
                     style={{
-                      marginLeft: 6,
-                      backgroundColor: theme.colors.primary[600],
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                      borderRadius: 10,
+                      color: theme.colors.primary[700],
+                      fontWeight: "600",
                     }}
                   >
-                    <Text
+                    Quick Picks →
+                  </Text>
+                  {iceUnanswered > 0 && (
+                    <View
                       style={{
-                        color: Colors.text.inverse,
-                        fontSize: 12,
-                        fontWeight: "700",
+                        marginLeft: 6,
+                        backgroundColor: theme.colors.primary[600],
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 10,
                       }}
                     >
-                      {iceUnanswered}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          </View>
+                      <Text
+                        style={{
+                          color: theme.colors.text.inverse,
+                          fontSize: 12,
+                          fontWeight: "700",
+                        }}
+                      >
+                        {iceUnanswered}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </HapticPressable>
+            }
+          />
         </FadeInView>
 
         {/* Inline upgrade banner for interests when near/at limit */}
@@ -790,6 +879,30 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           >
             Your Matches
           </Text>
+          {/* Quick CTA to Icebreakers if any unanswered */}
+          {iceUnanswered > 0 && (
+            <HapticPressable
+              onPress={() => navigation.navigate("Icebreakers" as never)}
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 4,
+                marginBottom: Layout.spacing.xs,
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 14,
+                backgroundColor: theme.colors.primary[50],
+                borderWidth: 1,
+                borderColor: theme.colors.primary[200],
+              }}
+              accessibilityLabel="Answer today's icebreakers"
+            >
+              <Text
+                style={{ color: theme.colors.primary[700], fontWeight: "600" }}
+              >
+                Break the ice ({iceUnanswered}) →
+              </Text>
+            </HapticPressable>
+          )}
           <Text
             style={[
               styles.sectionSubtitle,
@@ -798,6 +911,24 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           >
             Start conversations with your mutual matches
           </Text>
+          {(() => {
+            const canInitiate = Boolean(features?.canInitiateChat);
+            const mf = usage?.features?.find(
+              (x: any) => x.name === "messagesSent"
+            );
+            const msgReached = (mf?.percentageUsed ?? 0) >= 100;
+            if (!canInitiate || msgReached) {
+              const hint = !canInitiate
+                ? "Upgrade to Premium to start conversations with your matches."
+                : "You've reached today’s messaging limit. Upgrade for higher limits.";
+              return (
+                <View style={{ marginTop: 6 }}>
+                  <HintPopover label="Why?" hint={hint} />
+                </View>
+              );
+            }
+            return null;
+          })()}
 
           {matchesError ? (
             <ApiErrorDisplay error={matchesError} onRetry={refetchMatches} />
@@ -865,43 +996,124 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
           height={220}
         >
           <View style={{ gap: Layout.spacing.sm }}>
-            <TouchableOpacity
-              style={styles.actionItem}
+            <HapticPressable
+              style={[
+                styles.actionItem,
+                {
+                  backgroundColor: theme.colors.background.secondary,
+                  borderColor: theme.colors.border.primary,
+                },
+              ]}
+              onPress={async () => {
+                if (selectedMatch) {
+                  try {
+                    await (apiClient as any).markConversationAsRead(
+                      selectedMatch.conversationId
+                    );
+                    queryClient.invalidateQueries({ queryKey: ["matches"] });
+                    toast?.show?.("Marked as read", "success");
+                  } catch {}
+                }
+                setActionSheetVisible(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                Mark as read
+              </Text>
+            </HapticPressable>
+
+            <HapticPressable
+              style={[
+                styles.actionItem,
+                {
+                  backgroundColor: theme.colors.background.secondary,
+                  borderColor: theme.colors.border.primary,
+                },
+              ]}
               onPress={async () => {
                 if (selectedMatch)
                   await archiveConversation(selectedMatch.conversationId);
                 setActionSheetVisible(false);
               }}
             >
-              <Text style={styles.actionLabel}>Archive</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionItem}
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                Archive
+              </Text>
+            </HapticPressable>
+
+            <HapticPressable
+              style={[
+                styles.actionItem,
+                {
+                  backgroundColor: theme.colors.background.secondary,
+                  borderColor: theme.colors.border.primary,
+                },
+              ]}
               onPress={() => {
                 setActionSheetVisible(false);
                 setSafetyVisible(true);
               }}
             >
-              <Text style={styles.actionLabel}>Safety options</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionItem}
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                Safety options
+              </Text>
+            </HapticPressable>
+
+            <HapticPressable
+              style={[
+                styles.actionItem,
+                {
+                  backgroundColor: theme.colors.background.secondary,
+                  borderColor: theme.colors.border.primary,
+                },
+              ]}
               onPress={() => setActionSheetVisible(false)}
             >
-              <Text style={styles.actionLabel}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionItem}
+              <Text
+                style={[
+                  styles.actionLabel,
+                  { color: theme.colors.text.primary },
+                ]}
+              >
+                Cancel
+              </Text>
+            </HapticPressable>
+
+            <HapticPressable
+              style={[
+                styles.actionItem,
+                {
+                  backgroundColor: theme.colors.background.secondary,
+                  borderColor: theme.colors.border.primary,
+                },
+              ]}
               onPress={async () => {
                 if (selectedMatch)
                   await deleteConversation(selectedMatch.conversationId);
                 setActionSheetVisible(false);
               }}
             >
-              <Text style={[styles.actionLabel, styles.actionDestructive]}>
+              <Text
+                style={[styles.actionLabel, { color: theme.colors.error[600] }]}
+              >
                 Delete
               </Text>
-            </TouchableOpacity>
+            </HapticPressable>
           </View>
         </BottomSheet>
 
@@ -952,7 +1164,6 @@ export default function MatchesScreen({ navigation }: MatchesScreenProps) {
     </ErrorBoundary>
   );
 }
-
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: Layout.spacing.lg,
@@ -966,7 +1177,6 @@ const styles = StyleSheet.create({
     fontFamily: "Boldonse-Regular",
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
   },
   contentStyle: {
     flexGrow: 1,
@@ -979,64 +1189,40 @@ const styles = StyleSheet.create({
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize.xl,
     fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   sectionSubtitle: {
     fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
     marginBottom: Layout.spacing.lg,
   },
   matchesList: {
     paddingBottom: Layout.spacing.lg,
   },
   matchCard: {
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.lg,
     padding: Layout.spacing.lg,
-    marginBottom: Layout.spacing.md,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: Colors.border.primary,
   },
   matchImageContainer: {
     marginRight: Layout.spacing.md,
   },
-  matchImagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.neutral[100],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  matchAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.neutral[100],
-  },
-  matchImageText: {
-    fontSize: Layout.typography.fontSize["2xl"],
-  },
+  // Avatar styles handled by shared component
   matchInfo: {
     flex: 1,
   },
   matchName: {
     fontSize: Layout.typography.fontSize.lg,
     fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   matchStatus: {
     fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
     marginBottom: Layout.spacing.xs,
   },
   matchTime: {
     fontSize: Layout.typography.fontSize.xs,
-    color: Colors.text.tertiary,
   },
   matchActions: {
     alignItems: "center",
@@ -1045,7 +1231,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: Layout.radius.full,
-    backgroundColor: Colors.primary[50],
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1065,27 +1250,18 @@ const styles = StyleSheet.create({
     paddingVertical: Layout.spacing.md,
     paddingHorizontal: Layout.spacing.md,
     borderRadius: Layout.radius.lg,
-    backgroundColor: Colors.background.secondary,
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     marginBottom: Layout.spacing.sm,
   },
   actionLabel: {
     fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-  },
-  actionDestructive: {
-    color: Colors.error[600],
   },
   interestCard: {
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.lg,
     padding: Layout.spacing.lg,
     marginBottom: Layout.spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.primary[500],
   },
   interestProfile: {
     flexDirection: "row",
@@ -1095,33 +1271,20 @@ const styles = StyleSheet.create({
   interestImageContainer: {
     marginRight: Layout.spacing.md,
   },
-  interestImagePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: Layout.radius.full,
-    backgroundColor: Colors.neutral[100],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  interestImageText: {
-    fontSize: Layout.typography.fontSize.lg,
-  },
+  // Avatar handled by shared component
   interestInfo: {
     flex: 1,
   },
   interestName: {
     fontSize: Layout.typography.fontSize.base,
     fontWeight: Layout.typography.fontWeight.medium,
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   interestTime: {
     fontSize: Layout.typography.fontSize.xs,
-    color: Colors.text.tertiary,
   },
   interestNote: {
     fontSize: Layout.typography.fontSize.xs,
-    color: Colors.text.secondary,
     marginTop: Layout.spacing.xs,
   },
   interestActions: {
@@ -1135,17 +1298,5 @@ const styles = StyleSheet.create({
     borderRadius: Layout.radius.full,
     justifyContent: "center",
     alignItems: "center",
-  },
-  acceptButton: {
-    backgroundColor: Colors.success[50],
-  },
-  rejectButton: {
-    backgroundColor: Colors.error[50],
-  },
-  acceptButtonText: {
-    fontSize: Layout.typography.fontSize.xl,
-  },
-  rejectButtonText: {
-    fontSize: Layout.typography.fontSize.lg,
   },
 });

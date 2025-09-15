@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 
 const root = process.cwd();
-const iosPlist = process.env.GOOGLE_SERVICE_INFO_PLIST || './ios/Aroosi/GoogleService-Info.plist';
-const androidJson = process.env.GOOGLE_SERVICES_JSON || './android/app/google-services.json';
+const iosPlist =
+  process.env.GOOGLE_SERVICE_INFO_PLIST || "./GoogleService-Info.plist";
+const androidJson =
+  process.env.GOOGLE_SERVICES_JSON || "./android/app/google-services.json";
 
 function check(p) {
   const abs = path.resolve(root, p);
@@ -21,6 +23,24 @@ for (const r of results) {
   } else {
     console.log(`Found: ${r.rel}`);
   }
+}
+
+// Optional: sanity check web client id alignment (Android json vs .env)
+try {
+  const jsonPath = path.resolve(root, androidJson);
+  if (fs.existsSync(jsonPath)) {
+    const data = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+    const oauthClients = data?.client?.[0]?.oauth_client || [];
+    const webClient = oauthClients.find((c) => c.client_type === 3)?.client_id;
+    const envWebClient = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+    if (envWebClient && webClient && envWebClient !== webClient) {
+      console.warn(
+        `\nWARNING: EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID does not match google-services.json web client id.\n  .env: ${envWebClient}\n  json: ${webClient}\nThis can cause Google token errors. Consider aligning them.`
+      );
+    }
+  }
+} catch (e) {
+  console.warn("Could not validate web client id alignment:", e?.message || e);
 }
 
 if (!ok) {

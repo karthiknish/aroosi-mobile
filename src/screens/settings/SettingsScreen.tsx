@@ -7,9 +7,12 @@ import {
   Switch,
   Alert,
 } from "react-native";
+import HapticPressable from "@/components/ui/HapticPressable";
 import { useAuth } from "@contexts/AuthProvider";
 import { useState } from "react";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
+import { useNotifications } from "@/utils/notificationHandler";
 import useResponsiveSpacing from "@/hooks/useResponsive";
 import useResponsiveTypography from "@/hooks/useResponsive";
 import ScreenContainer from "@components/common/ScreenContainer";
@@ -23,6 +26,8 @@ import UpgradePrompt from "@components/subscription/UpgradePrompt";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import type { SubscriptionTier } from "@/types/subscription";
+import { getBillingPortalUrl } from "@services/subscriptions";
+import HintPopover from "@/components/ui/HintPopover";
 interface SettingsScreenProps {
   navigation: any;
 }
@@ -53,8 +58,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const font = (n: number) => (rt?.scale?.font ? rt.scale.font(n) : n);
 
   // Local state for toggles
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const { preferences: notifPrefs, updatePreferences: updateNotifPrefs } =
+    useNotifications();
+  const [pushNotifications, setPushNotifications] = useState(
+    notifPrefs.enabled
+  );
+  const [emailNotifications, setEmailNotifications] = useState(
+    notifPrefs.emailEnabled
+  );
+
+  // Sync local toggle state when preferences change externally
+  React.useEffect(() => {
+    setPushNotifications(notifPrefs.enabled);
+    setEmailNotifications(notifPrefs.emailEnabled);
+  }, [notifPrefs.enabled, notifPrefs.emailEnabled]);
   const [showOnlineStatus, setShowOnlineStatus] = useState(true);
   const [readReceipts, setReadReceipts] = useState(true);
   const [hideFromFreeUsers, setHideFromFreeUsers] = useState<boolean>(false);
@@ -62,10 +79,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const apiClient = useApiClient();
   const [resendLoading, setResendLoading] = useState(false);
   const [checking, setChecking] = useState(false);
-  const { subscription } = useSubscription();
+  const { subscription, canUseFeatureNow } = useSubscription();
   const { checkFeatureAccess } = useFeatureAccess();
   const currentTier = (subscription?.plan as SubscriptionTier) || "free";
   const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const { theme, isDark, setTheme } = useTheme();
   const [recommendedTier, setRecommendedTier] =
     useState<SubscriptionTier>("premium");
   const [lastUpgradeTap, setLastUpgradeTap] = useState<number>(0);
@@ -135,6 +153,32 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     );
   };
 
+  // Derived helpers for boost time remaining
+  const formatTimeRemaining = (until?: number): string => {
+    if (!until) return "";
+    const now = Date.now();
+    const timeLeft = until - now;
+    if (timeLeft <= 0) return "";
+    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    return hours > 0
+      ? `${hours}h ${minutes}m remaining`
+      : `${minutes}m remaining`;
+  };
+  const nextMonthlyResetDate = React.useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0);
+  }, []);
+
+  // Local derived state from profile for premium quick actions
+  const [boostedUntil, setBoostedUntil] = useState<number | undefined>(
+    undefined
+  );
+  const [boostsRemaining, setBoostsRemaining] = useState<number | undefined>(
+    undefined
+  );
+  const [hasSpotlightBadge, setHasSpotlightBadge] = useState<boolean>(false);
+
   // Hydrate settings from server
   React.useEffect(() => {
     let cancelled = false;
@@ -143,6 +187,9 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       if (!cancelled && res.success && (res.data as any)?.data) {
         const profile = (res.data as any).data;
         setHideFromFreeUsers(!!profile?.hideFromFreeUsers);
+        setBoostedUntil(profile?.boostedUntil);
+        setBoostsRemaining(profile?.boostsRemaining);
+        setHasSpotlightBadge(!!profile?.hasSpotlightBadge);
       }
     })();
     return () => {
@@ -151,6 +198,18 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   }, [apiClient]);
 
   const settingSections = [
+    {
+      title: "Appearance",
+      items: [
+        {
+          title: "Dark Mode",
+          subtitle: "Use a dark theme across the app",
+          type: "toggle" as const,
+          value: isDark,
+          onToggle: (val: boolean) => setTheme(val),
+        },
+      ],
+    },
     {
       title: "Account",
       items: [
@@ -166,6 +225,25 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           type: "navigation" as const,
           onPress: () => navigation.navigate("Subscription"),
         },
+        // Hide Manage Billing for free users
+        ...(currentTier === "free"
+          ? []
+          : [
+              {
+                title: "Manage Billing",
+                subtitle: "Open the billing portal",
+                type: "action" as const,
+                onPress: async () => {
+                  try {
+                    const { url } = await getBillingPortalUrl();
+                    if (url) await Linking.openURL(url);
+                    else toast.show("Unable to open billing portal.", "error");
+                  } catch (e) {
+                    toast.show("Unable to open billing portal.", "error");
+                  }
+                },
+              },
+            ]),
         {
           title: "Notifications",
           subtitle: "Choose which alerts you receive",
@@ -188,14 +266,21 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           subtitle: "Receive notifications on your device",
           type: "toggle" as const,
           value: pushNotifications,
-          onToggle: setPushNotifications,
+          onToggle: async (val: boolean) => {
+            setPushNotifications(val);
+            await updateNotifPrefs({ enabled: val });
+          },
         },
         {
           title: "Email Notifications",
           subtitle: "Receive notifications via email",
           type: "toggle" as const,
           value: emailNotifications,
-          onToggle: setEmailNotifications,
+          onToggle: async (val: boolean) => {
+            setEmailNotifications(val);
+            await updateNotifPrefs({ emailEnabled: val });
+            // Optionally call server to update email prefs here if available
+          },
         },
       ],
     },
@@ -262,13 +347,30 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       items: [
         {
           title: "Boost Profile",
-          subtitle: "Get more visibility for 24 hours",
+          subtitle:
+            boostedUntil && boostedUntil > Date.now()
+              ? `Profile is boosted! (${formatTimeRemaining(boostedUntil)})`
+              : typeof boostsRemaining === "number"
+              ? boostsRemaining > 0
+                ? `Boost your profile (${boostsRemaining} remaining this month)`
+                : `No boosts left this month. Resets on ${nextMonthlyResetDate.toLocaleDateString()}`
+              : "Get more visibility for 24 hours",
           type: "action" as const,
           onPress: async () => {
+            // Plan gate first
             const access = await checkFeatureAccess("canBoostProfile");
             if (!access.allowed) {
-              setRecommendedTier("premium");
+              setRecommendedTier("premiumPlus");
               setUpgradeVisible(true);
+              return;
+            }
+            // Server-side quota check
+            const avail = await canUseFeatureNow("profileBoosts");
+            if (!avail.canUse) {
+              toast.show(
+                avail.reason || "You've reached your boost quota for now.",
+                "info"
+              );
               return;
             }
             const res = await apiClient.boostProfile();
@@ -276,12 +378,48 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               toast.show((res as any)?.error || "Failed to boost", "error");
             } else {
               toast.show("Boost activated", "success");
+              // Optimistically reflect updated state
+              setBoostedUntil(Date.now() + 24 * 60 * 60 * 1000);
+              if (typeof boostsRemaining === "number") {
+                setBoostsRemaining(Math.max(0, boostsRemaining - 1));
+              }
             }
           },
         },
         {
+          title: "Profile Viewers",
+          subtitle: "See who's viewed your profile",
+          type: "action" as const,
+          onPress: async () => {
+            const access = await checkFeatureAccess("canViewProfileViewers");
+            if (!access.allowed) {
+              setRecommendedTier("premiumPlus");
+              setUpgradeVisible(true);
+              return;
+            }
+            toast.show("Opening your profile viewers…", "info");
+            navigation.navigate("Profile", { focus: "viewers" } as any);
+          },
+        },
+        {
+          title: "Advanced Filters",
+          subtitle: "Filter by income, education, and career",
+          type: "action" as const,
+          onPress: async () => {
+            const access = await checkFeatureAccess("canUseAdvancedFilters");
+            if (!access.allowed) {
+              setRecommendedTier("premiumPlus");
+              setUpgradeVisible(true);
+              return;
+            }
+            navigation.navigate("Search", { openAdvancedFilters: true } as any);
+          },
+        },
+        {
           title: "Activate Spotlight",
-          subtitle: "Show spotlight badge (Premium Plus)",
+          subtitle: hasSpotlightBadge
+            ? "Spotlight active"
+            : "Show spotlight badge (Premium Plus)",
           type: "action" as const,
           onPress: async () => {
             const access = await checkFeatureAccess("canUseIncognitoMode");
@@ -290,11 +428,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               setUpgradeVisible(true);
               return;
             }
+            if (hasSpotlightBadge) {
+              toast.show("Spotlight already active", "info");
+              return;
+            }
             const res = await apiClient.activateSpotlight();
             if ((res as any)?.success === false) {
               toast.show((res as any)?.error || "Failed to activate", "error");
             } else {
               toast.show("Spotlight activated", "success");
+              setHasSpotlightBadge(true);
             }
           },
         },
@@ -303,6 +446,12 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     {
       title: "Safety & Support",
       items: [
+        {
+          title: "About Aroosi",
+          subtitle: "Version, terms, privacy, and support",
+          type: "navigation" as const,
+          onPress: () => navigation.navigate("About" as any),
+        },
         {
           title: "Safety Center",
           subtitle: "Report issues and safety concerns",
@@ -396,7 +545,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
     },
     contentStyle: {
       flexGrow: 1,
@@ -407,27 +556,27 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       alignItems: "center",
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
+      borderBottomColor: theme.colors.border.primary,
     },
     backButton: {
       padding: spacing.xs,
     },
     backButtonText: {
       fontSize: font(16),
-      color: Colors.primary[500],
+      color: theme.colors.primary[500],
     },
     headerTitle: {
       fontSize: font(18),
       fontWeight: "bold",
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
     },
     placeholder: {
       width: 50,
     },
     userInfo: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       paddingVertical: spacing.xl,
       alignItems: "center",
       marginBottom: spacing.lg,
@@ -436,7 +585,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       justifyContent: "center",
       alignItems: "center",
       marginBottom: spacing.md,
@@ -445,18 +594,18 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: font(24),
       fontWeight: "bold",
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
     },
     userName: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: font(18),
       fontWeight: "bold",
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs / 2,
     },
     userEmail: {
       fontSize: font(14),
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
     },
     // Removed inline banner styles; using shared component
     section: {
@@ -466,15 +615,15 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: font(16),
       fontWeight: "600",
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs,
       marginHorizontal: spacing.lg,
     },
     sectionContent: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderTopWidth: 1,
       borderBottomWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     settingItem: {
       flexDirection: "row",
@@ -482,7 +631,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
+      borderBottomColor: theme.colors.border.primary,
     },
     destructiveItem: {
       // Additional styling for destructive items if needed
@@ -492,19 +641,19 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     settingTitle: {
       fontSize: font(16),
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: 2,
     },
     destructiveText: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
     },
     settingSubtitle: {
       fontSize: font(14),
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
     },
     chevron: {
       fontSize: font(18),
-      color: Colors.neutral[400],
+      color: theme.colors.neutral[400],
       marginLeft: spacing.xs,
     },
     versionContainer: {
@@ -513,13 +662,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     },
     versionText: {
       fontSize: font(14),
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
     },
   });
 
   const renderSettingItem = (item: SettingItem, index: number) => (
-    <TouchableOpacity
+    <HapticPressable
       key={index}
+      haptic={
+        item.type !== "toggle" && !item.destructive ? "selection" : "light"
+      }
       style={[styles.settingItem, item.destructive && styles.destructiveItem]}
       onPress={item.onPress}
       disabled={item.type === "toggle"}
@@ -542,13 +694,20 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <Switch
           value={item.value}
           onValueChange={item.onToggle}
-          trackColor={{ false: Colors.gray[300], true: Colors.primary[500] }}
-          thumbColor={item.value ? Colors.background.primary : Colors.gray[100]}
+          trackColor={{
+            false: theme.colors.neutral[300],
+            true: theme.colors.primary[500],
+          }}
+          thumbColor={
+            item.value
+              ? theme.colors.background.primary
+              : theme.colors.neutral[100]
+          }
         />
       )}
 
       {item.type === "navigation" && <Text style={styles.chevron}>›</Text>}
-    </TouchableOpacity>
+    </HapticPressable>
   );
 
   return (
@@ -558,13 +717,39 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
+        <HapticPressable
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Settings</Text>
+        </HapticPressable>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <View
+            style={{
+              marginLeft: 8,
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 999,
+              backgroundColor:
+                currentTier === "free"
+                  ? theme.colors.neutral[200]
+                  : theme.colors.primary[100],
+            }}
+          >
+            <Text
+              style={{
+                fontSize: font(12),
+                color:
+                  currentTier === "free"
+                    ? theme.colors.neutral[700]
+                    : theme.colors.primary[700],
+              }}
+            >
+              Plan: {currentTier}
+            </Text>
+          </View>
+        </View>
         <View style={styles.placeholder} />
       </View>
 
@@ -589,21 +774,29 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
         <View key={sectionIndex} style={styles.section}>
           <Text style={styles.sectionTitle}>{section.title}</Text>
           {section.title === "Privacy" && currentTier === "free" && (
-            <PremiumFeatureGuard
-              feature="canSeeReadReceipts"
-              mode="inline"
-              message="Upgrade to unlock read receipts and incognito mode"
-              containerStyle={{
-                marginHorizontal: spacing.lg,
-                marginBottom: spacing.sm,
-              }}
-              onUpgrade={(tier) =>
-                navigation.navigate("Subscription", {
-                  screen: "Subscription",
-                  params: { tier },
-                } as any)
-              }
-            />
+            <View
+              style={{ marginHorizontal: spacing.lg, marginBottom: spacing.sm }}
+            >
+              <PremiumFeatureGuard
+                feature="canSeeReadReceipts"
+                mode="inline"
+                message="Upgrade to unlock read receipts and incognito mode"
+                onUpgrade={(tier) =>
+                  navigation.navigate("Subscription", {
+                    screen: "Subscription",
+                    params: { tier },
+                  } as any)
+                }
+              />
+              <View style={{ marginTop: 6 }}>
+                <HintPopover
+                  label="Why?"
+                  hint={
+                    "Some privacy controls like Read Receipts and Incognito Mode are Premium features. Upgrade to enable them."
+                  }
+                />
+              </View>
+            </View>
           )}
           <View style={styles.sectionContent}>
             {section.items.map((item, itemIndex) =>

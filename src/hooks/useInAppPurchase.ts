@@ -11,16 +11,11 @@ import {
   purchaseUpdatedListener,
   purchaseErrorListener,
   finishTransaction,
-  getProducts,
+  fetchProducts,
   requestPurchase,
   getAvailablePurchases,
-  validateReceiptIos,
-  validateReceiptAndroid,
   endConnection,
-  PurchaseError as RNIAPPurchaseError,
-  Product as RNIAPProduct,
   Purchase as RNIAPPurchase,
-  SubscriptionPurchase,
 } from "react-native-iap";
 import { useApiClient } from "@utils/api";
 import {
@@ -69,14 +64,14 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
       if (result) {
         // Set up purchase listeners
         purchaseUpdateSubscription.current = purchaseUpdatedListener(
-          async (purchase: RNIAPPurchase | SubscriptionPurchase) => {
+          async (purchase: any) => {
             console.log("Purchase updated:", purchase);
             await handlePurchaseUpdate(purchase);
           }
         );
 
         purchaseErrorSubscription.current = purchaseErrorListener(
-          (error: RNIAPPurchaseError) => {
+          (error: any) => {
             console.log("Purchase error:", error);
             handlePurchaseError(error);
           }
@@ -131,26 +126,32 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         PRODUCT_IDS[PLATFORM].premiumPlus,
       ];
 
-      const products = await getProducts({ skus: productIds });
+      // On v14, use fetchProducts with type 'subs' to fetch subscription products
+      const productsFromStore = await fetchProducts({
+        skus: productIds,
+        type: "subs",
+      });
 
-      const mappedProducts: Product[] = products.map(
-        (product: RNIAPProduct) => ({
-          productId: product.productId,
-          title: product.title,
-          description: product.description,
-          price: product.price,
-          currency: product.currency,
-          localizedPrice: product.localizedPrice,
-          countryCode: product.countryCode || "US",
-          subscriptionPeriod: (product as any).subscriptionPeriod ?? undefined,
-          introductoryPrice: (product as any).introductoryPrice ?? undefined,
-          introductoryPricePeriod:
-            (product as any).introductoryPricePeriod ?? undefined,
-          freeTrialPeriod: (product as any).freeTrialPeriod ?? undefined,
-        })
-      );
+      const mappedProducts: Product[] = productsFromStore.map((p: any) => ({
+        productId: p.id || p.productId || p.sku,
+        title: p.title,
+        description: p.description,
+        price: String(p.price ?? ""),
+        currency: p.currency,
+        localizedPrice: p.displayPrice || p.localizedPrice || "",
+        countryCode: p.countryCode || "US",
+        subscriptionPeriod: p.subscription?.subscriptionPeriod?.unit
+          ? `${p.subscription.subscriptionPeriod.value || ""} ${
+              p.subscription.subscriptionPeriod.unit
+            }`
+          : p.subscriptionPeriod ?? undefined,
+        introductoryPrice: p.introductoryPrice || undefined,
+        introductoryPricePeriod:
+          p.introductoryPriceSubscriptionPeriodIOS || undefined,
+        freeTrialPeriod: p.freeTrialPeriod || undefined,
+      }));
 
-      setState((prev) => ({
+      setState((prev: PurchaseState) => ({
         ...prev,
         products: mappedProducts,
       }));
@@ -184,30 +185,108 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         }
 
         setState((prev) => ({ ...prev, isLoading: true }));
+        // Wrap event-based purchase flow to resolve when next event for this product arrives
+        const result = await new Promise<PurchaseResult>((resolve) => {
+          const timeout = setTimeout(() => {
+            cleanup();
+            resolve({
+              success: false,
+              error: { type: "UnknownError", message: "Purchase timed out" },
+            });
+          }, 60000);
 
-        const purchase = await requestPurchase({
-          sku: productId,
-          andDangerouslyFinishTransactionAutomaticallyIOS: false,
+          const updatedSub = purchaseUpdatedListener((purchase: any) => {
+            try {
+              if (purchase?.productId === productId) {
+                clearTimeout(timeout);
+                cleanup();
+                resolve({
+                  success: true,
+                  transaction: mapPurchaseToTransaction(purchase),
+                });
+              }
+            } catch (_) {
+              // ignore
+            }
+          });
+          const errorSub = purchaseErrorListener((err: any) => {
+            try {
+              // If error relates to this SKU or generic
+              if (!err?.productId || err?.productId === productId) {
+                clearTimeout(timeout);
+                cleanup();
+                const mapped = mapErrorToPurchaseError(err);
+                resolve({ success: false, error: mapped });
+              }
+            } catch (_) {
+              // ignore
+            }
+          });
+
+          const cleanup = () => {
+            try {
+              updatedSub.remove?.();
+            } catch (_) {}
+            try {
+              errorSub.remove?.();
+            } catch (_) {}
+          };
+
+          // Trigger purchase request (treat as subscription)
+          const trigger = async () => {
+            // Build Android subscriptionOffers with offerToken if available
+            let androidRequest: {
+              skus: string[];
+              subscriptionOffers?: { sku: string; offerToken: string }[];
+            } = { skus: [productId] };
+            if (Platform.OS === "android") {
+              try {
+                const [product] = await fetchProducts({
+                  skus: [productId],
+                  type: "subs",
+                });
+                const offerToken: string | undefined =
+                  (product as any)?.subscriptionOfferDetailsAndroid?.[0]
+                    ?.offerToken ||
+                  (product as any)?.subscriptionOfferDetails?.[0]?.offerToken;
+                if (offerToken) {
+                  androidRequest.subscriptionOffers = [
+                    { sku: productId, offerToken },
+                  ];
+                } else {
+                  console.warn(
+                    "No offerToken found for subscription on Android"
+                  );
+                }
+              } catch (err) {
+                console.warn(
+                  "Failed to fetch product offers for Android:",
+                  err
+                );
+              }
+            }
+
+            await requestPurchase({
+              request: {
+                ios: {
+                  sku: productId,
+                  andDangerouslyFinishTransactionAutomatically: false,
+                },
+                android: androidRequest,
+              },
+              type: "subs",
+            });
+          };
+
+          trigger().catch((e) => {
+            clearTimeout(timeout);
+            cleanup();
+            const mapped = mapErrorToPurchaseError(e);
+            resolve({ success: false, error: mapped });
+          });
         });
 
-        if (
-          purchase &&
-          typeof purchase === "object" &&
-          !Array.isArray(purchase)
-        ) {
-          return {
-            success: true,
-            transaction: mapPurchaseToTransaction(purchase),
-          };
-        } else {
-          return {
-            success: false,
-            error: {
-              type: "UnknownError",
-              message: "No purchase was made",
-            },
-          };
-        }
+        return result;
       } catch (error) {
         console.error("Error purchasing product:", error);
 
@@ -228,74 +307,69 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
   );
 
   // Handle purchase updates
-  const handlePurchaseUpdate = useCallback(
-    async (purchase: RNIAPPurchase | SubscriptionPurchase) => {
-      try {
-        // Validate purchase with backend
-        const transaction = mapPurchaseToTransaction(purchase);
-        const validationResult = await validatePurchase(transaction);
+  const handlePurchaseUpdate = useCallback(async (purchase: any) => {
+    try {
+      // Validate purchase with backend
+      const transaction = mapPurchaseToTransaction(purchase);
+      const validationResult = await validatePurchase(transaction);
 
-        if (validationResult.success && validationResult.valid) {
-          // Purchase is valid, finish the transaction
-          if (purchase && !Array.isArray(purchase)) {
-            await finishTransaction({ purchase, isConsumable: false });
-          }
+      if (validationResult.success && validationResult.valid) {
+        // Purchase is valid, finish the transaction
+        if (purchase && !Array.isArray(purchase)) {
+          await finishTransaction({ purchase, isConsumable: false });
+        }
 
-          // Update subscription status
-          if (validationResult.subscription) {
-            setState((prev) => ({
-              ...prev,
-              currentSubscription: {
-                isActive: true,
-                plan: validationResult.subscription!.plan,
-                expiresAt: validationResult.subscription!.expiresAt,
-                autoRenewing: validationResult.subscription!.autoRenewing,
-                isTrialPeriod: validationResult.subscription!.isTrialPeriod,
-                originalPurchaseDate:
-                  validationResult.subscription!.originalPurchaseDate,
-              },
-              isLoading: false,
-              error: undefined,
-            }));
-          }
-
-          // Previously used Alert to notify success. Replace with non-blocking log or integrate toast in UI layer.
-          console.log(
-            "Purchase Successful: Subscription activated successfully"
-          );
-        } else {
-          // Purchase validation failed
+        // Update subscription status
+        if (validationResult.subscription) {
           setState((prev) => ({
             ...prev,
-            isLoading: false,
-            error: {
-              type: "ValidationFailed",
-              message: validationResult.message || "Purchase validation failed",
+            currentSubscription: {
+              isActive: true,
+              plan: validationResult.subscription!.plan,
+              expiresAt: validationResult.subscription!.expiresAt,
+              autoRenewing: validationResult.subscription!.autoRenewing,
+              isTrialPeriod: validationResult.subscription!.isTrialPeriod,
+              originalPurchaseDate:
+                validationResult.subscription!.originalPurchaseDate,
             },
+            isLoading: false,
+            error: undefined,
           }));
-
-          // Previously used Alert to notify validation failure. Replace with non-blocking log or integrate toast in UI layer.
-          console.log(
-            "Purchase Failed: Issue validating purchase. Please contact support."
-          );
         }
-      } catch (error) {
-        console.error("Error handling purchase update:", error);
+
+        // Previously used Alert to notify success. Replace with non-blocking log or integrate toast in UI layer.
+        console.log("Purchase Successful: Subscription activated successfully");
+      } else {
+        // Purchase validation failed
         setState((prev) => ({
           ...prev,
           isLoading: false,
           error: {
             type: "ValidationFailed",
-            message: "Failed to process purchase",
+            message: validationResult.message || "Purchase validation failed",
           },
         }));
+
+        // Previously used Alert to notify validation failure. Replace with non-blocking log or integrate toast in UI layer.
+        console.log(
+          "Purchase Failed: Issue validating purchase. Please contact support."
+        );
       }
-    },
-    []
-  );
+    } catch (error) {
+      console.error("Error handling purchase update:", error);
+      setState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: {
+          type: "ValidationFailed",
+          message: "Failed to process purchase",
+        },
+      }));
+    }
+  }, []);
 
   // Handle purchase errors
-  const handlePurchaseError = useCallback((error: RNIAPPurchaseError) => {
+  const handlePurchaseError = useCallback((error: any) => {
     const purchaseError = mapErrorToPurchaseError(error);
 
     setState((prev) => ({
@@ -540,12 +614,16 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
 
   // Helper functions
   const mapPurchaseToTransaction = (
-    purchase: RNIAPPurchase | SubscriptionPurchase
+    purchase: RNIAPPurchase
   ): PurchaseTransaction => {
     return {
-      transactionId: purchase.transactionId || "",
-      productId: purchase.productId,
-      purchaseToken: purchase.purchaseToken || "",
+      transactionId:
+        (purchase as any).transactionId || (purchase as any).id || "",
+      productId: (purchase as any).productId || (purchase as any).id,
+      purchaseToken:
+        (purchase as any).purchaseToken ||
+        (purchase as any).purchaseTokenAndroid ||
+        "",
       purchaseTime: Number(purchase.transactionDate),
       packageName:
         typeof (purchase as any).packageName === "string"
@@ -556,22 +634,21 @@ export const useInAppPurchase = (): UsePurchaseReturn => {
         "originalTransactionIdentifierIOS" in purchase
           ? purchase.originalTransactionIdentifierIOS
           : undefined,
-      receiptData:
-        "transactionReceipt" in purchase
-          ? purchase.transactionReceipt
-          : undefined,
+      receiptData: (purchase as any).transactionReceipt
+        ? (purchase as any).transactionReceipt
+        : undefined,
       purchaseState:
-        "purchaseStateAndroid" in purchase
-          ? purchase.purchaseStateAndroid
-          : undefined,
+        (purchase as any).purchaseStateAndroid ??
+        (purchase as any).purchaseState ??
+        undefined,
       acknowledged:
         "isAcknowledgedAndroid" in purchase
           ? purchase.isAcknowledgedAndroid
           : undefined,
       autoRenewing:
-        "autoRenewingAndroid" in purchase
-          ? purchase.autoRenewingAndroid
-          : undefined,
+        (purchase as any).isAutoRenewing ??
+        (purchase as any).autoRenewingAndroid ??
+        undefined,
     };
   };
 

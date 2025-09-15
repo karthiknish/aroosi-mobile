@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, Switch } from "react-native";
 import ScreenContainer from "@components/common/ScreenContainer";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import { Layout } from "@constants/Layout";
 import { useApiClient } from "@/utils/api";
 import { useToast } from "@providers/ToastContext";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 
 export default function PrivacySettingsScreen() {
+  const { theme } = useTheme();
   const api = useApiClient();
   const toast = useToast();
   const { checkFeatureAccess } = useFeatureAccess();
@@ -26,7 +27,9 @@ export default function PrivacySettingsScreen() {
       if (!cancelled) {
         if (res.success && (res.data as any)?.data) {
           const profile = (res.data as any).data;
-          setShowOnlineStatus(profile?.privacySettings?.showOnlineStatus ?? true);
+          setShowOnlineStatus(
+            profile?.privacySettings?.showOnlineStatus ?? true
+          );
           setShowLastSeen(profile?.privacySettings?.showLastSeen ?? true);
           setHideFromFreeUsers(profile?.hideFromFreeUsers ?? false);
         }
@@ -79,80 +82,131 @@ export default function PrivacySettingsScreen() {
 
   return (
     <ScreenContainer
-      containerStyle={styles.container}
-      contentStyle={styles.content}
+      containerStyle={{
+        flex: 1,
+        backgroundColor: theme.colors.background.secondary,
+      }}
+      contentStyle={{ padding: Layout.spacing.lg }}
     >
-      <Text style={styles.header}>Privacy</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
+      <Text
+        style={{
+          fontSize: 20,
+          fontWeight: "700",
+          color: theme.colors.text.primary,
+          marginBottom: Layout.spacing.md,
+        }}
+      >
+        Privacy
+      </Text>
+      <View
+        style={{
+          backgroundColor: theme.colors.background.primary,
+          borderRadius: Layout.radius.md,
+          padding: Layout.spacing.md,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: Layout.spacing.sm,
+          }}
+        >
           <View style={styles.left}>
-            <Text style={styles.title}>Show Online Status</Text>
-            <Text style={styles.subtitle}>Let others see when you're online</Text>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: theme.colors.text.primary,
+                marginBottom: 4,
+              }}
+            >
+              Show Online Status
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+              Let others see when you're online
+            </Text>
           </View>
           <Switch value={showOnlineStatus} onValueChange={onToggleOnline} />
         </View>
-        <View style={styles.row}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: Layout.spacing.sm,
+          }}
+        >
           <View style={styles.left}>
-            <Text style={styles.title}>Show Last Seen</Text>
-            <Text style={styles.subtitle}>Display your last active time</Text>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: theme.colors.text.primary,
+                marginBottom: 4,
+              }}
+            >
+              Show Last Seen
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+              Display your last active time
+            </Text>
           </View>
           <Switch value={showLastSeen} onValueChange={onToggleLastSeen} />
         </View>
-        <View style={styles.row}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: Layout.spacing.sm,
+          }}
+        >
           <View style={styles.left}>
-            <Text style={styles.title}>Hide from free users</Text>
-            <Text style={styles.subtitle}>Only paid members can view your profile</Text>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: "600",
+                color: theme.colors.text.primary,
+                marginBottom: 4,
+              }}
+            >
+              Hide from free users
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.secondary }}>
+              Only paid members can view your profile
+            </Text>
           </View>
-          <Switch value={hideFromFreeUsers} onValueChange={onToggleHideFromFree} />
+          <Switch
+            value={hideFromFreeUsers}
+            onValueChange={onToggleHideFromFree}
+          />
         </View>
-        {loading && <Text style={styles.loading}>Loading…</Text>}
-        {saving && <Text style={styles.loading}>Saving…</Text>}
+        {loading && (
+          <Text
+            style={{
+              marginTop: Layout.spacing.sm,
+              color: theme.colors.text.secondary,
+            }}
+          >
+            Loading…
+          </Text>
+        )}
+        {saving && (
+          <Text
+            style={{
+              marginTop: Layout.spacing.sm,
+              color: theme.colors.text.secondary,
+            }}
+          >
+            Saving…
+          </Text>
+        )}
       </View>
     </ScreenContainer>
   );
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.secondary,
-  },
-  content: {
-    padding: Layout.spacing.lg,
-  },
-  header: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.md,
-  },
-  card: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: Layout.radius.md,
-    padding: Layout.spacing.md,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: Layout.spacing.sm,
-  },
-  left: {
-    flex: 1,
-    paddingRight: Layout.spacing.md,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: Colors.text.secondary,
-  },
-  loading: {
-    marginTop: Layout.spacing.sm,
-    color: Colors.text.secondary,
-  },
+  left: { flex: 1, paddingRight: Layout.spacing.md },
 });

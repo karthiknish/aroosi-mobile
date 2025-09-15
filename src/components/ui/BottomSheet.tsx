@@ -16,7 +16,8 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { BlurView } from "expo-blur";
-import { Colors, Layout } from "../../../constants";
+import { Layout } from "../../../constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 import * as Haptics from "expo-haptics";
 
@@ -41,6 +42,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   showHandle = true,
   enableBackdropDismiss = true,
 }) => {
+  const { theme } = useTheme();
   const translateY = useSharedValue(height);
   const backdropOpacity = useSharedValue(0);
 
@@ -90,31 +92,68 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       <View style={styles.container}>
         {/* Backdrop */}
         <TouchableWithoutFeedback onPress={handleBackdropPress}>
-          <Animated.View style={[styles.backdrop, backdropStyle]}>
+          <Animated.View
+            style={[
+              styles.backdrop,
+              { backgroundColor: rgbaHex(theme.colors.neutral[900], 0.5) },
+              backdropStyle,
+            ]}
+          >
             <BlurView intensity={20} style={StyleSheet.absoluteFill} />
           </Animated.View>
         </TouchableWithoutFeedback>
 
         {/* Bottom Sheet */}
-        <Animated.View style={[styles.sheet, { height }, sheetStyle]}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              height,
+              backgroundColor: theme.colors.background.primary,
+              shadowColor: theme.colors.neutral[900],
+            },
+            sheetStyle,
+          ]}
+        >
           <View style={styles.sheetContent}>
             {/* Handle */}
             {showHandle && (
               <View style={styles.handleContainer}>
-                <View style={styles.handle} />
+                <View
+                  style={[
+                    styles.handle,
+                    { backgroundColor: theme.colors.neutral[300] },
+                  ]}
+                />
               </View>
             )}
 
             {/* Header */}
             {title && (
-              <View style={styles.header}>
-                <Text style={styles.title}>{title}</Text>
+              <View
+                style={[
+                  styles.header,
+                  { borderBottomColor: theme.colors.border.primary },
+                ]}
+              >
+                <Text
+                  style={[styles.title, { color: theme.colors.text.primary }]}
+                >
+                  {title}
+                </Text>
                 <TouchableOpacity
                   style={styles.closeButton}
                   onPress={onClose}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={styles.closeButtonText}>✕</Text>
+                  <Text
+                    style={[
+                      styles.closeButtonText,
+                      { color: theme.colors.text.secondary },
+                    ]}
+                  >
+                    ✕
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -135,13 +174,10 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
   },
   sheet: {
-    backgroundColor: Colors.background.primary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: Colors.neutral[900],
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
@@ -157,7 +193,6 @@ const styles = StyleSheet.create({
   handle: {
     width: 40,
     height: 4,
-    backgroundColor: Colors.neutral[300],
     borderRadius: 2,
   },
   header: {
@@ -167,26 +202,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
   },
   title: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: 20,
     fontWeight: "600",
-    color: Colors.text.primary,
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.neutral[100],
+    // backgroundColor provided inline when rendered if needed
     justifyContent: "center",
     alignItems: "center",
   },
   closeButtonText: {
     fontFamily: Layout.typography.fontFamily.sansSemiBold,
     fontSize: 16,
-    color: Colors.text.secondary,
     fontWeight: "600",
   },
   content: {

@@ -18,6 +18,9 @@ export interface NotificationData {
 }
 
 export interface NotificationPreferences {
+  // Global controls
+  enabled: boolean; // master toggle for push notifications
+  emailEnabled: boolean; // preference for email notifications (persisted here; server sync optional)
   messages: boolean;
   matches: boolean;
   interests: boolean;
@@ -33,6 +36,8 @@ export interface NotificationPreferences {
 }
 
 const DEFAULT_PREFERENCES: NotificationPreferences = {
+  enabled: true,
+  emailEnabled: true,
   messages: true,
   matches: true,
   interests: true,
@@ -294,6 +299,8 @@ export class NotificationManager {
     data: NotificationData,
     delay = 0
   ): Promise<void> {
+    // Respect master enablement
+    if (!this.preferences.enabled) return;
     if (!this.shouldAllowNotification(data.type)) return;
 
     try {
@@ -428,6 +435,11 @@ export class NotificationManager {
     const data = notification.request.content
       .data as unknown as NotificationData;
 
+    // Master switch
+    if (!this.preferences.enabled) {
+      return false;
+    }
+
     // Check if notification type is enabled
     if (!this.shouldAllowNotification(data.type)) {
       return false;
@@ -504,7 +516,8 @@ export function useNotifications() {
   const [token, setToken] = React.useState<string | null>(null);
   const [preferences, setPreferences] =
     React.useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-  const manager = NotificationManager.getInstance();
+  // Memoize the manager instance to satisfy exhaustive-deps and avoid re-subscribing
+  const manager = React.useMemo(() => NotificationManager.getInstance(), []);
 
   React.useEffect(() => {
     const initializeNotifications = async () => {
@@ -515,7 +528,7 @@ export function useNotifications() {
     };
 
     initializeNotifications();
-  }, []);
+  }, [manager]);
 
   const updatePreferences = React.useCallback(
     async (newPreferences: Partial<NotificationPreferences>) => {

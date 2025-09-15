@@ -9,18 +9,19 @@
 /* Begin PBXBuildFile section */
 		12A982C47D3BF4655D63560A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C4B939E41A155E78FE63DE /* ExpoModulesProvider.swift */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		2E3F2B8D75DC4DBB874D2B93 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 27A9217F43584F23A0B69BBB /* GoogleService-Info.plist */; };
 		33F9A003CF9482ECB7A9C98A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 3AFC369408C3F1FB31A87094 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D6B030AF9D8CE103DF9FEFFB /* libPods-Aroosi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 79881B6F50061A0000E5B533 /* libPods-Aroosi.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		2E3F2B8D75DC4DBB874D2B93 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 27A9217F43584F23A0B69BBB /* GoogleService-Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* Aroosi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aroosi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Aroosi/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Aroosi/Info.plist; sourceTree = "<group>"; };
+		27A9217F43584F23A0B69BBB /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; name = "GoogleService-Info.plist"; path = "Aroosi/GoogleService-Info.plist"; sourceTree = "<group>"; };
 		3AFC369408C3F1FB31A87094 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = Aroosi/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		79881B6F50061A0000E5B533 /* libPods-Aroosi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Aroosi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A7C4B939E41A155E78FE63DE /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Aroosi/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
@@ -31,7 +32,6 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Aroosi/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Aroosi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Aroosi-Bridging-Header.h"; path = "Aroosi/Aroosi-Bridging-Header.h"; sourceTree = "<group>"; };
-		27A9217F43584F23A0B69BBB /* GoogleService-Info.plist */ = {isa = PBXFileReference; name = "GoogleService-Info.plist"; path = "Aroosi/GoogleService-Info.plist"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = text.plist.xml; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -411,7 +411,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aroosi.mobile;
-				PRODUCT_NAME = "Aroosi";
+				PRODUCT_NAME = Aroosi;
 				SWIFT_OBJC_BRIDGING_HEADER = "Aroosi/Aroosi-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -443,7 +443,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aroosi.mobile;
-				PRODUCT_NAME = "Aroosi";
+				PRODUCT_NAME = Aroosi;
 				SWIFT_OBJC_BRIDGING_HEADER = "Aroosi/Aroosi-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";

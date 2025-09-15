@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Message } from "../../types/messaging";
 import { useMessageHistory } from "@/hooks/useMessageHistory";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface MessageListProps {
   conversationId: string;
@@ -42,6 +43,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   onScroll,
   maintainVisibleContentPosition = true,
 }) => {
+  const { theme } = useTheme();
   const {
     messages,
     isLoading,
@@ -170,19 +172,27 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     return (
       <View style={styles.loadingHeader}>
-        <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading more messages...</Text>
+        <ActivityIndicator size="small" color={theme.colors.primary[500]} />
+        <Text
+          style={[styles.loadingText, { color: theme.colors.text.secondary }]}
+        >
+          Loading more messages...
+        </Text>
       </View>
     );
-  }, [isLoadingMore]);
+  }, [isLoadingMore, theme.colors.primary, theme.colors.text]);
 
   // Render empty state
   const renderEmptyState = useCallback(() => {
     if (isLoading) {
       return (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.emptyText}>Loading messages...</Text>
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
+          <Text
+            style={[styles.emptyText, { color: theme.colors.text.primary }]}
+          >
+            Loading messages...
+          </Text>
         </View>
       );
     }
@@ -190,8 +200,17 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (error) {
       return (
         <View style={styles.emptyState}>
-          <Text style={styles.errorText}>Failed to load messages</Text>
-          <Text style={styles.errorSubtext}>{error.message}</Text>
+          <Text style={[styles.errorText, { color: theme.colors.error[600] }]}>
+            Failed to load messages
+          </Text>
+          <Text
+            style={[
+              styles.errorSubtext,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            {error.message}
+          </Text>
         </View>
       );
     }
@@ -199,8 +218,19 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (isEmpty) {
       return (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No messages yet</Text>
-          <Text style={styles.emptySubtext}>Start the conversation!</Text>
+          <Text
+            style={[styles.emptyText, { color: theme.colors.text.primary }]}
+          >
+            No messages yet
+          </Text>
+          <Text
+            style={[
+              styles.emptySubtext,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            Start the conversation!
+          </Text>
         </View>
       );
     }
@@ -253,13 +283,13 @@ export const MessageList: React.FC<MessageListProps> = ({
         <RefreshControl
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          colors={["#007AFF"]}
-          tintColor="#007AFF"
+          colors={[theme.colors.primary[500]]}
+          tintColor={theme.colors.primary[500]}
         />
       }
       ListHeaderComponent={renderLoadingHeader}
       ListFooterComponent={ListFooterComponent}
-          ListEmptyComponent={renderEmptyState as any}
+      ListEmptyComponent={renderEmptyState as any}
       removeClippedSubviews={true}
       maxToRenderPerBatch={10}
       windowSize={10}
@@ -337,7 +367,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: 8,
     fontSize: 14,
-    color: "#666",
+    color: undefined,
   },
   emptyState: {
     flex: 1,
@@ -348,25 +378,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    color: undefined,
     textAlign: "center",
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: "#666",
+    color: undefined,
     textAlign: "center",
   },
   errorText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FF3B30",
+    color: undefined,
     textAlign: "center",
     marginBottom: 8,
   },
   errorSubtext: {
     fontSize: 14,
-    color: "#666",
+    color: undefined,
     textAlign: "center",
   },
 });

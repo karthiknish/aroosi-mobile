@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../constants/Colors";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 
 interface SuccessMessageProps {
   message: string;
@@ -22,6 +22,8 @@ export function SuccessMessage({
   style,
   showIcon = true,
 }: SuccessMessageProps) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(-50)).current;
 
@@ -89,7 +91,7 @@ export function SuccessMessage({
           <Ionicons
             name="checkmark-circle"
             size={20}
-            color={Colors.success[400]}
+            color={theme.colors.success[400]}
             style={styles.icon}
           />
         )}
@@ -99,35 +101,36 @@ export function SuccessMessage({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.success[50],
-    borderColor: Colors.success[200],
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 8,
-    shadowColor: Colors.success[400],
-    shadowOffset: {
-      width: 0,
-      height: 2,
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.colors.success[50],
+      borderColor: theme.colors.success[200],
+      borderWidth: 1,
+      borderRadius: 8,
+      padding: 12,
+      marginVertical: 8,
+      shadowColor: theme.colors.success[400],
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  content: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  icon: {
-    marginRight: 8,
-  },
-  message: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.success[600],
-    fontFamily: "NunitoSans-Regular",
-    lineHeight: 20,
-  },
-});
+    content: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    icon: {
+      marginRight: 8,
+    },
+    message: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.success[600],
+      fontFamily: "NunitoSans-Regular",
+      lineHeight: 20,
+    },
+  });

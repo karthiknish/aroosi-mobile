@@ -20,8 +20,12 @@ module.exports = function (api) {
           extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
         },
       ],
-      // Reanimated must be listed last
-      "react-native-reanimated/plugin",
+      // Remove console.* in production builds
+      ...(process.env.NODE_ENV === "production"
+        ? [["transform-remove-console", { exclude: ["error", "warn"] }]]
+        : []),
+      // Worklets/Reanimated plugin must be listed last
+      "react-native-worklets/plugin",
     ],
   };
 };

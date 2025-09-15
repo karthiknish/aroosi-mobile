@@ -22,7 +22,10 @@ import {
   verifyPasswordResetCode,
   confirmPasswordReset,
 } from "firebase/auth";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import {
+  GoogleSignin,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 
@@ -383,21 +386,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Native Google account picker
       const signInRes = await GoogleSignin.signIn();
-      if (signInRes?.type !== "success") {
-        return { success: false, error: "Canceled" };
-      }
-
-      // Extract tokens from response; idToken may be null on some configs
+      // signIn() returns user info; no `type` field in this API
+      // Prefer idToken from result, then fall back to getTokens()
       let idToken: string | undefined =
-        (signInRes as any)?.data?.idToken ?? undefined;
-      let accessToken: string | undefined = undefined;
+        (signInRes as any)?.idToken ?? undefined;
+      let accessToken: string | undefined =
+        (signInRes as any)?.accessToken ?? undefined;
 
-      // Always try to get tokens to ensure we have accessToken and possibly idToken
-      try {
-        const tokens = await GoogleSignin.getTokens();
-        if (!idToken && tokens?.idToken) idToken = tokens.idToken;
-        if (tokens?.accessToken) accessToken = tokens.accessToken;
-      } catch {}
+      // Ensure we have tokens (some platforms/configs require this extra call)
+      if (!idToken || !accessToken) {
+        try {
+          const tokens = await GoogleSignin.getTokens();
+          if (!idToken && tokens?.idToken) idToken = tokens.idToken;
+          if (!accessToken && tokens?.accessToken)
+            accessToken = tokens.accessToken;
+        } catch {}
+      }
 
       if (!idToken && !accessToken) {
         return {
@@ -418,10 +422,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const msg = e?.message || "Google sign-in failed";
       // Common cancellation codes across platforms
       if (
-        code === "12501" || // sign in cancelled
+        code === "12501" || // legacy android cancelled
         code === "12502" || // in progress
         code === "ERR_CANCELED" ||
-        code === "CANCELED"
+        code === "CANCELED" ||
+        code === statusCodes.SIGN_IN_CANCELLED ||
+        code === statusCodes.IN_PROGRESS
       ) {
         return { success: false, error: "Canceled" };
       }

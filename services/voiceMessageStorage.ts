@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { ApiResponse } from "../types/profile";
 import { MessagingAPI } from "../types/messaging";
 import { UnifiedResponseSystem } from "@utils/unifiedResponseSystem";
@@ -16,6 +16,133 @@ export class VoiceMessageStorage {
     this.api = api;
     this.cacheDirectory = `${FileSystem.cacheDirectory}voice-messages/`;
     this.ensureCacheDirectoryExists();
+  }
+
+  /**
+   * Starts a cancellable upload for a voice message, returning a handle with promise and cancel
+   */
+  beginUploadVoiceMessage(
+    audioUri: string,
+    metadata?: { duration?: number; fileSize?: number; mimeType?: string },
+    onProgress?: (progress: number) => void
+  ): {
+    promise: Promise<ApiResponse<{ storageId: string; url: string }>>;
+    cancel: () => void;
+  } {
+    let cancelImpl: () => void = () => {};
+
+    const promise = (async () => {
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(audioUri);
+        if (!fileInfo.exists) throw new Error("Audio file does not exist");
+
+        const uploadUrlResponse = await this.generateUploadUrl();
+        if (!uploadUrlResponse.success || !uploadUrlResponse.data) {
+          return uploadUrlResponse as any;
+        }
+        const { uploadUrl, storageId } = uploadUrlResponse.data;
+        const mimeType = metadata?.mimeType || "audio/m4a";
+
+        let statusCode = 0;
+
+        if (Platform.OS === "web") {
+          const blob = await uriToBlob(audioUri);
+          const xhr = new XMLHttpRequest();
+          cancelImpl = () => {
+            try {
+              xhr.abort();
+            } catch {}
+          };
+          await new Promise<void>((resolve, reject) => {
+            xhr.upload.onprogress = (evt) => {
+              if (evt.lengthComputable && onProgress) {
+                const pct = evt.total > 0 ? evt.loaded / evt.total : 0;
+                onProgress(Math.max(0, Math.min(1, pct)));
+              }
+            };
+            xhr.onerror = () => reject(new Error("Upload failed"));
+            xhr.onabort = () => reject(new Error("Upload canceled"));
+            xhr.onload = () => resolve();
+            xhr.open("PUT", uploadUrl);
+            xhr.setRequestHeader("Content-Type", mimeType);
+            xhr.send(blob);
+          });
+          statusCode = xhr.status;
+        } else {
+          const hasCreateUploadTask = typeof (FileSystem as any).createUploadTask === "function";
+          if (hasCreateUploadTask) {
+            const task: any = (FileSystem as any).createUploadTask(
+              uploadUrl,
+              audioUri,
+              {
+                httpMethod: "PUT",
+                headers: { "Content-Type": mimeType },
+              },
+              ({ totalBytesSent, totalBytesExpectedToSend }: any) => {
+                if (onProgress && totalBytesExpectedToSend > 0) {
+                  onProgress(totalBytesSent / totalBytesExpectedToSend);
+                }
+              }
+            );
+            cancelImpl = () => {
+              try {
+                task.cancelAsync?.();
+              } catch {}
+            };
+            const resp: any = await task.uploadAsync();
+            statusCode = resp?.status ?? 0;
+          } else {
+            const resp: any = await (FileSystem as any).uploadAsync(uploadUrl, audioUri, {
+              httpMethod: "PUT",
+              headers: { "Content-Type": mimeType },
+            });
+            statusCode = resp?.status ?? 0;
+          }
+        }
+
+        if (statusCode !== 200) {
+          return {
+            success: false,
+            error: {
+              code: "UPLOAD_FAILED",
+              message: `Failed to upload voice message: ${statusCode}`,
+              details: { status: statusCode },
+            },
+          };
+        }
+
+        const urlResponse = await this.api.getVoiceMessageUrl(storageId);
+        if (!urlResponse.success || !urlResponse.data) {
+          return {
+            success: false,
+            error: {
+              code: "URL_RETRIEVAL_FAILED",
+              message: "Failed to get URL for uploaded voice message",
+              details: urlResponse.error,
+            },
+          };
+        }
+
+        return {
+          success: true,
+          data: { storageId, url: urlResponse.data.url },
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            code: "UPLOAD_ERROR",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Failed to upload voice message",
+            details: error,
+          },
+        };
+      }
+    })();
+
+    return { promise, cancel: () => cancelImpl() };
   }
 
   /**
@@ -55,7 +182,8 @@ export class VoiceMessageStorage {
       duration?: number;
       fileSize?: number;
       mimeType?: string;
-    }
+    },
+    onProgress?: (progress: number) => void
   ): Promise<ApiResponse<{ storageId: string; url: string }>> {
     try {
       // Get file info
@@ -75,36 +203,78 @@ export class VoiceMessageStorage {
       // Determine mime type
       const mimeType = metadata?.mimeType || "audio/m4a";
 
-      // Upload the file
-      let uploadResponse;
-
+      // Upload the file with progress reporting when possible
+      let statusCode = 0;
       if (Platform.OS === "web") {
-        // For web, convert to blob and upload
+        // Web: use XMLHttpRequest to get upload progress
         const blob = await uriToBlob(audioUri);
-        uploadResponse = await fetch(uploadUrl, {
-          method: "PUT",
-          body: blob,
-          headers: {
-            "Content-Type": mimeType,
-          },
+        const xhr = new XMLHttpRequest();
+        const result: { status?: number } = {};
+        await new Promise<void>((resolve, reject) => {
+          xhr.upload.onprogress = (evt) => {
+            if (evt.lengthComputable && onProgress) {
+              const pct = evt.total > 0 ? evt.loaded / evt.total : 0;
+              try {
+                onProgress(Math.max(0, Math.min(1, pct)));
+              } catch {}
+            }
+          };
+          xhr.onerror = () => reject(new Error("Upload failed"));
+          xhr.onload = () => {
+            result.status = xhr.status;
+            resolve();
+          };
+          xhr.open("PUT", uploadUrl);
+          xhr.setRequestHeader("Content-Type", mimeType);
+          xhr.send(blob);
         });
+        statusCode = result.status ?? 0;
       } else {
-        // For native platforms, use FileSystem.uploadAsync
-        uploadResponse = await FileSystem.uploadAsync(uploadUrl, audioUri, {
-          httpMethod: "PUT",
-          headers: {
-            "Content-Type": mimeType,
-          },
-        });
+        // Native: prefer createUploadTask with progress callback; fallback to uploadAsync
+        const hasCreateUploadTask =
+          typeof (FileSystem as any).createUploadTask === "function";
+        if (hasCreateUploadTask) {
+          const task: any = (FileSystem as any).createUploadTask(
+            uploadUrl,
+            audioUri,
+            {
+              httpMethod: "PUT",
+              headers: {
+                "Content-Type": mimeType,
+              },
+            },
+            ({ totalBytesSent, totalBytesExpectedToSend }: any) => {
+              if (onProgress && totalBytesExpectedToSend > 0) {
+                try {
+                  onProgress(totalBytesSent / totalBytesExpectedToSend);
+                } catch {}
+              }
+            }
+          );
+          const resp: any = await task.uploadAsync();
+          statusCode = resp?.status ?? 0;
+        } else {
+          const resp: any = await (FileSystem as any).uploadAsync(
+            uploadUrl,
+            audioUri,
+            {
+              httpMethod: "PUT",
+              headers: {
+                "Content-Type": mimeType,
+              },
+            }
+          );
+          statusCode = resp?.status ?? 0;
+        }
       }
 
-      if (uploadResponse.status !== 200) {
+      if (statusCode !== 200) {
         return {
           success: false,
           error: {
             code: "UPLOAD_FAILED",
-            message: `Failed to upload voice message: ${uploadResponse.status}`,
-            details: uploadResponse,
+            message: `Failed to upload voice message: ${statusCode}`,
+            details: { status: statusCode },
           },
         };
       }

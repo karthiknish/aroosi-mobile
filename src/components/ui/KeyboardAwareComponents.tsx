@@ -12,7 +12,7 @@ import {
   Animated,
 } from 'react-native';
 import { useKeyboard, useKeyboardAnimation, dismissKeyboard, getKeyboardAvoidingViewBehavior } from '@utils/keyboardUtils';
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 // KeyboardAwareScrollView - Automatically scrolls to focused input
 interface KeyboardAwareScrollViewProps extends ScrollViewProps {
@@ -23,7 +23,9 @@ interface KeyboardAwareScrollViewProps extends ScrollViewProps {
   resetScrollToCoords?: { x: number; y: number };
 }
 
-export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = ({
+export const KeyboardAwareScrollView: React.FC<
+  KeyboardAwareScrollViewProps
+> = ({
   children,
   extraScrollHeight = 75,
   enableAutomaticScroll = true,
@@ -34,7 +36,7 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
 }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const keyboard = useKeyboard();
-  
+
   useKeyboardAnimation();
 
   useEffect(() => {
@@ -51,14 +53,23 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
 
     // Find the focused input and scroll to it
     setTimeout(() => {
-      reactNode.measure((x: number, y: number, width: number, height: number, pageX: number, pageY: number) => {
-        const scrollY = pageY - extraScrollHeight;
-        scrollViewRef.current?.scrollTo({
-          x: 0,
-          y: Math.max(0, scrollY),
-          animated: true,
-        });
-      });
+      reactNode.measure(
+        (
+          x: number,
+          y: number,
+          width: number,
+          height: number,
+          pageX: number,
+          pageY: number
+        ) => {
+          const scrollY = pageY - extraScrollHeight;
+          scrollViewRef.current?.scrollTo({
+            x: 0,
+            y: Math.max(0, scrollY),
+            animated: true,
+          });
+        }
+      );
     }, 100);
   };
 
@@ -66,7 +77,7 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={getKeyboardAvoidingViewBehavior()}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 25}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 25}
     >
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <ScrollView
@@ -108,12 +119,9 @@ interface KeyboardAvoidingContainerProps extends ViewProps {
   offset?: number;
 }
 
-export const KeyboardAvoidingContainer: React.FC<KeyboardAvoidingContainerProps> = ({
-  children,
-  offset = 0,
-  style,
-  ...props
-}) => {
+export const KeyboardAvoidingContainer: React.FC<
+  KeyboardAvoidingContainerProps
+> = ({ children, offset = 0, style, ...props }) => {
   const keyboard = useKeyboard();
   const animatedValue = useRef(new Animated.Value(0)).current;
 
@@ -155,13 +163,19 @@ export const KeyboardSpacer: React.FC<KeyboardSpacerProps> = ({
 
   useEffect(() => {
     onToggle?.(keyboard.isVisible, keyboard.height);
-    
+
     Animated.timing(animatedHeight, {
       toValue: keyboard.isVisible ? keyboard.height + topSpacing : 0,
       duration: keyboard.animationDuration,
       useNativeDriver: false,
     }).start();
-  }, [keyboard.isVisible, keyboard.height, keyboard.animationDuration, topSpacing, onToggle]);
+  }, [
+    keyboard.isVisible,
+    keyboard.height,
+    keyboard.animationDuration,
+    topSpacing,
+    onToggle,
+  ]);
 
   return <Animated.View style={{ height: animatedHeight }} />;
 };
@@ -189,11 +203,20 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
   onBlur,
   style,
   containerStyle,
-  focusedBorderColor = Colors.border.focus,
-  unfocusedBorderColor = Colors.border.primary,
-  placeholderTextColor = Colors.text.secondary,
+  focusedBorderColor,
+  unfocusedBorderColor,
+  placeholderTextColor,
   ...props
 }) => {
+  const { theme } = useTheme();
+  const _focusedBorderColor =
+    focusedBorderColor ||
+    theme.colors.border.focus ||
+    theme.colors.primary[500];
+  const _unfocusedBorderColor =
+    unfocusedBorderColor || theme.colors.border.primary;
+  const _placeholderTextColor =
+    placeholderTextColor || theme.colors.text.secondary;
   const [isFocused, setIsFocused] = useState(false);
   const animatedBorderColor = useRef(new Animated.Value(0)).current;
   const animatedScale = useRef(new Animated.Value(1)).current;
@@ -215,7 +238,7 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
 
   const borderColor = animatedBorderColor.interpolate({
     inputRange: [0, 1],
-    outputRange: [unfocusedBorderColor, focusedBorderColor],
+    outputRange: [_unfocusedBorderColor, _focusedBorderColor],
   });
 
   const handleFocus = () => {
@@ -236,7 +259,7 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
           borderRadius: 8,
           paddingHorizontal: 12,
           paddingVertical: 10,
-          backgroundColor: Colors.background.primary,
+          backgroundColor: theme.colors.background.primary,
           transform: [{ scale: animatedScale }],
         },
         containerStyle,
@@ -245,7 +268,7 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
     >
       <TextInput
         placeholder={placeholder}
-        placeholderTextColor={placeholderTextColor}
+        placeholderTextColor={_placeholderTextColor}
         value={value}
         onChangeText={onChangeText}
         onFocus={handleFocus}
@@ -253,7 +276,7 @@ export const AnimatedTextInput: React.FC<AnimatedTextInputProps> = ({
         style={[
           {
             fontSize: 16,
-            color: Colors.text.primary,
+            color: theme.colors.text.primary,
             minHeight: 20,
           },
           style,
@@ -273,9 +296,12 @@ interface KeyboardToolbarProps {
 
 export const KeyboardToolbar: React.FC<KeyboardToolbarProps> = ({
   children,
-  backgroundColor = Colors.background.secondary,
-  borderColor = Colors.border.primary,
+  backgroundColor,
+  borderColor,
 }) => {
+  const { theme } = useTheme();
+  const bg = backgroundColor || theme.colors.background.secondary;
+  const br = borderColor || theme.colors.border.primary;
   const keyboard = useKeyboard();
   const animatedTranslateY = useRef(new Animated.Value(100)).current;
 
@@ -292,18 +318,18 @@ export const KeyboardToolbar: React.FC<KeyboardToolbarProps> = ({
   return (
     <Animated.View
       style={{
-        position: 'absolute',
+        position: "absolute",
         bottom: keyboard.height,
         left: 0,
         right: 0,
-        backgroundColor,
+        backgroundColor: bg,
         borderTopWidth: 1,
-        borderTopColor: borderColor,
+        borderTopColor: br,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
         transform: [{ translateY: animatedTranslateY }],
       }}
     >

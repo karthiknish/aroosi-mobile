@@ -11,28 +11,21 @@ import {
 } from "react-native";
 import { useRoute, RouteProp } from "@react-navigation/native";
 import { useAuth } from "@contexts/AuthProvider";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { FullScreenLoading } from "@/components/ui/LoadingStates";
-import { EmptyState } from "@/components/ui/EmptyStates";
 import * as Haptics from "expo-haptics";
 // import ScreenContainer from "@components/common/ScreenContainer";
 import useResponsiveSpacing from "@/hooks/useResponsive";
-
-// Import our new messaging system
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useConversationMessaging } from "@/hooks/useOfflineMessaging";
 import { Message } from "@/types/message";
 import { OfflineMessageStatus } from "@components/messaging/OfflineMessageStatus";
 import { useToast } from "@/providers/ToastContext";
-// Import voice messaging components
 import { VoiceMessageDisplay } from "@components/messaging/VoiceMessage";
 import { VoiceRecorder } from "@components/messaging/VoiceRecorder";
-
-// Import real-time components
-// Typing indicator is shown via MessagesList footer
 import { useTypingIndicator } from "@/hooks/useTypingIndicator";
 import { useMessageSearch } from "@/hooks/useMessageSearch";
-
-// Import messaging features for subscription gating
 import {
   useMessagingFeatures,
   useVoiceMessageLimits,
@@ -40,17 +33,26 @@ import {
 } from "@/hooks/useMessagingFeatures";
 import MessagesList from "@components/chat/MessagesList";
 import { useApiClient } from "@/utils/api";
+import { VoiceMessageManager } from "../../../services/voiceMessageManager";
+import { computePeaksFromUri } from "@/utils/peaks";
+import type { MessagingAPI } from "@/types/messaging";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import {
+  imageUploadQueue,
+  type ImageUploadItem,
+} from "@/utils/imageUploadQueue";
 import { BottomSheet } from "@/components/ui/BottomSheet";
-// useSubscription imported above
 import { useSubscription } from "@/hooks/useSubscription";
+import { validatePickedImage } from "@/utils/imageValidation";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import UpgradePrompt from "@components/subscription/UpgradePrompt";
 import SafetyActionSheet from "@components/safety/SafetyActionSheet";
 import ReportUserModal from "@components/safety/ReportUserModal";
-
-interface ChatScreenProps {
-  navigation: any;
-}
+import AppHeader from "@/components/common/AppHeader";
+import { useFeatureGuard } from "@/hooks/useFeatureGuard";
+import HintPopover from "@/components/ui/HintPopover";
+// (Note: ChatScreenProps defined below)
 
 type ChatRouteParams = {
   Chat: {
@@ -62,6 +64,10 @@ type ChatRouteParams = {
 
 type ChatScreenRoute = RouteProp<ChatRouteParams, "Chat">;
 
+interface ChatScreenProps {
+  navigation: any;
+}
+
 export default function ChatScreen({ navigation }: ChatScreenProps) {
   const route = useRoute<ChatScreenRoute>();
   const { conversationId, partnerName, partnerId } = route.params;
@@ -71,6 +77,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const [inputText, setInputText] = useState("");
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [showAttachmentTray, setShowAttachmentTray] = useState(false);
   const [replyContext, setReplyContext] = useState<{
     messageId: string;
     text?: string;
@@ -92,6 +99,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const { spacing } = useResponsiveSpacing();
   const fontSize = Layout.typography.fontSize;
   const toast = useToast();
+  const { theme } = useTheme();
   // Use our new unified messaging system
   const {
     messages,
@@ -103,9 +111,74 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     isInitialized,
     hasMessages,
     canSend,
+    retryMessageById,
   } = useConversationMessaging(conversationId);
 
   const apiClient = useApiClient();
+  // Adapter to make our existing apiClient conform to MessagingAPI expected by VoiceMessageManager
+  class ApiClientAdapter implements MessagingAPI {
+    constructor(private client: any) {}
+    async getMessages(
+      conversationId: string,
+      options?: { limit?: number; before?: number }
+    ) {
+      return this.client.transportRequest(
+        `/conversations/${conversationId}/messages`,
+        { method: "GET" }
+      );
+    }
+    async sendMessage(data: any) {
+      return this.client.transportRequest("/messages", {
+        method: "POST",
+        body: data,
+      });
+    }
+    async markConversationAsRead(conversationId: string) {
+      return this.client.transportRequest(
+        `/conversations/${conversationId}/read`,
+        { method: "POST" }
+      );
+    }
+    async generateVoiceUploadUrl() {
+      return this.client.transportRequest("/voice/upload-url", {
+        method: "POST",
+      });
+    }
+    async getVoiceMessageUrl(storageId: string) {
+      return this.client.transportRequest(`/voice/${storageId}/url`);
+    }
+    async sendTypingIndicator(
+      _conversationId: string,
+      _action: "start" | "stop"
+    ) {
+      // no-op here; handled elsewhere in app
+      return { success: true } as any;
+    }
+    async sendDeliveryReceipt(_messageId: string, _status: string) {
+      // no-op here; handled elsewhere in app
+      return { success: true } as any;
+    }
+    async getConversations() {
+      return this.client.transportRequest("/conversations");
+    }
+    async createConversation(participantIds: string[]) {
+      return this.client.transportRequest("/conversations", {
+        method: "POST",
+        body: { participantIds },
+      });
+    }
+    async deleteConversation(conversationId: string) {
+      return this.client.transportRequest(`/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+    }
+  }
+  const voiceManagerRef = useRef<VoiceMessageManager | null>(null);
+  if (!voiceManagerRef.current) {
+    voiceManagerRef.current = new VoiceMessageManager(
+      new ApiClientAdapter(apiClient)
+    );
+  }
   // Presence state for partner
   const [partnerPresence, setPartnerPresence] = useState<{
     isOnline: boolean;
@@ -133,6 +206,29 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       day: "numeric",
     })}`;
   }, [partnerPresence.isOnline, partnerPresence.lastSeen]);
+
+  // Draft persistence per conversation
+  useEffect(() => {
+    let mounted = true;
+    const key = `chatDraft:${conversationId}`;
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(key);
+        if (mounted && typeof saved === "string") setInputText(saved);
+      } catch {}
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [conversationId]);
+
+  useEffect(() => {
+    const key = `chatDraft:${conversationId}`;
+    const t = setTimeout(() => {
+      AsyncStorage.setItem(key, inputText).catch(() => undefined);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [inputText, conversationId]);
 
   // Presence polling + heartbeat
   useEffect(() => {
@@ -172,6 +268,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     };
   }, [apiClient, partnerId]);
   const { usage, subscription } = useSubscription();
+  const { ensureAllowed } = useFeatureGuard();
   const subscriptionPlan = subscription?.plan || subscription?.tier || "free";
   const [receiptMap, setReceiptMap] = useState<Record<string, any[]>>({});
   const [reactionMap, setReactionMap] = useState<
@@ -186,7 +283,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   >([]);
 
   // Messaging features for subscription checks
-  const { canSendVoiceMessage, canSendTextMessage } = useMessagingFeatures();
+  const { canSendVoiceMessage, canSendTextMessage, canSendImageMessage } =
+    useMessagingFeatures();
   const { canSendVoice } = useVoiceMessageLimits();
   const {
     remainingMessages,
@@ -203,6 +301,27 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   >("premium");
   const [safetyVisible, setSafetyVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pendingAsset, setPendingAsset] =
+    useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [localUploads, setLocalUploads] = useState<ImageUploadItem[]>([]);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  // Ephemeral voice uploads state: track by tempId
+  const [pendingVoice, setPendingVoice] = useState<
+    Record<
+      string,
+      {
+        uri: string;
+        progress: number; // 0..1
+        duration: number; // seconds
+        createdAt: number;
+        error?: string;
+        peaks?: number[];
+        cancel?: () => void;
+      }
+    >
+  >({});
 
   // Real-time features
   const typingIndicator = useTypingIndicator({
@@ -457,6 +576,11 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           setUpgradeVisible(true);
           return;
         }
+        if (hasReachedLimit) {
+          setRecommendedTier("premium");
+          setUpgradeVisible(true);
+          return;
+        }
       }
 
       // Send the message using our unified system
@@ -497,6 +621,10 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           try {
             recordMessage();
           } catch {}
+        } else if (type === "voice") {
+          try {
+            recordMessage();
+          } catch {}
         }
         // Haptics on successful send
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -532,18 +660,425 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   };
 
   const handleVoiceMessage = async (audioUri: string, duration: number) => {
-    console.log("Voice message:", audioUri, duration);
     setShowVoiceRecorder(false);
-
-    // Send voice message with metadata
-    await handleSendMessage(
-      `Voice message (${Math.round(duration)}s)`,
-      "voice",
-      {
-        audioStorageId: audioUri, // This would be the storage ID after upload
-        duration: Math.round(duration),
-        fileSize: 0, // Would be set by the voice message manager
+    if (!conversationId || !userId || !partnerId) return;
+    try {
+      // Final gating before starting upload (plan + daily limit)
+      const voicePermission = canSendVoiceMessage(Math.round(duration));
+      if (!voicePermission.allowed) {
+        setRecommendedTier(
+          (voicePermission.reason || "").toLowerCase().includes("plus")
+            ? "premiumPlus"
+            : "premium"
+        );
+        setUpgradeVisible(true);
+        return;
       }
+      if (hasReachedLimit) {
+        setRecommendedTier("premium");
+        setUpgradeVisible(true);
+        return;
+      }
+      const tempId = `v_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+      // Seed an ephemeral pending bubble with progress
+      setPendingVoice((prev) => ({
+        ...prev,
+        [tempId]: {
+          uri: audioUri,
+          progress: 0.05,
+          duration: Math.round(duration),
+          createdAt: Date.now(),
+        },
+      }));
+      const mgr = voiceManagerRef.current!;
+      // Compute lightweight peaks to send for consistent rendering
+      let peaks: number[] | undefined = undefined;
+      try {
+        peaks = await computePeaksFromUri(audioUri, 28);
+      } catch {}
+
+      const handle = mgr.beginUploadVoiceMessage(
+        audioUri,
+        conversationId,
+        userId,
+        partnerId,
+        Math.round(duration),
+        {
+          onProgress: (p) =>
+            setPendingVoice((prev) =>
+              prev[tempId]
+                ? {
+                    ...prev,
+                    [tempId]: {
+                      ...prev[tempId],
+                      progress: Math.max(0, Math.min(1, p)),
+                    },
+                  }
+                : prev
+            ),
+          peaks,
+        }
+      );
+      // store cancel
+      setPendingVoice((prev) =>
+        prev[tempId]
+          ? {
+              ...prev,
+              [tempId]: { ...prev[tempId], peaks, cancel: handle.cancel },
+            }
+          : prev
+      );
+
+      const res = await handle.promise;
+      if (res?.success) {
+        // Remove ephemeral and refresh to reflect server message
+        setPendingVoice((prev) => {
+          const { [tempId]: _omit, ...rest } = prev;
+          return rest;
+        });
+        await loadMessages();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        toast?.show?.("Voice message sent", "success");
+      } else {
+        const msg =
+          (res as any)?.error?.message || "Failed to send voice message";
+        setPendingVoice((prev) =>
+          prev[tempId]
+            ? { ...prev, [tempId]: { ...prev[tempId], error: msg } }
+            : prev
+        );
+        toast?.show?.(msg, "error");
+      }
+    } catch (e: any) {
+      const msg = e?.message || "Failed to send voice message";
+      // Mark ephemeral as failed for retry
+      setPendingVoice((prev) => {
+        const keys = Object.keys(prev);
+        if (!keys.length) return prev;
+        const lastKey = keys[keys.length - 1];
+        return { ...prev, [lastKey]: { ...prev[lastKey], error: msg } };
+      });
+      toast?.show?.(msg, "error");
+    }
+  };
+
+  // Actions for voice upload retries / cancel / dismiss
+  const retryPendingVoice = async (tempId: string) => {
+    const entry = pendingVoice[tempId];
+    if (!entry) return;
+    if (!conversationId || !userId || !partnerId) return;
+    try {
+      // reset error/progress
+      setPendingVoice((prev) => ({
+        ...prev,
+        [tempId]: { ...prev[tempId], error: undefined, progress: 0 },
+      }));
+      const mgr = voiceManagerRef.current!;
+      const handle = mgr.beginUploadVoiceMessage(
+        entry.uri,
+        conversationId,
+        userId,
+        partnerId,
+        pendingVoice[tempId].duration,
+        {
+          onProgress: (p) =>
+            setPendingVoice((prev) =>
+              prev[tempId]
+                ? { ...prev, [tempId]: { ...prev[tempId], progress: p } }
+                : prev
+            ),
+          peaks: pendingVoice[tempId].peaks,
+        }
+      );
+      setPendingVoice((prev) => ({
+        ...prev,
+        [tempId]: { ...prev[tempId], cancel: handle.cancel },
+      }));
+      const res = await handle.promise;
+      if (res?.success) {
+        setPendingVoice((prev) => {
+          const { [tempId]: _omit, ...rest } = prev;
+          return rest;
+        });
+        await loadMessages();
+        toast?.show?.("Voice message sent", "success");
+      } else {
+        const msg = (res as any)?.error?.message || "Failed to send";
+        setPendingVoice((prev) => ({
+          ...prev,
+          [tempId]: { ...prev[tempId], error: msg },
+        }));
+      }
+    } catch {
+      toast?.show?.("Retry failed", "error");
+    }
+  };
+
+  const cancelPendingVoice = (tempId: string) => {
+    const entry = pendingVoice[tempId];
+    try {
+      entry?.cancel?.();
+    } catch {}
+    setPendingVoice((prev) => {
+      const next = { ...prev } as any;
+      if (next[tempId]) next[tempId].error = "Canceled";
+      return next;
+    });
+  };
+
+  const dismissPendingVoice = (tempId: string) => {
+    setPendingVoice((prev) => {
+      const { [tempId]: _omit, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  // Image attachments
+  const requestCameraPermission = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      return status === "granted";
+    } catch {
+      return false;
+    }
+  };
+
+  const requestMediaLibraryPermission = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      return status === "granted";
+    } catch {
+      return false;
+    }
+  };
+
+  const assetToBlob = async (uri: string): Promise<Blob> => {
+    const res = await fetch(uri);
+    return await res.blob();
+  };
+
+  // Resize/compress large images to speed up upload and reduce data usage
+  const prepareImageForUpload = async (
+    asset: ImagePicker.ImagePickerAsset
+  ): Promise<{
+    uri: string;
+    blob: Blob;
+    fileName: string;
+    contentType: string;
+    width?: number;
+    height?: number;
+  }> => {
+    // Target a reasonable long edge to keep quality but reduce size
+    const maxEdge = 1440;
+    const { width, height } = asset;
+    let resizedUri = asset.uri;
+    let outWidth = width;
+    let outHeight = height;
+
+    // Compute scale only if needed
+    if (width && height && (width > maxEdge || height > maxEdge)) {
+      const scale = Math.min(maxEdge / width, maxEdge / height);
+      const targetW = Math.round(width * scale);
+      const targetH = Math.round(height * scale);
+      try {
+        const result = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: targetW, height: targetH } }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        resizedUri = result.uri;
+        outWidth = result.width ?? targetW;
+        outHeight = result.height ?? targetH;
+      } catch {
+        // If manipulation fails, fall back to original
+      }
+    }
+
+    const fileName =
+      asset.fileName ||
+      resizedUri.split("/").pop() ||
+      `photo_${Date.now()}.jpg`;
+    const contentType =
+      (asset as any).mimeType ||
+      (asset.type === "image" ? "image/jpeg" : "application/octet-stream");
+    const blob = await assetToBlob(resizedUri);
+
+    return {
+      uri: resizedUri,
+      blob,
+      fileName,
+      contentType,
+      width: outWidth,
+      height: outHeight,
+    };
+  };
+
+  const uploadImageAsset = async (asset: ImagePicker.ImagePickerAsset) => {
+    if (!userId || !partnerId) return;
+    try {
+      // Validate the selected image before uploading
+      const validation = await validatePickedImage(
+        {
+          uri: asset.uri,
+          type: (asset as any).mimeType || undefined,
+          size: (asset as any).fileSize || undefined,
+          name: asset.fileName || undefined,
+        },
+        {
+          maxFileSizeBytes: 5 * 1024 * 1024, // 5MB limit
+          minWidth: 200,
+          minHeight: 200,
+          allowedFormats: ["jpg", "jpeg", "png", "webp"],
+        }
+      );
+
+      if (!validation.isValid) {
+        const msg = validation.errors[0] || "Invalid image selected";
+        setPendingAsset(asset);
+        setUploadError(msg);
+        if (toast?.show) toast.show(msg, "error");
+        else Alert.alert("Invalid image", msg);
+        return;
+      }
+      // Optionally surface non-blocking warnings
+      if (validation.warnings.length && toast?.show) {
+        toast.show(validation.warnings[0], "info");
+      }
+
+      // Resize/compress if needed before upload, then enqueue to upload queue
+      const {
+        uri: processedUri,
+        fileName,
+        contentType,
+        width,
+        height,
+      } = await prepareImageForUpload(asset);
+
+      await imageUploadQueue.enqueue({
+        conversationId,
+        fromUserId: userId,
+        toUserId: partnerId,
+        localUri: processedUri,
+        fileName,
+        contentType: contentType as string,
+        width,
+        height,
+      });
+      // Inform user
+      toast?.show?.(
+        isOnline ? "Uploading image…" : "Image queued for upload",
+        "info"
+      );
+      setPendingAsset(null);
+      setUploadError(null);
+    } catch (e) {
+      setPendingAsset(asset);
+      setUploadError("Failed to upload image. Please try again.");
+      toast?.show?.("Failed to upload image. Please try again.", "error");
+    } finally {
+      // Queue handles progress; no local spinner needed here
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handlePickFromCamera = async () => {
+    // Feature guard for image via camera
+    const imgGuard = ensureAllowed("image");
+    if (!imgGuard.allowed) {
+      setRecommendedTier(imgGuard.recommendedTier || "premium");
+      setUpgradeVisible(true);
+      return;
+    }
+    const granted = await requestCameraPermission();
+    if (!granted) {
+      Alert.alert(
+        "Camera permission required",
+        "Please enable camera access in Settings."
+      );
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        exif: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset) {
+        setShowAttachmentTray(false);
+        await uploadImageAsset(asset);
+      }
+    } catch (e) {
+      toast?.show?.("Could not open camera.", "error");
+    }
+  };
+
+  const handlePickFromLibrary = async () => {
+    // Feature guard for image via library
+    const imgGuard = ensureAllowed("image");
+    if (!imgGuard.allowed) {
+      setRecommendedTier(imgGuard.recommendedTier || "premium");
+      setUpgradeVisible(true);
+      return;
+    }
+    const granted = await requestMediaLibraryPermission();
+    if (!granted) {
+      Alert.alert(
+        "Photos permission required",
+        "Please allow photo library access in Settings."
+      );
+      return;
+    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsMultipleSelection: false,
+        selectionLimit: 1,
+        exif: false,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (asset) {
+        setShowAttachmentTray(false);
+        await uploadImageAsset(asset);
+      }
+    } catch (e) {
+      toast?.show?.("Could not open photo library.", "error");
+    }
+  };
+
+  // Typing dots component (inline)
+  const TypingDots: React.FC = () => {
+    const { theme } = useTheme();
+    const [frame, setFrame] = useState(0);
+    useEffect(() => {
+      const id = setInterval(() => setFrame((f) => (f + 1) % 3), 400);
+      return () => clearInterval(id);
+    }, []);
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: 3,
+              marginHorizontal: 2,
+              backgroundColor:
+                i <= frame
+                  ? theme.colors.primary[500]
+                  : theme.colors.neutral[300],
+              opacity: i <= frame ? 1 : 0.5,
+            }}
+          />
+        ))}
+      </View>
     );
   };
 
@@ -725,7 +1260,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
     },
     contentStyle: {
       flexGrow: 1,
@@ -733,41 +1268,31 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     keyboardAvoidingView: {
       flex: 1,
     },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      backgroundColor: Colors.background.primary,
-      borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
-    },
-    backButton: {
-      padding: spacing.sm,
-      marginRight: spacing.sm,
-    },
-    backButtonText: {
-      fontSize: fontSize.xl,
-      color: Colors.primary[500],
-    },
-    headerInfo: {
-      flex: 1,
-    },
-    headerName: {
-      fontFamily: Layout.typography.fontFamily.serif,
-      fontSize: fontSize.lg,
-      fontWeight: "600" as any,
-      color: Colors.text.primary,
-    },
+    // Header handled by AppHeader
     connectionStatus: {
       fontSize: fontSize.xs,
-      color: Colors.success[500],
+      color: theme.colors.success[500],
       fontWeight: "500" as any,
     },
     typingStatus: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       fontStyle: "italic",
+    },
+    typingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.xs,
+      marginTop: 2,
+    },
+    typingAvatarPlaceholder: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: theme.colors.primary[500],
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: spacing.xs,
     },
     profileButton: {
       padding: spacing.sm,
@@ -789,8 +1314,8 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     },
     dateText: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
-      backgroundColor: Colors.background.primary,
+      color: theme.colors.text.secondary,
+      backgroundColor: theme.colors.background.primary,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
       borderRadius: Layout.radius.full,
@@ -811,24 +1336,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       borderRadius: Layout.radius.lg,
     },
     ownMessageBubble: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       borderBottomRightRadius: Layout.radius.xs,
     },
     otherMessageBubble: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderBottomLeftRadius: Layout.radius.xs,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     messageText: {
       fontSize: fontSize.base,
       lineHeight: fontSize.base * 1.4,
     },
     ownMessageText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
     },
     otherMessageText: {
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
     },
     messageFooter: {
       flexDirection: "row",
@@ -840,10 +1365,10 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       fontSize: fontSize.xs,
     },
     ownMessageTime: {
-      color: Colors.primary[100],
+      color: theme.colors.primary[100],
     },
     otherMessageTime: {
-      color: Colors.text.tertiary,
+      color: theme.colors.text.tertiary,
     },
     messageStatus: {
       marginLeft: spacing.xs,
@@ -853,21 +1378,45 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       alignItems: "flex-end",
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderTopWidth: 1,
-      borderTopColor: Colors.border.primary,
+      borderTopColor: theme.colors.border.primary,
+    },
+    attachmentTray: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      backgroundColor: theme.colors.background.primary,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border.primary,
+    },
+    attachmentChip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: Layout.radius.full,
+      borderWidth: 1,
     },
     chatInput: {
       flex: 1,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       borderRadius: Layout.radius.lg,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       fontSize: fontSize.base,
       maxHeight: 100,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       marginRight: spacing.sm,
+    },
+    plusButton: {
+      width: spacing.xl + spacing.sm + spacing.xs,
+      height: spacing.xl + spacing.sm + spacing.xs,
+      borderRadius: Layout.radius.full,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: spacing.sm,
+      borderWidth: 1,
     },
     sendButton: {
       width: spacing.xl + spacing.sm + spacing.xs,
@@ -877,14 +1426,14 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       alignItems: "center",
     },
     sendButtonActive: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
     },
     sendButtonInactive: {
-      backgroundColor: Colors.gray[300],
+      backgroundColor: theme.colors.neutral[300],
     },
     sendButtonText: {
       fontSize: fontSize.lg,
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontWeight: "bold" as any,
     },
     voiceRecorderContainer: {
@@ -896,7 +1445,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       width: spacing.xl + spacing.sm + spacing.xs,
       height: spacing.xl + spacing.sm + spacing.xs,
       borderRadius: Layout.radius.full,
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       justifyContent: "center",
       alignItems: "center",
       marginRight: spacing.sm,
@@ -909,15 +1458,15 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       alignItems: "center",
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
-      backgroundColor: Colors.neutral[100],
+      backgroundColor: theme.colors.neutral[100],
       borderTopWidth: 1,
-      borderTopColor: Colors.border.primary,
+      borderTopColor: theme.colors.border.primary,
       gap: spacing.sm,
     },
     replyBannerBar: {
       width: 3,
       alignSelf: "stretch",
-      backgroundColor: Colors.primary[300],
+      backgroundColor: theme.colors.primary[300],
       borderRadius: 2,
     },
     replyBannerContent: {
@@ -925,26 +1474,26 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     },
     replyBannerTitle: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       marginBottom: 2,
     },
     replyBannerText: {
       fontSize: fontSize.base,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
     },
     replyBannerClose: {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       justifyContent: "center",
       alignItems: "center",
     },
     replyBannerCloseText: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
     },
     actionsContainer: {
       gap: spacing.sm,
@@ -953,19 +1502,19 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.md,
       borderRadius: Layout.radius.lg,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     actionLabel: {
       fontSize: fontSize.base,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
     },
     actionDisabled: {
       opacity: 0.5,
     },
     actionDestructive: {
-      color: Colors.error[600],
+      color: theme.colors.error[600],
     },
     // Search functionality styles
     headerActions: {
@@ -975,9 +1524,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     actionButton: {
       padding: spacing.sm,
       borderRadius: Layout.radius.md,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     actionButtonText: {
       fontSize: fontSize.lg,
@@ -985,9 +1534,9 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     searchContainer: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
+      borderBottomColor: theme.colors.border.primary,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
       gap: spacing.sm,
@@ -995,10 +1544,10 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     searchInput: {
       flex: 1,
       fontSize: fontSize.base,
-      color: Colors.text.primary,
-      backgroundColor: Colors.background.secondary,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.background.secondary,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       borderRadius: Layout.radius.md,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm,
@@ -1006,13 +1555,13 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     searchCloseButton: {
       padding: spacing.sm,
       borderRadius: Layout.radius.md,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     searchCloseText: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
     },
     searchResultsEmpty: {
       flex: 1,
@@ -1022,7 +1571,19 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     },
     searchResultsEmptyText: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
+      textAlign: "center",
+    },
+    offlineHint: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      backgroundColor: theme.colors.warning?.[50] || theme.colors.neutral[100],
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border.primary,
+    },
+    offlineHintText: {
+      fontSize: fontSize.xs,
+      color: theme.colors.text.secondary,
       textAlign: "center",
     },
   });
@@ -1035,6 +1596,60 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
     );
   }
 
+  // Initialize and bind to image upload queue
+  useEffect(() => {
+    let mounted = true;
+    const ensureInit = async () => {
+      try {
+        await imageUploadQueue.initialize();
+      } catch {}
+    };
+    ensureInit();
+
+    const refresh = () => {
+      const state = (imageUploadQueue as any).getState?.();
+      if (!state) return;
+      const list = (state.items as ImageUploadItem[]).filter(
+        (i) => i.conversationId === conversationId
+      );
+      if (mounted) setLocalUploads(list);
+    };
+
+    const onAny = () => refresh();
+    imageUploadQueue.on("initialized", onAny);
+    imageUploadQueue.on("enqueued", onAny);
+    imageUploadQueue.on("status", onAny);
+    imageUploadQueue.on("removed", onAny);
+    imageUploadQueue.on("done", ({ conversationId: cid }) => {
+      if (cid === conversationId) {
+        loadMessages();
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      refresh();
+    });
+    imageUploadQueue.on("error", onAny);
+
+    // Initial sync
+    refresh();
+
+    return () => {
+      mounted = false;
+      imageUploadQueue.off("initialized", onAny);
+      imageUploadQueue.off("enqueued", onAny);
+      imageUploadQueue.off("status", onAny);
+      imageUploadQueue.off("removed", onAny);
+      imageUploadQueue.off("done", onAny as any);
+      imageUploadQueue.off("error", onAny);
+    };
+  }, [conversationId, loadMessages]);
+
+  // Keep queue aware of connectivity
+  useEffect(() => {
+    try {
+      imageUploadQueue.setOnlineStatus(!!isOnline);
+    } catch {}
+  }, [isOnline]);
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -1046,55 +1661,51 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         <OfflineMessageStatus showDetails={false} />
 
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
+        <AppHeader
+          title={partnerName || "Chat"}
+          subtitle={lastSeenLabel}
+          onPressBack={() => navigation.goBack()}
+          rightActions={
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={toggleSearchMode}
+              >
+                <Text style={styles.actionButtonText}>🔍</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => setSafetyVisible(true)}
+              >
+                <Text style={styles.actionButtonText}>⚠️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.profileButton}
+                onPress={() =>
+                  partnerId &&
+                  navigation.navigate("ProfileDetail", { profileId: partnerId })
+                }
+              >
+                <Text style={styles.profileButtonText}>👤</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+        {isTyping && (
+          <View
+            style={[
+              styles.typingRow,
+              { paddingHorizontal: spacing.md, paddingBottom: spacing.xs },
+            ]}
           >
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerName}>{partnerName || "Chat"}</Text>
-            <Text
-              style={[
-                styles.connectionStatus,
-                {
-                  color: partnerPresence.isOnline
-                    ? Colors.success[500]
-                    : Colors.text.secondary,
-                },
-              ]}
-            >
-              {lastSeenLabel}
-            </Text>
-            {isTyping && <Text style={styles.typingStatus}>Typing...</Text>}
+            <View style={styles.typingAvatarPlaceholder}>
+              <Text style={{ color: theme.colors.text.inverse, fontSize: 10 }}>
+                {(partnerName || "?").toString().charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <TypingDots />
           </View>
-
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={toggleSearchMode}
-            >
-              <Text style={styles.actionButtonText}>🔍</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => setSafetyVisible(true)}
-            >
-              <Text style={styles.actionButtonText}>⚠️</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.profileButton}
-              onPress={() =>
-                partnerId &&
-                navigation.navigate("ProfileDetail", { profileId: partnerId })
-              }
-            >
-              <Text style={styles.profileButtonText}>👤</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        )}
 
         {/* Search Bar */}
         {isSearchMode && (
@@ -1102,7 +1713,7 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             <TextInput
               style={styles.searchInput}
               placeholder="Search messages..."
-              placeholderTextColor={Colors.text.secondary}
+              placeholderTextColor={theme.colors.text.secondary}
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
@@ -1137,71 +1748,117 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
         )}
 
         {/* Messages */}
-        {error ? (
-          <EmptyState
-            title="Unable to load messages"
-            message="Please check your connection and try again."
-            actionText="Retry"
-            onActionPress={() => loadMessages()}
-          />
-        ) : (
-          <View style={styles.messagesContainer}>
-            <MessagesList
-              messages={
-                (isSearchMode && searchResults.length > 0
+        <View style={styles.messagesContainer}>
+          <MessagesList
+            messages={((): any => {
+              const base = (
+                isSearchMode && searchResults.length > 0
                   ? searchResults
-                  : displayMessages) as any
-              }
-              currentUserId={userId || ""}
-              typingVisible={typingIndicator.isAnyoneElseTyping}
-              typingText={typingIndicator.isAnyoneElseTyping ? "Typing..." : ""}
-              onToggleReaction={handleToggleReaction}
-              getReactionsForMessage={getReactionsForMessage}
-              onReplyMessage={(m: any) => {
-                setReplyContext({
-                  messageId: m._id,
-                  text: m.text,
-                  type: m.type,
-                  fromUserId: m.fromUserId,
-                });
-              }}
-              onEditMessage={(m: any) => {
-                if (!canEdit(m)) return;
-                setEditingMessageId(m._id);
-                setInputText(m.text || "");
-              }}
-              onDeleteMessage={(m: any) => {
-                if (!canDelete(m)) return;
-                const targetId = m._id;
-                Alert.alert(
-                  "Delete message?",
-                  "This will delete the message for everyone.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: async () => {
-                        try {
-                          setOptimisticDeleted((prev) => ({
-                            ...prev,
-                            [targetId]: true,
-                          }));
-                          const res = await apiClient.deleteMessage(targetId);
-                          if (!res?.success) {
-                            setOptimisticDeleted((prev) => {
-                              const { [targetId]: _omit, ...rest } = prev;
-                              return rest;
-                            });
-                            if (toast)
-                              toast.show(
-                                "Delete failed. Please try again.",
-                                "error"
-                              );
-                          } else {
-                            loadMessages();
-                          }
-                        } catch (e) {
+                  : displayMessages
+              ) as any[];
+              const pending = Object.entries(pendingVoice).map(([id, v]) => ({
+                _id: id,
+                conversationId,
+                fromUserId: userId!,
+                toUserId: partnerId!,
+                type: "voice",
+                createdAt: v.createdAt,
+                status: v.error ? ("failed" as const) : ("pending" as const),
+                durationSeconds: v.duration,
+                peaks: v.peaks,
+                // special fields for UI rendering progress
+                __uploading: !v.error,
+                __progress: v.progress,
+                __error: v.error,
+              }));
+              // Show pending at the end (most recent)
+              return [...base, ...pending];
+            })()}
+            currentUserId={userId || ""}
+            error={error}
+            onRetry={() => loadMessages()}
+            onRetryFailedMessage={async (m: any) => {
+              try {
+                if (m?._id?.startsWith("optimistic_") || m?._id?.startsWith("queue_")) {
+                  const ok = await retryMessageById(m._id);
+                  if (!ok) {
+                    // If no mapping available, refresh so queue can reconcile
+                    await loadMessages();
+                  }
+                } else if (m.type === "text") {
+                  await sendMessage({
+                    conversationId,
+                    fromUserId: userId!,
+                    toUserId: partnerId!,
+                    text: m.text || "",
+                    type: "text",
+                    createdAt: Date.now(),
+                  } as any);
+                }
+              } catch {}
+            }}
+            onDismissFailedMessage={(id: string) => {
+              // Optimistically remove failed message from local array so it doesn't clutter UI
+              try {
+                const idx = messages.findIndex((mm: any) => mm._id === id);
+                if (idx >= 0) {
+                  const next = messages.slice();
+                  next.splice(idx, 1);
+                  // Not directly setting state here since messages come from hook; request a refresh instead
+                  loadMessages();
+                }
+              } catch {}
+            }}
+            typingVisible={typingIndicator.isAnyoneElseTyping}
+            typingText={typingIndicator.isAnyoneElseTyping ? "Typing..." : ""}
+            showScrollToBottom={showScrollToBottom}
+            onAtBottomChange={(atBottom: boolean) => {
+              // Show FAB when not at bottom and there are messages
+              setShowScrollToBottom(!atBottom && !!displayMessages?.length);
+            }}
+            onToggleReaction={handleToggleReaction}
+            getReactionsForMessage={getReactionsForMessage}
+            fetchImageUrl={async (messageId: string) => {
+              try {
+                const res = await apiClient.getMessageImageUrl(messageId);
+                if (res.success && (res.data as any)?.imageUrl) {
+                  return (res.data as any).imageUrl as string;
+                }
+              } catch {}
+              return null;
+            }}
+            onReplyMessage={(m: any) => {
+              setReplyContext({
+                messageId: m._id,
+                text: m.text,
+                type: m.type,
+                fromUserId: m.fromUserId,
+              });
+            }}
+            onEditMessage={(m: any) => {
+              if (!canEdit(m)) return;
+              setEditingMessageId(m._id);
+              setInputText(m.text || "");
+            }}
+            onDeleteMessage={(m: any) => {
+              if (!canDelete(m)) return;
+              const targetId = m._id;
+              Alert.alert(
+                "Delete message?",
+                "This will delete the message for everyone.",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                      try {
+                        setOptimisticDeleted((prev) => ({
+                          ...prev,
+                          [targetId]: true,
+                        }));
+                        const res = await apiClient.deleteMessage(targetId);
+                        if (!res?.success) {
                           setOptimisticDeleted((prev) => {
                             const { [targetId]: _omit, ...rest } = prev;
                             return rest;
@@ -1211,50 +1868,65 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                               "Delete failed. Please try again.",
                               "error"
                             );
+                        } else {
+                          loadMessages();
                         }
-                      },
+                      } catch (e) {
+                        setOptimisticDeleted((prev) => {
+                          const { [targetId]: _omit, ...rest } = prev;
+                          return rest;
+                        });
+                        if (toast)
+                          toast.show(
+                            "Delete failed. Please try again.",
+                            "error"
+                          );
+                      }
                     },
-                  ]
-                );
-              }}
-              onFetchOlder={async () => {
-                const beforeTs = messages?.[0]?.createdAt;
-                if (beforeTs) await loadMessages({ before: beforeTs });
-              }}
-              hasMore={true}
-              loading={loading}
-              onRefresh={async () => {
-                await Promise.all([loadMessages(), loadReceipts()]);
-                await apiClient.markConversationAsRead(conversationId);
-              }}
-              refreshing={loading}
-              showUpgradeChip={
-                subscription?.plan === "free" &&
-                !!usage?.features?.find(
-                  (f: any) =>
-                    f.name === "messagesSent" && f.percentageUsed >= 80
-                )
-              }
-              upgradeChipText={(() => {
-                const f = usage?.features?.find(
-                  (x: any) => x.name === "messagesSent"
-                );
-                const pct = f?.percentageUsed ?? 0;
-                return pct >= 100
-                  ? "Limit reached — Upgrade for unlimited"
-                  : `You're at ${pct}% — Upgrade for unlimited`;
-              })()}
-              onPressUpgrade={() => setUpgradeVisible(true)}
-            />
-            {isSearchMode && searchResults.length === 0 && searchQuery && (
-              <View style={styles.searchResultsEmpty}>
-                <Text style={styles.searchResultsEmptyText}>
-                  No messages found for "{searchQuery}"
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
+                  },
+                ]
+              );
+            }}
+            onFetchOlder={async () => {
+              const beforeTs = messages?.[0]?.createdAt;
+              if (beforeTs) await loadMessages({ before: beforeTs });
+            }}
+            hasMore={true}
+            loading={loading}
+            onRefresh={async () => {
+              await Promise.all([loadMessages(), loadReceipts()]);
+              await apiClient.markConversationAsRead(conversationId);
+            }}
+            refreshing={loading}
+            showUpgradeChip={
+              subscription?.plan === "free" &&
+              !!usage?.features?.find(
+                (f: any) => f.name === "messagesSent" && f.percentageUsed >= 80
+              )
+            }
+            upgradeChipText={(() => {
+              const f = usage?.features?.find(
+                (x: any) => x.name === "messagesSent"
+              );
+              const pct = f?.percentageUsed ?? 0;
+              return pct >= 100
+                ? "Limit reached — Upgrade for unlimited"
+                : `You're at ${pct}% — Upgrade for unlimited`;
+            })()}
+            onPressUpgrade={() => setUpgradeVisible(true)}
+            // Provide voice upload retry/cancel actions via extra props if we add later
+            onRetryVoice={(id) => retryPendingVoice(id)}
+            onCancelVoice={(id) => cancelPendingVoice(id)}
+            onDismissVoice={(id) => dismissPendingVoice(id)}
+          />
+          {isSearchMode && searchResults.length === 0 && searchQuery && (
+            <View style={styles.searchResultsEmpty}>
+              <Text style={styles.searchResultsEmptyText}>
+                No messages found for "{searchQuery}"
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Reply/Edit Banner */}
         {(replyContext || editingMessageId) && (
@@ -1288,7 +1960,207 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
           </View>
         )}
 
+        {/* Attachment Tray */}
+        {showAttachmentTray && (
+          <View style={styles.attachmentTray}>
+            <TouchableOpacity
+              style={[
+                styles.attachmentChip,
+                { borderColor: theme.colors.border.primary },
+              ]}
+              onPress={handlePickFromCamera}
+            >
+              <Text style={{ color: theme.colors.text.primary }}>📷 Photo</Text>
+            </TouchableOpacity>
+            {(() => {
+              const guard = ensureAllowed("image");
+              if (!guard.allowed) {
+                return (
+                  <Text
+                    style={{
+                      color: theme.colors.text.secondary,
+                      fontSize: fontSize.xs,
+                      marginLeft: spacing.xs,
+                    }}
+                    accessibilityLabel="image-gate-reason-camera"
+                    numberOfLines={1}
+                  >
+                    {guard.reason || "Upgrade to share photos"}
+                  </Text>
+                );
+              }
+              return null;
+            })()}
+            <TouchableOpacity
+              style={[
+                styles.attachmentChip,
+                { borderColor: theme.colors.border.primary },
+              ]}
+              onPress={handlePickFromLibrary}
+            >
+              <Text style={{ color: theme.colors.text.primary }}>
+                🖼 Library
+              </Text>
+            </TouchableOpacity>
+            {(() => {
+              const guard = ensureAllowed("image");
+              if (!guard.allowed) {
+                return (
+                  <Text
+                    style={{
+                      color: theme.colors.text.secondary,
+                      fontSize: fontSize.xs,
+                      marginLeft: spacing.xs,
+                    }}
+                    accessibilityLabel="image-gate-reason-library"
+                    numberOfLines={1}
+                  >
+                    {guard.reason || "Upgrade to share photos"}
+                  </Text>
+                );
+              }
+              return null;
+            })()}
+            <TouchableOpacity
+              style={[
+                styles.attachmentChip,
+                { borderColor: theme.colors.border.primary },
+              ]}
+              onPress={() =>
+                toast?.show?.("Share location (coming soon)", "info")
+              }
+            >
+              <Text style={{ color: theme.colors.text.primary }}>
+                📍 Location
+              </Text>
+            </TouchableOpacity>
+            {localUploads.length > 0 && (
+              <View style={{ flex: 1, gap: spacing.xs }}>
+                {localUploads.map((u) => (
+                  <View
+                    key={u.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: spacing.sm,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    <Text
+                      style={{ flex: 1, color: theme.colors.text.primary }}
+                      numberOfLines={1}
+                    >
+                      {u.fileName} ·{" "}
+                      {u.status === "queued"
+                        ? "Queued"
+                        : u.status === "error"
+                        ? "Failed"
+                        : `${Math.round((u.progress || 0) * 100)}%`}
+                    </Text>
+                    {u.status === "error" ? (
+                      <>
+                        <TouchableOpacity
+                          style={[
+                            styles.attachmentChip,
+                            { borderColor: theme.colors.error[400] },
+                          ]}
+                          onPress={() => imageUploadQueue.retry(u.id)}
+                        >
+                          <Text style={{ color: theme.colors.text.primary }}>
+                            Retry
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.attachmentChip,
+                            { borderColor: theme.colors.border.primary },
+                          ]}
+                          onPress={() => imageUploadQueue.remove(u.id)}
+                        >
+                          <Text style={{ color: theme.colors.text.primary }}>
+                            Dismiss
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <Text style={{ color: theme.colors.text.secondary }}>
+                        {u.status === "done"
+                          ? "Done"
+                          : u.status === "queued"
+                          ? "Waiting"
+                          : "Uploading"}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+            {!!uploadError && (
+              <View
+                style={{
+                  flex: 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing.sm,
+                  paddingVertical: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    flex: 1,
+                    color: theme.colors.error[600],
+                  }}
+                  numberOfLines={2}
+                >
+                  {uploadError}
+                </Text>
+                {!!pendingAsset && (
+                  <TouchableOpacity
+                    style={[
+                      styles.attachmentChip,
+                      { borderColor: theme.colors.error[400] },
+                    ]}
+                    onPress={async () => {
+                      const a = pendingAsset;
+                      setUploadError(null);
+                      setPendingAsset(null);
+                      if (a) await uploadImageAsset(a);
+                    }}
+                  >
+                    <Text style={{ color: theme.colors.text.primary }}>
+                      Retry
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[
+                    styles.attachmentChip,
+                    { borderColor: theme.colors.border.primary },
+                  ]}
+                  onPress={() => {
+                    setUploadError(null);
+                    setPendingAsset(null);
+                  }}
+                >
+                  <Text style={{ color: theme.colors.text.primary }}>
+                    Dismiss
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Chat Input */}
+        {/* Offline hint */}
+        {!isOnline && (
+          <View style={styles.offlineHint}>
+            <Text style={styles.offlineHintText}>
+              You’re offline. New messages will be queued and sent when you’re
+              back online.
+            </Text>
+          </View>
+        )}
         <View style={styles.chatInputContainer}>
           {showVoiceRecorder ? (
             <VoiceRecorder
@@ -1298,12 +2170,36 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
             />
           ) : (
             <>
+              {/** Precompute guard states for UX hints */}
+              {(() => {
+                return null;
+              })()}
+              <TouchableOpacity
+                style={[
+                  styles.plusButton,
+                  {
+                    backgroundColor: theme.colors.background.secondary,
+                    borderColor: theme.colors.border.primary,
+                  },
+                ]}
+                onPress={() => setShowAttachmentTray((v) => !v)}
+              >
+                <Text
+                  style={{
+                    fontSize: fontSize.lg,
+                    color: theme.colors.text.primary,
+                  }}
+                >
+                  ＋
+                </Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.voiceButton}
                 onPress={() => {
-                  // Check voice message permission first
-                  if (!canSendVoice) {
-                    setRecommendedTier("premium");
+                  // Centralized feature guard for voice
+                  const guard = ensureAllowed("voice");
+                  if (!guard.allowed) {
+                    setRecommendedTier(guard.recommendedTier || "premium");
                     setUpgradeVisible(true);
                     return;
                   }
@@ -1314,6 +2210,22 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
               >
                 <Text style={styles.voiceButtonText}>🎤</Text>
               </TouchableOpacity>
+              {(() => {
+                const guard = ensureAllowed("voice");
+                if (!guard.allowed) {
+                  return (
+                    <HintPopover
+                      hint={
+                        guard.reason ||
+                        "Upgrade your plan or wait until tomorrow to send voice messages."
+                      }
+                      label="Why?"
+                      title="Voice messages disabled"
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               <TextInput
                 style={styles.chatInput}
@@ -1328,12 +2240,16 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                   const trimmed = inputText.trim();
                   if (!trimmed) return;
                   if (trimmed.length > 500) {
-                    if (toast) {
-                      toast.show(
-                        "Messages are limited to 500 characters.",
-                        "info"
-                      );
-                    }
+                    toast?.show?.(
+                      "Messages are limited to 500 characters.",
+                      "info"
+                    );
+                    return;
+                  }
+                  const guard = ensureAllowed("text");
+                  if (!guard.allowed) {
+                    setRecommendedTier(guard.recommendedTier || "premium");
+                    setUpgradeVisible(true);
                     return;
                   }
                   if (editingMessageId) handleEditSubmit();
@@ -1341,36 +2257,24 @@ export default function ChatScreen({ navigation }: ChatScreenProps) {
                 }}
                 returnKeyType="send"
               />
-
-              <TouchableOpacity
-                style={[
-                  styles.sendButton,
-                  inputText.trim()
-                    ? styles.sendButtonActive
-                    : styles.sendButtonInactive,
-                ]}
-                onPress={() => {
-                  const trimmed = inputText.trim();
-                  if (!trimmed) return;
-                  if (trimmed.length > 500) {
-                    if (toast) {
-                      toast.show(
-                        "Messages are limited to 500 characters.",
-                        "info"
-                      );
-                    }
-                    return;
-                  }
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (editingMessageId) handleEditSubmit();
-                  else handleSendMessage(trimmed);
-                }}
-                disabled={!inputText.trim() || !canSend}
-              >
-                <Text style={styles.sendButtonText}>
-                  {loading ? "⏳" : "➤"}
-                </Text>
-              </TouchableOpacity>
+              {(() => {
+                const trimmed = inputText.trim();
+                let reason: string | null = null;
+                if (!trimmed) reason = "Type a message to enable send";
+                else if (!canSend) reason = "You’re offline";
+                else if (!ensureAllowed("text").allowed)
+                  reason =
+                    ensureAllowed("text").reason ||
+                    "Upgrade to continue messaging";
+                if (!reason) return null;
+                return (
+                  <HintPopover
+                    hint={reason}
+                    label="Why?"
+                    title="Send disabled"
+                  />
+                );
+              })()}
             </>
           )}
         </View>

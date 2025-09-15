@@ -7,6 +7,7 @@ import {
   Animated,
 } from "react-native";
 import { useDailyMessageLimit } from "@/hooks/useMessagingFeatures";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface MessageLimitIndicatorProps {
   onUpgradePress?: () => void;
@@ -19,6 +20,7 @@ export const MessageLimitIndicator: React.FC<MessageLimitIndicatorProps> = ({
   style,
   showWhenUnlimited = false,
 }) => {
+  const { theme } = useTheme();
   const {
     remainingMessages,
     hasUnlimitedMessages,
@@ -34,10 +36,10 @@ export const MessageLimitIndicator: React.FC<MessageLimitIndicatorProps> = ({
   }
 
   const getIndicatorColor = () => {
-    if (hasUnlimitedMessages) return "#4caf50";
-    if (hasReachedLimit) return "#f44336";
-    if (isNearLimit) return "#ff9800";
-    return "#2196f3";
+    if (hasUnlimitedMessages) return theme.colors.success[500];
+    if (hasReachedLimit) return theme.colors.error[500];
+    if (isNearLimit) return theme.colors.warning[500];
+    return theme.colors.info[500];
   };
 
   const getIndicatorText = () => {
@@ -62,10 +64,21 @@ export const MessageLimitIndicator: React.FC<MessageLimitIndicatorProps> = ({
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View
+      style={[
+        styles.container,
+        style,
+        { backgroundColor: theme.colors.background.secondary },
+      ]}
+    >
       {/* Progress Bar */}
       <View style={styles.progressContainer}>
-        <View style={styles.progressBackground}>
+        <View
+          style={[
+            styles.progressBackground,
+            { backgroundColor: theme.colors.neutral[300] },
+          ]}
+        >
           <View
             style={[
               styles.progressFill,
@@ -86,13 +99,17 @@ export const MessageLimitIndicator: React.FC<MessageLimitIndicatorProps> = ({
           </Text>
 
           {!hasUnlimitedMessages && dailyLimit > 0 && (
-            <Text style={styles.subText}>
+            <Text
+              style={[styles.subText, { color: theme.colors.text.secondary }]}
+            >
               {dailyLimit - remainingMessages} of {dailyLimit} used
             </Text>
           )}
 
           {hasUnlimitedMessages && (
-            <Text style={styles.subText}>
+            <Text
+              style={[styles.subText, { color: theme.colors.text.secondary }]}
+            >
               Premium {subscriptionTier === "premiumPlus" ? "Plus" : ""} member
             </Text>
           )}
@@ -100,10 +117,20 @@ export const MessageLimitIndicator: React.FC<MessageLimitIndicatorProps> = ({
 
         {shouldShowUpgradeButton() && onUpgradePress && (
           <TouchableOpacity
-            style={styles.upgradeButton}
+            style={[
+              styles.upgradeButton,
+              { backgroundColor: theme.colors.primary[600] },
+            ]}
             onPress={onUpgradePress}
           >
-            <Text style={styles.upgradeButtonText}>Upgrade</Text>
+            <Text
+              style={[
+                styles.upgradeButtonText,
+                { color: theme.colors.text.inverse },
+              ]}
+            >
+              Upgrade
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -125,6 +152,7 @@ export const MessageLimitWarning: React.FC<MessageLimitWarningProps> = ({
   onDismiss,
 }) => {
   if (!visible) return null;
+  const { theme } = useTheme();
 
   const getWarningText = () => {
     if (remainingMessages <= 0) {
@@ -139,19 +167,41 @@ export const MessageLimitWarning: React.FC<MessageLimitWarningProps> = ({
   };
 
   return (
-    <View style={styles.warningContainer}>
+    <View
+      style={[
+        styles.warningContainer,
+        {
+          backgroundColor: theme.colors.warning[100],
+          borderColor: theme.colors.warning[200],
+        },
+      ]}
+    >
       <View style={styles.warningContent}>
         <Text style={styles.warningIcon}>⚠️</Text>
-        <Text style={styles.warningText}>{getWarningText()}</Text>
+        <Text
+          style={[styles.warningText, { color: theme.colors.warning[700] }]}
+        >
+          {getWarningText()}
+        </Text>
       </View>
 
       <View style={styles.warningActions}>
         {onUpgradePress && (
           <TouchableOpacity
-            style={styles.warningUpgradeButton}
+            style={[
+              styles.warningUpgradeButton,
+              { backgroundColor: theme.colors.primary[600] },
+            ]}
             onPress={onUpgradePress}
           >
-            <Text style={styles.warningUpgradeText}>Upgrade Now</Text>
+            <Text
+              style={[
+                styles.warningUpgradeText,
+                { color: theme.colors.text.inverse },
+              ]}
+            >
+              Upgrade Now
+            </Text>
           </TouchableOpacity>
         )}
 
@@ -160,7 +210,14 @@ export const MessageLimitWarning: React.FC<MessageLimitWarningProps> = ({
             style={styles.warningDismissButton}
             onPress={onDismiss}
           >
-            <Text style={styles.warningDismissText}>Dismiss</Text>
+            <Text
+              style={[
+                styles.warningDismissText,
+                { color: theme.colors.warning[700] },
+              ]}
+            >
+              Dismiss
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -170,7 +227,7 @@ export const MessageLimitWarning: React.FC<MessageLimitWarningProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
@@ -180,7 +237,7 @@ const styles = StyleSheet.create({
   },
   progressBackground: {
     height: 4,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "transparent",
     borderRadius: 2,
     overflow: "hidden",
   },
@@ -203,24 +260,24 @@ const styles = StyleSheet.create({
   },
   subText: {
     fontSize: 14,
-    color: "#666",
+    color: undefined,
   },
   upgradeButton: {
-    backgroundColor: "#1976d2",
+    backgroundColor: "transparent",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
   },
   upgradeButtonText: {
-    color: "white",
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
   },
 
   // Warning styles
   warningContainer: {
-    backgroundColor: "#fff3cd",
-    borderColor: "#ffeaa7",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
@@ -238,7 +295,7 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
     fontSize: 16,
-    color: "#856404",
+    color: undefined,
     lineHeight: 22,
   },
   warningActions: {
@@ -247,13 +304,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   warningUpgradeButton: {
-    backgroundColor: "#1976d2",
+    backgroundColor: "transparent",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
   },
   warningUpgradeText: {
-    color: "white",
+    color: undefined,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -263,10 +320,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#856404",
+    borderColor: "transparent",
   },
   warningDismissText: {
-    color: "#856404",
+    color: undefined,
     fontSize: 14,
     fontWeight: "500",
   },

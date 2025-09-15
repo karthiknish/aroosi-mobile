@@ -31,6 +31,16 @@ if (!API_BASE_URL) {
   );
 }
 
+/**
+ * ApiClient
+ *
+ * Transport + compatibility strategy:
+ * - Paths are normalized to include the "/api" prefix to match the web backend.
+ * - Prefer the canonical web endpoints first; on 404/NOT_FOUND we fall back to
+ *   legacy mobile endpoints to avoid regressions during migration.
+ * - When sending FormData (multipart), we do NOT set Content-Type so the runtime
+ *   can add the proper boundary header.
+ */
 class ApiClient {
   private baseUrl: string;
 
@@ -89,6 +99,14 @@ class ApiClient {
         } catch (authError) {
           console.warn("Failed to get auth token:", authError);
         }
+      }
+
+      // If sending FormData, let fetch set the proper multipart boundary
+      // (Don't force application/json header)
+      const isFormData =
+        typeof FormData !== "undefined" && options.body instanceof FormData;
+      if (isFormData && headers["Content-Type"]) {
+        delete headers["Content-Type"];
       }
 
       const response = await fetch(url, {
@@ -243,11 +261,56 @@ class ApiClient {
   }
 
   async getProfileById(profileId: string): Promise<ApiResponse<Profile>> {
-    const res = await this.request<any>(`/profile-detail/${profileId}`);
-    if (!res.success) return res as ApiResponse<Profile>;
-    const payload = res.data as any;
-    const profile: any = payload?.profile ?? payload?.data?.profile ?? payload;
-    return { success: true, data: profile as Profile };
+    // Try primary endpoint
+    const primary = await this.request<any>(`/profile-detail/${profileId}`);
+    if (primary.success) {
+      const payload = primary.data as any;
+      const profile: any =
+        payload?.profile ?? payload?.data?.profile ?? payload;
+      if (profile && (profile.userId || profile._id || profile.email)) {
+        return { success: true, data: profile as Profile };
+      }
+    }
+
+    // Fallback 1: RESTful style /profiles/:id
+    const fallback1 = await this.request<any>(`/profiles/${profileId}`);
+    if (fallback1.success) {
+      const payload = fallback1.data as any;
+      const profile: any =
+        payload?.profile ?? payload?.data?.profile ?? payload;
+      if (profile && (profile.userId || profile._id || profile.email)) {
+        return { success: true, data: profile as Profile };
+      }
+    }
+
+    // Fallback 2: Query by userId
+    const fallback2 = await this.request<any>(
+      `/profile?userId=${encodeURIComponent(profileId)}`
+    );
+    if (fallback2.success) {
+      const payload = fallback2.data as any;
+      const profile: any =
+        payload?.profile ?? payload?.data?.profile ?? payload;
+      if (profile && (profile.userId || profile._id || profile.email)) {
+        return { success: true, data: profile as Profile };
+      }
+    }
+
+    // Fallback 3: Unified user profile endpoint
+    const fallback3 = await this.request<any>(
+      `/user/profile?userId=${encodeURIComponent(profileId)}`
+    );
+    if (fallback3.success) {
+      const payload = fallback3.data as any;
+      const profile: any =
+        payload?.profile ?? payload?.data?.profile ?? payload;
+      if (profile && (profile.userId || profile._id || profile.email)) {
+        return { success: true, data: profile as Profile };
+      }
+    }
+
+    // Return the primary failure if nothing worked
+    return primary as ApiResponse<Profile>;
   }
 
   async createProfile(
@@ -497,6 +560,115 @@ class ApiClient {
     });
   }
 
+  /**
+   * Upload a message image (web-first multipart; fallback to two-step PUT)
+   * Primary (web): POST /api/messages/upload-image (multipart: image + metadata)
+   * Fallback (legacy):
+   *   1) POST /api/messages/upload-image-url -> { uploadUrl }
+   *   2) PUT file to uploadUrl
+   *   3) POST /api/messages/image to save metadata
+   */
+  async uploadMessageImageMultipart(params: {
+    conversationId: string;
+    fromUserId: string;
+    toUserId: string;
+    file: Blob;
+    fileName: string;
+    contentType: string;
+    width?: number;
+    height?: number;
+  }): Promise<
+    ApiResponse<{ success: boolean; messageId?: string; imageUrl?: string }>
+  > {
+    // Primary endpoint (web): /api/messages/upload-image (multipart)
+    const form = new FormData();
+    form.append("image", params.file as any, params.fileName);
+    form.append("conversationId", params.conversationId);
+    form.append("fromUserId", params.fromUserId);
+    form.append("toUserId", params.toUserId);
+    form.append("fileName", params.fileName);
+    form.append("contentType", params.contentType);
+    if (params.width) form.append("width", String(params.width));
+    if (params.height) form.append("height", String(params.height));
+
+    let primary = await this.request<{
+      success?: boolean;
+      messageId?: string;
+      imageUrl?: string;
+      error?: string;
+    }>("/messages/upload-image", { method: "POST", body: form });
+
+    // If server lacks multipart endpoint, fallback to two-step storage flow
+    if (!primary.success) {
+      const code = (primary as any)?.error?.code || "";
+      if (code === "HTTP_404" || code === "NOT_FOUND") {
+        // Step 1: get upload URL
+        const urlRes = await this.getMessageImageUploadUrl(
+          params.conversationId
+        );
+        if (!urlRes.success || !urlRes.data?.uploadUrl) return urlRes as any;
+        const put = await fetch(urlRes.data.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": params.contentType },
+          body: params.file,
+        });
+        if (!put.ok) {
+          return {
+            success: false,
+            error: {
+              code: `HTTP_${put.status}`,
+              message: `Upload failed (${put.status})`,
+            },
+          } as any;
+        }
+        const match = urlRes.data.uploadUrl.match(/messages\/images\/([\w-]+)/);
+        const storageId = match ? match[1] : undefined;
+        if (!storageId) {
+          return {
+            success: false,
+            error: { code: "UPLOAD_ERROR", message: "No storageId" },
+          } as any;
+        }
+        const meta = await this.saveMessageImageMetadata({
+          conversationId: params.conversationId,
+          storageId,
+          fileName: params.fileName,
+          contentType: params.contentType,
+          fileSize: (params.file as any).size ?? 0,
+          width: params.width,
+          height: params.height,
+        });
+        return meta as any;
+      }
+    }
+
+    return primary as any;
+  }
+
+  /**
+   * Retrieve a secure URL for a message image (web counterpart)
+   * Primary (web): GET /api/message-images/:messageId/url
+   * Some servers wrap payloads; we unwrap common { data: { imageUrl } } shapes.
+   */
+  async getMessageImageUrl(
+    messageId: string
+  ): Promise<ApiResponse<{ imageUrl: string }>> {
+    // Primary (web): /api/message-images/:id/url
+    let res = await this.request<{ imageUrl?: string }>(
+      `/message-images/${encodeURIComponent(messageId)}/url`
+    );
+    // If the server returns a wrapped payload
+    if (res.success) {
+      const imageUrl =
+        (res.data as any)?.imageUrl ?? (res.data as any)?.data?.imageUrl;
+      if (imageUrl) {
+        return { success: true, data: { imageUrl } } as any;
+      }
+    }
+    // Leave error as-is; callers may have their own fallback logic
+    return res as any;
+  }
+
   async getInterestStatus(
     _fromUserId: string,
     toUserId: string
@@ -678,6 +850,13 @@ class ApiClient {
   }
 
   // Message APIs - Aligned with unified messaging endpoints
+  /**
+   * List messages (web-first with legacy fallback)
+   * Primary (web): GET /api/messages/messages?conversationId=...
+   * Fallback (legacy): GET /api/match-messages?conversationId=...
+   * On 404/NOT_FOUND we return an empty list for new conversations.
+   * Messages are normalized to a consistent shape on success.
+   */
   async getMessages(
     conversationId: string,
     options?: { limit?: number; before?: number }
@@ -699,16 +878,45 @@ class ApiClient {
     if (options?.limit) params.append("limit", options.limit.toString());
     if (options?.before) params.append("before", options.before.toString());
 
-    const response = await this.request<Message[]>(`/match-messages?${params}`);
+    // Prefer web-style endpoint first, then fallback to legacy
+    // Primary (web): GET /api/messages/messages?conversationId=...
+    let response = await this.request<Message[]>(
+      `/messages/messages?${params.toString()}`
+    );
+
+    if (!response.success) {
+      const code = (response as any)?.error?.code || "";
+      // Fallback (legacy mobile): GET /api/match-messages?conversationId=...
+      if (code === "HTTP_404" || code === "NOT_FOUND") {
+        response = await this.request<Message[]>(
+          `/match-messages?${params.toString()}`
+        );
+      }
+    }
+
+    // Gracefully handle not found conversations as empty history
+    if (!response.success) {
+      const code = (response as any)?.error?.code || "";
+      if (code === "HTTP_404" || code === "NOT_FOUND") {
+        return { success: true, data: [] } as ApiResponse<Message[]>;
+      }
+      return response;
+    }
 
     // Normalize messages for backward compatibility
-    if (response.success && response.data) {
+    if (response.data) {
       response.data = response.data.map(this.normalizeMessage);
     }
 
     return response;
   }
 
+  /**
+   * Send a message (web-first with legacy fallback)
+   * Primary (web): POST /api/messages/send
+   * Fallback (legacy): POST /api/match-messages
+   * The returned message is normalized for backward compatibility.
+   */
   async sendMessage(data: {
     conversationId: string;
     fromUserId: string;
@@ -740,7 +948,9 @@ class ApiClient {
       };
     }
 
-    const response = await this.request<Message>("/match-messages", {
+    // Prefer web-style endpoint first, then fallback to legacy
+    // Primary (web): POST /api/messages/send
+    let response = await this.request<Message>("/messages/send", {
       method: "POST",
       body: JSON.stringify({
         conversationId: data.conversationId,
@@ -758,6 +968,31 @@ class ApiClient {
         replyToFromUserId: data.replyTo?.fromUserId,
       }),
     });
+
+    if (!response.success) {
+      const code = (response as any)?.error?.code || "";
+      if (code === "HTTP_404" || code === "NOT_FOUND") {
+        // Fallback (legacy mobile): POST /api/match-messages
+        response = await this.request<Message>("/match-messages", {
+          method: "POST",
+          body: JSON.stringify({
+            conversationId: data.conversationId,
+            fromUserId: data.fromUserId,
+            toUserId: data.toUserId,
+            text: data.text || "",
+            type: data.type || "text",
+            audioStorageId: data.audioStorageId,
+            duration: data.duration,
+            fileSize: data.fileSize,
+            mimeType: data.mimeType,
+            replyToMessageId: data.replyTo?.messageId,
+            replyToText: data.replyTo?.text,
+            replyToType: data.replyTo?.type,
+            replyToFromUserId: data.replyTo?.fromUserId,
+          }),
+        });
+      }
+    }
 
     // Normalize message for backward compatibility
     if (response.success && response.data) {
@@ -794,6 +1029,11 @@ class ApiClient {
     });
   }
 
+  /**
+   * Mark a conversation as read (web-first with legacy fallback)
+   * Primary (web): POST /api/messages/mark-read
+   * Fallback (legacy): POST /api/messages/read
+   */
   async markConversationAsRead(
     conversationId: string
   ): Promise<ApiResponse<void>> {
@@ -811,10 +1051,21 @@ class ApiClient {
       };
     }
 
-    return this.request("/messages/read", {
+    // Prefer web canonical endpoint; fallback to legacy
+    let res = await this.request<void>("/messages/mark-read", {
       method: "POST",
       body: JSON.stringify({ conversationId }),
     });
+    if (!res.success) {
+      const code = (res as any)?.error?.code || "";
+      if (code === "HTTP_404" || code === "NOT_FOUND") {
+        res = await this.request<void>("/messages/read", {
+          method: "POST",
+          body: JSON.stringify({ conversationId }),
+        });
+      }
+    }
+    return res as ApiResponse<void>;
   }
 
   // Delivery receipts
@@ -1394,9 +1645,27 @@ class ApiClient {
   }
 
   async getProfileDetailImages(profileId: string) {
-    const res = await this.request<any>(`/profile-detail/${profileId}/images`);
-    if (!res.success) return res as ApiResponse<any>;
-    const payload = res.data as any;
+    // Try primary endpoint
+    const primary = await this.request<any>(
+      `/profile-detail/${profileId}/images`
+    );
+    let source = primary;
+    if (!primary.success) {
+      // Fallback 1: RESTful style /profiles/:id/images
+      const fallback1 = await this.request<any>(
+        `/profiles/${profileId}/images`
+      );
+      if (fallback1.success) source = fallback1;
+      else {
+        // Fallback 2: query param
+        const fallback2 = await this.request<any>(
+          `/profile-images?userId=${encodeURIComponent(profileId)}`
+        );
+        if (fallback2.success) source = fallback2;
+      }
+    }
+    if (!source.success) return source as ApiResponse<any>;
+    const payload = source.data as any;
     let images: any[] = Array.isArray(payload)
       ? payload
       : Array.isArray(payload?.images)

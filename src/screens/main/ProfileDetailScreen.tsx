@@ -4,21 +4,22 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   Image,
-  SafeAreaView,
   Dimensions,
   ActivityIndicator,
+  Animated,
+  Easing,
 } from "react-native";
+import { LayoutAnimation, Platform, UIManager } from "react-native";
 import { useAuth } from "@contexts/AuthProvider";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient } from "@/utils/api";
 import { useInterests } from "@/hooks/useInterests";
 import { useSafety } from "@/hooks/useSafety";
 import { useTheme } from "@contexts/ThemeContext";
 import SafetyActionSheet from "@components/safety/SafetyActionSheet";
 import ReportUserModal from "@components/safety/ReportUserModal";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
 import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
@@ -30,6 +31,14 @@ import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@/providers/ToastContext";
 import ConfirmModal from "@components/ui/ConfirmModal";
 import { ProfileActions } from "@components/profile/ProfileActions";
+import AppHeader from "@/components/common/AppHeader";
+import { useSubscription } from "@/hooks/useSubscription";
+import type { SubscriptionTier } from "@/types/subscription";
+import UpgradePrompt from "@components/subscription/UpgradePrompt";
+import HintPopover from "@/components/ui/HintPopover";
+import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
+import HapticPressable from "@/components/ui/HapticPressable";
 
 const { width } = Dimensions.get("window");
 
@@ -47,7 +56,7 @@ export default function ProfileDetailScreen({
   route,
   navigation,
 }: ProfileDetailScreenProps) {
-  const { profileId, userId: paramUserId } = route.params;
+  const { profileId } = route.params;
   const { user } = useAuth();
   const currentUserId = user?.id;
   const apiClient = useApiClient();
@@ -56,6 +65,8 @@ export default function ProfileDetailScreen({
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const progressAnim = React.useRef(new Animated.Value(0)).current;
+  const [progressWidth, setProgressWidth] = useState(0);
   const [showSafetySheet, setShowSafetySheet] = useState(false);
   const [confirmBlockVisible, setConfirmBlockVisible] = useState(false);
   const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -68,33 +79,42 @@ export default function ProfileDetailScreen({
   const { status: interestStatus, loading: interestLoading } =
     useInterestStatus(profileId);
   const { data: blockStatus } = useBlockStatus(profileId);
+  // Subscription and usage for gating + hints
+  const { subscription, usage, canUseFeatureNow, trackFeatureUsage } =
+    useSubscription();
+  const [upgradeVisible, setUpgradeVisible] = useState(false);
+  const [recommendedTier, setRecommendedTier] =
+    useState<SubscriptionTier>("premium");
+  const subscriptionPlan =
+    (subscription?.plan as SubscriptionTier) ||
+    ((subscription as any)?.tier as SubscriptionTier) ||
+    ("free" as SubscriptionTier);
+
+  // Refs and layout positions for section index
+  const scrollRef = React.useRef<ScrollView | null>(null);
+  const aboutRef = React.useRef<View | null>(null);
+  const workRef = React.useRef<View | null>(null);
+  const lifestyleRef = React.useRef<View | null>(null);
+  const [sectionY, setSectionY] = useState<{
+    about?: number;
+    work?: number;
+    life?: number;
+  }>({});
+
+  const scrollTo = (y?: number) => {
+    if (!scrollRef.current || typeof y !== "number") return;
+    try {
+      scrollRef.current.scrollTo({ y, animated: true });
+    } catch {}
+  };
 
   // Define styles early so they can be used in early returns
   const styles = StyleSheet.create({
     container: {
       flex: 1,
     },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm + spacing.xs,
-      borderBottomWidth: 1,
-    },
-    backButton: {
-      padding: spacing.sm,
-    },
-    backText: {
-      fontSize: Layout.typography.fontSize.base,
-      fontWeight: "500",
-    },
-    safetyButton: {
-      padding: spacing.sm,
-    },
-    safetyText: {
-      fontSize: Layout.typography.fontSize.xl,
-      fontWeight: "bold",
+    contentStyle: {
+      flexGrow: 1,
     },
     loadingContainer: {
       flex: 1,
@@ -116,9 +136,6 @@ export default function ProfileDetailScreen({
       textAlign: "center",
       marginBottom: spacing.lg,
     },
-    scrollView: {
-      flex: 1,
-    },
     imageGallery: {
       position: "relative",
     },
@@ -127,19 +144,17 @@ export default function ProfileDetailScreen({
       height: width * 1.2,
       resizeMode: "cover",
     },
-    imageIndicators: {
-      flexDirection: "row",
-      justifyContent: "center",
+    progressTrack: {
       position: "absolute",
-      bottom: spacing.lg,
       left: 0,
       right: 0,
+      bottom: 0,
+      height: 3,
+      opacity: 0.9,
     },
-    indicator: {
-      width: spacing.sm,
-      height: spacing.sm,
-      borderRadius: spacing.xs,
-      marginHorizontal: spacing.xs,
+    progressFill: {
+      height: 3,
+      borderRadius: 2,
     },
     noImageContainer: {
       width: width,
@@ -149,6 +164,20 @@ export default function ProfileDetailScreen({
     },
     noImageText: {
       fontSize: Layout.typography.fontSize.base,
+    },
+    sectionIndexBar: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.xs,
+      paddingBottom: spacing.sm,
+    },
+    sectionIndexRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+    },
+    sectionIndexDot: {
+      marginHorizontal: spacing.xs,
+      opacity: 0.7,
     },
     profileInfo: {
       padding: spacing.md,
@@ -163,9 +192,6 @@ export default function ProfileDetailScreen({
       fontSize: Layout.typography.fontSize["2xl"] + spacing.xs,
       marginBottom: spacing.sm,
     },
-    basicDetails: {
-      gap: spacing.xs,
-    },
     detail: {
       fontSize: Layout.typography.fontSize.base,
       marginBottom: spacing.xs,
@@ -174,6 +200,15 @@ export default function ProfileDetailScreen({
       fontFamily: "Boldonse-Regular",
       fontSize: Layout.typography.fontSize.xl,
       marginBottom: spacing.sm * 1.5,
+    },
+    sectionHeaderRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: spacing.xs,
+    },
+    sectionChevron: {
+      fontSize: Layout.typography.fontSize.xl,
     },
     sectionText: {
       fontSize: Layout.typography.fontSize.base,
@@ -185,7 +220,7 @@ export default function ProfileDetailScreen({
       alignItems: "center",
       paddingVertical: spacing.sm,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
+      borderBottomColor: theme.colors.border.primary,
     },
     detailLabel: {
       fontSize: Layout.typography.fontSize.sm,
@@ -197,10 +232,26 @@ export default function ProfileDetailScreen({
       flex: 2,
       textAlign: "right",
     },
+    chipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      marginTop: spacing.sm,
+    },
+    chip: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: Layout.radius.full,
+      borderWidth: 1,
+      alignSelf: "flex-start",
+    },
+    chipText: {
+      fontSize: Layout.typography.fontSize.sm,
+    },
     actionContainer: {
       padding: spacing.md,
       borderTopWidth: 1,
-      borderTopColor: Colors.border.primary,
+      borderTopColor: theme.colors.border.primary,
     },
     interestButton: {
       paddingVertical: spacing.md,
@@ -214,12 +265,9 @@ export default function ProfileDetailScreen({
       alignItems: "center",
     },
     buttonText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: Layout.typography.fontSize.base,
       fontWeight: "600",
-    },
-    contentStyle: {
-      flexGrow: 1,
     },
   });
 
@@ -262,11 +310,31 @@ export default function ProfileDetailScreen({
   const handleSendInterest = async () => {
     if (!currentUserId || !profileId) return;
     try {
-      await sendInterest(profileId);
-      queryClient.invalidateQueries({
-        queryKey: ["interestStatus", currentUserId, profileId],
-      });
-      toast.show("Interest sent successfully!", "success");
+      // Preflight usage gating
+      try {
+        const availability = await canUseFeatureNow("interestsSent");
+        if (!availability.canUse) {
+          setRecommendedTier(
+            (availability.requiredPlan as SubscriptionTier) || "premium"
+          );
+          setUpgradeVisible(true);
+          return;
+        }
+      } catch {}
+
+      const ok = await sendInterest(profileId);
+      if (ok) {
+        try {
+          await trackFeatureUsage("interestsSent");
+        } catch {}
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        queryClient.invalidateQueries({
+          queryKey: ["interestStatus", currentUserId, profileId],
+        });
+        toast.show("Interest sent successfully!", "success");
+      } else {
+        toast.show("Failed to send interest. Please try again.", "error");
+      }
     } catch (error) {
       toast.show("Failed to send interest. Please try again.", "error");
     }
@@ -363,18 +431,7 @@ export default function ProfileDetailScreen({
         ]}
         contentStyle={styles.contentStyle}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text
-              style={[styles.backText, { color: theme.colors.primary[500] }]}
-            >
-              ← Back
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Profile" onPressBack={() => navigation.goBack()} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <Text
@@ -396,31 +453,21 @@ export default function ProfileDetailScreen({
         ]}
         contentStyle={styles.contentStyle}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text
-              style={[styles.backText, { color: theme.colors.primary[500] }]}
-            >
-              ← Back
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Profile" onPressBack={() => navigation.goBack()} />
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: theme.colors.error[500] }]}>
             Profile not found or unavailable
           </Text>
-          <TouchableOpacity
+          <HapticPressable
             onPress={() => navigation.goBack()}
             style={[
               styles.button,
               { backgroundColor: theme.colors.primary[500] },
             ]}
+            haptic="selection"
           >
             <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
+          </HapticPressable>
         </View>
       </ScreenContainer>
     );
@@ -435,33 +482,23 @@ export default function ProfileDetailScreen({
         ]}
         contentStyle={styles.contentStyle}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <Text
-              style={[styles.backText, { color: theme.colors.primary[500] }]}
-            >
-              ← Back
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <AppHeader title="Profile" onPressBack={() => navigation.goBack()} />
         <View style={styles.errorContainer}>
           <Text
             style={[styles.errorText, { color: theme.colors.text.secondary }]}
           >
             This profile is not available
           </Text>
-          <TouchableOpacity
+          <HapticPressable
             onPress={() => navigation.goBack()}
             style={[
               styles.button,
               { backgroundColor: theme.colors.primary[500] },
             ]}
+            haptic="selection"
           >
             <Text style={styles.buttonText}>Go Back</Text>
-          </TouchableOpacity>
+          </HapticPressable>
         </View>
       </ScreenContainer>
     );
@@ -470,6 +507,122 @@ export default function ProfileDetailScreen({
   const age = profile?.dateOfBirth ? calculateAge(profile.dateOfBirth) : null;
   const isOwnProfile = currentUserId === profileId;
   const hasInterest = interestStatus === "sent" || interestStatus === "matched";
+  // Derive usage for inline hint
+  const interestUsage = usage?.features?.find(
+    (x: any) => x.name === "interestsSent"
+  );
+  const interestsReached = (interestUsage?.percentageUsed ?? 0) >= 100;
+
+  // Local UI helpers: ExpandableSection & CollapsibleText
+  const ExpandableSection: React.FC<{
+    title: string;
+    initiallyOpen?: boolean;
+    children: React.ReactNode;
+  }> = ({ title, initiallyOpen = true, children }) => {
+    const [open, setOpen] = useState(initiallyOpen);
+    // Enable android layout animation
+    useEffect(() => {
+      if (
+        Platform.OS === "android" &&
+        UIManager.setLayoutAnimationEnabledExperimental
+      ) {
+        try {
+          UIManager.setLayoutAnimationEnabledExperimental(true);
+        } catch {}
+      }
+    }, []);
+    return (
+      <View
+        style={[
+          styles.section,
+          { backgroundColor: theme.colors.background.primary },
+        ]}
+      >
+        <HapticPressable
+          accessibilityRole="button"
+          accessibilityLabel={`${open ? "Collapse" : "Expand"} ${title}`}
+          onPress={() => {
+            // Smooth expand/collapse
+            LayoutAnimation.configureNext(
+              LayoutAnimation.create(
+                200,
+                LayoutAnimation.Types.easeInEaseOut,
+                LayoutAnimation.Properties.opacity
+              )
+            );
+            setOpen((v) => !v);
+          }}
+          style={styles.sectionHeaderRow}
+          haptic="selection"
+        >
+          <Text
+            style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+          >
+            {title}
+          </Text>
+          <Text
+            style={[
+              styles.sectionChevron,
+              { color: theme.colors.text.secondary },
+            ]}
+          >
+            {open ? "▾" : "▸"}
+          </Text>
+        </HapticPressable>
+        {open ? <View>{children}</View> : null}
+      </View>
+    );
+  };
+
+  const CollapsibleText: React.FC<{
+    text: string;
+    numberOfLines?: number;
+  }> = ({ text, numberOfLines = 3 }) => {
+    const [expanded, setExpanded] = useState(false);
+    const [showFade, setShowFade] = useState(false);
+    return (
+      <View style={{ position: "relative" }}>
+        <Text
+          style={[styles.sectionText, { color: theme.colors.text.secondary }]}
+          numberOfLines={expanded ? undefined : numberOfLines}
+          onTextLayout={(e) => {
+            const lines = e.nativeEvent.lines?.length ?? 0;
+            setShowFade(!expanded && lines > numberOfLines);
+          }}
+        >
+          {text}
+        </Text>
+        {!expanded && showFade ? (
+          <LinearGradient
+            pointerEvents="none"
+            colors={["rgba(0,0,0,0)", theme.colors.background.primary]}
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: spacing.lg * 1.2,
+            }}
+          />
+        ) : null}
+        {text && text.length > 0 ? (
+          <HapticPressable
+            onPress={() => setExpanded((v) => !v)}
+            style={{ marginTop: spacing.xs }}
+            accessibilityRole="button"
+            accessibilityLabel={expanded ? "Show less" : "Read more"}
+            haptic="selection"
+          >
+            <Text
+              style={{ color: theme.colors.primary[600], fontWeight: "600" }}
+            >
+              {expanded ? "Show less" : "Read more"}
+            </Text>
+          </HapticPressable>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <ScreenContainer
@@ -480,38 +633,31 @@ export default function ProfileDetailScreen({
       contentStyle={styles.contentStyle}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { borderBottomColor: theme.colors.border.primary },
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={[styles.backText, { color: theme.colors.primary[500] }]}>
-            ← Back
-          </Text>
-        </TouchableOpacity>
-
-        {!isOwnProfile && (
-          <TouchableOpacity
-            onPress={() => setShowSafetySheet(true)}
-            style={styles.safetyButton}
-          >
-            <Text
-              style={[
-                styles.safetyText,
-                { color: theme.colors.text.secondary },
-              ]}
+      <AppHeader
+        title={profile?.fullName || "Profile"}
+        onPressBack={() => navigation.goBack()}
+        rightActions={
+          !isOwnProfile ? (
+            <HapticPressable
+              accessibilityRole="button"
+              accessibilityLabel="Safety actions"
+              onPress={() => setShowSafetySheet(true)}
+              style={{ padding: spacing.sm }}
+              haptic="selection"
             >
-              ⋯
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+              <Text
+                style={{
+                  fontSize: Layout.typography.fontSize.xl,
+                  fontWeight: "bold",
+                  color: theme.colors.text.secondary,
+                }}
+              >
+                ⋯
+              </Text>
+            </HapticPressable>
+          ) : undefined
+        }
+      />
 
       <View>
         {/* Image Gallery */}
@@ -526,6 +672,15 @@ export default function ProfileDetailScreen({
                   event.nativeEvent.contentOffset.x / width
                 );
                 setCurrentImageIndex(newIndex);
+                try {
+                  const to = (newIndex + 1) / Math.max(profileImages.length, 1);
+                  Animated.timing(progressAnim, {
+                    toValue: to,
+                    duration: 220,
+                    easing: Easing.out(Easing.quad),
+                    useNativeDriver: false,
+                  }).start();
+                } catch {}
               }}
             >
               {profileImages.map((image: any, index: number) => {
@@ -541,24 +696,29 @@ export default function ProfileDetailScreen({
               })}
             </ScrollView>
 
-            {profileImages.length > 1 && (
-              <View style={styles.imageIndicators}>
-                {profileImages.map((_: any, index: number) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.indicator,
-                      {
-                        backgroundColor:
-                          index === currentImageIndex
-                            ? theme.colors.primary[500]
-                            : theme.colors.neutral[300],
-                      },
-                    ]}
-                  />
-                ))}
+            {/* Slim progress bar instead of dots */}
+            {profileImages.length > 1 ? (
+              <View
+                style={[
+                  styles.progressTrack,
+                  { backgroundColor: theme.colors.neutral[300] },
+                ]}
+                onLayout={(e) => setProgressWidth(e.nativeEvent.layout.width)}
+              >
+                <Animated.View
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: Animated.multiply(
+                        progressAnim,
+                        progressWidth || 1
+                      ),
+                      backgroundColor: theme.colors.primary[500],
+                    },
+                  ]}
+                />
               </View>
-            )}
+            ) : null}
           </View>
         ) : (
           <View
@@ -578,8 +738,69 @@ export default function ProfileDetailScreen({
           </View>
         )}
 
+        {/* Section index bar */}
+        <View
+          style={[
+            styles.sectionIndexBar,
+            { backgroundColor: theme.colors.background.primary },
+          ]}
+        >
+          <View style={styles.sectionIndexRow}>
+            <HapticPressable
+              onPress={() => scrollTo(sectionY.about)}
+              haptic="selection"
+            >
+              <Text
+                style={{ color: theme.colors.primary[700], fontWeight: "600" }}
+              >
+                About
+              </Text>
+            </HapticPressable>
+            <Text
+              style={[
+                styles.sectionIndexDot,
+                { color: theme.colors.text.tertiary },
+              ]}
+            >
+              •
+            </Text>
+            <HapticPressable
+              onPress={() => scrollTo(sectionY.work)}
+              haptic="selection"
+            >
+              <Text
+                style={{ color: theme.colors.primary[700], fontWeight: "600" }}
+              >
+                Work
+              </Text>
+            </HapticPressable>
+            <Text
+              style={[
+                styles.sectionIndexDot,
+                { color: theme.colors.text.tertiary },
+              ]}
+            >
+              •
+            </Text>
+            <HapticPressable
+              onPress={() => scrollTo(sectionY.life)}
+              haptic="selection"
+            >
+              <Text
+                style={{ color: theme.colors.primary[700], fontWeight: "600" }}
+              >
+                Lifestyle
+              </Text>
+            </HapticPressable>
+          </View>
+        </View>
+
         {/* Profile Information */}
-        <View style={styles.profileInfo}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.profileInfo}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Basic Info */}
           <View
             style={[
@@ -590,254 +811,259 @@ export default function ProfileDetailScreen({
             <Text style={[styles.name, { color: theme.colors.text.primary }]}>
               {profile?.fullName}
             </Text>
-
-            <View style={styles.basicDetails}>
-              {age && (
-                <Text
+            <View style={styles.chipsRow}>
+              {age ? (
+                <View
                   style={[
-                    styles.detail,
-                    { color: theme.colors.text.secondary },
+                    styles.chip,
+                    { borderColor: theme.colors.border.primary },
                   ]}
                 >
-                  {age} years old
-                </Text>
-              )}
-              {profile?.city && (
-                <Text
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    🎂 {age}
+                  </Text>
+                </View>
+              ) : null}
+              {profile?.city ? (
+                <View
                   style={[
-                    styles.detail,
-                    { color: theme.colors.text.secondary },
+                    styles.chip,
+                    { borderColor: theme.colors.border.primary },
                   ]}
                 >
-                  📍 {profile.city}
-                </Text>
-              )}
-              {profile?.height && (
-                <Text
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    📍 {profile.city}
+                  </Text>
+                </View>
+              ) : null}
+              {profile?.height ? (
+                <View
                   style={[
-                    styles.detail,
-                    { color: theme.colors.text.secondary },
+                    styles.chip,
+                    { borderColor: theme.colors.border.primary },
                   ]}
                 >
-                  📏{" "}
-                  {typeof profile.height === "string"
-                    ? profile.height
-                    : formatHeight(Number(profile.height))}
-                </Text>
-              )}
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: theme.colors.text.primary },
+                    ]}
+                  >
+                    📏{" "}
+                    {typeof profile.height === "string"
+                      ? profile.height
+                      : formatHeight(Number(profile.height))}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
           {/* About Me */}
-          {profile.aboutMe && (
+          {profile.aboutMe ? (
             <View
-              style={[
-                styles.section,
-                { backgroundColor: theme.colors.background.primary },
-              ]}
+              ref={aboutRef as any}
+              onLayout={(e) =>
+                setSectionY((s) => ({
+                  ...s,
+                  about: e.nativeEvent.layout.y - 12,
+                }))
+              }
             >
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.colors.text.primary },
-                ]}
-              >
-                About Me
-              </Text>
-              <Text
-                style={[
-                  styles.sectionText,
-                  { color: theme.colors.text.secondary },
-                ]}
-              >
-                {profile.aboutMe}
-              </Text>
+              <ExpandableSection title="About Me" initiallyOpen={true}>
+                <CollapsibleText text={profile.aboutMe} numberOfLines={4} />
+              </ExpandableSection>
             </View>
-          )}
+          ) : null}
 
           {/* Professional Details */}
-          {(profile.occupation ||
-            profile.education ||
-            profile.annualIncome) && (
+          {profile.occupation || profile.education || profile.annualIncome ? (
             <View
-              style={[
-                styles.section,
-                { backgroundColor: theme.colors.background.primary },
-              ]}
+              ref={workRef as any}
+              onLayout={(e) =>
+                setSectionY((s) => ({
+                  ...s,
+                  work: e.nativeEvent.layout.y - 12,
+                }))
+              }
             >
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.colors.text.primary },
-                ]}
+              <ExpandableSection
+                title="Professional Details"
+                initiallyOpen={false}
               >
-                Professional Details
-              </Text>
-              {profile.occupation && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Occupation:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.occupation}
-                  </Text>
-                </View>
-              )}
-              {profile.education && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Education:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.education}
-                  </Text>
-                </View>
-              )}
-              {profile.annualIncome && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Annual Income:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    £{profile.annualIncome.toLocaleString()}
-                  </Text>
-                </View>
-              )}
+                {profile.occupation && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Occupation:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.occupation}
+                    </Text>
+                  </View>
+                )}
+                {profile.education && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Education:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.education}
+                    </Text>
+                  </View>
+                )}
+                {profile.annualIncome && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Annual Income:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      £{profile.annualIncome.toLocaleString()}
+                    </Text>
+                  </View>
+                )}
+              </ExpandableSection>
             </View>
-          )}
+          ) : null}
 
           {/* Lifestyle */}
-          {(profile.diet ||
-            profile.smoking ||
-            profile.drinking ||
-            profile.physicalStatus) && (
+          {profile.diet ||
+          profile.smoking ||
+          profile.drinking ||
+          profile.physicalStatus ? (
             <View
-              style={[
-                styles.section,
-                { backgroundColor: theme.colors.background.primary },
-              ]}
+              ref={lifestyleRef as any}
+              onLayout={(e) =>
+                setSectionY((s) => ({
+                  ...s,
+                  life: e.nativeEvent.layout.y - 12,
+                }))
+              }
             >
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: theme.colors.text.primary },
-                ]}
-              >
-                Lifestyle
-              </Text>
-              {profile.diet && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Diet:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.diet}
-                  </Text>
-                </View>
-              )}
-              {profile.smoking && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Smoking:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.smoking}
-                  </Text>
-                </View>
-              )}
-              {profile.drinking && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Drinking:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.drinking}
-                  </Text>
-                </View>
-              )}
-              {profile.physicalStatus && (
-                <View style={styles.detailRow}>
-                  <Text
-                    style={[
-                      styles.detailLabel,
-                      { color: theme.colors.text.secondary },
-                    ]}
-                  >
-                    Physical Status:
-                  </Text>
-                  <Text
-                    style={[
-                      styles.detailValue,
-                      { color: theme.colors.text.primary },
-                    ]}
-                  >
-                    {profile.physicalStatus}
-                  </Text>
-                </View>
-              )}
+              <ExpandableSection title="Lifestyle" initiallyOpen={false}>
+                {profile.diet && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Diet:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.diet}
+                    </Text>
+                  </View>
+                )}
+                {profile.smoking && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Smoking:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.smoking}
+                    </Text>
+                  </View>
+                )}
+                {profile.drinking && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Drinking:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.drinking}
+                    </Text>
+                  </View>
+                )}
+                {profile.physicalStatus && (
+                  <View style={styles.detailRow}>
+                    <Text
+                      style={[
+                        styles.detailLabel,
+                        { color: theme.colors.text.secondary },
+                      ]}
+                    >
+                      Physical Status:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.detailValue,
+                        { color: theme.colors.text.primary },
+                      ]}
+                    >
+                      {profile.physicalStatus}
+                    </Text>
+                  </View>
+                )}
+              </ExpandableSection>
             </View>
-          )}
-        </View>
+          ) : null}
+        </ScrollView>
       </View>
 
       {/* Action Buttons */}
@@ -848,7 +1074,7 @@ export default function ProfileDetailScreen({
             { backgroundColor: theme.colors.background.primary },
           ]}
         >
-          <TouchableOpacity
+          <HapticPressable
             onPress={hasInterest ? handleRemoveInterest : handleSendInterest}
             disabled={interestLoading}
             style={[
@@ -859,15 +1085,35 @@ export default function ProfileDetailScreen({
                   : theme.colors.primary[500],
               },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              hasInterest ? "Remove interest" : "Send interest"
+            }
+            haptic={hasInterest ? "medium" : "light"}
           >
             {interestLoading ? (
-              <ActivityIndicator size="small" color={Colors.text.inverse} />
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.text.inverse}
+              />
             ) : (
               <Text style={styles.buttonText}>
                 {hasInterest ? "💔 Remove Interest" : "💖 Send Interest"}
               </Text>
             )}
-          </TouchableOpacity>
+          </HapticPressable>
+
+          {/* Inline hint when interest sending is gated */}
+          {!hasInterest && interestsReached ? (
+            <View style={{ marginTop: spacing.sm }}>
+              <HintPopover
+                label="Why?"
+                hint={
+                  "You've reached this month's free interest limit. Upgrade to continue sending interests."
+                }
+              />
+            </View>
+          ) : null}
 
           {/* Shortlist Actions */}
           <ProfileActions
@@ -903,6 +1149,32 @@ export default function ProfileDetailScreen({
         destructive
         onConfirm={confirmBlock}
         onCancel={cancelBlock}
+      />
+
+      {/* Upgrade prompt for gated actions */}
+      <UpgradePrompt
+        visible={upgradeVisible}
+        onClose={() => setUpgradeVisible(false)}
+        onUpgrade={(tier) => {
+          setUpgradeVisible(false);
+          navigation.navigate("Subscription", {
+            screen: "Subscription",
+            params: { tier },
+          } as any);
+        }}
+        currentTier={subscriptionPlan}
+        recommendedTier={recommendedTier}
+        title={
+          recommendedTier === "premiumPlus"
+            ? "Premium Plus required"
+            : "Upgrade required"
+        }
+        message={
+          recommendedTier === "premiumPlus"
+            ? "This feature is part of Premium Plus. Upgrade to unlock it."
+            : "Upgrade to Premium to continue sending interests and unlock more features."
+        }
+        feature="Interests"
       />
     </ScreenContainer>
   );

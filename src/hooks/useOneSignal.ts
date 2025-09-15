@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Platform } from "react-native";
 import { OneSignal } from "react-native-onesignal";
 import { logger } from "@utils/logger";
+import { NotificationHandler } from "@utils/notificationHandler";
 import { useAuth } from "@contexts/AuthProvider";
 import { useApiClient } from "@utils/api";
 import {
@@ -133,6 +134,22 @@ export const useOneSignal = (): UseOneSignalReturn => {
       logger.debug("ONESIGNAL", "Processing foreground notification", {
         title: notification.title || "",
       });
+
+      // Forward to NotificationHandler for badge updates or side effects
+      try {
+        const additionalData = notification.additionalData || {};
+        const mapped = mapAdditionalDataToNotificationData(
+          additionalData,
+          notification.title,
+          notification.body
+        );
+        if (mapped) {
+          // Do not navigate on foreground receive; just allow handler to update badge if needed
+          // Navigation occurs on click handler below
+        }
+      } catch (e) {
+        logger.warn("ONESIGNAL", "Foreground mapping failed", e as any);
+      }
     },
     []
   );
@@ -150,6 +167,17 @@ export const useOneSignal = (): UseOneSignalReturn => {
         if (navigationData?.screen) {
           // Handle deep linking based on notification type
           handleNotificationNavigation(navigationData);
+        }
+
+        // Also forward generic payloads to NotificationHandler for centralized navigation
+        const additionalData = notification.additionalData || {};
+        const mapped = mapAdditionalDataToNotificationData(
+          additionalData,
+          notification.title,
+          notification.body
+        );
+        if (mapped) {
+          NotificationHandler.handleDeepLink(mapped as any);
         }
 
         logger.debug("ONESIGNAL", "Notification opened", {
@@ -382,3 +410,72 @@ export const useOneSignal = (): UseOneSignalReturn => {
     removeTags,
   };
 };
+
+// Helpers
+function mapAdditionalDataToNotificationData(
+  additionalData: Record<string, any>,
+  title?: string,
+  body?: string
+) {
+  // Prefer explicit navigationData if provided
+  const nav = additionalData?.navigationData as
+    | NotificationNavigationData
+    | undefined;
+  if (nav?.screen) {
+    return {
+      type: inferTypeFromScreen(nav.screen),
+      title: title || "",
+      body: body || "",
+      data: nav.params || {},
+      conversationId: (nav.params || {}).conversationId,
+      profileId: (nav.params || {}).profileId,
+      matchId: (nav.params || {}).matchId,
+    };
+  }
+
+  // Map common web notification types to mobile handler types
+  const webType = String(additionalData?.type || "");
+  const mappedType = mapWebTypeToMobileType(webType);
+  if (mappedType) {
+    return {
+      type: mappedType,
+      title: title || "",
+      body: body || "",
+      data: additionalData,
+      conversationId: additionalData?.conversationId,
+      profileId: additionalData?.profileId || additionalData?.userId,
+      matchId: additionalData?.matchId,
+    };
+  }
+  return null;
+}
+
+function mapWebTypeToMobileType(
+  webType: string
+): "message" | "match" | "interest" | "system" | "subscription" | undefined {
+  switch (webType) {
+    case "new_message":
+      return "message";
+    case "new_match":
+      return "match";
+    case "new_interest":
+      return "interest";
+    case "subscription_update":
+      return "subscription";
+    case "system_notification":
+      return "system";
+    default:
+      return undefined;
+  }
+}
+
+function inferTypeFromScreen(
+  screen: string
+): "message" | "match" | "interest" | "system" | "subscription" {
+  const s = (screen || "").toLowerCase();
+  if (s.includes("chat") || s.includes("message")) return "message";
+  if (s.includes("match")) return "match";
+  if (s.includes("profile")) return "interest";
+  if (s.includes("settings") || s.includes("system")) return "system";
+  return "system";
+}

@@ -1,5 +1,4 @@
 import { rgbaHex } from "@utils/color";
-import { Colors } from "../../constants";
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -13,6 +12,7 @@ import { VoiceMessageManager } from "../../services/voiceMessageManager";
 import { useApiClient } from "@utils/api";
 import { MessagingAPI } from "../../types/messaging";
 import { formatTime } from "@utils/timeUtils";
+import { useTheme } from "@contexts/ThemeContext";
 
 // Adapter to make ApiClient compatible with MessagingAPI
 class ApiClientAdapter implements MessagingAPI {
@@ -111,6 +111,7 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
   onError,
   style,
 }) => {
+  const { theme } = useTheme();
   const apiClient = useApiClient();
   const [voiceManager] = useState(
     () => new VoiceMessageManager(new ApiClientAdapter(apiClient))
@@ -169,11 +170,18 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
 
   // Get text color based on ownership
   const getTextColor = () => {
-    return isOwn ? Colors.text.inverse : Colors.text.primary;
+    return isOwn ? theme.colors.text.inverse : theme.colors.text.primary;
   };
 
   return (
-    <View style={getBubbleStyle()}>
+    <View
+      style={[
+        getBubbleStyle(),
+        isOwn
+          ? { backgroundColor: theme.colors.primary[500] }
+          : { backgroundColor: theme.colors.background.secondary },
+      ]}
+    >
       {/* Voice Player */}
       <View style={styles.playerContainer}>
         {isDownloading ? (
@@ -190,7 +198,10 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
             </Text>
             <TouchableOpacity
               onPress={() => fetchVoiceUrl(storageId)}
-              style={styles.retryButton}
+              style={[
+                styles.retryButton,
+                { backgroundColor: rgbaHex(theme.colors.text.inverse, 0.2) },
+              ]}
             >
               <Text style={[styles.retryText, { color: getTextColor() }]}>
                 Retry
@@ -209,8 +220,8 @@ export const VoiceMessageBubble: React.FC<VoiceMessageBubbleProps> = ({
               styles.voicePlayer,
               {
                 backgroundColor: isOwn
-                  ? rgbaHex(Colors.text.inverse, 0.1)
-                  : Colors.background.secondary,
+                  ? rgbaHex(theme.colors.text.inverse, 0.1)
+                  : theme.colors.background.secondary,
               },
             ]}
           />
@@ -261,12 +272,12 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   ownBubble: {
-    backgroundColor: Colors.primary[500],
+    // background color applied inline via theme in container style
     alignSelf: "flex-end",
     borderBottomRightRadius: 4,
   },
   otherBubble: {
-    backgroundColor: Colors.background.secondary,
+    // background color applied inline via theme in container style
     alignSelf: "flex-start",
     borderBottomLeftRadius: 4,
   },
@@ -298,7 +309,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
-    backgroundColor: rgbaHex(Colors.text.inverse, 0.2),
+    // color applied inline when rendering using theme
   },
   retryText: {
     fontSize: 12,

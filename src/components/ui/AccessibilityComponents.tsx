@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 // Accessibility utilities
 export const AccessibilityUtils = {
@@ -40,32 +40,35 @@ export const AccessibilityUtils = {
   },
 
   // Get accessibility roles for different components
-  getRoleForComponent: (type: 'button' | 'link' | 'header' | 'text' | 'image' | 'list'): AccessibilityRole => {
+  getRoleForComponent: (
+    type: "button" | "link" | "header" | "text" | "image" | "list"
+  ): AccessibilityRole => {
     const roleMap: Record<string, AccessibilityRole> = {
-      button: 'button',
-      link: 'link',
-      header: 'header',
-      text: 'text',
-      image: 'image',
-      list: 'list',
+      button: "button",
+      link: "link",
+      header: "header",
+      text: "text",
+      image: "image",
+      list: "list",
     };
-    return roleMap[type] || 'none';
+    return roleMap[type] || "none";
   },
 
   // Generate accessibility hints
   generateHint: (action: string, context?: string): string => {
     const hints = {
-      tap: 'Double tap to activate',
-      swipe: 'Swipe left or right to navigate',
-      scroll: 'Scroll to see more content',
-      edit: 'Double tap to edit',
-      delete: 'Double tap to delete',
-      like: 'Double tap to like',
-      match: 'Double tap to match',
-      message: 'Double tap to send message',
+      tap: "Double tap to activate",
+      swipe: "Swipe left or right to navigate",
+      scroll: "Scroll to see more content",
+      edit: "Double tap to edit",
+      delete: "Double tap to delete",
+      like: "Double tap to like",
+      match: "Double tap to match",
+      message: "Double tap to send message",
     };
-    
-    const baseHint = hints[action as keyof typeof hints] || 'Double tap to activate';
+
+    const baseHint =
+      hints[action as keyof typeof hints] || "Double tap to activate";
     return context ? `${baseHint}. ${context}` : baseHint;
   },
 };
@@ -91,7 +94,7 @@ export const AccessibleTouchable: React.FC<AccessibleTouchableProps> = ({
   onPress,
   accessibilityLabel,
   accessibilityHint,
-  accessibilityRole = 'button',
+  accessibilityRole = "button",
   accessibilityState,
   accessibilityValue,
   disabled = false,
@@ -145,7 +148,7 @@ interface AccessibleTextProps {
 
 export const AccessibleText: React.FC<AccessibleTextProps> = ({
   children,
-  accessibilityRole = 'text',
+  accessibilityRole = "text",
   accessibilityLevel,
   style,
   testID,
@@ -175,6 +178,7 @@ export const SkipLink: React.FC<SkipLinkProps> = ({
   label,
   style,
 }) => {
+  const { theme } = useTheme();
   const handleSkip = () => {
     AccessibilityUtils.focusOn(targetRef);
     AccessibilityUtils.announce(`Skipped to ${label}`);
@@ -189,13 +193,15 @@ export const SkipLink: React.FC<SkipLinkProps> = ({
         position: "absolute",
         top: -1000,
         left: 0,
-        backgroundColor: Colors.neutral[900],
+        backgroundColor: theme.colors.neutral[900],
         padding: 8,
         zIndex: 9999,
         ...style,
       }}
     >
-      <Text style={{ color: Colors.background.primary }}>Skip to {label}</Text>
+      <Text style={{ color: theme.colors.background.primary }}>
+        Skip to {label}
+      </Text>
     </AccessibleTouchable>
   );
 };
@@ -278,11 +284,13 @@ export const AccessibleIconButton: React.FC<AccessibleIconButtonProps> = ({
   accessibilityLabel,
   accessibilityHint,
   size = 24,
-  color = Colors.text.primary,
+  color,
   disabled = false,
   style,
   hapticFeedback = true,
 }) => {
+  const { theme } = useTheme();
+  const iconColor = color || theme.colors.text.primary;
   return (
     <AccessibleTouchable
       onPress={onPress}
@@ -304,7 +312,7 @@ export const AccessibleIconButton: React.FC<AccessibleIconButtonProps> = ({
       <Ionicons
         name={iconName}
         size={size}
-        color={disabled ? Colors.neutral[300] : color}
+        color={disabled ? theme.colors.neutral[300] : iconColor}
       />
     </AccessibleTouchable>
   );
@@ -324,8 +332,9 @@ export const AccessibleProgress: React.FC<AccessibleProgressProps> = ({
   style,
   showPercentage = true,
 }) => {
+  const { theme } = useTheme();
   const percentage = Math.round(progress * 100);
-  
+
   return (
     <View
       style={style}
@@ -342,7 +351,7 @@ export const AccessibleProgress: React.FC<AccessibleProgressProps> = ({
       <View
         style={{
           height: 8,
-          backgroundColor: Colors.neutral[200],
+          backgroundColor: theme.colors.neutral[200],
           borderRadius: 4,
           overflow: "hidden",
         }}
@@ -351,14 +360,18 @@ export const AccessibleProgress: React.FC<AccessibleProgressProps> = ({
           style={{
             height: "100%",
             width: `${percentage}%`,
-            backgroundColor: Colors.info[500],
+            backgroundColor: theme.colors.info[500],
             borderRadius: 4,
           }}
         />
       </View>
       {showPercentage && (
         <AccessibleText
-          style={{ marginTop: 4, fontSize: 12, color: Colors.text.secondary }}
+          style={{
+            marginTop: 4,
+            fontSize: 12,
+            color: theme.colors.text.secondary,
+          }}
         >
           {percentage}%
         </AccessibleText>
@@ -385,6 +398,7 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
   style,
   disabled = false,
 }) => {
+  const { theme } = useTheme();
   if (onPress) {
     return (
       <AccessibleTouchable
@@ -394,10 +408,10 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
         accessibilityRole="button"
         disabled={disabled}
         style={{
-          backgroundColor: Colors.background.primary,
+          backgroundColor: theme.colors.background.primary,
           borderRadius: 12,
           padding: 16,
-          shadowColor: Colors.neutral[900],
+          shadowColor: theme.colors.neutral[900],
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,
@@ -414,10 +428,10 @@ export const AccessibleCard: React.FC<AccessibleCardProps> = ({
     <View
       style={[
         {
-          backgroundColor: Colors.background.primary,
+          backgroundColor: theme.colors.background.primary,
           borderRadius: 12,
           padding: 16,
-          shadowColor: Colors.neutral[900],
+          shadowColor: theme.colors.neutral[900],
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: 4,

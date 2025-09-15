@@ -1,6 +1,104 @@
 import { Alert, Platform } from "react-native";
 import { Toast } from "@providers/ToastContext";
 
+// Central error shape used across the app
+export type NormalizedError = {
+  code?: string;
+  status?: number;
+  message: string;
+  details?: any;
+  isNetwork?: boolean;
+  isAuth?: boolean;
+  retriable?: boolean;
+};
+
+// Simple in-memory throttle to prevent duplicate error toasts spam
+let lastToastKey: string | null = null;
+let lastToastAt = 0;
+const TOAST_DEDUP_WINDOW_MS = 1500;
+
+function shouldSuppressToast(key: string): boolean {
+  const now = Date.now();
+  if (lastToastKey === key && now - lastToastAt < TOAST_DEDUP_WINDOW_MS) {
+    return true;
+  }
+  lastToastKey = key;
+  lastToastAt = now;
+  return false;
+}
+
+/**
+ * Normalize various error shapes (fetch/ApiResponse/Axios/strings) into a consistent object
+ */
+export function normalizeError(err: any, fallbackMessage = "An error occurred"): NormalizedError {
+  // Already normalized
+  if (err && typeof err === "object" && "message" in err && ("isNetwork" in err || "isAuth" in err || "retriable" in err)) {
+    return err as NormalizedError;
+  }
+
+  // ApiResponse style: { success: false, error: { code, message, details } }
+  if (err && typeof err === "object" && "success" in err && err.success === false && (err as any).error) {
+    const e = (err as any).error || {};
+    const code = e.code ?? undefined;
+    const status = typeof e.status === "number" ? e.status : undefined;
+    const message = e.message || fallbackMessage;
+    return {
+      code,
+      status,
+      message,
+      details: e.details,
+      isNetwork: code === "NETWORK_ERROR" || /network|timeout/i.test(String(message)),
+      isAuth: code === "UNAUTHORIZED" || status === 401,
+      retriable: !status || (status >= 500 || status === 429),
+    };
+  }
+
+  // Axios-like error
+  const axiosMessage = err?.response?.data?.error?.message || err?.response?.data?.message;
+  const axiosCode = err?.response?.data?.error?.code || err?.code;
+  const axiosStatus = err?.response?.status ?? err?.status;
+  if (axiosMessage || axiosStatus) {
+    const msg = axiosMessage || err?.message || fallbackMessage;
+    return {
+      code: axiosCode,
+      status: typeof axiosStatus === "number" ? axiosStatus : undefined,
+      message: msg,
+      details: err?.response?.data?.error?.details || err?.response?.data?.details,
+      isNetwork:
+        axiosCode === "ECONNABORTED" || axiosCode === "NETWORK_ERROR" || /network|timeout/i.test(String(msg)),
+      isAuth: axiosStatus === 401,
+      retriable: !axiosStatus || axiosStatus >= 500 || axiosStatus === 429,
+    };
+  }
+
+  // Fetch Response error-like
+  if (err && typeof err === "object" && "ok" in err && "status" in err) {
+    const status = (err as any).status as number;
+    return {
+      status,
+      message: `HTTP ${status}`,
+      isAuth: status === 401,
+      retriable: status >= 500 || status === 429,
+    };
+  }
+
+  // Plain Error
+  if (err instanceof Error) {
+    const msg = err.message || fallbackMessage;
+    return {
+      message: msg,
+      isNetwork: /network|timeout|fetch/i.test(msg),
+      retriable: /network|timeout/i.test(msg),
+    };
+  }
+
+  // String or unknown
+  if (typeof err === "string") {
+    return { message: err };
+  }
+  return { message: fallbackMessage };
+}
+
 export interface ToastConfig {
   type: "success" | "error" | "info" | "warning";
   title?: string;
@@ -35,7 +133,9 @@ export function showErrorToast(
     return;
   }
   // Use centralized error humanization + dedupe
-  Toast.error(combined, undefined, duration);
+  if (!shouldSuppressToast(`error:${combined}`)) {
+    Toast.error(combined, undefined, duration);
+  }
 }
 
 export function showInfoToast(
@@ -48,7 +148,9 @@ export function showInfoToast(
     Alert.alert(title || "Info", message);
     return;
   }
-  Toast.info(combined, duration);
+  if (!shouldSuppressToast(`info:${combined}`)) {
+    Toast.info(combined, duration);
+  }
 }
 
 export function showWarningToast(
@@ -61,7 +163,9 @@ export function showWarningToast(
     Alert.alert(title || "Warning", message);
     return;
   }
-  Toast.warning(combined, duration);
+  if (!shouldSuppressToast(`warning:${combined}`)) {
+    Toast.warning(combined, duration);
+  }
 }
 
 export function showCustomToast(config: ToastConfig) {
@@ -72,14 +176,16 @@ export function showCustomToast(config: ToastConfig) {
   const text = config.title
     ? `${config.title}: ${config.message}`
     : config.message;
-  Toast.show(text, {
-    type: config.type,
-    durationMs: config.duration ?? 3000,
-    position: config.position ?? "top",
-    action: config.onPress
-      ? { label: "Open", onPress: config.onPress }
-      : undefined,
-  });
+  if (!shouldSuppressToast(`${config.type}:${text}`)) {
+    Toast.show(text, {
+      type: config.type,
+      durationMs: config.duration ?? 3000,
+      position: config.position ?? "top",
+      action: config.onPress
+        ? { label: "Open", onPress: config.onPress }
+        : undefined,
+    });
+  }
 }
 
 export function hideToast() {
@@ -108,17 +214,13 @@ export function handleApiError(
   error: any,
   defaultMessage = "An error occurred"
 ) {
-  let message = defaultMessage;
+  const normalized = normalizeError(error, defaultMessage);
+  showErrorToast(normalized.message);
+}
 
-  if (error?.response?.data?.error?.message) {
-    message = error.response.data.error.message;
-  } else if (error?.message) {
-    message = error.message;
-  } else if (typeof error === "string") {
-    message = error;
-  }
-
-  showErrorToast(message);
+// Alias for convenience/semantics
+export function showApiError(error: any, defaultMessage = "An error occurred") {
+  return handleApiError(error, defaultMessage);
 }
 
 export function handleValidationErrors(errors: Record<string, string>) {
@@ -130,7 +232,8 @@ export function handleValidationErrors(errors: Record<string, string>) {
 
 // Network error handling
 export function handleNetworkError(error: any) {
-  if (error?.code === "NETWORK_ERROR" || error?.message?.includes("Network")) {
+  const n = normalizeError(error);
+  if (n.isNetwork) {
     showErrorToast(
       "Please check your internet connection and try again",
       "Network Error"
@@ -142,7 +245,8 @@ export function handleNetworkError(error: any) {
 
 // Authentication error handling
 export function handleAuthError(error: any) {
-  if (error?.code === "TOKEN_EXPIRED" || error?.status === 401) {
+  const n = normalizeError(error);
+  if (n.isAuth || error?.code === "TOKEN_EXPIRED" || error?.status === 401) {
     showErrorToast(
       "Your session has expired. Please login again",
       "Session Expired"

@@ -8,7 +8,11 @@ import {
   RealtimeEventHandlers,
 } from "../../services/RealtimeMessagingService";
 import { useAuth } from "@contexts/AuthProvider";
-import { WEBSOCKET_CONFIG } from "@utils/websocketConfig";
+import {
+  WEBSOCKET_CONFIG,
+  validateWebSocketConnection,
+} from "@utils/websocketConfig";
+import { API_BASE_URL } from "@utils/api";
 
 interface UseRealtimeMessagingOptions {
   autoConnect?: boolean;
@@ -38,16 +42,57 @@ export function useRealtimeMessaging(
   const typingTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
-  // WebSocket URL - using Vercel-compatible configuration
-  const wsUrl = process.env.EXPO_PUBLIC_WS_URL || WEBSOCKET_CONFIG.getUrl();
-
-  // Initialize service
-  useEffect(() => {
-    if (!serviceRef.current) {
-      serviceRef.current = new RealtimeMessagingService(wsUrl);
+  // Derive WebSocket URL: prefer explicit env, else derive from API_BASE_URL, else config
+  const deriveWsFromApi = useCallback(() => {
+    try {
+      if (!API_BASE_URL) return WEBSOCKET_CONFIG.getUrl();
+      const u = new URL(API_BASE_URL);
+      const wsProtocol = u.protocol === "https:" ? "wss:" : "ws:";
+      return `${wsProtocol}//${u.host}/api/websocket`;
+    } catch {
+      return WEBSOCKET_CONFIG.getUrl();
     }
+  }, []);
+
+  const wsUrl = (process.env.EXPO_PUBLIC_WS_URL as string) || deriveWsFromApi();
+
+  const [wsAvailable, setWsAvailable] = useState<boolean | null>(null);
+
+  // Pre-flight validate WS once and initialize service
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Quick pre-flight check to avoid noisy reconnect loops when endpoint is unavailable
+        const ok = await validateWebSocketConnection(`${wsUrl}?userId=ping`);
+        if (cancelled) return;
+        setWsAvailable(ok);
+        if (!ok) {
+          console.warn(
+            "Realtime WS unavailable at",
+            wsUrl,
+            "– disabling realtime messaging."
+          );
+          // Ensure any previous service is disconnected
+          if (serviceRef.current) {
+            serviceRef.current.disconnect();
+            serviceRef.current = null;
+          }
+          return;
+        }
+
+        if (!serviceRef.current) {
+          serviceRef.current = new RealtimeMessagingService(wsUrl);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setWsAvailable(false);
+        console.warn("Realtime WS validation failed:", e);
+      }
+    })();
 
     return () => {
+      cancelled = true;
       if (serviceRef.current) {
         serviceRef.current.disconnect();
         serviceRef.current = null;
@@ -82,6 +127,8 @@ export function useRealtimeMessaging(
 
   // Auto-connect when user is available
   useEffect(() => {
+    if (wsAvailable === false) return; // disabled
+    if (wsAvailable === null) return; // unknown yet
     if (
       userId &&
       options.autoConnect !== false &&
@@ -90,7 +137,7 @@ export function useRealtimeMessaging(
     ) {
       connect();
     }
-  }, [userId, options.autoConnect, isConnected, isConnecting]);
+  }, [userId, options.autoConnect, isConnected, isConnecting, wsAvailable]);
 
   // Event handlers
   const eventHandlers: RealtimeEventHandlers = {
@@ -181,7 +228,12 @@ export function useRealtimeMessaging(
 
   // Connect to real-time service
   const connect = useCallback(async () => {
-    if (!userId || !serviceRef.current || isConnecting) {
+    if (
+      !userId ||
+      !serviceRef.current ||
+      isConnecting ||
+      wsAvailable === false
+    ) {
       return false;
     }
 
@@ -207,7 +259,7 @@ export function useRealtimeMessaging(
       setIsConnecting(false);
       return false;
     }
-  }, [userId, isConnecting, eventHandlers]);
+  }, [userId, isConnecting, eventHandlers, wsAvailable]);
 
   // Disconnect from real-time service
   const disconnect = useCallback(() => {
@@ -314,6 +366,7 @@ export function useRealtimeMessaging(
     isConnected,
     isConnecting,
     error,
+    wsAvailable,
 
     // Connection control
     connect,

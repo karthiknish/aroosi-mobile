@@ -9,7 +9,7 @@ import {
   StyleSheet,
   Platform,
 } from "react-native";
-import { Colors } from "../constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface SearchableSelectProps {
   options: string[];
@@ -43,14 +43,31 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
     setSearchTerm("");
   };
 
+  const { theme } = useTheme();
   return (
     <View style={[styles.wrapper, containerStyle]}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, { color: theme.colors.text.primary }]}>
+          {label}
+        </Text>
+      )}
       <TouchableOpacity
-        style={styles.selector}
+        style={[
+          styles.selector,
+          {
+            borderColor: theme.colors.border.primary,
+            backgroundColor: theme.colors.background.primary,
+          },
+        ]}
         onPress={() => setModalVisible(true)}
       >
-        <Text style={selectedValue ? styles.valueText : styles.placeholderText}>
+        <Text
+          style={
+            selectedValue
+              ? [styles.valueText, { color: theme.colors.text.primary }]
+              : [styles.placeholderText, { color: theme.colors.text.secondary }]
+          }
+        >
           {selectedValue || placeholder}
         </Text>
       </TouchableOpacity>
@@ -60,9 +77,17 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalContainer}>
+        <View
+          style={[
+            styles.modalContainer,
+            { backgroundColor: theme.colors.background.primary },
+          ]}
+        >
           <TextInput
-            style={styles.searchInput}
+            style={[
+              styles.searchInput,
+              { borderColor: theme.colors.border.primary },
+            ]}
             placeholder="Search..."
             value={searchTerm}
             onChangeText={setSearchTerm}
@@ -74,10 +99,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             keyExtractor={(item, index) => `${item}-${index}`}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.optionItem}
+                style={[
+                  styles.optionItem,
+                  { borderBottomColor: theme.colors.border.primary },
+                ]}
                 onPress={() => handleSelect(item)}
               >
-                <Text style={styles.optionText}>{item}</Text>
+                <Text
+                  style={[
+                    styles.optionText,
+                    { color: theme.colors.text.primary },
+                  ]}
+                >
+                  {item}
+                </Text>
               </TouchableOpacity>
             )}
             keyboardShouldPersistTaps="handled"
@@ -94,32 +129,23 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: Colors.text.primary,
     marginBottom: 4,
   },
   selector: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: 4,
-    backgroundColor: Colors.background.primary,
   },
-  placeholderText: {
-    color: Colors.text.secondary,
-  },
-  valueText: {
-    color: Colors.text.primary,
-  },
+  placeholderText: {},
+  valueText: {},
   modalContainer: {
     flex: 1,
     paddingTop: Platform.OS === "android" ? 40 : 60,
     paddingHorizontal: 16,
-    backgroundColor: Colors.background.primary,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: 4,
     paddingVertical: 10,
     paddingHorizontal: 12,
@@ -128,11 +154,9 @@ const styles = StyleSheet.create({
   optionItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
   },
   optionText: {
     fontSize: 16,
-    color: Colors.text.primary,
   },
 });
 

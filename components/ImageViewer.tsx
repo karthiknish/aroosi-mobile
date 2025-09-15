@@ -11,15 +11,8 @@ import {
   SafeAreaView,
   Image,
 } from "react-native";
-import {
-  PanGestureHandler,
-  PinchGestureHandler,
-  State,
-  PanGestureHandlerGestureEvent,
-  PinchGestureHandlerGestureEvent,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  useAnimatedGestureHandler,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -27,7 +20,7 @@ import Animated, {
   runOnJS,
 } from "react-native-reanimated";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../constants/Colors";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -51,8 +44,9 @@ export function ImageViewer({
   onDelete,
   onShare,
   showControls = true,
-  backgroundColor = Colors.neutral[900],
+  backgroundColor,
 }: ImageViewerProps) {
+  const { theme } = useTheme();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [controlsVisible, setControlsVisible] = useState(true);
 
@@ -61,10 +55,6 @@ export function ImageViewer({
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(1);
-
-  // Gesture refs
-  const pinchRef = useRef<PinchGestureHandler>(null);
-  const panRef = useRef<PanGestureHandler>(null);
 
   const currentImage = images[currentIndex];
 
@@ -86,84 +76,82 @@ export function ImageViewer({
     return () => clearTimeout(timer);
   }, [controlsVisible]);
 
-  const pinchGestureHandler =
-    useAnimatedGestureHandler<PinchGestureHandlerGestureEvent>({
-      onStart: () => {
-        runOnJS(setControlsVisible)(false);
-      },
-      onActive: (event) => {
-        scale.value = Math.max(0.5, Math.min(event.scale, 3));
-      },
-      onEnd: () => {
-        if (scale.value < 1) {
-          scale.value = withSpring(1);
-          translateX.value = withSpring(0);
-          translateY.value = withSpring(0);
-        } else if (scale.value > 2.5) {
-          scale.value = withSpring(2.5);
-        }
-      },
+  // Gesture handlers (RNGH v2 API)
+  const pinchGesture = Gesture.Pinch()
+    .onBegin(() => {
+      runOnJS(setControlsVisible)(false);
+    })
+    .onChange((e) => {
+      "worklet";
+      const next = Math.max(0.5, Math.min(e.scale, 3));
+      scale.value = next;
+    })
+    .onEnd(() => {
+      "worklet";
+      if (scale.value < 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      } else if (scale.value > 2.5) {
+        scale.value = withSpring(2.5);
+      }
     });
 
-  const panGestureHandler =
-    useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
-      onStart: () => {
-        runOnJS(setControlsVisible)(false);
-      },
-      onActive: (event) => {
-        if (scale.value > 1) {
-          // Pan when zoomed in
-          translateX.value = event.translationX;
-          translateY.value = event.translationY;
-        } else {
-          // Swipe to change images when not zoomed
-          translateX.value = event.translationX;
+  const panGesture = Gesture.Pan()
+    .onBegin(() => {
+      runOnJS(setControlsVisible)(false);
+    })
+    .onChange((e) => {
+      "worklet";
+      if (scale.value > 1) {
+        // Pan when zoomed in
+        translateX.value = e.translationX;
+        translateY.value = e.translationY;
+      } else {
+        // Swipe to change images when not zoomed
+        translateX.value = e.translationX;
 
-          // Add some resistance when swiping beyond bounds
-          if (currentIndex === 0 && event.translationX > 0) {
-            translateX.value = event.translationX * 0.3;
-          } else if (
-            currentIndex === images.length - 1 &&
-            event.translationX < 0
-          ) {
-            translateX.value = event.translationX * 0.3;
+        // Add some resistance when swiping beyond bounds
+        if (currentIndex === 0 && e.translationX > 0) {
+          translateX.value = e.translationX * 0.3;
+        } else if (currentIndex === images.length - 1 && e.translationX < 0) {
+          translateX.value = e.translationX * 0.3;
+        }
+      }
+    })
+    .onEnd((e) => {
+      "worklet";
+      if (scale.value > 1) {
+        // Snap back to bounds when zoomed
+        const maxTranslateX = (screenWidth * (scale.value - 1)) / 2;
+        const maxTranslateY = (screenHeight * (scale.value - 1)) / 2;
+
+        translateX.value = withSpring(
+          Math.max(-maxTranslateX, Math.min(maxTranslateX, translateX.value))
+        );
+        translateY.value = withSpring(
+          Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY.value))
+        );
+      } else {
+        // Handle image swipe
+        const threshold = screenWidth * 0.3;
+
+        if (Math.abs(e.translationX) > threshold) {
+          if (e.translationX > 0 && currentIndex > 0) {
+            // Swipe right - previous image
+            runOnJS(setCurrentIndex)(currentIndex - 1);
+          } else if (e.translationX < 0 && currentIndex < images.length - 1) {
+            // Swipe left - next image
+            runOnJS(setCurrentIndex)(currentIndex + 1);
           }
         }
-      },
-      onEnd: (event) => {
-        if (scale.value > 1) {
-          // Snap back to bounds when zoomed
-          const maxTranslateX = (screenWidth * (scale.value - 1)) / 2;
-          const maxTranslateY = (screenHeight * (scale.value - 1)) / 2;
 
-          translateX.value = withSpring(
-            Math.max(-maxTranslateX, Math.min(maxTranslateX, translateX.value))
-          );
-          translateY.value = withSpring(
-            Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY.value))
-          );
-        } else {
-          // Handle image swipe
-          const threshold = screenWidth * 0.3;
-
-          if (Math.abs(event.translationX) > threshold) {
-            if (event.translationX > 0 && currentIndex > 0) {
-              // Swipe right - previous image
-              runOnJS(setCurrentIndex)(currentIndex - 1);
-            } else if (
-              event.translationX < 0 &&
-              currentIndex < images.length - 1
-            ) {
-              // Swipe left - next image
-              runOnJS(setCurrentIndex)(currentIndex + 1);
-            }
-          }
-
-          translateX.value = withSpring(0);
-          translateY.value = withSpring(0);
-        }
-      },
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
     });
+
+  const composedGesture = Gesture.Simultaneous(pinchGesture, panGesture);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -223,6 +211,104 @@ export function ImageViewer({
     return null;
   }
 
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+      },
+      safeArea: {
+        flex: 1,
+      },
+      header: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        position: "absolute",
+        top: Platform.OS === "ios" ? 44 : 24,
+        left: 0,
+        right: 0,
+        zIndex: 1,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+      },
+      closeButton: {
+        padding: 8,
+      },
+      counter: {
+        color: t.colors.text.inverse,
+        fontSize: 16,
+        fontWeight: "500",
+        fontFamily: "NunitoSans-Medium",
+      },
+      headerActions: {
+        flexDirection: "row",
+      },
+      actionButton: {
+        padding: 8,
+        marginLeft: 8,
+      },
+      imageContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      imageWrapper: {
+        width: screenWidth,
+        height: screenHeight,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      imageTouchable: {
+        width: "100%",
+        height: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      image: {
+        width: screenWidth,
+        height: screenHeight * 0.8,
+      },
+      navigation: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        position: "absolute",
+        bottom: Platform.OS === "ios" ? 34 : 24,
+        left: 0,
+        right: 0,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+      },
+      navButton: {
+        padding: 8,
+      },
+      navButtonDisabled: {
+        opacity: 0.5,
+      },
+      dots: {
+        flexDirection: "row",
+        alignItems: "center",
+      },
+      dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: rgbaHex(t.colors.background.primary, 0.5),
+        marginHorizontal: 4,
+      },
+      activeDot: {
+        backgroundColor: t.colors.text.inverse,
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+      },
+    })
+  );
+
+  const bgColor = backgroundColor ?? theme.colors.neutral[900];
+
   return (
     <Modal
       visible={visible}
@@ -232,7 +318,7 @@ export function ImageViewer({
       statusBarTranslucent
     >
       <StatusBar hidden />
-      <View style={[styles.container, { backgroundColor }]}>
+      <View style={[styles.container, { backgroundColor: bgColor }]}>
         <SafeAreaView style={styles.safeArea}>
           {/* Header Controls */}
           {showControls && controlsVisible && (
@@ -241,7 +327,7 @@ export function ImageViewer({
                 onPress={handleClose}
                 style={styles.closeButton}
               >
-                <Ionicons name="close" size={24} color={Colors.text.inverse} />
+                <Ionicons name="close" size={24} color={theme.colors.text.inverse} />
               </TouchableOpacity>
 
               <Text style={styles.counter}>
@@ -257,7 +343,7 @@ export function ImageViewer({
                     <Ionicons
                       name="share-outline"
                       size={24}
-                      color={Colors.text.inverse}
+                      color={theme.colors.text.inverse}
                     />
                   </TouchableOpacity>
                 )}
@@ -269,7 +355,7 @@ export function ImageViewer({
                     <Ionicons
                       name="trash-outline"
                       size={24}
-                      color={Colors.text.inverse}
+                      color={theme.colors.text.inverse}
                     />
                   </TouchableOpacity>
                 )}
@@ -279,36 +365,22 @@ export function ImageViewer({
 
           {/* Image Container */}
           <View style={styles.imageContainer}>
-            <PinchGestureHandler
-              ref={pinchRef}
-              onGestureEvent={pinchGestureHandler}
-              simultaneousHandlers={panRef}
-            >
-              <Animated.View style={styles.imageWrapper}>
-                <PanGestureHandler
-                  ref={panRef}
-                  onGestureEvent={panGestureHandler}
-                  simultaneousHandlers={pinchRef}
-                  minPointers={1}
-                  maxPointers={1}
+            <GestureDetector gesture={composedGesture}>
+              <Animated.View style={[styles.imageWrapper, animatedStyle]}>
+                <TouchableOpacity
+                  activeOpacity={1}
+                  onPress={handleSingleTap}
+                  onLongPress={handleDoubleTap}
+                  style={styles.imageTouchable}
                 >
-                  <Animated.View style={[styles.imageWrapper, animatedStyle]}>
-                    <TouchableOpacity
-                      activeOpacity={1}
-                      onPress={handleSingleTap}
-                      onLongPress={handleDoubleTap}
-                      style={styles.imageTouchable}
-                    >
-                      <Image
-                        source={{ uri: currentImage }}
-                        style={styles.image}
-                        resizeMode="contain"
-                      />
-                    </TouchableOpacity>
-                  </Animated.View>
-                </PanGestureHandler>
+                  <Image
+                    source={{ uri: currentImage }}
+                    style={styles.image}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
               </Animated.View>
-            </PinchGestureHandler>
+            </GestureDetector>
           </View>
 
           {/* Navigation Controls */}
@@ -326,7 +398,9 @@ export function ImageViewer({
                   name="chevron-back"
                   size={24}
                   color={
-                    currentIndex === 0 ? Colors.gray[500] : Colors.text.inverse
+                    currentIndex === 0
+                      ? theme.colors.gray[500]
+                      : theme.colors.text.inverse
                   }
                 />
               </TouchableOpacity>
@@ -358,8 +432,8 @@ export function ImageViewer({
                   size={24}
                   color={
                     currentIndex === images.length - 1
-                      ? Colors.gray[500]
-                      : Colors.text.inverse
+                      ? theme.colors.gray[500]
+                      : theme.colors.text.inverse
                   }
                 />
               </TouchableOpacity>
@@ -371,96 +445,3 @@ export function ImageViewer({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: "absolute",
-    top: Platform.OS === "ios" ? 44 : 24,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-  },
-  closeButton: {
-    padding: 8,
-  },
-  counter: {
-    color: Colors.text.inverse,
-    fontSize: 16,
-    fontWeight: "500",
-    fontFamily: "NunitoSans-Medium",
-  },
-  headerActions: {
-    flexDirection: "row",
-  },
-  actionButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  imageContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  imageWrapper: {
-    width: screenWidth,
-    height: screenHeight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  imageTouchable: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  image: {
-    width: screenWidth,
-    height: screenHeight * 0.8,
-  },
-  navigation: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 34 : 24,
-    left: 0,
-    right: 0,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-  },
-  navButton: {
-    padding: 8,
-  },
-  navButtonDisabled: {
-    opacity: 0.5,
-  },
-  dots: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: rgbaHex(Colors.background.primary, 0.5),
-    marginHorizontal: 4,
-  },
-  activeDot: {
-    backgroundColor: Colors.text.inverse,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-});

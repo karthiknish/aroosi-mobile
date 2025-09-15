@@ -5,9 +5,9 @@ import {
   Animated,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/Colors';
+import { Ionicons } from "@expo/vector-icons";
 import { Layout } from '../../constants/Layout';
+import { useTheme } from "@contexts/ThemeContext";
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -28,6 +28,7 @@ export const Toast: React.FC<ToastProps> = ({
   visible,
   position = 'top',
 }) => {
+  const { theme } = useTheme();
   const translateY = useRef(new Animated.Value(position === 'top' ? -100 : 100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -79,33 +80,33 @@ export const Toast: React.FC<ToastProps> = ({
     switch (type) {
       case 'success':
         return {
-          backgroundColor: Colors.success[500],
-          icon: 'checkmark-circle' as const,
-          iconColor: '#FFFFFF',
+          backgroundColor: theme.colors.success[500],
+          icon: "checkmark-circle" as const,
+          iconColor: theme.colors.text.inverse,
         };
       case 'error':
         return {
-          backgroundColor: Colors.error[500],
-          icon: 'close-circle' as const,
-          iconColor: '#FFFFFF',
+          backgroundColor: theme.colors.error[500],
+          icon: "close-circle" as const,
+          iconColor: theme.colors.text.inverse,
         };
       case 'warning':
         return {
-          backgroundColor: Colors.warning[500],
-          icon: 'warning' as const,
-          iconColor: '#FFFFFF',
+          backgroundColor: theme.colors.warning[500],
+          icon: "warning" as const,
+          iconColor: theme.colors.text.inverse,
         };
       case 'info':
         return {
-          backgroundColor: Colors.primary[500],
-          icon: 'information-circle' as const,
-          iconColor: '#FFFFFF',
+          backgroundColor: theme.colors.primary[500],
+          icon: "information-circle" as const,
+          iconColor: theme.colors.text.inverse,
         };
       default:
         return {
-          backgroundColor: Colors.primary[500],
-          icon: 'information-circle' as const,
-          iconColor: '#FFFFFF',
+          backgroundColor: theme.colors.primary[500],
+          icon: "information-circle" as const,
+          iconColor: theme.colors.text.inverse,
         };
     }
   };
@@ -116,16 +117,19 @@ export const Toast: React.FC<ToastProps> = ({
 
   return (
     <Animated.View
-        style={[
+      style={[
         styles.container,
         {
           transform: [{ translateY }],
           opacity,
           backgroundColor: config.backgroundColor,
-          top: position === 'top' ? Layout.safeArea.top + 10 : undefined,
-          bottom: position === 'bottom' ? Layout.safeArea.bottom + 10 : undefined,
+          shadowColor: theme.colors.neutral[900],
+          top: position === "top" ? Layout.safeArea.top + 10 : undefined,
+          bottom:
+            position === "bottom" ? Layout.safeArea.bottom + 10 : undefined,
         },
-      ]}    >
+      ]}
+    >
       <TouchableOpacity
         style={styles.content}
         onPress={hideToast}
@@ -137,7 +141,16 @@ export const Toast: React.FC<ToastProps> = ({
           color={config.iconColor}
           style={styles.icon}
         />
-        <Text style={[styles.message, { fontSize: Layout.typography.fontSize.sm }]} numberOfLines={3}>
+        <Text
+          style={[
+            styles.message,
+            {
+              fontSize: Layout.typography.fontSize.sm,
+              color: theme.colors.text.inverse,
+            },
+          ]}
+          numberOfLines={3}
+        >
           {message}
         </Text>
         <TouchableOpacity onPress={hideToast} style={styles.closeButton}>
@@ -154,11 +167,11 @@ export const Toast: React.FC<ToastProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
+    position: "absolute",
     left: Layout.spacing.md,
     right: Layout.spacing.md,
     borderRadius: Layout.radius.md,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -169,8 +182,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   content: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
     minHeight: Layout.getResponsiveSpacing(56),
@@ -180,8 +193,7 @@ const styles = StyleSheet.create({
   },
   message: {
     flex: 1,
-    color: '#FFFFFF',
-    fontWeight: '500',
+    fontWeight: "500",
     lineHeight: Layout.typography.lineHeight.sm,
   },
   closeButton: {

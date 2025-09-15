@@ -12,8 +12,9 @@ import {
 import { useVoiceRecording } from "@/hooks/useVoiceRecording";
 import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
 import { VoiceDurationIndicator } from "./VoiceDurationIndicator";
-import { Colors } from "@constants";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 
 interface VoiceRecorderProps {
   conversationId?: string;
@@ -44,6 +45,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   maxDuration,
   style,
 }) => {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   // Get subscription-based voice limits
   const { canSendVoice } = useVoiceMessageLimits();
 
@@ -67,6 +70,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const waveAnim = useRef(new Animated.Value(0)).current;
+  const { reduceMotion } = useReduceMotion();
 
   // Update duration callback
   useEffect(() => {
@@ -76,37 +80,42 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   // Start pulse animation when recording
   useEffect(() => {
     if (isRecording) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.2,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
+      if (!reduceMotion) {
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.15,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 800,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
 
-      // Wave animation
-      Animated.loop(
-        Animated.timing(waveAnim, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.linear,
-          useNativeDriver: false,
-        })
-      ).start();
+        // Wave animation
+        Animated.loop(
+          Animated.timing(waveAnim, {
+            toValue: 1,
+            duration: 1500,
+            easing: Easing.linear,
+            useNativeDriver: false,
+          })
+        ).start();
+      } else {
+        pulseAnim.setValue(1);
+        waveAnim.setValue(0);
+      }
     } else {
       pulseAnim.setValue(1);
       waveAnim.setValue(0);
     }
-  }, [isRecording, pulseAnim, waveAnim]);
+  }, [isRecording, reduceMotion, pulseAnim, waveAnim]);
 
   // Handle recording button press
   const handleRecordPress = async () => {
@@ -174,8 +183,8 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
               height: animatedHeight,
               opacity: isRecording ? 1 : 0.5,
               backgroundColor: isRecording
-                ? Colors.error[500]
-                : Colors.neutral[300],
+                ? theme.colors.error[500]
+                : theme.colors.neutral[300],
             },
           ]}
         />
@@ -190,7 +199,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     if (recordingState === "processing") {
       return (
         <View style={styles.recordButton}>
-          <ActivityIndicator color={Colors.text.inverse} size="small" />
+          <ActivityIndicator color={theme.colors.text.inverse} size="small" />
         </View>
       );
     }
@@ -282,114 +291,115 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: Colors.background.secondary,
-  },
-  durationIndicator: {
-    marginBottom: 16,
-  },
-  controlsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  waveContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-evenly",
-    height: 60,
-    marginRight: 16,
-  },
-  waveBar: {
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.neutral[300],
-  },
-  buttonContainer: {
-    marginLeft: "auto",
-  },
-  recordButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.error[500],
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: Colors.neutral[900],
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  recordingButton: {
-    backgroundColor: Colors.error[700],
-  },
-  disabledButton: {
-    backgroundColor: Colors.neutral[300],
-  },
-  stopIcon: {
-    width: 20,
-    height: 20,
-    backgroundColor: Colors.background.primary,
-    borderRadius: 2,
-  },
-  micIcon: {
-    alignItems: "center",
-  },
-  micTop: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.background.primary,
-  },
-  micBody: {
-    width: 4,
-    height: 15,
-    backgroundColor: Colors.background.primary,
-    marginTop: -2,
-  },
-  micBottom: {
-    width: 16,
-    height: 4,
-    backgroundColor: Colors.background.primary,
-    borderRadius: 2,
-    marginTop: -2,
-  },
-  cancelButton: {
-    marginLeft: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.1),
-  },
-  cancelText: {
-    color: Colors.text.secondary,
-    fontWeight: "600",
-  },
-  errorText: {
-    color: Colors.error[500],
-    marginTop: 8,
-    fontSize: 14,
-  },
-  permissionText: {
-    color: Colors.warning[600],
-    marginTop: 8,
-    fontSize: 14,
-  },
-  upgradeContainer: {
-    marginTop: 8,
-    padding: 8,
-    backgroundColor: Colors.info[50],
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  upgradeText: {
-    color: Colors.info[700],
-    fontWeight: "600",
-    fontSize: 14,
-  },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: theme.colors.background.secondary,
+    },
+    durationIndicator: {
+      marginBottom: 16,
+    },
+    controlsContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    waveContainer: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-evenly",
+      height: 60,
+      marginRight: 16,
+    },
+    waveBar: {
+      width: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.neutral[300],
+    },
+    buttonContainer: {
+      marginLeft: "auto",
+    },
+    recordButton: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: theme.colors.error[500],
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: theme.colors.neutral[900],
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    recordingButton: {
+      backgroundColor: theme.colors.error[700],
+    },
+    disabledButton: {
+      backgroundColor: theme.colors.neutral[300],
+    },
+    stopIcon: {
+      width: 20,
+      height: 20,
+      backgroundColor: theme.colors.background.primary,
+      borderRadius: 2,
+    },
+    micIcon: {
+      alignItems: "center",
+    },
+    micTop: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.colors.background.primary,
+    },
+    micBody: {
+      width: 4,
+      height: 15,
+      backgroundColor: theme.colors.background.primary,
+      marginTop: -2,
+    },
+    micBottom: {
+      width: 16,
+      height: 4,
+      backgroundColor: theme.colors.background.primary,
+      borderRadius: 2,
+      marginTop: -2,
+    },
+    cancelButton: {
+      marginLeft: 16,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: rgbaHex(theme.colors.text.primary, 0.1),
+    },
+    cancelText: {
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+    },
+    errorText: {
+      color: theme.colors.error[500],
+      marginTop: 8,
+      fontSize: 14,
+    },
+    permissionText: {
+      color: theme.colors.warning[600],
+      marginTop: 8,
+      fontSize: 14,
+    },
+    upgradeContainer: {
+      marginTop: 8,
+      padding: 8,
+      backgroundColor: theme.colors.info[50],
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    upgradeText: {
+      color: theme.colors.info[700],
+      fontWeight: "600",
+      fontSize: 14,
+    },
+  });

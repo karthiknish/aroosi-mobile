@@ -8,10 +8,11 @@ import {
   Image,
   Modal,
 } from "react-native";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { useBlockedUsers, useUnblockUser } from "@/hooks/useSafety";
 import { BlockedUserWithProfile } from "@/types/safety";
-import LoadingState from "@components/ui/LoadingState";
+import SkeletonList from "@/components/ui/SkeletonList";
 import EmptyState from "@components/ui/EmptyState";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { rgbaHex } from "@utils/color";
@@ -23,6 +24,8 @@ interface BlockedUsersScreenProps {
 export default function BlockedUsersScreen({
   navigation,
 }: BlockedUsersScreenProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [modalVisible, setModalVisible] = React.useState(false);
   const [modalType, setModalType] = React.useState<
     "confirm" | "success" | "error" | null
@@ -136,12 +139,12 @@ export default function BlockedUsersScreen({
             flex: 1,
             justifyContent: "center",
             alignItems: "center",
-            backgroundColor: rgbaHex(Colors.text.primary, 0.3),
+            backgroundColor: rgbaHex(theme.colors.text.primary, 0.3),
           }}
         >
           <View
             style={{
-              backgroundColor: Colors.background.primary,
+              backgroundColor: theme.colors.background.primary,
               borderRadius: 12,
               padding: 24,
               minWidth: 280,
@@ -153,7 +156,7 @@ export default function BlockedUsersScreen({
                 fontSize: 18,
                 fontWeight: "600",
                 marginBottom: 16,
-                color: Colors.text.primary,
+                color: theme.colors.text.primary,
               }}
             >
               {modalType === "confirm"
@@ -165,7 +168,7 @@ export default function BlockedUsersScreen({
             <Text
               style={{
                 fontSize: 16,
-                color: Colors.text.primary,
+                color: theme.colors.text.primary,
                 marginBottom: 24,
                 textAlign: "center",
               }}
@@ -177,7 +180,7 @@ export default function BlockedUsersScreen({
                 <>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: Colors.background.secondary,
+                      backgroundColor: theme.colors.background.secondary,
                       paddingHorizontal: 20,
                       paddingVertical: 10,
                       borderRadius: 8,
@@ -186,14 +189,17 @@ export default function BlockedUsersScreen({
                     onPress={() => setModalVisible(false)}
                   >
                     <Text
-                      style={{ fontWeight: "600", color: Colors.text.primary }}
+                      style={{
+                        fontWeight: "600",
+                        color: theme.colors.text.primary,
+                      }}
                     >
                       Cancel
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={{
-                      backgroundColor: Colors.success[500],
+                      backgroundColor: theme.colors.success[500],
                       paddingHorizontal: 20,
                       paddingVertical: 10,
                       borderRadius: 8,
@@ -204,7 +210,7 @@ export default function BlockedUsersScreen({
                     <Text
                       style={{
                         fontWeight: "600",
-                        color: Colors.background.primary,
+                        color: theme.colors.background.primary,
                       }}
                     >
                       {unblockUserMutation.isPending
@@ -217,7 +223,7 @@ export default function BlockedUsersScreen({
               {modalType === "success" && (
                 <TouchableOpacity
                   style={{
-                    backgroundColor: Colors.success[500],
+                    backgroundColor: theme.colors.success[500],
                     paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 8,
@@ -227,7 +233,7 @@ export default function BlockedUsersScreen({
                   <Text
                     style={{
                       fontWeight: "600",
-                      color: Colors.background.primary,
+                      color: theme.colors.background.primary,
                     }}
                   >
                     OK
@@ -237,7 +243,7 @@ export default function BlockedUsersScreen({
               {modalType === "error" && (
                 <TouchableOpacity
                   style={{
-                    backgroundColor: Colors.error[500],
+                    backgroundColor: theme.colors.error[500],
                     paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 8,
@@ -247,7 +253,7 @@ export default function BlockedUsersScreen({
                   <Text
                     style={{
                       fontWeight: "600",
-                      color: Colors.background.primary,
+                      color: theme.colors.background.primary,
                     }}
                   >
                     OK
@@ -310,7 +316,19 @@ export default function BlockedUsersScreen({
         contentStyle={styles.contentStyle}
         useScrollView={false}
       >
-        <LoadingState message="Loading blocked users..." />
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Blocked Users</Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <SkeletonList rows={6} />
       </ScreenContainer>
     );
   }
@@ -388,169 +406,171 @@ export default function BlockedUsersScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  contentStyle: {
-    flexGrow: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  backButton: {
-    padding: Layout.spacing.sm,
-  },
-  backButtonText: {
-    fontSize: Layout.typography.fontSize.xl,
-    color: Colors.primary[500],
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    textAlign: "center",
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  infoBanner: {
-    backgroundColor: Colors.info[50],
-    padding: Layout.spacing.md,
-    margin: Layout.spacing.lg,
-    borderRadius: Layout.radius.md,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.info[500],
-  },
-  infoBannerText: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.info[700],
-    lineHeight: 20,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    paddingHorizontal: Layout.spacing.lg,
-  },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Layout.radius.lg,
-    padding: Layout.spacing.lg,
-    marginBottom: Layout.spacing.md,
-  },
-  userInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  userImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: Layout.spacing.md,
-  },
-  placeholderImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.neutral[200],
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: Layout.spacing.md,
-  },
-  placeholderText: {
-    fontSize: 20,
-    color: Colors.neutral[500],
-  },
-  userDetails: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.xs,
-  },
-  blockDate: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-  },
-  unblockButton: {
-    backgroundColor: Colors.success[500],
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    borderRadius: Layout.radius.md,
-  },
-  unblockButtonText: {
-    fontSize: Layout.typography.fontSize.sm,
-    fontWeight: "600",
-    color: Colors.background.primary,
-  },
-  emptyContainer: {
-    flex: 1,
-    paddingHorizontal: Layout.spacing.lg,
-  },
-  emptyActions: {
-    alignItems: "center",
-    marginVertical: Layout.spacing.xl,
-  },
-  guidelinesButton: {
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: Layout.spacing.xl,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-  },
-  guidelinesButtonText: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "600",
-    color: Colors.background.primary,
-  },
-  infoSection: {
-    backgroundColor: Colors.background.secondary,
-    padding: Layout.spacing.lg,
-    borderRadius: Layout.radius.lg,
-    marginTop: Layout.spacing.xl,
-  },
-  infoTitle: {
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.md,
-  },
-  infoList: {
-    marginLeft: Layout.spacing.sm,
-  },
-  infoItem: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-    lineHeight: 22,
-    marginBottom: Layout.spacing.sm,
-  },
-  footer: {
-    padding: Layout.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
-  },
-  footerButton: {
-    backgroundColor: Colors.background.secondary,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    alignItems: "center",
-  },
-  footerButtonText: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "500",
-    color: Colors.primary[500],
-  },
-});
+function createStyles(theme: any) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    contentStyle: {
+      flexGrow: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: Layout.spacing.lg,
+      paddingVertical: Layout.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border.primary,
+    },
+    backButton: {
+      padding: Layout.spacing.sm,
+    },
+    backButtonText: {
+      fontSize: Layout.typography.fontSize.xl,
+      color: theme.colors.primary[500],
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: Layout.typography.fontSize.lg,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+      textAlign: "center",
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    infoBanner: {
+      backgroundColor: theme.colors.info[50],
+      padding: Layout.spacing.md,
+      margin: Layout.spacing.lg,
+      borderRadius: Layout.radius.md,
+      borderLeftWidth: 4,
+      borderLeftColor: theme.colors.info[500],
+    },
+    infoBannerText: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.info[700],
+      lineHeight: 20,
+    },
+    list: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: Layout.spacing.lg,
+    },
+    userCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: Layout.radius.lg,
+      padding: Layout.spacing.lg,
+      marginBottom: Layout.spacing.md,
+    },
+    userInfo: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    userImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      marginRight: Layout.spacing.md,
+    },
+    placeholderImage: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: theme.colors.neutral[200],
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: Layout.spacing.md,
+    },
+    placeholderText: {
+      fontSize: 20,
+      color: theme.colors.neutral[500],
+    },
+    userDetails: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: Layout.typography.fontSize.lg,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+      marginBottom: Layout.spacing.xs,
+    },
+    blockDate: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+    },
+    unblockButton: {
+      backgroundColor: theme.colors.success[500],
+      paddingHorizontal: Layout.spacing.md,
+      paddingVertical: Layout.spacing.sm,
+      borderRadius: Layout.radius.md,
+    },
+    unblockButtonText: {
+      fontSize: Layout.typography.fontSize.sm,
+      fontWeight: "600",
+      color: theme.colors.background.primary,
+    },
+    emptyContainer: {
+      flex: 1,
+      paddingHorizontal: Layout.spacing.lg,
+    },
+    emptyActions: {
+      alignItems: "center",
+      marginVertical: Layout.spacing.xl,
+    },
+    guidelinesButton: {
+      backgroundColor: theme.colors.primary[500],
+      paddingHorizontal: Layout.spacing.xl,
+      paddingVertical: Layout.spacing.md,
+      borderRadius: Layout.radius.md,
+    },
+    guidelinesButtonText: {
+      fontSize: Layout.typography.fontSize.base,
+      fontWeight: "600",
+      color: theme.colors.background.primary,
+    },
+    infoSection: {
+      backgroundColor: theme.colors.background.secondary,
+      padding: Layout.spacing.lg,
+      borderRadius: Layout.radius.lg,
+      marginTop: Layout.spacing.xl,
+    },
+    infoTitle: {
+      fontSize: Layout.typography.fontSize.lg,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+      marginBottom: Layout.spacing.md,
+    },
+    infoList: {
+      marginLeft: Layout.spacing.sm,
+    },
+    infoItem: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.secondary,
+      lineHeight: 22,
+      marginBottom: Layout.spacing.sm,
+    },
+    footer: {
+      padding: Layout.spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border.primary,
+    },
+    footerButton: {
+      backgroundColor: theme.colors.background.secondary,
+      paddingVertical: Layout.spacing.md,
+      borderRadius: Layout.radius.md,
+      alignItems: "center",
+    },
+    footerButtonText: {
+      fontSize: Layout.typography.fontSize.base,
+      fontWeight: "500",
+      color: theme.colors.primary[500],
+    },
+  });
+}

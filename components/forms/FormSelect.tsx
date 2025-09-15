@@ -8,7 +8,7 @@ import {
   FlatList,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
@@ -32,6 +32,108 @@ interface FormSelectProps {
   disabled?: boolean;
 }
 
+const createStyles = (theme: any, spacing: any, fontSize: any) =>
+  StyleSheet.create({
+    container: {
+      marginBottom: spacing.md,
+    },
+    label: {
+      fontSize: fontSize.base,
+      fontWeight: "600",
+      color: theme.colors.gray[900],
+      marginBottom: spacing.sm,
+      fontFamily: "NunitoSans-SemiBold",
+    },
+    required: {
+      color: theme.colors.error[500],
+    },
+    selector: {
+      borderWidth: 1,
+      borderColor: theme.colors.gray[300],
+      borderRadius: spacing.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + spacing.xs,
+      backgroundColor: theme.colors.background.primary,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    selectorError: {
+      borderColor: theme.colors.error[500],
+      backgroundColor: theme.colors.error[50],
+    },
+    selectorDisabled: {
+      backgroundColor: theme.colors.gray[100],
+      borderColor: theme.colors.gray[200],
+    },
+    selectorText: {
+      fontSize: fontSize.base,
+      color: theme.colors.gray[900],
+      fontFamily: "NunitoSans-Regular",
+    },
+    placeholder: {
+      color: theme.colors.gray[400],
+    },
+    disabledText: {
+      color: theme.colors.gray[400],
+    },
+    error: {
+      fontSize: fontSize.sm,
+      color: theme.colors.error[500],
+      marginTop: spacing.xs,
+      fontFamily: "NunitoSans-Regular",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: rgbaHex(theme.colors.text.primary, 0.5),
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      backgroundColor: theme.colors.background.primary,
+      borderTopLeftRadius: spacing.lg - spacing.xs,
+      borderTopRightRadius: spacing.lg - spacing.xs,
+      maxHeight: "70%",
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: spacing.lg - spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[200],
+    },
+    modalTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: "600",
+      color: theme.colors.gray[900],
+      fontFamily: "NunitoSans-SemiBold",
+    },
+    closeButton: {
+      padding: spacing.xs,
+    },
+    option: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: spacing.lg - spacing.xs,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.gray[100],
+    },
+    selectedOption: {
+      backgroundColor: theme.colors.primary[50],
+    },
+    optionText: {
+      fontSize: fontSize.base,
+      color: theme.colors.gray[900],
+      fontFamily: "NunitoSans-Regular",
+    },
+    selectedOptionText: {
+      color: theme.colors.primary[500],
+      fontWeight: "600",
+    },
+  });
+
 export function FormSelect({
   label,
   value,
@@ -45,6 +147,8 @@ export function FormSelect({
 }: FormSelectProps) {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
+  const { theme } = useTheme();
+  const styles = createStyles(theme, spacing, fontSize);
   const [isVisible, setIsVisible] = useState(false);
 
   const selectedOption = options.find((option) => option.value === value);
@@ -54,63 +158,63 @@ export function FormSelect({
     setIsVisible(false);
   };
 
-  const styles = StyleSheet.create({
+  const base = {
     container: {
       marginBottom: spacing.md,
     },
     label: {
       fontSize: fontSize.base,
       fontWeight: "600",
-      color: Colors.gray[900],
+      color: theme.colors.gray[900],
       marginBottom: spacing.sm,
       fontFamily: "NunitoSans-SemiBold",
     },
     required: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
     },
     selector: {
       borderWidth: 1,
-      borderColor: Colors.gray[300],
+      borderColor: theme.colors.gray[300],
       borderRadius: spacing.sm,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm + spacing.xs,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
     },
     selectorError: {
-      borderColor: Colors.error[500],
-      backgroundColor: Colors.error[50],
+      borderColor: theme.colors.error[500],
+      backgroundColor: theme.colors.error[50],
     },
     selectorDisabled: {
-      backgroundColor: Colors.gray[100],
-      borderColor: Colors.gray[200],
+      backgroundColor: theme.colors.gray[100],
+      borderColor: theme.colors.gray[200],
     },
     selectorText: {
       fontSize: fontSize.base,
-      color: Colors.gray[900],
+      color: theme.colors.gray[900],
       fontFamily: "NunitoSans-Regular",
     },
     placeholder: {
-      color: Colors.gray[400],
+      color: theme.colors.gray[400],
     },
     disabledText: {
-      color: Colors.gray[400],
+      color: theme.colors.gray[400],
     },
     error: {
       fontSize: fontSize.sm,
-      color: Colors.error[500],
+      color: theme.colors.error[500],
       marginTop: spacing.xs,
       fontFamily: "NunitoSans-Regular",
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: rgbaHex(Colors.text.primary, 0.5),
+      backgroundColor: rgbaHex(theme.colors.text.primary, 0.5),
       justifyContent: "flex-end",
     },
     modalContent: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderTopLeftRadius: spacing.lg - spacing.xs,
       borderTopRightRadius: spacing.lg - spacing.xs,
       maxHeight: "70%",
@@ -121,12 +225,12 @@ export function FormSelect({
       alignItems: "center",
       padding: spacing.lg - spacing.xs,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.gray[200],
+      borderBottomColor: theme.colors.gray[200],
     },
     modalTitle: {
       fontSize: fontSize.lg,
       fontWeight: "600",
-      color: Colors.gray[900],
+      color: theme.colors.gray[900],
       fontFamily: "NunitoSans-SemiBold",
     },
     closeButton: {
@@ -139,21 +243,23 @@ export function FormSelect({
       paddingHorizontal: spacing.lg - spacing.xs,
       paddingVertical: spacing.md,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.gray[100],
+      borderBottomColor: theme.colors.gray[100],
     },
     selectedOption: {
-      backgroundColor: Colors.primary[50],
+      backgroundColor: theme.colors.primary[50],
     },
     optionText: {
       fontSize: fontSize.base,
-      color: Colors.gray[900],
+      color: theme.colors.gray[900],
       fontFamily: "NunitoSans-Regular",
     },
     selectedOptionText: {
-      color: Colors.primary[500],
+      color: theme.colors.primary[500],
       fontWeight: "600",
     },
-  });
+  } as const;
+
+  // keep base for readability; actual styles are created via createStyles above
 
   return (
     <View style={[styles.container, containerStyle]}>
@@ -183,7 +289,7 @@ export function FormSelect({
         <Ionicons
           name="chevron-down"
           size={20}
-          color={disabled ? Colors.gray[400] : Colors.gray[600]}
+          color={disabled ? theme.colors.gray[400] : theme.colors.gray[600]}
         />
       </TouchableOpacity>
 
@@ -203,7 +309,11 @@ export function FormSelect({
                 onPress={() => setIsVisible(false)}
                 style={styles.closeButton}
               >
-                <Ionicons name="close" size={24} color={Colors.gray[600]} />
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={theme.colors.gray[600]}
+                />
               </TouchableOpacity>
             </View>
 
@@ -230,7 +340,7 @@ export function FormSelect({
                     <Ionicons
                       name="checkmark"
                       size={20}
-                      color={Colors.primary[500]}
+                      color={theme.colors.primary[500]}
                     />
                   )}
                 </TouchableOpacity>

@@ -11,8 +11,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import { Colors } from "@constants";
 import { GradientBackground } from "@/components/ui/GradientComponents";
+import { useTheme } from "@contexts/ThemeContext";
 
 const { height } = Dimensions.get("window");
 
@@ -49,6 +49,7 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
   ...scrollViewProps
 }) => {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   // Do not call bottom-tabs hook here (may be used outside tabs). Prop will be set by HOCs.
   const detectedTabBarHeight = 0;
   const [footerHeight, setFooterHeight] = useState(0);
@@ -75,7 +76,7 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
       edges={["top", "right", "left"]}
     >
       <GradientBackground
-        colors={Colors.gradient.secondary as any}
+        colors={theme.colors.gradient.secondary as any}
         style={styles.gradient}
       >
         {useScrollView ? (
@@ -96,12 +97,14 @@ const ScreenContainer: React.FC<ScreenContainerProps> = ({
           </ScrollView>
         ) : (
           <View
-            style={[
-              styles.scroll,
-              styles.content,
-              { paddingBottom: contentPaddingBottom },
-              contentStyle,
-            ] as any}
+            style={
+              [
+                styles.scroll,
+                styles.content,
+                { paddingBottom: contentPaddingBottom },
+                contentStyle,
+              ] as any
+            }
           >
             {children}
           </View>

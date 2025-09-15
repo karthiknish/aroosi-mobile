@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   Platform,
 } from "react-native";
@@ -33,7 +32,8 @@ import {
   formatPhoneNumber,
   cleanPhoneNumber,
 } from "@utils/profileValidation";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import useResponsiveSpacing from "@/hooks/useResponsive";
 import useResponsiveTypography from "@/hooks/useResponsive";
 import { useToast } from "@providers/ToastContext";
@@ -42,9 +42,9 @@ import { COUNTRIES } from "@constants/countries";
 import SearchableSelect from "@components/SearchableSelect";
 import {
   MOTHER_TONGUE_OPTIONS,
-  RELIGION_OPTIONS,
   ETHNICITY_OPTIONS,
 } from "../../../constants/languages";
+import AppHeader from "@/components/common/AppHeader";
 
 interface EditProfileScreenProps {
   navigation: any;
@@ -53,6 +53,157 @@ interface EditProfileScreenProps {
 export default function EditProfileScreen({
   navigation,
 }: EditProfileScreenProps) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+        backgroundColor: t.colors.background.primary,
+      },
+      loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      loadingText: {
+        marginTop: Layout.spacing.md,
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.secondary,
+      },
+      header: {
+        // deprecated in favor of AppHeader
+      },
+      cancelButton: {
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.secondary,
+      },
+      headerTitle: {
+        fontFamily: Layout.typography.fontFamily.serif,
+        fontSize: Layout.typography.fontSize.lg,
+        color: t.colors.text.primary,
+      },
+      saveButton: {
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "600",
+        color: t.colors.primary[500],
+      },
+      content: {
+        flex: 1,
+      },
+      section: {
+        marginTop: Layout.spacing.lg,
+      },
+      sectionTitle: {
+        fontFamily: Layout.typography.fontFamily.serif,
+        fontSize: Layout.typography.fontSize.lg,
+        color: t.colors.text.primary,
+        marginBottom: Layout.spacing.md,
+      },
+      formGroup: {
+        marginBottom: Layout.spacing.md,
+      },
+      formRow: {
+        flexDirection: "row",
+      },
+      label: {
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "500",
+        color: t.colors.text.primary,
+        marginBottom: Layout.spacing.sm,
+      },
+      input: {
+        borderWidth: 1,
+        borderColor: t.colors.border.primary,
+        borderRadius: Layout.radius.md,
+        paddingHorizontal: Layout.spacing.md,
+        paddingVertical: Layout.spacing.sm,
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.primary,
+        backgroundColor: t.colors.background.secondary,
+      },
+      inputError: {
+        borderColor: t.colors.error[500],
+      },
+      textArea: {
+        borderWidth: 1,
+        borderColor: t.colors.border.primary,
+        borderRadius: Layout.radius.md,
+        paddingHorizontal: Layout.spacing.md,
+        paddingVertical: Layout.spacing.sm,
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.primary,
+        backgroundColor: t.colors.background.secondary,
+        height: 120,
+      },
+      dateInput: {
+        justifyContent: "center",
+      },
+      dateText: {
+        color: t.colors.text.primary,
+      },
+      placeholderText: {
+        color: t.colors.text.tertiary,
+      },
+      pickerContainer: {
+        borderWidth: 1,
+        borderColor: t.colors.border.primary,
+        borderRadius: Layout.radius.md,
+        backgroundColor: t.colors.background.secondary,
+      },
+      picker: {
+        height: 50,
+      },
+      heightSliders: {
+        flexDirection: "row",
+        gap: Layout.spacing.md,
+      },
+      sliderGroup: {
+        flex: 1,
+      },
+      sliderLabel: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.text.secondary,
+        marginBottom: Layout.spacing.xs,
+      },
+      errorText: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.error[500],
+        marginTop: Layout.spacing.xs,
+      },
+      bottomSpacing: {
+        height: Layout.spacing.xl,
+      },
+      checkboxContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: Layout.spacing.sm,
+      },
+      checkbox: {
+        width: 24,
+        height: 24,
+        borderWidth: 2,
+        borderColor: t.colors.border.primary,
+        borderRadius: Layout.radius.sm,
+        marginRight: Layout.spacing.md,
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      checkboxChecked: {
+        backgroundColor: t.colors.primary[500],
+        borderColor: t.colors.primary[500],
+      },
+      checkmark: {
+        color: t.colors.text.inverse,
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "bold",
+      },
+      checkboxLabel: {
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.primary,
+        flex: 1,
+      },
+    })
+  );
   const { user } = useAuth();
   const userId = user?.id;
   const apiClient = useApiClient();
@@ -178,7 +329,7 @@ export default function EditProfileScreen({
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary[500]} />
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </View>
@@ -187,28 +338,25 @@ export default function EditProfileScreen({
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-        ]}
-      >
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancelButton}>Cancel</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity
-          onPress={handleSave}
-          disabled={updateProfileMutation.isPending}
-        >
-          {updateProfileMutation.isPending ? (
-            <ActivityIndicator size="small" color={Colors.primary[500]} />
-          ) : (
-            <Text style={styles.saveButton}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title="Edit Profile"
+        onPressBack={() => navigation.goBack()}
+        rightActions={
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={updateProfileMutation.isPending}
+          >
+            {updateProfileMutation.isPending ? (
+              <ActivityIndicator
+                size="small"
+                color={theme.colors.primary[500]}
+              />
+            ) : (
+              <Text style={styles.saveButton}>Save</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       <View style={[styles.content, { paddingHorizontal: spacing.lg }]}>
         {/* Basic Information */}
@@ -952,158 +1100,3 @@ export default function EditProfileScreen({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: Layout.spacing.md,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  cancelButton: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
-  headerTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    color: Colors.text.primary,
-  },
-  saveButton: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "600",
-    color: Colors.primary[500],
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginTop: Layout.spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.md,
-  },
-  formGroup: {
-    marginBottom: Layout.spacing.md,
-  },
-  formRow: {
-    flexDirection: "row",
-  },
-  label: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "500",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.sm,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    backgroundColor: Colors.background.secondary,
-  },
-  inputError: {
-    borderColor: Colors.error[500],
-  },
-  textArea: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    backgroundColor: Colors.background.secondary,
-    height: 120,
-  },
-  dateInput: {
-    justifyContent: "center",
-  },
-  dateText: {
-    color: Colors.text.primary,
-  },
-  placeholderText: {
-    color: Colors.text.tertiary,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    backgroundColor: Colors.background.secondary,
-  },
-  picker: {
-    height: 50,
-  },
-  heightSliders: {
-    flexDirection: "row",
-    gap: Layout.spacing.md,
-  },
-  sliderGroup: {
-    flex: 1,
-  },
-  sliderLabel: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
-  },
-  errorText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.error[500],
-    marginTop: Layout.spacing.xs,
-  },
-  bottomSpacing: {
-    height: Layout.spacing.xl,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Layout.spacing.sm,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.sm,
-    marginRight: Layout.spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.primary[500],
-    borderColor: Colors.primary[500],
-  },
-  checkmark: {
-    color: Colors.text.inverse,
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "bold",
-  },
-  checkboxLabel: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    flex: 1,
-  },
-});

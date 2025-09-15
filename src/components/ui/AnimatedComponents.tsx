@@ -7,10 +7,10 @@ import {
   ViewProps,
   ViewStyle,
   Dimensions,
+  Text,
 } from "react-native";
 import {
   createFadeInAnimation,
-  createFadeOutAnimation,
   createScaleInAnimation,
   createSlideInAnimation,
   createBounceAnimation,
@@ -20,11 +20,12 @@ import {
   createSequentialFadeIn,
   ANIMATION_DURATIONS,
 } from "@utils/animations";
-import { Colors } from "../../../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
 
-// Animated Container for fade in effects
+// FadeInView
 interface FadeInViewProps extends ViewProps {
   duration?: number;
   delay?: number;
@@ -39,11 +40,9 @@ export const FadeInView: React.FC<FadeInViewProps> = ({
   ...props
 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     createFadeInAnimation(fadeAnim, duration, delay).start();
   }, [fadeAnim, duration, delay]);
-
   return (
     <Animated.View style={[style, { opacity: fadeAnim }]} {...props}>
       {children}
@@ -51,7 +50,7 @@ export const FadeInView: React.FC<FadeInViewProps> = ({
   );
 };
 
-// Animated Container for scale in effects
+// ScaleInView
 interface ScaleInViewProps extends ViewProps {
   duration?: number;
   delay?: number;
@@ -68,15 +67,12 @@ export const ScaleInView: React.FC<ScaleInViewProps> = ({
   ...props
 }) => {
   const scaleAnim = useRef(new Animated.Value(fromScale)).current;
-
   useEffect(() => {
     const timer = setTimeout(() => {
       createScaleInAnimation(scaleAnim, fromScale, 1, duration).start();
     }, delay);
-
     return () => clearTimeout(timer);
   }, [scaleAnim, duration, delay, fromScale]);
-
   return (
     <Animated.View
       style={[style, { transform: [{ scale: scaleAnim }] }]}
@@ -87,7 +83,7 @@ export const ScaleInView: React.FC<ScaleInViewProps> = ({
   );
 };
 
-// Animated Container for slide in effects
+// SlideInView
 interface SlideInViewProps extends ViewProps {
   direction: "left" | "right" | "up" | "down";
   duration?: number;
@@ -106,10 +102,8 @@ export const SlideInView: React.FC<SlideInViewProps> = ({
   ...props
 }) => {
   const slideAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
-    let fromValue: number;
-
+    let fromValue = 0;
     switch (direction) {
       case "left":
         fromValue = distance || -screenWidth;
@@ -123,27 +117,17 @@ export const SlideInView: React.FC<SlideInViewProps> = ({
       case "down":
         fromValue = distance || screenHeight;
         break;
-      default:
-        fromValue = 0;
     }
-
     slideAnim.setValue(fromValue);
-
     const timer = setTimeout(() => {
       createSlideInAnimation(slideAnim, fromValue, 0, duration).start();
     }, delay);
-
     return () => clearTimeout(timer);
   }, [slideAnim, direction, duration, delay, distance]);
-
-  const getTransformStyle = (): ViewStyle => {
-    if (direction === "left" || direction === "right") {
-      return { transform: [{ translateX: slideAnim }] };
-    } else {
-      return { transform: [{ translateY: slideAnim }] };
-    }
-  };
-
+  const getTransformStyle = (): ViewStyle =>
+    direction === "left" || direction === "right"
+      ? { transform: [{ translateX: slideAnim }] }
+      : { transform: [{ translateY: slideAnim }] };
   return (
     <Animated.View style={[style, getTransformStyle()]} {...props}>
       {children}
@@ -151,7 +135,7 @@ export const SlideInView: React.FC<SlideInViewProps> = ({
   );
 };
 
-// Animated Button with press effects
+// AnimatedButton
 interface AnimatedButtonProps extends TouchableOpacityProps {
   animationType?: "scale" | "bounce" | "fade";
   scaleValue?: number;
@@ -172,35 +156,27 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
     animValue,
     scaleValue
   );
-
   const handlePressIn = () => {
-    if (animationType === "scale") {
-      pressIn();
-    } else if (animationType === "bounce") {
+    if (animationType === "scale") pressIn();
+    else if (animationType === "bounce")
       createBounceAnimation(animValue).start();
-    }
     onPressIn?.({} as any);
   };
-
   const handlePressOut = () => {
-    if (animationType === "scale") {
-      pressOut();
-    }
+    if (animationType === "scale") pressOut();
     onPressOut?.({} as any);
   };
-
   const getAnimatedStyle = (): ViewStyle => {
     switch (animationType) {
       case "scale":
       case "bounce":
         return { transform: [{ scale: animValue }] };
       case "fade":
-        return { opacity: animValue };
+        return { opacity: animValue } as ViewStyle;
       default:
-        return {};
+        return {} as ViewStyle;
     }
   };
-
   return (
     <TouchableOpacity
       onPressIn={handlePressIn}
@@ -214,7 +190,7 @@ export const AnimatedButton: React.FC<AnimatedButtonProps> = ({
   );
 };
 
-// Animated Heart Button for likes
+// HeartButton
 interface HeartButtonProps extends TouchableOpacityProps {
   isLiked: boolean;
   onToggle: () => void;
@@ -227,30 +203,28 @@ export const HeartButton: React.FC<HeartButtonProps> = ({
   isLiked,
   onToggle,
   size = 24,
-  likedColor = Colors.error[500],
-  unlikedColor = Colors.neutral[400],
+  likedColor,
+  unlikedColor,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const [liked, setLiked] = useState(isLiked);
-
-  useEffect(() => {
-    setLiked(isLiked);
-  }, [isLiked]);
-
+  useEffect(() => setLiked(isLiked), [isLiked]);
   const handlePress = () => {
     setLiked(!liked);
     createHeartAnimation(scaleAnim).start();
     onToggle();
   };
-
   return (
     <TouchableOpacity onPress={handlePress} style={style} {...props}>
       <Animated.Text
         style={{
           fontSize: size,
-          color: liked ? likedColor : unlikedColor,
+          color: liked
+            ? likedColor ?? theme.colors.error[500]
+            : unlikedColor ?? theme.colors.neutral[400],
           transform: [{ scale: scaleAnim }],
         }}
       >
@@ -260,7 +234,7 @@ export const HeartButton: React.FC<HeartButtonProps> = ({
   );
 };
 
-// Shake animation component for errors
+// ShakeView
 interface ShakeViewProps extends ViewProps {
   shouldShake: boolean;
   onShakeComplete?: () => void;
@@ -275,23 +249,14 @@ export const ShakeView: React.FC<ShakeViewProps> = ({
   ...props
 }) => {
   const shakeAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     if (shouldShake) {
-      createShakeAnimation(shakeAnim).start(() => {
-        onShakeComplete?.();
-      });
+      createShakeAnimation(shakeAnim).start(() => onShakeComplete?.());
     }
   }, [shouldShake, shakeAnim, onShakeComplete]);
-
   return (
     <Animated.View
-      style={[
-        style,
-        {
-          transform: [{ translateX: shakeAnim }],
-        },
-      ]}
+      style={[style, { transform: [{ translateX: shakeAnim }] }]}
       {...props}
     >
       {children}
@@ -299,7 +264,7 @@ export const ShakeView: React.FC<ShakeViewProps> = ({
   );
 };
 
-// Staggered list animation
+// StaggeredList
 interface StaggeredListProps extends ViewProps {
   children: React.ReactElement[];
   staggerDelay?: number;
@@ -316,15 +281,10 @@ export const StaggeredList: React.FC<StaggeredListProps> = ({
   const animatedValues = useRef(
     children.map(() => new Animated.Value(0))
   ).current;
-
   useEffect(() => {
-    // Reset all values
-    animatedValues.forEach((value) => value.setValue(0));
-
-    // Start staggered animation
+    animatedValues.forEach((v) => v.setValue(0));
     createSequentialFadeIn(animatedValues, staggerDelay, itemDuration).start();
   }, [animatedValues, staggerDelay, itemDuration]);
-
   return (
     <View style={style} {...props}>
       {children.map((child, index) => (
@@ -349,9 +309,9 @@ export const StaggeredList: React.FC<StaggeredListProps> = ({
   );
 };
 
-// Progress bar with animation
+// AnimatedProgressBar
 interface AnimatedProgressBarProps extends ViewProps {
-  progress: number; // 0 to 1
+  progress: number;
   height?: number;
   backgroundColor?: string;
   progressColor?: string;
@@ -362,15 +322,15 @@ interface AnimatedProgressBarProps extends ViewProps {
 export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
   progress,
   height = 4,
-  backgroundColor = Colors.neutral[200],
-  progressColor = Colors.success[400],
+  backgroundColor,
+  progressColor,
   animated = true,
   duration = ANIMATION_DURATIONS.slow,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   const progressAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     if (animated) {
       Animated.timing(progressAnim, {
@@ -382,13 +342,12 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
       progressAnim.setValue(progress);
     }
   }, [progress, animated, duration, progressAnim]);
-
   return (
     <View
       style={[
         {
           height,
-          backgroundColor,
+          backgroundColor: backgroundColor ?? theme.colors.neutral[200],
           borderRadius: height / 2,
           overflow: "hidden",
         },
@@ -399,7 +358,7 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
       <Animated.View
         style={{
           height: "100%",
-          backgroundColor: progressColor,
+          backgroundColor: progressColor ?? theme.colors.success[400],
           width: progressAnim.interpolate({
             inputRange: [0, 1],
             outputRange: ["0%", "100%"],
@@ -410,42 +369,48 @@ export const AnimatedProgressBar: React.FC<AnimatedProgressBarProps> = ({
   );
 };
 
-// Floating Action Button with animations
+// FloatingActionButton
 interface FloatingActionButtonProps extends TouchableOpacityProps {
   icon: string;
   size?: number;
   backgroundColor?: string;
   shadowColor?: string;
+  respectReduceMotion?: boolean;
 }
 
 export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   icon,
   size = 56,
-  backgroundColor = Colors.primary[500],
-  shadowColor = Colors.neutral[900],
+  backgroundColor,
+  shadowColor,
   style,
+  respectReduceMotion = true,
   ...props
 }) => {
+  const { theme } = useTheme();
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
-
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = !(respectReduceMotion && reduceMotion);
   useEffect(() => {
-    // Entrance animation
-    Animated.parallel([
-      createScaleInAnimation(scaleAnim, 0, 1, ANIMATION_DURATIONS.bounce),
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: ANIMATION_DURATIONS.bounce,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [scaleAnim, rotateAnim]);
-
+    if (shouldAnimate) {
+      Animated.parallel([
+        createScaleInAnimation(scaleAnim, 0, 1, ANIMATION_DURATIONS.bounce),
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: ANIMATION_DURATIONS.bounce,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      scaleAnim.setValue(1);
+      rotateAnim.setValue(0);
+    }
+  }, [scaleAnim, rotateAnim, shouldAnimate]);
   const rotation = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
-
   return (
     <AnimatedButton
       style={[
@@ -456,23 +421,23 @@ export const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
           width: size,
           height: size,
           borderRadius: size / 2,
-          backgroundColor,
+          backgroundColor: backgroundColor ?? theme.colors.primary[500],
           justifyContent: "center",
           alignItems: "center",
           elevation: 8,
-          shadowColor,
+          shadowColor: shadowColor ?? theme.colors.neutral[900],
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.3,
           shadowRadius: 8,
         },
         style,
-        {
-          transform: [{ scale: scaleAnim }, { rotate: rotation }],
-        },
+        { transform: [{ scale: scaleAnim }, { rotate: rotation }] },
       ]}
       {...props}
     >
-      <Animated.Text style={{ fontSize: size * 0.4 }}>{icon}</Animated.Text>
+      <Text style={{ fontSize: size * 0.4, color: theme.colors.text.primary }}>
+        {icon}
+      </Text>
     </AnimatedButton>
   );
 };
@@ -482,19 +447,24 @@ interface PulseViewProps extends ViewProps {
   isActive: boolean;
   pulseColor?: string;
   children: React.ReactNode;
+  respectReduceMotion?: boolean;
 }
 
 export const PulseView: React.FC<PulseViewProps> = ({
   isActive,
-  pulseColor = Colors.primary[500],
+  pulseColor,
   children,
   style,
+  respectReduceMotion = true,
   ...props
 }) => {
+  const { theme } = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const { reduceMotion } = useReduceMotion();
+  const shouldAnimate = isActive && !(respectReduceMotion && reduceMotion);
 
   useEffect(() => {
-    if (isActive) {
+    if (shouldAnimate) {
       const pulseAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -514,7 +484,7 @@ export const PulseView: React.FC<PulseViewProps> = ({
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isActive, pulseAnim]);
+  }, [shouldAnimate, pulseAnim]);
 
   return (
     <Animated.View

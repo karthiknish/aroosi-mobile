@@ -15,15 +15,14 @@ import SubscriptionCard from "@components/subscription/SubscriptionCard";
 // UsageDashboard is optional and not wired in this API-based flow
 import UpgradeConfirmationModal from "@components/subscription/UpgradeConfirmationModal";
 import PaywallModal from "@components/subscription/PaywallModal";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { useToast } from "@/providers/ToastContext";
 import { getPlans, getBillingPortalUrl } from "@services/subscriptions";
-import type {
-  SubscriptionPlan,
-  SubscriptionTier,
-} from "@/types/subscription";
+import type { SubscriptionPlan, SubscriptionTier } from "@/types/subscription";
 import { useInAppPurchase } from "@/hooks/useInAppPurchase";
 import { PRODUCT_IDS } from "@/types/inAppPurchase";
+import AppHeader from "@/components/common/AppHeader";
 
 // Helper to coerce backend ids to SubscriptionTier safely
 const asTier = (id: string): SubscriptionTier =>
@@ -64,6 +63,165 @@ export default function SubscriptionScreen({
   const queryClient = useQueryClient();
   const toast = useToast();
   const iap = useInAppPurchase();
+  const { theme } = useTheme();
+
+  // Theme-scoped styles
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        header: {
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: Layout.spacing.lg,
+          paddingVertical: Layout.spacing.md,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border.primary,
+        },
+        backButton: { padding: 8 },
+        backButtonText: {
+          fontSize: Layout.typography.fontSize.base,
+          color: theme.colors.primary[500],
+        },
+        headerTitle: {
+          fontSize: Layout.typography.fontSize.lg,
+          fontWeight: Layout.typography.fontWeight.bold,
+          color: theme.colors.text.primary,
+        },
+        placeholder: { width: 50 },
+        statusCard: {
+          marginHorizontal: Layout.spacing.lg,
+          marginTop: Layout.spacing.lg,
+          marginBottom: Layout.spacing.lg,
+          padding: Layout.spacing.lg,
+          backgroundColor: theme.colors.background.primary,
+          borderRadius: Layout.radius.lg,
+          borderWidth: 1,
+          borderColor: theme.colors.border.primary,
+        },
+        plansSection: {
+          marginHorizontal: Layout.spacing.lg,
+          marginBottom: Layout.spacing.lg,
+        },
+        plansTitle: {
+          fontFamily: Layout.typography.fontFamily.serif,
+          fontSize: Layout.typography.fontSize["2xl"],
+          fontWeight: Layout.typography.fontWeight.bold,
+          color: theme.colors.text.primary,
+          textAlign: "center",
+          marginBottom: Layout.spacing.lg,
+        },
+        loadingContainer: {
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        loadingText: {
+          marginTop: Layout.spacing.md,
+          fontSize: Layout.typography.fontSize.base,
+          color: theme.colors.text.secondary,
+        },
+        purchaseSection: {
+          marginHorizontal: Layout.spacing.lg,
+          marginBottom: Layout.spacing.lg,
+        },
+        purchaseButton: {
+          backgroundColor: theme.colors.primary[500],
+          paddingVertical: Layout.spacing.lg,
+          borderRadius: Layout.radius.lg,
+          alignItems: "center",
+        },
+        purchaseButtonText: {
+          color: theme.colors.text.inverse,
+          fontSize: Layout.typography.fontSize.lg,
+          fontWeight: Layout.typography.fontWeight.bold,
+        },
+        purchaseHelpText: {
+          marginTop: Layout.spacing.sm,
+          textAlign: "center",
+          color: theme.colors.text.secondary,
+          fontSize: Layout.typography.fontSize.sm,
+        },
+        statusTitle: {
+          fontFamily: Layout.typography.fontFamily.serif,
+          fontSize: Layout.typography.fontSize.lg,
+          fontWeight: Layout.typography.fontWeight.semibold,
+          color: theme.colors.text.primary,
+          marginBottom: Layout.spacing.sm,
+        },
+        statusActive: {
+          fontFamily: Layout.typography.fontFamily.sansSemiBold,
+          fontSize: Layout.typography.fontSize.base,
+          fontWeight: Layout.typography.fontWeight.semibold,
+          color: theme.colors.success[500],
+          marginBottom: Layout.spacing.xs,
+        },
+        statusFree: {
+          fontSize: Layout.typography.fontSize.base,
+          color: theme.colors.text.secondary,
+        },
+        statusExpiry: {
+          fontSize: Layout.typography.fontSize.sm,
+          color: theme.colors.text.secondary,
+        },
+        managementSection: {
+          paddingHorizontal: Layout.spacing.lg,
+          marginTop: Layout.spacing.lg,
+        },
+        usageHistoryButton: {
+          backgroundColor: theme.colors.background.primary,
+          paddingVertical: Layout.spacing.md,
+          borderRadius: Layout.radius.md,
+          alignItems: "center",
+          marginBottom: Layout.spacing.md,
+          borderWidth: 1,
+          borderColor: theme.colors.primary[500],
+        },
+        usageHistoryButtonText: {
+          color: theme.colors.primary[500],
+          fontSize: Layout.typography.fontSize.base,
+          fontWeight: Layout.typography.fontWeight.semibold,
+        },
+        cancelButton: {
+          backgroundColor: theme.colors.background.primary,
+          paddingVertical: Layout.spacing.md,
+          borderRadius: Layout.radius.md,
+          alignItems: "center",
+          marginBottom: Layout.spacing.md,
+          borderWidth: 1,
+          borderColor: theme.colors.error[500],
+        },
+        cancelButtonText: {
+          color: theme.colors.error[500],
+          fontSize: Layout.typography.fontSize.base,
+          fontWeight: Layout.typography.fontWeight.semibold,
+        },
+        restoreButton: {
+          backgroundColor: theme.colors.background.primary,
+          paddingVertical: Layout.spacing.md,
+          borderRadius: Layout.radius.md,
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor: theme.colors.primary[500],
+        },
+        restoreButtonText: {
+          color: theme.colors.primary[500],
+          fontSize: Layout.typography.fontSize.base,
+          fontWeight: Layout.typography.fontWeight.semibold,
+        },
+        termsSection: {
+          paddingHorizontal: Layout.spacing.lg,
+          paddingVertical: Layout.spacing.lg,
+        },
+        termsText: {
+          fontSize: Layout.typography.fontSize.xs,
+          color: theme.colors.text.secondary,
+          textAlign: "center",
+          lineHeight: 18,
+        },
+      }),
+    [theme]
+  );
 
   const profile = user?.profile as any | null;
   const currentTier: string = profile?.subscriptionPlan ?? "free";
@@ -250,16 +408,7 @@ export default function SubscriptionScreen({
   return (
     <>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AppHeader title="Subscription" onPressBack={() => navigation.goBack()} />
 
       {/* Current Status */}
       <View style={styles.statusCard}>
@@ -287,7 +436,7 @@ export default function SubscriptionScreen({
         <Text style={styles.plansTitle}>Choose Your Plan</Text>
         {loadingPlans ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary[500]} />
+            <ActivityIndicator size="large" color={theme.colors.primary[500]} />
             <Text style={styles.loadingText}>Loading plans...</Text>
           </View>
         ) : (
@@ -317,25 +466,27 @@ export default function SubscriptionScreen({
       </View>
 
       {/* Purchase Button */}
-  {selectedPlanId && selectedPlanId !== currentTier && selectedPlanId !== "free" && (
-        <View style={styles.purchaseSection}>
-          <TouchableOpacity
-            style={styles.purchaseButton}
-            onPress={() => handlePurchase(selectedPlanId)}
-            disabled={purchasing !== null}
-          >
-            {purchasing === selectedPlanId ? (
-              <ActivityIndicator color={Colors.background.primary} />
-            ) : (
-              <Text style={styles.purchaseButtonText}>Subscribe</Text>
-            )}
-          </TouchableOpacity>
-          <Text style={styles.purchaseHelpText}>
-            You can cancel anytime from Settings. Your plan will auto-renew each
-            month.
-          </Text>
-        </View>
-      )}
+      {selectedPlanId &&
+        selectedPlanId !== currentTier &&
+        selectedPlanId !== "free" && (
+          <View style={styles.purchaseSection}>
+            <TouchableOpacity
+              style={styles.purchaseButton}
+              onPress={() => handlePurchase(selectedPlanId)}
+              disabled={purchasing !== null}
+            >
+              {purchasing === selectedPlanId ? (
+                <ActivityIndicator color={theme.colors.background.primary} />
+              ) : (
+                <Text style={styles.purchaseButtonText}>Subscribe</Text>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.purchaseHelpText}>
+              You can cancel anytime from Settings. Your plan will auto-renew
+              each month.
+            </Text>
+          </View>
+        )}
 
       {/* Management Section */}
       <View style={styles.managementSection}>
@@ -372,7 +523,6 @@ export default function SubscriptionScreen({
           billing portal.
         </Text>
       </View>
-
       {/* Upgrade Confirmation Modal */}
       {upgradeTargetId && (
         <UpgradeConfirmationModal
@@ -428,199 +578,3 @@ export default function SubscriptionScreen({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  backButton: {
-    padding: 8,
-  },
-  backButtonText: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.primary[500],
-  },
-  headerTitle: {
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
-  },
-  placeholder: {
-    width: 50,
-  },
-  statusCard: {
-    marginHorizontal: Layout.spacing.lg,
-    marginTop: Layout.spacing.lg,
-    marginBottom: Layout.spacing.lg,
-    padding: Layout.spacing.lg,
-    backgroundColor: Colors.background.primary,
-    borderRadius: Layout.radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-  },
-  usageSection: {
-    marginHorizontal: Layout.spacing.lg,
-    marginBottom: Layout.spacing.lg,
-  },
-  plansSection: {
-    marginHorizontal: Layout.spacing.lg,
-    marginBottom: Layout.spacing.lg,
-  },
-  plansTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize["2xl"],
-    fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
-    textAlign: "center",
-    marginBottom: Layout.spacing.lg,
-  },
-  purchaseSection: {
-    marginHorizontal: Layout.spacing.lg,
-    marginBottom: Layout.spacing.lg,
-  },
-  purchaseButton: {
-    backgroundColor: Colors.primary[500],
-    paddingVertical: Layout.spacing.lg,
-    borderRadius: Layout.radius.lg,
-    alignItems: "center",
-  },
-  purchaseButtonText: {
-    color: Colors.text.inverse,
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.bold,
-  },
-  purchaseHelpText: {
-    marginTop: Layout.spacing.sm,
-    textAlign: "center",
-    color: Colors.text.secondary,
-    fontSize: Layout.typography.fontSize.sm,
-  },
-  statusTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: Layout.typography.fontWeight.semibold,
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.sm,
-  },
-  statusActive: {
-    fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-    color: Colors.success[500],
-    marginBottom: Layout.spacing.xs,
-  },
-  statusTrial: {
-    fontFamily: Layout.typography.fontFamily.sansSemiBold,
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-    color: Colors.warning[500],
-    marginBottom: Layout.spacing.xs,
-  },
-  statusFree: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
-  statusExpiry: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-  },
-  managementSection: {
-    paddingHorizontal: Layout.spacing.lg,
-    marginTop: Layout.spacing.lg,
-  },
-  usageHistoryButton: {
-    backgroundColor: Colors.background.primary,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    alignItems: "center",
-    marginBottom: Layout.spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.primary[500],
-  },
-  usageHistoryButtonText: {
-    color: Colors.primary[500],
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-  },
-  cancelButton: {
-    backgroundColor: Colors.background.primary,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    alignItems: "center",
-    marginBottom: Layout.spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.error[500],
-  },
-  cancelButtonText: {
-    color: Colors.error[500],
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-  },
-  restoreButton: {
-    backgroundColor: Colors.background.primary,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.primary[500],
-  },
-  restoreButtonText: {
-    color: Colors.primary[500],
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: Layout.typography.fontWeight.semibold,
-  },
-  termsSection: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.lg,
-  },
-  termsText: {
-    fontSize: Layout.typography.fontSize.xs,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  featureRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  featureTitle: {
-    flex: 2,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-  },
-  featureChecks: {
-    flex: 3,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  checkContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkMark: {
-    fontSize: Layout.typography.fontSize.lg,
-    color: Colors.primary[500],
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: Layout.spacing.md,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
-  // loading styles defined later after removing duplicates
-});

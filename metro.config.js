@@ -5,9 +5,11 @@ const config = getDefaultConfig(__dirname);
 
 // Workaround for Expo SDK 53 + Firebase dual-package hazard
 config.resolver = config.resolver || {};
-config.resolver.sourceExts = Array.from(new Set([...(config.resolver.sourceExts || []), 'cjs']));
-// @ts-ignore
-config.resolver.unstable_enablePackageExports = false;
+config.resolver.sourceExts = Array.from(
+  new Set([...(config.resolver.sourceExts || []), 'cjs'])
+);
+// Re-enabled package exports in SDK 54 by relying on Metro defaults (true)
+// Previously forced off for SDK 53 Firebase issues.
 
 // Add support for additional asset extensions
 config.resolver.assetExts.push(

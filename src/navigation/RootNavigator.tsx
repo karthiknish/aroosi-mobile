@@ -17,11 +17,12 @@ import { getScreenTransition } from "@/utils/navigationAnimations";
 
 // Loading screen
 import { View, ActivityIndicator } from "react-native";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
+  const { theme } = useTheme();
   const { user, isLoading } = useAuth();
   const userId = user?.id;
   const profile = user?.profile;
@@ -48,7 +49,7 @@ export default function RootNavigator() {
   if (isLoading || (userId && isProfileLoading)) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={Colors.primary[500]} />
+        <ActivityIndicator size="large" color={theme.colors.primary[500]} />
       </View>
     );
   }

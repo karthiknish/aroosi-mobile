@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useOfflineMessagingHealth } from "@/hooks/useOfflineMessaging";
-import { useToast } from "../../contexts/ToastContext";
+import { useToast } from "@providers/ToastContext";
 import { Colors, Layout } from "@constants";
 import { rgbaHex } from "@utils/color";
 
@@ -50,30 +50,14 @@ export const OfflineMessageStatus: React.FC<OfflineMessageStatusProps> = ({
   const handleActionPress = async (action: any) => {
     try {
       await action.action();
-      // Use a conservative toast API: .add or .notify; avoid .show which may not exist in typing
+      // Use active Toast provider API
       const msg = `${action.label} completed successfully`;
-      // @ts-ignore
-      if (typeof (toast as any)?.add === "function") {
-        // @ts-ignore
-        (toast as any).add({ message: msg, type: "success" });
-        // @ts-ignore
-      } else if (typeof (toast as any)?.notify === "function") {
-        // @ts-ignore
-        (toast as any).notify({ message: msg, type: "success" });
-      }
+      toast.show(msg, "success");
     } catch (error: any) {
       const errMsg =
         typeof error === "string" ? error : error?.message || "Unknown error";
       const msg = `Failed to ${action.label.toLowerCase()}: ${errMsg}`;
-      // @ts-ignore
-      if (typeof (toast as any)?.add === "function") {
-        // @ts-ignore
-        (toast as any).add({ message: msg, type: "danger" });
-        // @ts-ignore
-      } else if (typeof (toast as any)?.notify === "function") {
-        // @ts-ignore
-        (toast as any).notify({ message: msg, type: "danger" });
-      }
+      toast.show(msg, "error");
     }
   };
 

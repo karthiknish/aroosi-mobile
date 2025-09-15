@@ -14,7 +14,12 @@ if (!API_BASE_URL) {
 
 /**
  * Unified Messaging API Client aligned with web platform (uses EXPO_PUBLIC_API_URL only)
- * Implements the MessagingAPI interface for consistent cross-platform behavior
+ * Implements the MessagingAPI interface for consistent cross-platform behavior.
+ *
+ * Transport + compatibility notes:
+ * - Endpoints are normalized to include the "/api" prefix.
+ * - We prefer the canonical web endpoints and fall back to legacy ones on 404/NOT_FOUND
+ *   to keep mobile stable while the backend is unified.
  */
 export class UnifiedMessagingAPI implements MessagingAPI {
   private baseUrl: string;
@@ -70,8 +75,10 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   }
 
   /**
-   * Get messages for a conversation with pagination
-   * Aligned with web endpoint: /api/match-messages
+   * Get messages for a conversation with pagination (web-first with legacy fallback)
+   * Primary (web): GET /api/messages/messages?conversationId=...
+   * Fallback (legacy): GET /api/match-messages?conversationId=...
+   * Normalizes message shapes on success.
    */
   async getMessages(
     conversationId: string,
@@ -95,9 +102,20 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      const response = await this.request<UnifiedMessage[]>(
-        `/match-messages?${params}`
+      // Prefer web endpoint first: GET /api/messages/messages
+      let response = await this.request<UnifiedMessage[]>(
+        `/messages/messages?${params.toString()}`
       );
+
+      if (!response.success) {
+        const code = (response as any)?.error?.code || "";
+        if (code === "HTTP_404" || code === "NOT_FOUND") {
+          // Fallback to legacy: GET /api/match-messages
+          response = await this.request<UnifiedMessage[]>(
+            `/match-messages?${params.toString()}`
+          );
+        }
+      }
 
       if (response.success && response.data) {
         // Normalize messages for backward compatibility
@@ -117,8 +135,10 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   }
 
   /**
-   * Send a message (text, voice, or image)
-   * Aligned with web endpoint: /api/match-messages
+   * Send a message (text, voice, or image) (web-first with legacy fallback)
+   * Primary (web): POST /api/messages/send
+   * Fallback (legacy): POST /api/match-messages
+   * Normalizes message shape on success.
    */
   async sendMessage(data: {
     conversationId: string;
@@ -148,7 +168,8 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      const response = await this.request<UnifiedMessage>("/match-messages", {
+      // Prefer web endpoint first: POST /api/messages/send
+      let response = await this.request<UnifiedMessage>("/messages/send", {
         method: "POST",
         body: JSON.stringify({
           conversationId: data.conversationId,
@@ -167,6 +188,31 @@ export class UnifiedMessagingAPI implements MessagingAPI {
           replyToFromUserId: data.replyTo?.fromUserId,
         }),
       });
+
+      if (!response.success) {
+        const code = (response as any)?.error?.code || "";
+        if (code === "HTTP_404" || code === "NOT_FOUND") {
+          // Fallback to legacy: POST /api/match-messages
+          response = await this.request<UnifiedMessage>("/match-messages", {
+            method: "POST",
+            body: JSON.stringify({
+              conversationId: data.conversationId,
+              fromUserId: data.fromUserId,
+              toUserId: data.toUserId,
+              text: data.text || "",
+              type: data.type || "text",
+              audioStorageId: data.audioStorageId,
+              duration: data.duration,
+              fileSize: data.fileSize,
+              mimeType: data.mimeType,
+              replyToMessageId: data.replyTo?.messageId,
+              replyToText: data.replyTo?.text,
+              replyToType: data.replyTo?.type,
+              replyToFromUserId: data.replyTo?.fromUserId,
+            }),
+          });
+        }
+      }
 
       if (response.success && response.data) {
         // Normalize message for backward compatibility
@@ -253,8 +299,9 @@ export class UnifiedMessagingAPI implements MessagingAPI {
   }
 
   /**
-   * Mark conversation as read
-   * Aligned with web endpoint: /api/messages/read
+   * Mark conversation as read (web-first with legacy fallback)
+   * Primary (web): POST /api/messages/mark-read
+   * Fallback (legacy): POST /api/messages/read
    */
   async markConversationAsRead(
     conversationId: string
@@ -269,10 +316,22 @@ export class UnifiedMessagingAPI implements MessagingAPI {
     }
 
     try {
-      return await this.request<void>("/messages/read", {
+      // Prefer web endpoint first: POST /api/messages/mark-read
+      let res = await this.request<void>("/messages/mark-read", {
         method: "POST",
         body: JSON.stringify({ conversationId }),
       });
+      if (!res.success) {
+        const code = (res as any)?.error?.code || "";
+        if (code === "HTTP_404" || code === "NOT_FOUND") {
+          // Fallback to legacy: POST /api/messages/read
+          res = await this.request<void>("/messages/read", {
+            method: "POST",
+            body: JSON.stringify({ conversationId }),
+          });
+        }
+      }
+      return res;
     } catch (error: any) {
       const message =
         error?.message ||

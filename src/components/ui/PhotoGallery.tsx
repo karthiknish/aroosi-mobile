@@ -27,7 +27,7 @@ import Animated, {
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
-import { Colors } from "../../../constants/Colors";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
@@ -59,6 +59,18 @@ const ZoomableImage: React.FC<ZoomableImageProps> = ({
   onSingleTap,
   onDoubleTap,
 }) => {
+  const zoomStyles = StyleSheet.create({
+    zoomableContainer: {
+      width: screenWidth,
+      height: screenHeight,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    zoomableImage: {
+      width: screenWidth,
+      height: screenHeight,
+    },
+  });
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -149,10 +161,10 @@ const ZoomableImage: React.FC<ZoomableImageProps> = ({
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.zoomableContainer, animatedStyle]}>
+    <Animated.View style={[zoomStyles.zoomableContainer, animatedStyle]}>
         <Image
           source={{ uri }}
-          style={styles.zoomableImage}
+      style={zoomStyles.zoomableImage}
           resizeMode="contain"
         />
       </Animated.View>
@@ -168,6 +180,192 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
   onPhotoChange,
   style,
 }) => {
+  const { theme } = useTheme();
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      galleryContainer: {
+        flex: 1,
+        backgroundColor: t.colors.background.primary,
+      },
+      photoContainer: {
+        width: screenWidth,
+        height: screenHeight,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      zoomableContainer: {
+        width: screenWidth,
+        height: screenHeight,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      zoomableImage: {
+        width: screenWidth,
+        height: screenHeight,
+      },
+      controlsOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        pointerEvents: "box-none",
+      },
+      header: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+      },
+      headerGradient: {
+        paddingTop: 20,
+        paddingBottom: 20,
+      },
+      headerContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 20,
+      },
+      closeButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      closeButtonText: {
+        color: t.colors.background.primary,
+        fontSize: 18,
+        fontWeight: "600",
+      },
+      photoInfo: {
+        flex: 1,
+        alignItems: "center",
+        marginHorizontal: 20,
+      },
+      photoCounter: {
+        color: t.colors.background.primary,
+        fontSize: 16,
+        fontWeight: "600",
+      },
+      photoCaption: {
+        color: t.colors.background.primary,
+        fontSize: 14,
+        textAlign: "center",
+        marginTop: 4,
+        opacity: 0.8,
+      },
+      shareButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      shareButtonText: {
+        fontSize: 18,
+      },
+      navButtonLeft: {
+        position: "absolute",
+        left: 20,
+        top: "50%",
+        marginTop: -25,
+        zIndex: 10,
+      },
+      navButtonRight: {
+        position: "absolute",
+        right: 20,
+        top: "50%",
+        marginTop: -25,
+        zIndex: 10,
+      },
+      navButtonBackground: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      navButtonText: {
+        color: t.colors.background.primary,
+        fontSize: 24,
+        fontWeight: "600",
+      },
+      bottomControls: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10,
+      },
+      bottomGradient: {
+        paddingTop: 40,
+        paddingBottom: 20,
+      },
+      thumbnailsContainer: {
+        paddingHorizontal: 20,
+      },
+      thumbnail: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        marginRight: 12,
+        overflow: "hidden",
+        borderWidth: 2,
+        borderColor: "transparent",
+      },
+      activeThumbnail: {
+        borderColor: t.colors.primary[500],
+      },
+      thumbnailImage: {
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
+      },
+      mainBadge: {
+        position: "absolute",
+        top: 4,
+        right: 4,
+        backgroundColor: t.colors.primary[500],
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+      },
+      mainBadgeText: {
+        color: t.colors.background.primary,
+        fontSize: 10,
+        fontWeight: "600",
+      },
+      gridContainer: {
+        flex: 1,
+      },
+      gridItem: {
+        borderRadius: 12,
+        overflow: "hidden",
+        position: "relative",
+      },
+      gridImage: {
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
+      },
+      gridMainBadge: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        backgroundColor: t.colors.primary[500],
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+      },
+      gridMainBadgeText: {
+        color: t.colors.background.primary,
+        fontSize: 12,
+        fontWeight: "600",
+      },
+    })
+  );
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isVisible, setIsVisible] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -264,13 +462,13 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       onRequestClose={handleClose}
     >
       <StatusBar hidden />
-      <View style={styles.galleryContainer}>
+  <View style={styles.galleryContainer}>
         {/* Background */}
         <BlurView intensity={100} style={StyleSheet.absoluteFill} />
         <View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: rgbaHex(Colors.text.primary, 0.9) },
+    { backgroundColor: rgbaHex(theme.colors.text.primary, 0.9) },
           ]}
         />
 
@@ -302,7 +500,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           {/* Header */}
           <SafeAreaView style={styles.header}>
             <LinearGradient
-              colors={[rgbaHex(Colors.text.primary, 0.8), "transparent"]}
+              colors={[rgbaHex(theme.colors.text.primary, 0.8), "transparent"]}
               style={styles.headerGradient}
             >
               <View style={styles.headerContent}>
@@ -355,7 +553,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
           {photos.length > 1 && (
             <View style={styles.bottomControls}>
               <LinearGradient
-                colors={["transparent", rgbaHex(Colors.text.primary, 0.8)]}
+                colors={["transparent", rgbaHex(theme.colors.text.primary, 0.8)]}
                 style={styles.bottomGradient}
               >
                 <FlatList
@@ -391,6 +589,37 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
   spacing = 8,
   style,
 }) => {
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      gridContainer: {
+        flex: 1,
+      },
+      gridItem: {
+        borderRadius: 12,
+        overflow: "hidden",
+        position: "relative",
+      },
+      gridImage: {
+        width: "100%",
+        height: "100%",
+        resizeMode: "cover",
+      },
+      gridMainBadge: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        backgroundColor: t.colors.primary[500],
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+      },
+      gridMainBadgeText: {
+        color: t.colors.background.primary,
+        fontSize: 12,
+        fontWeight: "600",
+      },
+    })
+  );
   const itemSize = (screenWidth - spacing * (columns + 1)) / columns;
 
   const renderPhoto = ({ item, index }: { item: PhotoItem; index: number }) => (
@@ -429,186 +658,4 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  galleryContainer: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  photoContainer: {
-    width: screenWidth,
-    height: screenHeight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  zoomableContainer: {
-    width: screenWidth,
-    height: screenHeight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  zoomableImage: {
-    width: screenWidth,
-    height: screenHeight,
-  },
-  controlsOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    pointerEvents: "box-none",
-  },
-  header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  headerGradient: {
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-  headerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeButtonText: {
-    color: Colors.background.primary,
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  photoInfo: {
-    flex: 1,
-    alignItems: "center",
-    marginHorizontal: 20,
-  },
-  photoCounter: {
-    color: Colors.background.primary,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  photoCaption: {
-    color: Colors.background.primary,
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 4,
-    opacity: 0.8,
-  },
-  shareButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shareButtonText: {
-    fontSize: 18,
-  },
-  navButtonLeft: {
-    position: "absolute",
-    left: 20,
-    top: "50%",
-    marginTop: -25,
-    zIndex: 10,
-  },
-  navButtonRight: {
-    position: "absolute",
-    right: 20,
-    top: "50%",
-    marginTop: -25,
-    zIndex: 10,
-  },
-  navButtonBackground: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navButtonText: {
-    color: Colors.background.primary,
-    fontSize: 24,
-    fontWeight: "600",
-  },
-  bottomControls: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  bottomGradient: {
-    paddingTop: 40,
-    paddingBottom: 20,
-  },
-  thumbnailsContainer: {
-    paddingHorizontal: 20,
-  },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  activeThumbnail: {
-    borderColor: Colors.primary[500],
-  },
-  thumbnailImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  mainBadge: {
-    position: "absolute",
-    top: 4,
-    right: 4,
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  mainBadgeText: {
-    color: Colors.background.primary,
-    fontSize: 10,
-    fontWeight: "600",
-  },
-  gridContainer: {
-    flex: 1,
-  },
-  gridItem: {
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
-  },
-  gridImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  gridMainBadge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  gridMainBadgeText: {
-    color: Colors.background.primary,
-    fontSize: 12,
-    fontWeight: "600",
-  },
-});
+// themed styles are provided above via useThemedStyles

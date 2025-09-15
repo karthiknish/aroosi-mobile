@@ -1,6 +1,7 @@
 import React from "react";
 import { createStackNavigator } from "@react-navigation/stack";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 // Import auth screens
 import LoginScreen from "../screens/auth/LoginScreen";
@@ -18,15 +19,16 @@ export type AuthStackParamList = {
 const Stack = createStackNavigator<AuthStackParamList>();
 
 export default function AuthNavigator() {
+  const { theme } = useTheme();
   return (
     <Stack.Navigator
       id={undefined}
       screenOptions={{
         ...getScreenTransition("default"),
         headerStyle: {
-          backgroundColor: Colors.background.secondary,
+          backgroundColor: theme.colors.background.secondary,
         },
-        headerTintColor: Colors.text.primary,
+        headerTintColor: theme.colors.text.primary,
         headerTitleStyle: {
           fontFamily: Layout.typography.fontFamily.serif,
         },

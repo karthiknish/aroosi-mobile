@@ -1,0 +1,158 @@
+name: EAS Build and Submit
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (ios|android|all)'
+        required: false
+        default: 'all'
+      profile:
+        description: 'EAS build profile (staging|production|development|development-device|production-apk)'
+        required: false
+        default: 'production'
+      submit:
+        description: 'Submit to stores after build? (true|false)'
+        required: false
+        default: 'true'
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build via EAS
+    runs-on: macos-14
+    timeout-minutes: 90
+    env:
+      NODE_VERSION: '20'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install EAS CLI
+        run: npm i -g eas-cli@latest
+
+      - name: Login to Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "${EXPO_TOKEN}" ]; then
+            echo "EXPO_TOKEN secret is required" >&2
+            exit 1
+          fi
+          eas whoami || eas login --token "$EXPO_TOKEN"
+
+      - name: Prepare credentials files
+        run: |
+          mkdir -p secrets
+          if [ -n "${ASC_API_KEY_P8}" ]; then
+            echo "$ASC_API_KEY_P8" | base64 --decode > secrets/asc-api-key.p8
+            echo "Created secrets/asc-api-key.p8"
+          else
+            echo "ASC_API_KEY_P8 not provided; iOS submit may fail if required"
+          fi
+
+          if [ -n "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | base64 --decode > secrets/google-service-account.json
+            echo "Created secrets/google-service-account.json"
+          else
+            echo "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON not provided; Android submit may fail if required"
+          fi
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+
+      - name: Select platforms
+        id: select
+        run: |
+          INPUT_PLATFORM=${{ github.event.inputs.platform || 'all' }}
+          case "$INPUT_PLATFORM" in
+            ios)  echo "platforms=ios"  >> $GITHUB_OUTPUT ;;
+            android) echo "platforms=android" >> $GITHUB_OUTPUT ;;
+            all|*) echo "platforms=ios android" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Build iOS
+        if: contains(steps.select.outputs.platforms, 'ios')
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'production' }}
+          eas build --platform ios --profile "$PROFILE" --non-interactive
+
+      - name: Build Android
+        if: contains(steps.select.outputs.platforms, 'android')
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'production' }}
+          eas build --platform android --profile "$PROFILE" --non-interactive
+
+      - name: Output build dashboard links
+        if: always()
+        run: |
+          echo "Check builds at: https://expo.dev/accounts/karthiknish/projects/aroosi/builds"
+
+  submit:
+    name: Submit to Stores
+    needs: build
+    if: ${{ github.event.inputs.submit != 'false' }}
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install EAS CLI
+        run: npm i -g eas-cli@latest
+
+      - name: Login to Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas whoami || eas login --token "$EXPO_TOKEN"
+
+      - name: Restore credentials files
+        run: |
+          mkdir -p secrets
+          if [ -n "${ASC_API_KEY_P8}" ]; then
+            echo "$ASC_API_KEY_P8" | base64 --decode > secrets/asc-api-key.p8
+          fi
+          if [ -n "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "$GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" | base64 --decode > secrets/google-service-account.json
+          fi
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+
+      - name: Submit iOS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'production' }}
+          eas submit --platform ios --profile "$PROFILE" --non-interactive || echo "iOS submit step finished (may have failed if creds missing)"
+
+      - name: Submit Android
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          PROFILE=${{ github.event.inputs.profile || 'production' }}
+          eas submit --platform android --profile "$PROFILE" --non-interactive || echo "Android submit step finished (may have failed if creds missing)"

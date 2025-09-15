@@ -56,25 +56,53 @@ export function useMessageImageUpload(conversationId: string) {
       }
 
       setProgress(15);
+      const fileBlob = await(await fetch(image.uri)).blob();
+
+      // Try multipart-first (web-aligned)
+      const multi = await apiClient.uploadMessageImageMultipart({
+        conversationId,
+        fromUserId: "", // server infers from auth; kept for parity
+        toUserId: "", // not strictly required for server logic
+        file: fileBlob,
+        fileName: image.name,
+        contentType: image.type,
+        width: image.width,
+        height: image.height,
+      });
+
+      if (multi.success && multi.data) {
+        setProgress(100);
+        const messageId = (multi.data as any).messageId;
+        const imageUrl = (multi.data as any).imageUrl;
+        if (messageId && imageUrl) return { messageId, imageUrl };
+        // If not provided, attempt to fetch image URL via messageId
+        if (messageId) {
+          const urlRes = await apiClient.getMessageImageUrl(messageId);
+          if (urlRes.success && urlRes.data?.imageUrl) {
+            return { messageId, imageUrl: urlRes.data.imageUrl } as any;
+          }
+        }
+      }
+
+      // Fallback to existing two-step flow if multipart not available
+      setProgress(25);
       const urlResp = await apiClient.getMessageImageUploadUrl(conversationId);
       if (!urlResp.success || !urlResp.data?.uploadUrl) {
         throw new Error(urlResp.error?.message || "Failed to get upload URL");
       }
       const uploadUrl = (urlResp.data as any).uploadUrl as string;
-      setProgress(30);
+      setProgress(40);
 
-      // Perform PUT upload
       const putRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": image.type },
-        body: await (await fetch(image.uri)).blob(),
+        body: fileBlob,
       });
       if (!putRes.ok) {
         throw new Error(`Storage upload failed (${putRes.status})`);
       }
       setProgress(75);
 
-      // Derive storageId from URL similar to profile images pattern
       const match = uploadUrl.match(/messages\/images\/([\w-]+)/);
       const storageId = match ? match[1] : undefined;
       if (!storageId) throw new Error("Unable to extract storageId");

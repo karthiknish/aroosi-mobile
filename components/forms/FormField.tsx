@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TextInputProps,
 } from "react-native";
-import { Colors } from "../../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
@@ -36,6 +36,7 @@ export function FormField({
 }: FormFieldProps) {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
+  const { theme } = useTheme();
 
   const styles = StyleSheet.create({
     container: {
@@ -44,36 +45,36 @@ export function FormField({
     label: {
       fontSize: fontSize.base,
       fontWeight: "600",
-      color: Colors.gray[900],
+      color: theme.colors.gray[900],
       marginBottom: spacing.sm,
       fontFamily: "NunitoSans-SemiBold",
     },
     required: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
     },
     input: {
       borderWidth: 1,
-      borderColor: Colors.gray[300],
+      borderColor: theme.colors.gray[300],
       borderRadius: spacing.sm,
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.sm + spacing.xs,
       fontSize: fontSize.base,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       fontFamily: "NunitoSans-Regular",
     },
     inputError: {
-      borderColor: Colors.error[500],
-      backgroundColor: Colors.error[50],
+      borderColor: theme.colors.error[500],
+      backgroundColor: theme.colors.error[50],
     },
     error: {
       fontSize: fontSize.sm,
-      color: Colors.error[500],
+      color: theme.colors.error[500],
       marginTop: spacing.xs,
       fontFamily: "NunitoSans-Regular",
     },
     helperText: {
       fontSize: fontSize.sm,
-      color: Colors.gray[600],
+      color: theme.colors.gray[600],
       marginTop: spacing.xs,
       fontFamily: "NunitoSans-Regular",
     },
@@ -88,7 +89,7 @@ export function FormField({
 
       <TextInput
         style={[styles.input, error && styles.inputError, inputStyle]}
-        placeholderTextColor={Colors.gray[400]}
+        placeholderTextColor={theme.colors.gray[400]}
         {...textInputProps}
       />
 

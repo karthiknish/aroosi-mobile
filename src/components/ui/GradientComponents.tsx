@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 
 // Gradient Button Component
@@ -34,24 +34,45 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   const getVariantColors = () => {
     switch (variant) {
       case "primary":
-        return [Colors.primary[500], Colors.primary[600], Colors.primary[700]];
+        return [
+          theme.colors.primary[500],
+          theme.colors.primary[600],
+          theme.colors.primary[700],
+        ];
       case "secondary":
         return [
-          Colors.secondary[500],
-          Colors.secondary[600],
-          Colors.secondary[700],
+          theme.colors.secondary[500],
+          theme.colors.secondary[600],
+          theme.colors.secondary[700],
         ];
       case "success":
-        return [Colors.success[500], Colors.success[600], Colors.success[700]];
+        return [
+          theme.colors.success[500],
+          theme.colors.success[600],
+          theme.colors.success[700],
+        ];
       case "error":
-        return [Colors.error[500], Colors.error[600], Colors.error[700]];
+        return [
+          theme.colors.error[500],
+          theme.colors.error[600],
+          theme.colors.error[700],
+        ];
       case "warning":
-        return [Colors.warning[500], Colors.warning[600], Colors.warning[700]];
+        return [
+          theme.colors.warning[500],
+          theme.colors.warning[600],
+          theme.colors.warning[700],
+        ];
       default:
-        return [Colors.primary[500], Colors.primary[600], Colors.primary[700]];
+        return [
+          theme.colors.primary[500],
+          theme.colors.primary[600],
+          theme.colors.primary[700],
+        ];
     }
   };
 
@@ -103,7 +124,10 @@ export const GradientButton: React.FC<GradientButtonProps> = ({
         <Text
           style={[
             styles.gradientButtonText,
-            { fontSize: sizeStyles.fontSize },
+            {
+              fontSize: sizeStyles.fontSize,
+              color: theme.colors.background.primary,
+            },
             textStyle,
           ]}
         >
@@ -130,10 +154,11 @@ export const GlassmorphismCard: React.FC<GlassmorphismCardProps> = ({
   tint = "light",
   borderRadius = 16,
   borderWidth = 1,
-  borderColor = rgbaHex(Colors.background.primary, 0.2),
+  borderColor,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   return (
     <View
       style={[
@@ -141,7 +166,8 @@ export const GlassmorphismCard: React.FC<GlassmorphismCardProps> = ({
         {
           borderRadius,
           borderWidth,
-          borderColor,
+          borderColor:
+            borderColor ?? rgbaHex(theme.colors.background.primary, 0.2),
         },
         style,
       ]}
@@ -152,7 +178,14 @@ export const GlassmorphismCard: React.FC<GlassmorphismCardProps> = ({
         tint={tint}
         style={[styles.blurView, { borderRadius }]}
       >
-        <View style={styles.glassmorphismContent}>{children}</View>
+        <View
+          style={[
+            styles.glassmorphismContent,
+            { backgroundColor: rgbaHex(theme.colors.background.primary, 0.1) },
+          ]}
+        >
+          {children}
+        </View>
       </BlurView>
     </View>
   );
@@ -166,12 +199,13 @@ interface GradientBackgroundProps extends ViewProps {
 }
 
 export const GradientBackground: React.FC<GradientBackgroundProps> = ({
-  colors = [Colors.primary[500], Colors.secondary[500]],
+  colors,
   direction = "diagonal",
   children,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   const getGradientDirection = () => {
     switch (direction) {
       case "vertical":
@@ -187,7 +221,7 @@ export const GradientBackground: React.FC<GradientBackgroundProps> = ({
 
   return (
     <LinearGradient
-      colors={colors as any}
+      colors={(colors || (theme.colors.gradient.primary as any)) as any}
       style={[styles.gradientBackground, style]}
       start={gradientDirection.start}
       end={gradientDirection.end}
@@ -209,15 +243,22 @@ interface GradientBorderProps extends ViewProps {
 
 export const GradientBorder: React.FC<GradientBorderProps> = ({
   children,
-  colors = [Colors.primary[500], Colors.secondary[500], Colors.primary[500]],
+  colors,
   borderWidth = 2,
   borderRadius = 12,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   return (
     <LinearGradient
-      colors={colors as any}
+      colors={
+        (colors || [
+          theme.colors.primary[500],
+          theme.colors.secondary[500],
+          theme.colors.primary[500],
+        ]) as any
+      }
       style={[
         styles.gradientBorderContainer,
         {
@@ -235,7 +276,7 @@ export const GradientBorder: React.FC<GradientBorderProps> = ({
           styles.gradientBorderContent,
           {
             borderRadius,
-            backgroundColor: Colors.background.primary,
+            backgroundColor: theme.colors.background.primary,
           },
         ]}
       >
@@ -256,20 +297,18 @@ interface FloatingGradientCardProps extends ViewProps {
 export const FloatingGradientCard: React.FC<FloatingGradientCardProps> = ({
   children,
   elevation = 8,
-  shadowColor = Colors.neutral[900],
-  gradientColors = [
-    rgbaHex(Colors.background.primary, 0.9),
-    rgbaHex(Colors.background.primary, 0.7),
-  ],
+  shadowColor,
+  gradientColors,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   return (
     <View
       style={[
         styles.floatingCard,
         {
-          shadowColor,
+          shadowColor: shadowColor ?? theme.colors.neutral[900],
           shadowOffset: { width: 0, height: elevation / 2 },
           shadowOpacity: 0.25,
           shadowRadius: elevation,
@@ -280,7 +319,12 @@ export const FloatingGradientCard: React.FC<FloatingGradientCardProps> = ({
       {...props}
     >
       <LinearGradient
-        colors={gradientColors as any}
+        colors={
+          (gradientColors || [
+            rgbaHex(theme.colors.background.primary, 0.9),
+            rgbaHex(theme.colors.background.primary, 0.7),
+          ]) as any
+        }
         style={styles.floatingCardGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -303,14 +347,11 @@ export const Shimmer: React.FC<ShimmerProps> = ({
   width = "100%",
   height = 20,
   borderRadius = 4,
-  colors = [
-    rgbaHex(Colors.background.primary, 0.1),
-    rgbaHex(Colors.background.primary, 0.3),
-    rgbaHex(Colors.background.primary, 0.1),
-  ],
+  colors,
   style,
   ...props
 }) => {
+  const { theme } = useTheme();
   return (
     <View
       style={[
@@ -319,13 +360,20 @@ export const Shimmer: React.FC<ShimmerProps> = ({
           width: width as any,
           height,
           borderRadius,
+          backgroundColor: theme.colors.neutral[200],
         },
         style,
       ]}
       {...props}
     >
       <LinearGradient
-        colors={colors as any}
+        colors={
+          (colors || [
+            rgbaHex(theme.colors.background.primary, 0.1),
+            rgbaHex(theme.colors.background.primary, 0.3),
+            rgbaHex(theme.colors.background.primary, 0.1),
+          ]) as any
+        }
         style={styles.shimmerGradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
@@ -343,20 +391,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   gradientButtonText: {
-    color: Colors.background.primary,
     fontWeight: "600",
     textAlign: "center",
   },
   glassmorphismContainer: {
     overflow: "hidden",
-    backgroundColor: rgbaHex(Colors.background.primary, 0.1),
   },
   blurView: {
     flex: 1,
   },
   glassmorphismContent: {
     flex: 1,
-    backgroundColor: rgbaHex(Colors.background.primary, 0.1),
   },
   gradientBackground: {
     flex: 1,
@@ -377,7 +422,6 @@ const styles = StyleSheet.create({
   },
   shimmerContainer: {
     overflow: "hidden",
-    backgroundColor: Colors.neutral[200],
   },
   shimmerGradient: {
     flex: 1,

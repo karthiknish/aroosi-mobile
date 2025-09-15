@@ -4,14 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  Switch,
-  TouchableOpacity,
-  Platform,
-} from "react-native";
+import { View, Text, StyleSheet, Switch, TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useApiClient } from "@/utils/api";
 import { useOneSignal } from "@/hooks/useOneSignal";
@@ -23,7 +16,7 @@ import {
   NotificationPermissionStatus,
   NotificationType,
 } from "@/types/notifications";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import { Layout } from "@constants/Layout";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
@@ -44,29 +37,52 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
   value,
   onToggle,
   disabled = false,
-}) => (
-  <View style={styles.settingsRow}>
-    <View style={styles.settingsContent}>
-      <Text style={[styles.settingsTitle, disabled && styles.disabledText]}>
-        {title}
-      </Text>
-      {description && (
+}) => {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={[
+        styles.settingsRow,
+        { backgroundColor: theme.colors.background.primary },
+      ]}
+    >
+      <View style={styles.settingsContent}>
         <Text
-          style={[styles.settingsDescription, disabled && styles.disabledText]}
+          style={[
+            styles.settingsTitle,
+            { color: theme.colors.text.primary },
+            disabled && { color: theme.colors.gray[500] },
+          ]}
         >
-          {description}
+          {title}
         </Text>
-      )}
+        {description && (
+          <Text
+            style={[
+              styles.settingsDescription,
+              { color: theme.colors.text.secondary },
+              disabled && { color: theme.colors.gray[500] },
+            ]}
+          >
+            {description}
+          </Text>
+        )}
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onToggle}
+        disabled={disabled}
+        trackColor={{
+          false: theme.colors.gray[300],
+          true: theme.colors.primary[500],
+        }}
+        thumbColor={
+          value ? theme.colors.background.primary : theme.colors.gray[100]
+        }
+      />
     </View>
-    <Switch
-      value={value}
-      onValueChange={onToggle}
-      disabled={disabled}
-      trackColor={{ false: Colors.gray[300], true: Colors.primary[500] }}
-      thumbColor={value ? Colors.background.primary : Colors.gray[100]}
-    />
-  </View>
-);
+  );
+};
 
 export default function NotificationSettingsScreen() {
   const {
@@ -285,10 +301,20 @@ export default function NotificationSettingsScreen() {
     );
   };
 
+  const { theme } = useTheme();
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading preferences...</Text>
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: theme.colors.background.primary },
+        ]}
+      >
+        <Text
+          style={[styles.loadingText, { color: theme.colors.text.secondary }]}
+        >
+          Loading preferences...
+        </Text>
       </View>
     );
   }
@@ -298,23 +324,46 @@ export default function NotificationSettingsScreen() {
 
   return (
     <ScreenContainer
-      containerStyle={styles.container}
+      containerStyle={[
+        styles.container,
+        { backgroundColor: theme.colors.background.primary },
+      ]}
       contentStyle={styles.contentContainer}
     >
       {/* Permission Status Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notification Status</Text>
+        <Text
+          style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+        >
+          Notification Status
+        </Text>
 
-        <View style={styles.statusCard}>
+        <View
+          style={[
+            styles.statusCard,
+            {
+              backgroundColor: theme.colors.background.primary,
+              borderColor: theme.colors.border.primary,
+              borderWidth: 1,
+            },
+          ]}
+        >
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>System Permissions:</Text>
+            <Text
+              style={[
+                styles.statusLabel,
+                { color: theme.colors.text.secondary },
+              ]}
+            >
+              System Permissions:
+            </Text>
             <Text
               style={[
                 styles.statusValue,
                 {
                   color: notificationsEnabled
-                    ? Colors.success[500]
-                    : Colors.error[500],
+                    ? theme.colors.success[500]
+                    : theme.colors.error[500],
                 },
               ]}
             >
@@ -323,14 +372,21 @@ export default function NotificationSettingsScreen() {
           </View>
 
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Push Registration:</Text>
+            <Text
+              style={[
+                styles.statusLabel,
+                { color: theme.colors.text.secondary },
+              ]}
+            >
+              Push Registration:
+            </Text>
             <Text
               style={[
                 styles.statusValue,
                 {
                   color: isRegistered
-                    ? Colors.success[500]
-                    : Colors.warning[500],
+                    ? theme.colors.success[500]
+                    : theme.colors.warning[500],
                 },
               ]}
             >
@@ -341,10 +397,20 @@ export default function NotificationSettingsScreen() {
 
         {systemPermissionStatus === "denied" && (
           <TouchableOpacity
-            style={styles.permissionButton}
+            style={[
+              styles.permissionButton,
+              { backgroundColor: theme.colors.primary[500] },
+            ]}
             onPress={() => NotificationPermissionsManager.showSettingsAlert()}
           >
-            <Text style={styles.permissionButtonText}>Enable in Settings</Text>
+            <Text
+              style={[
+                styles.permissionButtonText,
+                { color: theme.colors.text.inverse },
+              ]}
+            >
+              Enable in Settings
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -362,7 +428,11 @@ export default function NotificationSettingsScreen() {
 
       {/* Notification Types Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notification Types</Text>
+        <Text
+          style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+        >
+          Notification Types
+        </Text>
 
         <SettingsRow
           title="New Messages"
@@ -427,7 +497,11 @@ export default function NotificationSettingsScreen() {
 
       {/* Sound & Vibration Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sound & Vibration</Text>
+        <Text
+          style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+        >
+          Sound & Vibration
+        </Text>
 
         <SettingsRow
           title="Sound"
@@ -448,19 +522,33 @@ export default function NotificationSettingsScreen() {
 
       {/* Notification Management */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notification Management</Text>
+        <Text
+          style={[styles.sectionTitle, { color: theme.colors.text.primary }]}
+        >
+          Notification Management
+        </Text>
 
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[
+            styles.actionButton,
+            { backgroundColor: theme.colors.primary[500] },
+          ]}
           onPress={clearAllNotifications}
         >
-          <Text style={styles.actionButtonText}>Clear All Notifications</Text>
+          <Text
+            style={[
+              styles.actionButtonText,
+              { color: theme.colors.text.inverse },
+            ]}
+          >
+            Clear All Notifications
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* Help Section */}
       <View style={styles.section}>
-        <Text style={styles.helpText}>
+        <Text style={[styles.helpText, { color: theme.colors.text.secondary }]}>
           Notifications help you stay connected with your matches and never miss
           important updates. You can customize which types of notifications you
           receive and when you receive them.
@@ -473,7 +561,6 @@ export default function NotificationSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
   },
   contentContainer: {
     paddingHorizontal: Layout.spacing.lg,
@@ -484,7 +571,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: Layout.spacing.xl,
     fontSize: 16,
-    color: Colors.text.secondary,
   },
   section: {
     marginBottom: Layout.spacing.lg,
@@ -492,11 +578,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },
   statusCard: {
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.md,
     padding: Layout.spacing.md,
     marginBottom: Layout.spacing.sm,
@@ -509,28 +593,24 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 16,
-    color: Colors.text.secondary,
   },
   statusValue: {
     fontSize: 16,
     fontWeight: "600",
   },
   permissionButton: {
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.md,
     paddingVertical: Layout.spacing.sm,
     paddingHorizontal: Layout.spacing.md,
     alignItems: "center",
   },
   permissionButtonText: {
-    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
   },
   settingsRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.md,
     padding: Layout.spacing.md,
     marginBottom: Layout.spacing.sm,
@@ -542,16 +622,13 @@ const styles = StyleSheet.create({
   settingsTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   settingsDescription: {
     fontSize: 14,
-    color: Colors.text.secondary,
     lineHeight: 20,
   },
   actionButton: {
-    backgroundColor: Colors.background.primary,
     borderRadius: Layout.radius.md,
     paddingVertical: Layout.spacing.md,
     paddingHorizontal: Layout.spacing.lg,
@@ -559,20 +636,15 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.sm,
   },
   actionButtonText: {
-    color: Colors.text.inverse,
     fontSize: 16,
     fontWeight: "600",
   },
   disabledButton: {
-    backgroundColor: Colors.gray[100],
     borderRadius: Layout.radius.sm,
   },
-  disabledText: {
-    color: Colors.gray[500],
-  },
+  disabledText: {},
   helpText: {
     fontSize: 14,
-    color: Colors.text.secondary,
     lineHeight: 22,
     textAlign: "center",
     fontStyle: "italic",

@@ -7,7 +7,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useAuth } from "@contexts/AuthProvider";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { useToast } from "@providers/ToastContext";
 
 type Variant = "banner" | "pill" | "badge" | "link";
@@ -34,12 +35,71 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
   const [checking, setChecking] = React.useState(false);
   const [cooldown, setCooldown] = React.useState(0);
   const cooldownRef = React.useRef<NodeJS.Timeout | null>(null);
+  const { theme } = useTheme();
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      // Banner variant
+      banner: {
+        backgroundColor: t.colors.warning[100],
+        borderColor: t.colors.warning[300],
+        borderWidth: 1,
+        borderRadius: Layout.radius.md,
+        paddingVertical: Layout.spacing.sm,
+        paddingHorizontal: Layout.spacing.md,
+        marginHorizontal: Layout.spacing.lg,
+        marginBottom: Layout.spacing.lg,
+      },
+      bannerText: {
+        color: t.colors.warning[900],
+        marginBottom: Layout.spacing.sm,
+        fontWeight: "500",
+      },
+      bannerActions: {
+        flexDirection: "row",
+        gap: Layout.spacing.md,
+      },
+      bannerBtn: {
+        backgroundColor: t.colors.warning[500],
+        paddingVertical: Layout.spacing.sm,
+        paddingHorizontal: Layout.spacing.md,
+        borderRadius: Layout.radius.sm,
+      },
+      bannerBtnText: { color: t.colors.text.inverse, fontWeight: "600" },
+
+      // Pill variant (header small)
+      pill: {
+        backgroundColor: t.colors.warning[600],
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+      },
+      pillText: {
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+        fontSize: 12,
+      },
+
+      // Badge variant (compact rectangular)
+      badge: {
+        backgroundColor: t.colors.warning[600],
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+      },
+      badgeText: { color: t.colors.text.inverse, fontWeight: "600" },
+
+      // Link variant (inline text action)
+      linkText: { color: t.colors.warning[600], fontWeight: "600" },
+
+      disabled: { opacity: 0.6 },
+    })
+  );
 
   React.useEffect(() => {
-  if (cooldown <= 0 && cooldownRef.current) {
-    clearInterval(cooldownRef.current);
-    cooldownRef.current = null;
-  }
+    if (cooldown <= 0 && cooldownRef.current) {
+      clearInterval(cooldownRef.current);
+      cooldownRef.current = null;
+    }
   }, [cooldown]);
 
   // Auto-start polling when inline prompt is visible so it can auto-hide on verification.
@@ -116,7 +176,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           testID="verify-email-pill"
         >
           {sending ? (
-            <ActivityIndicator color={Colors.text.inverse} />
+            <ActivityIndicator color={theme.colors.text.inverse} />
           ) : (
             <Text style={[styles.pillText, textStyle]}>
               {cooldown > 0
@@ -137,7 +197,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
           testID="verify-email-badge"
         >
           {sending ? (
-            <ActivityIndicator color={Colors.text.inverse} />
+            <ActivityIndicator color={theme.colors.text.inverse} />
           ) : (
             <Text style={[styles.badgeText, textStyle]}>
               {cooldown > 0 ? `Verify (${cooldown}s)` : label || "Verify Email"}
@@ -156,7 +216,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
             testID="verify-email-link"
           >
             {checking ? (
-              <ActivityIndicator color={Colors.warning[600]} />
+              <ActivityIndicator color={theme.colors.warning[600]} />
             ) : (
               <Text style={[styles.linkText, textStyle]}>
                 {label || "Unverified"}
@@ -185,7 +245,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
               testID="verify-email-resend"
             >
               {sending ? (
-                <ActivityIndicator color={Colors.text.inverse} />
+                <ActivityIndicator color={theme.colors.text.inverse} />
               ) : (
                 <Text style={styles.bannerBtnText}>
                   {cooldown > 0 ? `Resend (${cooldown}s)` : "Resend Email"}
@@ -196,7 +256,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
               onPress={doCheck}
               style={[
                 styles.bannerBtn,
-                { backgroundColor: Colors.primary[600] },
+                { backgroundColor: theme.colors.primary[600] },
                 checking && styles.disabled,
               ]}
               disabled={checking}
@@ -205,7 +265,7 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
               testID="verify-email-check"
             >
               {checking ? (
-                <ActivityIndicator color={Colors.text.inverse} />
+                <ActivityIndicator color={theme.colors.text.inverse} />
               ) : (
                 <Text style={styles.bannerBtnText}>I've Verified</Text>
               )}
@@ -216,55 +276,3 @@ export default function VerifyEmailInline(props: VerifyEmailInlineProps) {
   }
 }
 
-const styles = StyleSheet.create({
-  // Banner variant
-  banner: {
-    backgroundColor: Colors.warning[100],
-    borderColor: Colors.warning[300],
-    borderWidth: 1,
-    borderRadius: Layout.radius.md,
-    paddingVertical: Layout.spacing.sm,
-    paddingHorizontal: Layout.spacing.md,
-    marginHorizontal: Layout.spacing.lg,
-    marginBottom: Layout.spacing.lg,
-  },
-  bannerText: {
-    color: Colors.warning[900],
-    marginBottom: Layout.spacing.sm,
-    fontWeight: "500",
-  },
-  bannerActions: {
-    flexDirection: "row",
-    gap: Layout.spacing.md,
-  },
-  bannerBtn: {
-    backgroundColor: Colors.warning[500],
-    paddingVertical: Layout.spacing.sm,
-    paddingHorizontal: Layout.spacing.md,
-    borderRadius: Layout.radius.sm,
-  },
-  bannerBtnText: { color: Colors.text.inverse, fontWeight: "600" },
-
-  // Pill variant (header small)
-  pill: {
-    backgroundColor: Colors.warning[600],
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  pillText: { color: Colors.text.inverse, fontWeight: "600", fontSize: 12 },
-
-  // Badge variant (compact rectangular)
-  badge: {
-    backgroundColor: Colors.warning[600],
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeText: { color: Colors.text.inverse, fontWeight: "600" },
-
-  // Link variant (inline text action)
-  linkText: { color: Colors.warning[600], fontWeight: "600" },
-
-  disabled: { opacity: 0.6 },
-});

@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { View, TextInput, StyleSheet, TextInputProps } from "react-native";
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface OtpInputProps {
   value: string;
@@ -20,6 +20,7 @@ export function OtpInput({
   style,
 }: OtpInputProps) {
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const { theme } = useTheme();
 
   React.useEffect(() => {
     if (autoFocus) {
@@ -84,7 +85,14 @@ export function OtpInput({
           onChangeText={(text) => handleChange(index, text)}
           onKeyPress={(e) => handleKeyPress(index, e as any)}
           editable={!disabled}
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              borderColor: theme.colors.border.primary,
+              backgroundColor: theme.colors.background.primary,
+              color: theme.colors.text.primary,
+            },
+          ]}
         />
       ))}
     </View>
@@ -104,8 +112,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: 8,
-    backgroundColor: Colors.background.primary,
   },
 });

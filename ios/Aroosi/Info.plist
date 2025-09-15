@@ -127,7 +127,7 @@
     <false/>
     <key>UIUserInterfaceStyle</key>
     <string>Automatic</string>
-    <key>UIViewControllerBasedStatusBarAppearance</key>
-    <true/>
+  <key>UIViewControllerBasedStatusBarAppearance</key>
+  <false/>
   </dict>
 </plist>

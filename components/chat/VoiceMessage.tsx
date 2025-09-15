@@ -20,6 +20,13 @@ interface VoiceMessageProps {
   // Web-parity props: when provided, override message.voiceWaveform/voiceDuration
   peaks?: number[];
   durationSeconds?: number;
+  // Ephemeral upload support
+  uploading?: boolean;
+  progress?: number; // 0..1
+  errorText?: string;
+  onRetry?: () => void;
+  onCancel?: () => void;
+  onDismiss?: () => void;
 }
 
 export default function VoiceMessage({
@@ -28,6 +35,12 @@ export default function VoiceMessage({
   showStatus = false,
   peaks,
   durationSeconds,
+  uploading,
+  progress,
+  errorText,
+  onRetry,
+  onCancel,
+  onDismiss,
 }: VoiceMessageProps) {
   const [isInitialized, setIsInitialized] = useState(false);
   const waveformAnim = new Animated.Value(0);
@@ -47,14 +60,14 @@ export default function VoiceMessage({
     PlatformHaptics.light();
   });
 
-  // Initialize audio when component mounts
+  // Initialize audio when component mounts (skip while uploading)
   useEffect(() => {
-    if (message.voiceUrl && !isInitialized) {
+    if (message.voiceUrl && !isInitialized && !uploading) {
       loadAudio(message.voiceUrl).then((loaded) => {
         setIsInitialized(loaded);
       });
     }
-  }, [message.voiceUrl, loadAudio, isInitialized]);
+  }, [message.voiceUrl, loadAudio, isInitialized, uploading]);
 
   // Animate waveform when playing
   useEffect(() => {
@@ -79,6 +92,7 @@ export default function VoiceMessage({
   }, [playbackState.isPlaying, waveformAnim]);
 
   const handlePlayPause = async () => {
+    if (uploading) return; // disabled while uploading
     await PlatformHaptics.selection();
     if (playbackState.isPlaying) {
       await pause();
@@ -267,7 +281,9 @@ export default function VoiceMessage({
                 isOwnMessage ? styles.ownText : styles.otherText,
               ]}
             >
-              {playbackState.isPlaying
+              {uploading
+                ? "Uploading…"
+                : playbackState.isPlaying
                 ? getFormattedTime(playbackState.position)
                 : // Prefer provided durationSeconds; fallback to playbackState.duration; finally message.voiceDuration
                 typeof durationSeconds === "number" && durationSeconds > 0
@@ -290,18 +306,81 @@ export default function VoiceMessage({
           </View>
         </View>
 
-        {/* Status Indicator */}
+        {/* Upload progress / error or Status Indicator */}
         {showStatus && isOwnMessage && (
           <View style={styles.statusContainer}>
-            <MessageStatusIndicator status={effectiveStatus()} size={14} />
+            {uploading ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Text
+                  style={[
+                    styles.totalDuration,
+                    isOwnMessage
+                      ? styles.ownTextSecondary
+                      : styles.otherTextSecondary,
+                  ]}
+                >
+                  {Math.round(Math.max(0, Math.min(1, progress ?? 0)) * 100)}%
+                </Text>
+                {!!onCancel && (
+                  <TouchableOpacity onPress={onCancel}>
+                    <Text
+                      style={[
+                        styles.totalDuration,
+                        { textDecorationLine: "underline" },
+                      ]}
+                    >
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : errorText ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+              >
+                <Text style={[styles.errorText, { marginTop: 0 }]}>Failed</Text>
+                {!!onRetry && (
+                  <TouchableOpacity onPress={onRetry}>
+                    <Text
+                      style={[
+                        styles.totalDuration,
+                        {
+                          color: Colors.error[600],
+                          textDecorationLine: "underline",
+                        },
+                      ]}
+                    >
+                      Retry
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {!!onDismiss && (
+                  <TouchableOpacity onPress={onDismiss}>
+                    <Text
+                      style={[
+                        styles.totalDuration,
+                        { textDecorationLine: "underline" },
+                      ]}
+                    >
+                      Dismiss
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <MessageStatusIndicator status={effectiveStatus()} size={14} />
+            )}
           </View>
         )}
       </View>
 
       {/* Error State */}
-      {playbackState.error && (
+      {!uploading && playbackState.error && (
         <Text style={styles.errorText}>Failed to load voice message</Text>
       )}
+      {errorText && <Text style={styles.errorText}>{errorText}</Text>}
     </View>
   );
 }

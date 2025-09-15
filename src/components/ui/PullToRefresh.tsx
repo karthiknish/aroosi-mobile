@@ -9,7 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface PullToRefreshProps {
   children: React.ReactNode;
@@ -28,14 +28,15 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   children,
   onRefresh,
   refreshing = false,
-  colors = Colors.gradient.primary,
-  tintColor = Colors.info[500],
+  colors,
+  tintColor,
   backgroundColor = "transparent",
   size = "default",
   enabled = true,
   hapticFeedback = true,
   customIndicator,
 }) => {
+  const { theme } = useTheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pullDistance = useRef(new Animated.Value(0)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -151,14 +152,14 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
         }}
       >
         <LinearGradient
-          colors={colors as any}
+          colors={(colors || (theme.colors.gradient.primary as any)) as any}
           style={{
             width: size === "large" ? 50 : 40,
             height: size === "large" ? 50 : 40,
             borderRadius: size === "large" ? 25 : 20,
             justifyContent: "center",
             alignItems: "center",
-            shadowColor: Colors.neutral[900],
+            shadowColor: theme.colors.neutral[900],
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.25,
             shadowRadius: 4,
@@ -168,7 +169,7 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
           <Ionicons
             name={isRefreshing ? "refresh" : "arrow-down"}
             size={size === "large" ? 24 : 20}
-            color={Colors.text.inverse}
+            color={theme.colors.text.inverse}
           />
         </LinearGradient>
       </Animated.View>
@@ -201,8 +202,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
             <RefreshControl
               refreshing={refreshing || isRefreshing}
               onRefresh={handleRefresh}
-              colors={colors as any}
-              tintColor={tintColor}
+              colors={(colors || (theme.colors.gradient.primary as any)) as any}
+              tintColor={tintColor || theme.colors.info[500]}
               progressBackgroundColor={backgroundColor}
               // Map textual size to numeric constant (0 default, 1 large)
               size={size === "large" ? 1 : 0}
@@ -239,23 +240,24 @@ export const EnhancedRefreshControl: React.FC<{
 }> = ({
   refreshing,
   onRefresh,
-  colors = Colors.gradient.primary,
-  tintColor = Colors.info[500],
+  colors,
+  tintColor,
   backgroundColor = "transparent",
   size = "default",
   title,
-  titleColor = Colors.text.secondary,
+  titleColor,
 }) => {
+  const { theme } = useTheme();
   return (
     <RefreshControl
       refreshing={refreshing}
       onRefresh={onRefresh}
-      colors={colors as any}
-      tintColor={tintColor}
+      colors={(colors || (theme.colors.gradient.primary as any)) as any}
+      tintColor={tintColor || theme.colors.info[500]}
       progressBackgroundColor={backgroundColor}
       size={size === "large" ? 1 : 0}
       title={title}
-      titleColor={titleColor}
+      titleColor={titleColor || theme.colors.text.secondary}
       progressViewOffset={0}
     />
   );

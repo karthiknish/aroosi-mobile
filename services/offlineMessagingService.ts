@@ -42,6 +42,8 @@ export class OfflineMessagingService extends EventEmitter {
   private isInitialized = false;
   private isOnline = false;
   private userId: string | null = null;
+  // Guard to avoid feedback loops when propagating online status between components
+  private applyingStatus = false;
 
   private readonly options: Required<OfflineMessagingOptions>;
 
@@ -112,7 +114,8 @@ export class OfflineMessagingService extends EventEmitter {
     );
 
     this.offlineQueue.on("connection_status_changed", ({ online }) => {
-      this.setOnlineStatus(online);
+      // Update internal status without echoing back into the queue
+      this.applyOnlineStatus(online, "queue");
     });
 
     await this.offlineQueue.initialize();
@@ -391,11 +394,37 @@ export class OfflineMessagingService extends EventEmitter {
    * Set online/offline status
    */
   setOnlineStatus(online: boolean): void {
+    this.applyOnlineStatus(online, "external");
+  }
+
+  /**
+   * Internal helper to apply online status changes and propagate as needed
+   */
+  private applyOnlineStatus(
+    online: boolean,
+    source: "external" | "queue" = "external"
+  ): void {
+    if (this.applyingStatus) return;
     const wasOnline = this.isOnline;
+    if (online === wasOnline) {
+      // Still propagate event for listeners if needed, but avoid echo back to queue
+      this.emit("connection_status_changed", {
+        online,
+        previousStatus: wasOnline,
+      });
+      return;
+    }
+
     this.isOnline = online;
 
-    if (this.offlineQueue) {
-      this.offlineQueue.setOnlineStatus(online);
+    // Propagate to queue only when change originates externally
+    if (source === "external" && this.offlineQueue) {
+      try {
+        this.applyingStatus = true;
+        this.offlineQueue.setOnlineStatus(online);
+      } finally {
+        this.applyingStatus = false;
+      }
     }
 
     this.emit("connection_status_changed", {
@@ -586,6 +615,34 @@ export class OfflineMessagingService extends EventEmitter {
     }
 
     return await this.offlineQueue.retryMessage(messageId);
+  }
+
+  /**
+   * Get the underlying queue id for an optimistic id, if available
+   */
+  getQueueIdForOptimistic(optimisticId: string): string | null {
+    return this.optimisticToActual.get(optimisticId) || null;
+  }
+
+  /**
+   * Retry by either queue id or optimistic id (best-effort)
+   */
+  async retryMessageByAnyId(lookupId: string): Promise<boolean> {
+    // Direct queue id retry
+    if (lookupId?.startsWith("queue_")) {
+      return await this.retryMessage(lookupId);
+    }
+    // Try translate optimistic id to queue id
+    if (lookupId?.startsWith("optimistic_")) {
+      const qid = this.getQueueIdForOptimistic(lookupId);
+      if (qid) {
+        return await this.retryMessage(qid);
+      }
+      // If mapping is gone, nothing to retry in queue
+      return false;
+    }
+    // Unknown id format
+    return false;
   }
 
   /**

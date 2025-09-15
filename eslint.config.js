@@ -84,6 +84,58 @@ export default [
       // Ensure plugin rules are recognized but not overbearing
       "react-hooks/rules-of-hooks": "warn",
       "react-hooks/exhaustive-deps": "warn",
+      // Enforce centralized theming: forbid direct Colors import
+      "no-restricted-imports": [
+        "warn",
+        {
+          paths: [
+            {
+              name: "@constants/Colors",
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../../constants/Colors",
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../constants/Colors",
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../../../constants/Colors",
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "@constants",
+              importNames: ["Colors"],
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../constants",
+              importNames: ["Colors"],
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../../constants",
+              importNames: ["Colors"],
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+            {
+              name: "../../../constants",
+              importNames: ["Colors"],
+              message:
+                "Use theme via useTheme/useThemedStyles from @contexts/ThemeContext instead of importing Colors directly.",
+            },
+          ],
+        },
+      ],
     },
   },
   // Jest/Test files override

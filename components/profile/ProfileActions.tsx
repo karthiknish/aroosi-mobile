@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
-import { Colors } from "../../constants/Colors";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchShortlists, toggleShortlist } from "@/utils/engagementUtil";
@@ -17,6 +17,8 @@ export function ProfileActions({
   toUserId,
   onShortlistChange,
 }: ProfileActionsProps) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [loading, setLoading] = useState(false);
   const [isShortlisted, setIsShortlisted] = useState<boolean | null>(null);
   const toast = useToast();
@@ -106,7 +108,9 @@ export function ProfileActions({
           <Ionicons
             name={isShortlisted ? "heart-dislike" : "heart"}
             size={20}
-            color={isShortlisted ? Colors.error[600] : Colors.error[500]}
+            color={
+              isShortlisted ? theme.colors.error[600] : theme.colors.error[500]
+            }
           />
           <Text
             style={[
@@ -122,51 +126,53 @@ export function ProfileActions({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    backgroundColor: Colors.background.primary,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
-  },
-  button: {
-    backgroundColor: Colors.background.primary,
-    borderWidth: 1,
-    borderColor: Colors.error[500],
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: Colors.neutral[900],
-    shadowOffset: {
-      width: 0,
-      height: 2,
+
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      padding: 16,
+      backgroundColor: theme.colors.background.primary,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border.primary,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  buttonShortlisted: {
-    backgroundColor: Colors.error[50],
-    borderColor: Colors.error[600],
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.error[500],
-  },
-  buttonTextShortlisted: {
-    color: Colors.error[600],
-  },
-});
+    button: {
+      backgroundColor: theme.colors.background.primary,
+      borderWidth: 1,
+      borderColor: theme.colors.error[500],
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: theme.colors.neutral[900],
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 3.84,
+      elevation: 5,
+    },
+    buttonShortlisted: {
+      backgroundColor: theme.colors.error[50],
+      borderColor: theme.colors.error[600],
+    },
+    buttonDisabled: {
+      opacity: 0.6,
+    },
+    buttonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    buttonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: theme.colors.error[500],
+    },
+    buttonTextShortlisted: {
+      color: theme.colors.error[600],
+    },
+  });
 
 export default ProfileActions;

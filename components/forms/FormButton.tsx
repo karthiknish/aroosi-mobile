@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   View,
 } from "react-native";
-import { Colors } from "../../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
@@ -39,6 +39,7 @@ export function FormButton({
 }: FormButtonProps) {
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
+  const { theme } = useTheme();
   const isDisabled = disabled || loading;
 
   const styles = StyleSheet.create({
@@ -79,21 +80,21 @@ export function FormButton({
 
     // Variants
     primary: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
     },
     secondary: {
-      backgroundColor: Colors.gray[600],
+      backgroundColor: theme.colors.gray[600],
     },
     outline: {
       backgroundColor: "transparent",
       borderWidth: 1,
-      borderColor: Colors.primary[500],
+      borderColor: theme.colors.primary[500],
     },
     danger: {
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
     },
     disabled: {
-      backgroundColor: Colors.gray[300],
+      backgroundColor: theme.colors.gray[300],
     },
 
     // Text styles
@@ -114,19 +115,19 @@ export function FormButton({
 
     // Text variants
     primaryText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
     },
     secondaryText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
     },
     outlineText: {
-      color: Colors.primary[500],
+      color: theme.colors.primary[500],
     },
     dangerText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
     },
     disabledText: {
-      color: Colors.gray[500],
+      color: theme.colors.gray[500],
     },
   });
 
@@ -187,7 +188,9 @@ export function FormButton({
         <ActivityIndicator
           size="small"
           color={
-            variant === "outline" ? Colors.primary[500] : Colors.text.inverse
+            variant === "outline"
+              ? theme.colors.primary[500]
+              : theme.colors.text.inverse
           }
         />
       ) : (

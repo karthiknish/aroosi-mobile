@@ -4,6 +4,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 // Import onboarding screens
 import WelcomeScreen from "../screens/onboarding/WelcomeScreen";
 import ProfileSetupScreen from "../screens/onboarding/ProfileSetupScreen";
+import OnboardingChecklistScreen from "../screens/onboarding/OnboardingChecklistScreen";
 import OnboardingCompleteScreen from "../screens/onboarding/OnboardingCompleteScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
 import { getScreenTransition } from "@/utils/navigationAnimations";
@@ -25,6 +26,7 @@ export type OnboardingStackParamList = {
   Welcome: undefined;
   ProfileSetup: { step?: number };
   OnboardingComplete: undefined;
+  OnboardingChecklist: undefined;
 };
 
 const Stack = createStackNavigator<OnboardingStackParamList>();
@@ -46,6 +48,10 @@ export default function OnboardingNavigator() {
       <Stack.Screen
         name="OnboardingComplete"
         component={withSC(OnboardingCompleteScreen)}
+      />
+      <Stack.Screen
+        name="OnboardingChecklist"
+        component={withSC(OnboardingChecklistScreen)}
       />
     </Stack.Navigator>
   );

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface ErrorMessageProps {
   message: string;
@@ -20,6 +20,7 @@ export function ErrorMessage({
   style,
   showIcon = true,
 }: ErrorMessageProps) {
+  const { theme } = useTheme();
   const getIconName = () => {
     switch (type) {
       case "error":
@@ -37,31 +38,31 @@ export function ErrorMessage({
     switch (type) {
       case "error":
         return {
-          background: Colors.error[50],
-          border: Colors.error[200],
-          text: Colors.error[800],
-          icon: Colors.error[500],
+          background: theme.colors.error[50],
+          border: theme.colors.error[200],
+          text: theme.colors.error[800],
+          icon: theme.colors.error[500],
         };
       case "warning":
         return {
-          background: Colors.warning[50],
-          border: Colors.warning[200],
-          text: Colors.warning[800],
-          icon: Colors.warning[500],
+          background: theme.colors.warning[50],
+          border: theme.colors.warning[200],
+          text: theme.colors.warning[800],
+          icon: theme.colors.warning[500],
         };
       case "info":
         return {
-          background: Colors.secondary[50],
-          border: Colors.secondary[200],
-          text: Colors.secondary[800],
-          icon: Colors.secondary[500],
+          background: theme.colors.secondary[50],
+          border: theme.colors.secondary[200],
+          text: theme.colors.secondary[800],
+          icon: theme.colors.secondary[500],
         };
       default:
         return {
-          background: Colors.error[50],
-          border: Colors.error[200],
-          text: Colors.error[800],
-          icon: Colors.error[500],
+          background: theme.colors.error[50],
+          border: theme.colors.error[200],
+          text: theme.colors.error[800],
+          icon: theme.colors.error[500],
         };
     }
   };

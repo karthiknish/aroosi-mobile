@@ -8,6 +8,7 @@ import {
   Animated,
 } from "react-native";
 import { useVoicePlayback } from "@/hooks/useVoicePlayback";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface VoicePlayerProps {
   uri?: string;
@@ -32,6 +33,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   style,
   small = false,
 }) => {
+  const { theme } = useTheme();
   const [audioUrl, setAudioUrl] = useState<string | undefined>(uri);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -112,9 +114,19 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   // Render loading state
   if (isLoading) {
     return (
-      <View style={[styles.container, style]}>
-        <ActivityIndicator size="small" color="#3498db" />
-        <Text style={styles.loadingText}>Loading audio...</Text>
+      <View
+        style={[
+          styles.container,
+          style,
+          { backgroundColor: theme.colors.background.secondary },
+        ]}
+      >
+        <ActivityIndicator size="small" color={theme.colors.primary[500]} />
+        <Text
+          style={[styles.loadingText, { color: theme.colors.text.secondary }]}
+        >
+          Loading audio...
+        </Text>
       </View>
     );
   }
@@ -122,8 +134,14 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   // Render error state
   if (fetchError || error) {
     return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.errorText}>
+      <View
+        style={[
+          styles.container,
+          style,
+          { backgroundColor: theme.colors.background.secondary },
+        ]}
+      >
+        <Text style={[styles.errorText, { color: theme.colors.error[600] }]}>
           {fetchError || error?.message || "Failed to load audio"}
         </Text>
       </View>
@@ -133,12 +151,20 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
   // Compact player for small mode
   if (small) {
     return (
-      <View style={[styles.smallContainer, style]}>
+      <View
+        style={[
+          styles.smallContainer,
+          style,
+          { backgroundColor: theme.colors.background.secondary },
+        ]}
+      >
         <TouchableOpacity
           onPress={togglePlayPause}
           style={styles.smallPlayButton}
         >
-          <Text style={styles.playIcon}>{isPlaying ? "⏸️" : "▶️"}</Text>
+          <Text style={[styles.playIcon, { color: theme.colors.text.inverse }]}>
+            {isPlaying ? "⏸️" : "▶️"}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.smallProgressContainer}>
@@ -171,11 +197,26 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
         <View style={[styles.playIcon, isPlaying && styles.pauseIcon]}>
           {isPlaying ? (
             <View style={styles.pauseIconInner}>
-              <View style={styles.pauseBar} />
-              <View style={styles.pauseBar} />
+              <View
+                style={[
+                  styles.pauseBar,
+                  { backgroundColor: theme.colors.text.inverse },
+                ]}
+              />
+              <View
+                style={[
+                  styles.pauseBar,
+                  { backgroundColor: theme.colors.text.inverse },
+                ]}
+              />
             </View>
           ) : (
-            <View style={styles.playTriangle} />
+            <View
+              style={[
+                styles.playTriangle,
+                { borderBottomColor: theme.colors.text.inverse },
+              ]}
+            />
           )}
         </View>
       </TouchableOpacity>
@@ -187,7 +228,12 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
           onPress={handleSeek}
           style={styles.progressContainer}
         >
-          <View style={styles.progressBackground} />
+          <View
+            style={[
+              styles.progressBackground,
+              { backgroundColor: theme.colors.neutral[300] },
+            ]}
+          />
           <Animated.View
             style={[
               styles.progressBar,
@@ -196,6 +242,7 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
                   inputRange: [0, 1],
                   outputRange: ["0%", "100%"],
                 }),
+                backgroundColor: theme.colors.primary[500],
               },
             ]}
           />
@@ -203,8 +250,14 @@ export const VoicePlayer: React.FC<VoicePlayerProps> = ({
 
         {/* Duration Text */}
         <View style={styles.timeContainer}>
-          <Text style={styles.timeText}>{formattedPosition}</Text>
-          <Text style={styles.timeText}>
+          <Text
+            style={[styles.timeText, { color: theme.colors.text.secondary }]}
+          >
+            {formattedPosition}
+          </Text>
+          <Text
+            style={[styles.timeText, { color: theme.colors.text.secondary }]}
+          >
             {formattedDuration || formatTime(initialDuration || 0)}
           </Text>
         </View>
@@ -225,14 +278,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 12,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
     borderRadius: 12,
   },
   playButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#3498db",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -253,7 +306,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 18,
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
-    borderBottomColor: "#fff",
+    borderBottomColor: "transparent",
     transform: [{ rotate: "90deg" }],
     marginLeft: 4,
   },
@@ -268,7 +321,7 @@ const styles = StyleSheet.create({
   pauseBar: {
     width: 6,
     height: 18,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
     borderRadius: 2,
   },
   controlsContainer: {
@@ -281,7 +334,7 @@ const styles = StyleSheet.create({
   },
   progressBackground: {
     height: 4,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "transparent",
     borderRadius: 2,
     position: "absolute",
     left: 0,
@@ -289,7 +342,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 4,
-    backgroundColor: "#3498db",
+    backgroundColor: "transparent",
     borderRadius: 2,
   },
   timeContainer: {
@@ -298,14 +351,14 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: "#7f8c8d",
+    color: undefined,
   },
   loadingText: {
     marginLeft: 8,
-    color: "#7f8c8d",
+    color: undefined,
   },
   errorText: {
-    color: "#e74c3c",
+    color: undefined,
   },
 
   // Small player styles
@@ -313,7 +366,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 8,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
     borderRadius: 16,
   },
   smallPlayButton: {
@@ -326,14 +379,14 @@ const styles = StyleSheet.create({
   smallProgressContainer: {
     flex: 1,
     height: 4,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "transparent",
     borderRadius: 2,
     marginHorizontal: 8,
     overflow: "hidden",
   },
   smallDuration: {
     fontSize: 12,
-    color: "#7f8c8d",
+    color: undefined,
     marginLeft: 8,
   },
 });

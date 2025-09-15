@@ -1,25 +1,10 @@
-import { useEffect, useState } from "react";
-import { useNavigation } from "@react-navigation/native";
-import { useApiClient } from "@/utils/api";
-import { createStackNavigator } from "@react-navigation/stack";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
+import React from "react";
 import { Ionicons } from "@expo/vector-icons";
-
-// Import navigation types
-import {
-  MainTabParamList,
-  ProfileStackParamList,
-  ChatStackParamList,
-} from "./types";
-
-// Import animation configurations
-import {
-  getScreenTransition,
-  tabBarAnimationConfig,
-} from "@/utils/navigationAnimations";
-
-// Import main screens
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { createStackNavigator } from "@react-navigation/stack";
+import { useTheme } from "@contexts/ThemeContext";
+import { getScreenTransition } from "@/utils/navigationAnimations";
+import { MainTabParamList, ProfileStackParamList } from "./types";
 import ProfileScreen from "@screens/main/ProfileScreen";
 import ProfileDetailScreen from "@screens/main/ProfileDetailScreen";
 import SubscriptionScreen from "@screens/main/SubscriptionScreen";
@@ -27,75 +12,39 @@ import EditProfileScreen from "@screens/main/EditProfileScreen";
 import SearchScreen from "@screens/main/SearchScreen";
 import MatchesScreen from "@screens/main/MatchesScreen";
 import InterestsScreen from "@screens/main/InterestsScreen";
-import ConversationListScreen from "@screens/main/ConversationListScreen";
-import ChatScreen from "@screens/main/ChatScreen";
 import SettingsScreen from "@screens/settings/SettingsScreen";
 import PrivacySettingsScreen from "@screens/settings/PrivacySettingsScreen";
-import IcebreakersScreen from "@screens/main/IcebreakersScreen";
-import ContactScreen from "@screens/support/ContactScreen";
-import AIChatbotScreen from "@screens/support/AIChatbotScreen";
-import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import QuickPicksScreen from "@screens/main/QuickPicksScreen";
 import NotificationSettingsScreen from "@screens/settings/NotificationSettingsScreen";
 import BlockedUsersScreen from "@screens/settings/BlockedUsersScreen";
 import SafetyGuidelinesScreen from "@screens/settings/SafetyGuidelinesScreen";
+import AboutScreen from "@screens/settings/AboutScreen";
+import IcebreakersScreen from "@screens/main/IcebreakersScreen";
+import ContactScreen from "@screens/support/ContactScreen";
+import AIChatbotScreen from "@screens/support/AIChatbotScreen";
+import ShortlistsScreen from "@screens/main/ShortlistsScreen";
 import withScreenContainer from "@components/common/withScreenContainer";
-import { TabBarProvider } from "@contexts/TabBarContext";
-
-// Placeholder screens for now
-import { View, Text } from "react-native";
-import { RouteProp } from "@react-navigation/native";
+import { View, Text, Pressable, StyleSheet, Platform } from "react-native";
+import { NavGuideProvider, useNavGuide } from "../../contexts/NavGuideContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PulseView } from "@/components/ui/AnimatedComponents";
 
 // Helper: wrap screens with ScreenContainer; allow opting out of ScrollView for list hosts
-const withSC = <P extends object>(
+function withSC<P extends object>(
   Comp: React.ComponentType<P>,
   options?: { useScrollView?: boolean }
-) => {
-  const Wrapped: React.FC<P> = (props) => {
-    const C = withScreenContainer(Comp, {
-      useScrollView: options?.useScrollView ?? true,
-    });
-    return <C {...props} />;
-  };
-  return Wrapped;
-};
+) {
+  return withScreenContainer(Comp, {
+    useScrollView: options?.useScrollView ?? true,
+  }) as any; // cast to any to satisfy React Navigation's ScreenComponentType expectations
+}
 
-const PlaceholderScreen = ({ name }: { name: string }) => (
-  <View
-    style={{
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      padding: 20,
-    }}
-  >
-    <Text
-      style={{
-        fontFamily: "Boldonse-Regular",
-        fontSize: 24,
-        marginBottom: 16,
-        textAlign: "center",
-      }}
-    >
-      Welcome to {name}
-    </Text>
-    <Text
-      style={{
-        fontFamily: "NunitoSans-Regular",
-        fontSize: 16,
-        textAlign: "center",
-      }}
-    >
-      This should use Boldonse font for the heading and Nunito Sans for body
-      text.
-    </Text>
-  </View>
-);
+// (Removed unused PlaceholderScreen)
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const ProfileStack = createStackNavigator<ProfileStackParamList>();
-const ChatStack = createStackNavigator<ChatStackParamList>();
+// Root stack to allow Search screen navigation via central button
+const RootStack = createStackNavigator();
 const MatchesStack =
   createStackNavigator<import("./types").MatchesStackParamList>();
 
@@ -173,64 +122,16 @@ function ProfileStackNavigator() {
         component={withSC(SafetyGuidelinesScreen)}
         options={getScreenTransition("default")}
       />
+      <ProfileStack.Screen
+        name="About"
+        component={withSC(AboutScreen)}
+        options={getScreenTransition("default")}
+      />
     </ProfileStack.Navigator>
   );
 }
 
-function ChatStackNavigator() {
-  const navigation = useNavigation();
-  const apiClient = useApiClient();
-  const [unreadTotal, setUnreadTotal] = useState<number | undefined>(undefined);
-
-  useEffect(() => {
-    let canceled = false;
-    const loadUnread = async () => {
-      const res = await apiClient.getConversations();
-      if (!res.success) return;
-      const list = Array.isArray((res.data as any)?.conversations)
-        ? (res.data as any).conversations
-        : (res.data as any);
-      if (!Array.isArray(list)) return;
-      const total = list.reduce(
-        (sum: number, conv: any) => sum + (conv.unreadCount || 0),
-        0
-      );
-      if (!canceled) {
-        setUnreadTotal(total);
-        navigation.setOptions({
-          tabBarBadge: total > 0 ? (total > 99 ? "99+" : total) : undefined,
-        });
-      }
-    };
-    loadUnread();
-    const interval = setInterval(loadUnread, 30000);
-    return () => {
-      canceled = true;
-      clearInterval(interval);
-    };
-  }, [apiClient, navigation]);
-
-  return (
-    <ChatStack.Navigator
-      id={undefined}
-      screenOptions={{
-        headerShown: false,
-        ...getScreenTransition("default"),
-      }}
-    >
-      <ChatStack.Screen
-        name="ConversationList"
-        component={withSC(ConversationListScreen, { useScrollView: false })}
-        options={getScreenTransition("ConversationList")}
-      />
-      <ChatStack.Screen
-        name="Chat"
-        component={withSC(ChatScreen, { useScrollView: false })}
-        options={getScreenTransition("Chat")}
-      />
-    </ChatStack.Navigator>
-  );
-}
+// Chat stack removed in new minimalist nav
 
 function MatchesStackNavigator() {
   return (
@@ -260,93 +161,195 @@ function MatchesStackNavigator() {
   );
 }
 
-export default function MainNavigator() {
+// Custom Tab Bar with centered "A" action button opening Search
+function CustomTabBar({ state, navigation }: any) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const baseHeight = 60;
-  const computedTabHeight = baseHeight + insets.bottom;
+  const { registerTarget, registerTabBar } = useNavGuide();
+
+  // Dynamic styles (avoid recreating StyleSheet object excessively; small component)
+  const tabBarHeight = Platform.select({ ios: 64, android: 68 });
+  const HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 };
+  const fontFamilyRegular = Platform.select({
+    ios: "NunitoSans-Regular",
+    android: "NunitoSans-Regular",
+  });
+  const boldBrandFont = Platform.select({
+    ios: "Boldonse-Regular",
+    android: "Boldonse-Regular",
+  });
+
   return (
-    <TabBarProvider height={computedTabHeight}>
-      <Tab.Navigator
-        id={undefined}
-        screenOptions={({
-          route,
-        }: {
-          route: RouteProp<MainTabParamList, keyof MainTabParamList>;
-        }): BottomTabNavigationOptions => ({
-          tabBarIcon: ({
-            focused,
-            color,
-            size,
-          }: {
-            focused: boolean;
-            color: string;
-            size: number;
-          }) => {
-            let iconName: keyof typeof Ionicons.glyphMap = "home";
+    <View
+      style={[
+        customStyles.tabBar,
+        {
+          backgroundColor: theme.colors.background.primary,
+          borderTopColor: theme.colors.border.primary,
+          paddingBottom: Math.max(insets.bottom, 6),
+          height: (tabBarHeight || 68) + Math.max(insets.bottom - 6, 0),
+        },
+        Platform.OS === "ios" && customStyles.tabBarShadowIOS,
+        Platform.OS === "ios" && { shadowColor: theme.colors.neutral[900] },
+        Platform.OS === "android" && { elevation: 8 },
+      ]}
+      accessibilityRole="tablist"
+      onLayout={(e) => {
+        const { x, y, width, height } = e.nativeEvent.layout;
+        registerTabBar({ x, y, width, height });
+      }}
+    >
+      {(() => {
+        const route = state.routes[0];
+        const isFocused = state.index === 0;
+        const iconName: keyof typeof Ionicons.glyphMap = isFocused
+          ? "heart"
+          : "heart-outline";
+        return (
+          <Pressable
+            key={route.key}
+            hitSlop={HIT_SLOP}
+            android_ripple={{
+              color: theme.colors.primary[200],
+              borderless: false,
+            }}
+            accessibilityRole="tab"
+            accessibilityLabel="Matches"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            onPress={() => {
+              if (!isFocused) navigation.navigate(route.name);
+            }}
+            style={[customStyles.matchesTab, { minWidth: 72 }]}
+            onLayout={(e) => {
+              const { x, y, width, height } = e.nativeEvent.layout;
+              registerTarget("matchesTab", { x, y, width, height });
+            }}
+          >
+            <Ionicons
+              name={iconName}
+              size={24}
+              color={
+                isFocused
+                  ? theme.colors.primary[600]
+                  : theme.colors.text.secondary
+              }
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
+            <Text
+              style={{
+                marginTop: 2,
+                fontSize: 12,
+                fontFamily: fontFamilyRegular,
+                color: isFocused
+                  ? theme.colors.primary[600]
+                  : theme.colors.text.secondary,
+              }}
+            >
+              Matches
+            </Text>
+          </Pressable>
+        );
+      })()}
 
-            if (route.name === "Search") {
-              iconName = focused ? "search" : "search-outline";
-            } else if (route.name === "Matches") {
-              iconName = focused ? "heart" : "heart-outline";
-            } else if (route.name === "Chat") {
-              iconName = focused ? "chatbubbles" : "chatbubbles-outline";
-            } else if (route.name === "ProfileTab") {
-              iconName = focused ? "person" : "person-outline";
-            } else if (route.name === "Premium") {
-              iconName = focused ? "star" : "star-outline";
-            }
-
-            return <Ionicons name={iconName} size={size} color={color} />;
+      <Pressable
+        hitSlop={HIT_SLOP}
+        accessibilityRole="button"
+        accessibilityLabel="Open Search"
+        android_ripple={{ color: theme.colors.primary[300] }}
+        onPress={() => navigation.navigate("Search")}
+        style={[
+          customStyles.centerButton,
+          {
+            backgroundColor: theme.colors.primary[500],
+            shadowColor:
+              Platform.OS === "ios" ? theme.colors.primary[800] : undefined,
           },
-          ...tabBarAnimationConfig.screenOptions,
-          tabBarLabelStyle: {
-            ...tabBarAnimationConfig.screenOptions.tabBarLabelStyle,
-            fontWeight: "500",
-          },
-          tabBarStyle: {
-            ...tabBarAnimationConfig.screenOptions.tabBarStyle,
-            // Ensure the tab bar sits fully inside the safe area on devices with a home indicator
-            paddingBottom: (
-              tabBarAnimationConfig.screenOptions.tabBarStyle as any
-            )?.paddingBottom
-              ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
-                  .paddingBottom + insets.bottom
-              : insets.bottom + 5,
-            height: (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
-              ?.height
-              ? (tabBarAnimationConfig.screenOptions.tabBarStyle as any)
-                  .height + insets.bottom
-              : computedTabHeight,
-          },
-          headerShown: false,
-        })}
+          Platform.OS === "android" && { elevation: 10 },
+        ]}
+        onLayout={(e) => {
+          const { x, y, width, height } = e.nativeEvent.layout;
+          registerTarget("searchButton", { x, y, width, height });
+        }}
       >
-        <Tab.Screen
-          name="Search"
-          component={withSC(SearchScreen)}
-          options={{ title: "Browse" }}
-        />
-        <Tab.Screen
-          name="Matches"
-          component={MatchesStackNavigator}
-          options={{ title: "Matches" }}
-        />
-        <Tab.Screen
-          name="Chat"
-          component={ChatStackNavigator}
-          options={{ title: "Messages" }}
-        />
-        <Tab.Screen
-          name="ProfileTab"
-          component={ProfileStackNavigator}
-          options={{ title: "Profile" }}
-        />
-        <Tab.Screen
-          name="Premium"
-          component={withSC(SubscriptionScreen)}
-          options={{ title: "Premium" }}
-        />
-      </Tab.Navigator>
-    </TabBarProvider>
+        <PulseView isActive respectReduceMotion>
+          <Text
+            style={{
+              fontFamily: boldBrandFont,
+              fontSize: 26,
+              color: theme.colors.text.inverse,
+              lineHeight: 28,
+              includeFontPadding: false,
+              textAlignVertical: "center",
+            }}
+          >
+            A
+          </Text>
+        </PulseView>
+      </Pressable>
+    </View>
   );
 }
+
+function TabsNavigator() {
+  return (
+    <Tab.Navigator
+      id={undefined}
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="Matches" component={MatchesStackNavigator} />
+    </Tab.Navigator>
+  );
+}
+
+export default function MainNavigator() {
+  return (
+    <NavGuideProvider>
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        <RootStack.Screen name="MainTabs" component={TabsNavigator} />
+        <RootStack.Screen
+          name="Search"
+          component={withSC(SearchScreen)}
+          options={getScreenTransition("Search")}
+        />
+      </RootStack.Navigator>
+    </NavGuideProvider>
+  );
+}
+
+const customStyles = StyleSheet.create({
+  tabBar: {
+    flexDirection: "row",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    borderTopWidth: 1,
+    paddingHorizontal: 24,
+  },
+  tabBarShadowIOS: {
+    shadowColor: "#000", // will be overridden dynamically in CustomTabBar
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -2 },
+  },
+  matchesTab: {
+    paddingVertical: 6,
+    paddingRight: 32,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  centerButton: {
+    position: "absolute",
+    top: -28, // lift higher for both platforms
+    alignSelf: "center",
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+  },
+});

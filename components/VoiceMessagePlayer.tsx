@@ -18,7 +18,8 @@ import {
 import * as FileSystem from "expo-file-system";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Rect } from "react-native-svg";
-import { Colors } from "../constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 
 interface VoiceMessagePlayerProps {
   audioUri: string;
@@ -43,6 +44,8 @@ export function VoiceMessagePlayer({
   style,
   waveformData,
 }: VoiceMessagePlayerProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const player = useAudioPlayer({ uri: audioUri });
   const status = useAudioPlayerStatus(player);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,6 +54,7 @@ export function VoiceMessagePlayer({
 
   const animatedValue = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const { reduceMotion } = useReduceMotion();
 
   // Generate default waveform data if not provided
   const defaultWaveformData = React.useMemo(() => {
@@ -70,9 +74,9 @@ export function VoiceMessagePlayer({
   }, [player]);
 
   useEffect(() => {
-    if (status?.playing) startPulseAnimation();
+    if (status?.playing && !reduceMotion) startPulseAnimation();
     else stopPulseAnimation();
-  }, [status?.playing]);
+  }, [status?.playing, reduceMotion]);
 
   const startPulseAnimation = () => {
     pulseAnimation.current = Animated.loop(
@@ -166,7 +170,9 @@ export function VoiceMessagePlayer({
                 y,
                 width: BAR_WIDTH,
                 height: barHeight,
-                fill: isPlayed ? Colors.primary[500] : Colors.gray[300],
+                fill: isPlayed
+                  ? theme.colors.primary[500]
+                  : theme.colors.gray[300],
                 rx: BAR_WIDTH / 2,
               } as any)}
               key={index}
@@ -222,7 +228,11 @@ export function VoiceMessagePlayer({
             <Ionicons
               name={status?.playing ? "pause" : "play"}
               size={16}
-              color={isOwn ? Colors.background.primary : Colors.primary[500]}
+              color={
+                isOwn
+                  ? theme.colors.background.primary
+                  : theme.colors.primary[500]
+              }
             />
           )}
         </TouchableOpacity>
@@ -247,101 +257,102 @@ export function VoiceMessagePlayer({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.gray[100],
-    borderRadius: 20,
-    padding: 12,
-    maxWidth: screenWidth * 0.7,
-  },
-  ownMessage: {
-    backgroundColor: Colors.primary[500],
-  },
-  playButton: {
-    marginRight: 12,
-  },
-  playButtonInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: Colors.background.primary,
-  },
-  ownPlayButton: {
-    backgroundColor: Colors.background.primary,
-  },
-  otherPlayButton: {
-    backgroundColor: Colors.primary[50],
-  },
-  loadingIndicator: {
-    width: 16,
-    height: 16,
-    borderWidth: 2,
-    borderColor: Colors.primary[500],
-    borderTopColor: "transparent",
-    borderRadius: 8,
-  },
-  waveformContainer: {
-    flex: 1,
-  },
-  waveformTouchable: {
-    marginBottom: 4,
-  },
-  timeContainer: {
-    alignItems: "flex-end",
-  },
-  timeText: {
-    fontSize: 12,
-    color: Colors.gray[600],
-    fontFamily: "NunitoSans-Regular",
-  },
-  ownTimeText: {
-    color: Colors.background.primary,
-    opacity: 0.8,
-  },
-  recorderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.error[50],
-    borderRadius: 25,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 50,
-  },
-  cancelButton: {
-    padding: 8,
-    marginRight: 12,
-  },
-  recordingIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.error[500],
-    marginRight: 12,
-  },
-  durationText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.gray[900],
-    fontFamily: "NunitoSans-Medium",
-    textAlign: "center",
-  },
-  stopButton: {
-    padding: 8,
-    marginLeft: 12,
-  },
-  recordButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.primary[50],
-    justifyContent: "center",
-    alignItems: "center",
-  },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: 20,
+      padding: 12,
+      maxWidth: screenWidth * 0.7,
+    },
+    ownMessage: {
+      backgroundColor: theme.colors.primary[500],
+    },
+    playButton: {
+      marginRight: 12,
+    },
+    playButtonInner: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: theme.colors.background.primary,
+    },
+    ownPlayButton: {
+      backgroundColor: theme.colors.background.primary,
+    },
+    otherPlayButton: {
+      backgroundColor: theme.colors.primary[50],
+    },
+    loadingIndicator: {
+      width: 16,
+      height: 16,
+      borderWidth: 2,
+      borderColor: theme.colors.primary[500],
+      borderTopColor: "transparent",
+      borderRadius: 8,
+    },
+    waveformContainer: {
+      flex: 1,
+    },
+    waveformTouchable: {
+      marginBottom: 4,
+    },
+    timeContainer: {
+      alignItems: "flex-end",
+    },
+    timeText: {
+      fontSize: 12,
+      color: theme.colors.gray[600],
+      fontFamily: "NunitoSans-Regular",
+    },
+    ownTimeText: {
+      color: theme.colors.background.primary,
+      opacity: 0.8,
+    },
+    recorderContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.error[50],
+      borderRadius: 25,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      minHeight: 50,
+    },
+    cancelButton: {
+      padding: 8,
+      marginRight: 12,
+    },
+    recordingIndicator: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: theme.colors.error[500],
+      marginRight: 12,
+    },
+    durationText: {
+      flex: 1,
+      fontSize: 16,
+      color: theme.colors.gray[900],
+      fontFamily: "NunitoSans-Medium",
+      textAlign: "center",
+    },
+    stopButton: {
+      padding: 8,
+      marginLeft: 12,
+    },
+    recordButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.primary[50],
+      justifyContent: "center",
+      alignItems: "center",
+    },
+  });
 
 // Voice message recorder component
 interface VoiceMessageRecorderProps {
@@ -361,6 +372,8 @@ export function VoiceMessageRecorder({
   maxDuration = 120000, // 2 minutes
   style,
 }: VoiceMessageRecorderProps) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -474,9 +487,9 @@ export function VoiceMessageRecorder({
       setIsRecording(false);
       await recorder.stop();
       const uri = recorder.uri || null;
-  if (uri) {
-    await FileSystem.deleteAsync(uri, { idempotent: true });
-  }
+      if (uri) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      }
       setRecordingDuration(0);
       onRecordingCancel();
     } catch (error) {
@@ -505,7 +518,7 @@ export function VoiceMessageRecorder({
     return (
       <View style={[styles.recorderContainer, style]}>
         <TouchableOpacity onPress={cancelRecording} style={styles.cancelButton}>
-          <Ionicons name="close" size={24} color={Colors.error[500]} />
+          <Ionicons name="close" size={24} color={theme.colors.error[500]} />
         </TouchableOpacity>
 
         <Animated.View
@@ -523,7 +536,7 @@ export function VoiceMessageRecorder({
         </Text>
 
         <TouchableOpacity onPress={stopRecording} style={styles.stopButton}>
-          <Ionicons name="send" size={24} color={Colors.primary[500]} />
+          <Ionicons name="send" size={24} color={theme.colors.primary[500]} />
         </TouchableOpacity>
       </View>
     );
@@ -534,7 +547,7 @@ export function VoiceMessageRecorder({
       onPress={startRecording}
       style={[styles.recordButton, style]}
     >
-      <Ionicons name="mic" size={24} color={Colors.primary[500]} />
+      <Ionicons name="mic" size={24} color={theme.colors.primary[500]} />
     </TouchableOpacity>
   );
 }

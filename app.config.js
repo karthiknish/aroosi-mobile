@@ -16,10 +16,24 @@ module.exports = () => {
     // app.json may not exist; ignore
   }
 
+  // Load version from package.json and build numbers from local file
+  const pkg = require("./package.json");
+  let buildMeta = { ios: { buildNumber: 1 }, android: { versionCode: 1 } };
+  try {
+    buildMeta = JSON.parse(
+      fs.readFileSync(
+        require("path").resolve(__dirname, "versioning/build-version.json"),
+        "utf8"
+      )
+    );
+  } catch (_) {
+    // default values used; file will be created by bump script
+  }
+
   const base = {
     name: "Aroosi",
     slug: "aroosi",
-    version: "1.0.3",
+    version: pkg.version || "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -37,8 +51,8 @@ module.exports = () => {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.aroosi.mobile",
-      buildNumber: "2",
-      usesAppleSignIn: false,
+      buildNumber: String(buildMeta.ios?.buildNumber ?? 1),
+      usesAppleSignIn: true,
       requireFullScreen: false,
       userInterfaceStyle: "automatic",
       backgroundColor: "#F9F7F5",
@@ -49,21 +63,16 @@ module.exports = () => {
           "Aroosi needs access to your camera to take profile pictures and share moments with your matches.",
         NSMicrophoneUsageDescription:
           "Aroosi needs access to your microphone to record voice messages for more personal conversations.",
-        NSContactsUsageDescription:
-          "Aroosi can access your contacts to help you find friends who are also using the app (optional).",
-        NSLocationWhenInUseUsageDescription:
-          "Aroosi uses your location to show you matches nearby and improve your experience.",
         NSUserNotificationsUsageDescription:
           "Aroosi sends notifications about new matches, messages, and important updates.",
-        NSCalendarsUsageDescription:
-          "Aroosi can access your calendar to help you schedule dates with your matches (optional).",
         NSPhotoLibraryAddUsageDescription:
           "Aroosi can save photos shared by your matches to your photo library.",
         ITSAppUsesNonExemptEncryption: false,
         CFBundleAllowMixedLocalizations: true,
         CFBundleLocalizations: ["en", "fa", "ps"],
         UIBackgroundModes: ["audio"],
-        UIViewControllerBasedStatusBarAppearance: true,
+        // Must be false for React Native status bar manager; setting true crashes dev/runtime
+        UIViewControllerBasedStatusBarAppearance: false,
         UISupportedInterfaceOrientations: ["UIInterfaceOrientationPortrait"],
         "UISupportedInterfaceOrientations~ipad": [
           "UIInterfaceOrientationPortrait",
@@ -84,13 +93,20 @@ module.exports = () => {
       config: {
         usesNonExemptEncryption: false,
       },
-      entitlements: {},
-      associatedDomains: [],
+      entitlements: {
+        // Enable Apple Sign-In capability
+        "com.apple.developer.applesignin": ["Default"],
+      },
+      associatedDomains: [
+        // Universal links for deep linking parity
+        "applinks:aroosi.app",
+        "applinks:www.aroosi.app",
+      ],
       // googleServicesFile will be set below with env fallback
     },
     android: {
       package: "com.aroosi.mobile",
-      versionCode: 4,
+      versionCode: Number(buildMeta.android?.versionCode ?? 1),
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#BFA67A",
@@ -113,9 +129,6 @@ module.exports = () => {
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.POST_NOTIFICATIONS",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.READ_CONTACTS",
         "com.android.vending.BILLING",
         "android.permission.MODIFY_AUDIO_SETTINGS",
       ],
@@ -141,6 +154,17 @@ module.exports = () => {
       bundler: "metro",
     },
     plugins: [
+      // OneSignal config plugin should be first
+      [
+        "onesignal-expo-plugin",
+        {
+          mode:
+            process.env.ONESIGNAL_MODE ||
+            (process.env.ENVIRONMENT === "production"
+              ? "production"
+              : "development"),
+        },
+      ],
       ["expo-dev-client", { launchMode: "most-recent" }],
       "expo-secure-store",
       [
@@ -170,14 +194,20 @@ module.exports = () => {
         },
       ],
       "expo-router",
+      // Enable Apple Sign-In native config
+      "expo-apple-authentication",
     ],
     extra: {
       eas: {
         projectId: "90150339-514c-413a-bfa1-9ce4cb689ba8",
       },
+      oneSignalAppId:
+        process.env.ONESIGNAL_APP_ID ||
+        process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID ||
+        null,
     },
     owner: "karthiknish",
-    runtimeVersion: "1.0.0",
+    runtimeVersion: { policy: "appVersion" },
     updates: {
       url: "https://u.expo.dev/90150339-514c-413a-bfa1-9ce4cb689ba8",
     },
@@ -195,15 +225,27 @@ module.exports = () => {
     ios: {
       ...base.ios,
       ...(jsonBase.ios || {}),
+      // Deep-merge Info.plist so required keys are not lost when app.json is present
+      infoPlist: {
+        ...(base.ios?.infoPlist || {}),
+        ...((jsonBase.ios && jsonBase.ios.infoPlist) || {}),
+      },
       googleServicesFile:
         process.env.GOOGLE_SERVICE_INFO_PLIST ??
         jsonBase.ios?.googleServicesFile ??
         base.ios?.googleServicesFile ??
-        "./ios/Aroosi/GoogleService-Info.plist",
+        "./GoogleService-Info.plist",
     },
     android: {
       ...base.android,
       ...(jsonBase.android || {}),
+      // Union permissions so additions here are not overwritten by app.json
+      permissions: Array.from(
+        new Set([
+          ...(base.android?.permissions || []),
+          ...((jsonBase.android && jsonBase.android.permissions) || []),
+        ])
+      ),
       googleServicesFile:
         process.env.GOOGLE_SERVICES_JSON ??
         jsonBase.android?.googleServicesFile ??

@@ -8,7 +8,7 @@ import {
   View,
   Modal,
 } from "react-native";
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import * as Haptics from "expo-haptics";
 
 // Keep track of recent toast messages to prevent duplicates (within a window)
@@ -63,6 +63,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
   children,
   maxVisible = 1,
 }) => {
+  const { theme } = useTheme();
   const [queue, setQueue] = useState<ToastMessage[]>([]);
   const idRef = useRef(1);
 
@@ -336,11 +337,22 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
               <Animated.View
                 style={[
                   styles.toast,
-                  stylesByType(current.type),
-                  { opacity, transform: [{ translateY }] },
+                  stylesByType(current.type, theme),
+                  {
+                    opacity,
+                    transform: [{ translateY }],
+                    shadowColor: theme.colors.neutral[900],
+                  },
                 ]}
               >
-                <Text style={styles.toastText}>{current.text}</Text>
+                <Text
+                  style={[
+                    styles.toastText,
+                    { color: theme.colors.text.inverse },
+                  ]}
+                >
+                  {current.text}
+                </Text>
                 {current.action && (
                   <TouchableOpacity
                     onPress={async () => {
@@ -357,7 +369,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
                     }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={styles.toastAction}>
+                    <Text
+                      style={[
+                        styles.toastAction,
+                        { color: theme.colors.text.inverse },
+                      ]}
+                    >
                       {current.action.label}
                     </Text>
                   </TouchableOpacity>
@@ -366,7 +383,14 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({
                   onPress={hide}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.toastAction}>Dismiss</Text>
+                  <Text
+                    style={[
+                      styles.toastAction,
+                      { color: theme.colors.text.inverse },
+                    ]}
+                  >
+                    Dismiss
+                  </Text>
                 </TouchableOpacity>
               </Animated.View>
             )}
@@ -404,36 +428,39 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    shadowColor: Colors.neutral[900],
     shadowOpacity: 0.15,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   toastText: {
-    color: Colors.text.inverse,
     flexShrink: 1,
     fontWeight: "600",
   },
   toastAction: {
-    color: Colors.text.inverse,
     fontWeight: "700",
     textDecorationLine: "underline",
   },
 });
 
-function stylesByType(type: ToastType) {
+function stylesByType(
+  type: ToastType,
+  theme: ReturnType<typeof useTheme>["theme"]
+) {
   switch (type) {
     case "success":
-      return { backgroundColor: Colors.success[500] };
+      return { backgroundColor: theme.colors.success[500] };
     case "error":
-      return { backgroundColor: Colors.error[500] };
+      return { backgroundColor: theme.colors.error[500] };
     case "warning":
-      return { backgroundColor: Colors.warning?.[600] ?? Colors.warning[500] };
+      return {
+        backgroundColor:
+          theme.colors.warning?.[600] ?? theme.colors.warning[500],
+      };
     case "primary":
-      return { backgroundColor: Colors.primary[600] };
+      return { backgroundColor: theme.colors.primary[600] };
     default:
-      return { backgroundColor: Colors.neutral[900] };
+      return { backgroundColor: theme.colors.neutral[900] };
   }
 }
 

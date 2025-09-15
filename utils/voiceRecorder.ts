@@ -8,7 +8,7 @@ import {
 } from "expo-audio";
 import { VoiceRecorder } from "../types/messaging";
 import { Platform } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 /**
  * Voice recorder implementation for React Native using expo-audio

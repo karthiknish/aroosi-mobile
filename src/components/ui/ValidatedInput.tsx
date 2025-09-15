@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
-import { Colors, Layout } from '@constants';
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 
-export interface ValidatedInputProps extends Omit<TextInputProps, 'onChangeText' | 'value'> {
+export interface ValidatedInputProps
+  extends Omit<TextInputProps, "onChangeText" | "value"> {
   label?: string;
   field: string;
   value: string;
@@ -32,37 +34,70 @@ export const ValidatedInput: React.FC<ValidatedInputProps> = ({
   testID,
   ...rest
 }) => {
+  const { theme } = useTheme();
   const showError = !!error;
   const labelNode = label ? (
-    <Text style={styles.label}>
-      {label} {required ? <Text style={styles.required}>*</Text> : null}
+    <Text style={[styles.label, { color: theme.colors.text.primary }]}>
+      {label}{" "}
+      {required ? (
+        <Text style={[styles.required, { color: theme.colors.error[500] }]}>
+          *
+        </Text>
+      ) : null}
     </Text>
   ) : null;
 
   return (
-    <View style={[styles.container, containerStyle]} testID={testID ?? `vi-${field}`}>
+    <View
+      style={[styles.container, containerStyle]}
+      testID={testID ?? `vi-${field}`}
+    >
       {labelNode}
       <View
         style={[
           styles.inputWrapper,
-          showError ? styles.inputWrapperError : value ? styles.inputWrapperValid : null,
+          {
+            borderColor: theme.colors.border.primary,
+            backgroundColor: theme.colors.background.secondary,
+          },
+          showError
+            ? { borderColor: theme.colors.error[500] }
+            : value
+            ? { borderColor: theme.colors.success[500] }
+            : null,
         ]}
         pointerEvents="box-none"
       >
-        {leftAccessory ? <View style={styles.accessoryLeft}>{leftAccessory}</View> : null}
+        {leftAccessory ? (
+          <View style={styles.accessoryLeft}>{leftAccessory}</View>
+        ) : null}
         <TextInput
-          style={[styles.input, inputStyle]}
+          style={[
+            styles.input,
+            inputStyle,
+            { color: theme.colors.text.primary },
+          ]}
           value={value}
           onChangeText={onValueChange}
-          placeholderTextColor={Colors.text.tertiary}
+          placeholderTextColor={theme.colors.text.tertiary}
           accessibilityLabel={label}
           accessibilityHint={hint}
           {...rest}
         />
-        {rightAccessory ? <View style={styles.accessoryRight}>{rightAccessory}</View> : null}
+        {rightAccessory ? (
+          <View style={styles.accessoryRight}>{rightAccessory}</View>
+        ) : null}
       </View>
-      {hint && !showError ? <Text style={styles.hint}>{hint}</Text> : null}
-      {showError ? <Text style={styles.error}>{error}</Text> : null}
+      {hint && !showError ? (
+        <Text style={[styles.hint, { color: theme.colors.text.secondary }]}>
+          {hint}
+        </Text>
+      ) : null}
+      {showError ? (
+        <Text style={[styles.error, { color: theme.colors.error[500] }]}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 };
@@ -74,32 +109,30 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Layout.typography.fontSize.base,
     fontWeight: "500",
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   required: {
-    color: Colors.error[500],
+    // color provided inline via theme in component
   },
   inputWrapper: {
     borderWidth: 1,
-    borderColor: Colors.border.primary,
+    borderColor: "transparent",
     borderRadius: Layout.radius.md,
-    backgroundColor: Colors.background.secondary,
+    backgroundColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
   },
   inputWrapperError: {
-    borderColor: Colors.error[500],
+    // borderColor provided inline via theme
   },
   inputWrapperValid: {
-    borderColor: Colors.success[500],
+    // borderColor provided inline via theme
   },
   input: {
     flex: 1,
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
     fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
   },
   accessoryLeft: {
     marginLeft: Layout.spacing.sm,
@@ -109,12 +142,10 @@ const styles = StyleSheet.create({
   },
   hint: {
     marginTop: Layout.spacing.xs,
-    color: Colors.text.secondary,
     fontSize: Layout.typography.fontSize.sm,
   },
   error: {
     marginTop: Layout.spacing.xs,
-    color: Colors.error[500],
     fontSize: Layout.typography.fontSize.sm,
   },
 });

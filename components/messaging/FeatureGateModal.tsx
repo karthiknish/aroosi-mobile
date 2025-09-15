@@ -12,7 +12,7 @@ import {
   SubscriptionTier,
   MessagingFeatureUtils,
 } from "../../utils/messagingFeatures";
-import { Colors } from "@constants";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import { rgbaHex } from "@utils/color";
 
 interface FeatureGateModalProps {
@@ -34,6 +34,8 @@ export const FeatureGateModal: React.FC<FeatureGateModalProps> = ({
   currentTier,
   reason,
 }) => {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const requiredTier = MessagingFeatureUtils.getRequiredTierForFeature(feature);
   const upgradePrompt = MessagingFeatureUtils.getUpgradePrompt(feature);
   const benefits = MessagingFeatureUtils.getSubscriptionBenefits(requiredTier);
@@ -160,133 +162,134 @@ export const FeatureGateModal: React.FC<FeatureGateModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modal: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: 16,
-    padding: 24,
-    width: Math.min(screenWidth - 40, 400),
-    maxHeight: "80%",
-  },
-  header: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  icon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.text.primary,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  tierComparison: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  tierBox: {
-    flex: 1,
-    alignItems: "center",
-  },
-  tierLabel: {
-    fontSize: 12,
-    color: Colors.neutral[500],
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  tierName: {
-    fontSize: 16,
-    fontWeight: "600",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  currentTier: {
-    backgroundColor: Colors.background.secondary,
-    color: Colors.text.secondary,
-  },
-  requiredTier: {
-    backgroundColor: Colors.info[50],
-    color: Colors.info[700],
-  },
-  arrow: {
-    marginHorizontal: 16,
-  },
-  arrowText: {
-    fontSize: 20,
-    color: Colors.text.secondary,
-  },
-  benefitsSection: {
-    marginBottom: 24,
-  },
-  benefitsTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: 16,
-  },
-  benefitItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-  benefitIcon: {
-    fontSize: 16,
-    color: Colors.success[400],
-    marginRight: 12,
-    marginTop: 2,
-  },
-  benefitText: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text.primary,
-    lineHeight: 22,
-  },
-  actions: {
-    gap: 12,
-  },
-  button: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  upgradeButton: {
-    backgroundColor: Colors.info[700],
-  },
-  upgradeButtonText: {
-    color: Colors.text.inverse,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  cancelButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-  },
-  cancelButtonText: {
-    color: Colors.text.secondary,
-    fontSize: 16,
-    fontWeight: "500",
-  },
-});
+const createStyles = (theme: any) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: rgbaHex(theme.colors.text.primary, 0.5),
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 20,
+    },
+    modal: {
+      backgroundColor: theme.colors.background.primary,
+      borderRadius: 16,
+      padding: 24,
+      width: Math.min(screenWidth - 40, 400),
+      maxHeight: "80%",
+    },
+    header: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    icon: {
+      fontSize: 48,
+      marginBottom: 12,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: theme.colors.text.primary,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: theme.colors.text.secondary,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+    tierComparison: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 24,
+      paddingHorizontal: 8,
+    },
+    tierBox: {
+      flex: 1,
+      alignItems: "center",
+    },
+    tierLabel: {
+      fontSize: 12,
+      color: theme.colors.neutral[500],
+      marginBottom: 4,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    tierName: {
+      fontSize: 16,
+      fontWeight: "600",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+    },
+    currentTier: {
+      backgroundColor: theme.colors.background.secondary,
+      color: theme.colors.text.secondary,
+    },
+    requiredTier: {
+      backgroundColor: theme.colors.info[50],
+      color: theme.colors.info[700],
+    },
+    arrow: {
+      marginHorizontal: 16,
+    },
+    arrowText: {
+      fontSize: 20,
+      color: theme.colors.text.secondary,
+    },
+    benefitsSection: {
+      marginBottom: 24,
+    },
+    benefitsTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: theme.colors.text.primary,
+      marginBottom: 16,
+    },
+    benefitItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      marginBottom: 12,
+    },
+    benefitIcon: {
+      fontSize: 16,
+      color: theme.colors.success[400],
+      marginRight: 12,
+      marginTop: 2,
+    },
+    benefitText: {
+      flex: 1,
+      fontSize: 16,
+      color: theme.colors.text.primary,
+      lineHeight: 22,
+    },
+    actions: {
+      gap: 12,
+    },
+    button: {
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    upgradeButton: {
+      backgroundColor: theme.colors.info[700],
+    },
+    upgradeButtonText: {
+      color: theme.colors.text.inverse,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    cancelButton: {
+      backgroundColor: "transparent",
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+    },
+    cancelButtonText: {
+      color: theme.colors.text.secondary,
+      fontSize: 16,
+      fontWeight: "500",
+    },
+  });

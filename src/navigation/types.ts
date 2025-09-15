@@ -33,6 +33,7 @@ export type ProfileStackParamList = {
   NotificationSettings: undefined;
   BlockedUsers: undefined;
   Safety: undefined;
+  About: undefined;
 };
 
 export type ChatStackParamList = {

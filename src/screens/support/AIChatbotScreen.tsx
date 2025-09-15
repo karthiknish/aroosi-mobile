@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import ScreenContainer from "@components/common/ScreenContainer";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
 import { useTheme } from "@contexts/ThemeContext";
 import { useApiClient } from "@/utils/api";
 import { useAuth } from "@contexts/AuthProvider";

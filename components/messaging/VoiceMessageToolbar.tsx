@@ -13,6 +13,7 @@ import {
 } from "./VoiceDurationIndicator";
 import { FeatureGateModal } from "./FeatureGateModal";
 import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface VoiceMessageToolbarProps {
   conversationId: string;
@@ -33,6 +34,7 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
   style,
   disabled = false,
 }) => {
+  const { theme } = useTheme();
   const [isRecording, setIsRecording] = useState(false);
   const [showRecorder, setShowRecorder] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -161,7 +163,13 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
           onUpgradeRequired={handleUpgradeRequired}
           onRecordingStart={handleRecordingStart}
           onDurationUpdate={handleDurationUpdate}
-          style={styles.recorder}
+          style={[
+            styles.recorder,
+            {
+              backgroundColor: theme.colors.background.primary,
+              shadowColor: theme.colors.neutral[900],
+            },
+          ]}
         />
 
         {/* Duration Indicator */}
@@ -189,9 +197,16 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
         disabled={disabled}
         style={[
           styles.voiceButton,
-          showRecorder && styles.voiceButtonActive,
-          disabled && styles.voiceButtonDisabled,
-          !canSendVoice && styles.voiceButtonRestricted,
+          {
+            backgroundColor: theme.colors.primary[500],
+            shadowColor: theme.colors.neutral[900],
+          },
+          showRecorder && { backgroundColor: theme.colors.error[500] },
+          disabled && {
+            backgroundColor: theme.colors.neutral[300],
+            opacity: 0.6,
+          },
+          !canSendVoice && { backgroundColor: theme.colors.warning[500] },
         ]}
         activeOpacity={0.7}
       >
@@ -200,6 +215,7 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
             styles.voiceButtonIcon,
             showRecorder && styles.voiceButtonIconActive,
             !canSendVoice && styles.voiceButtonIconRestricted,
+            { color: theme.colors.text.inverse },
           ]}
         >
           {showRecorder ? "✕" : "🎤"}
@@ -207,7 +223,14 @@ export const VoiceMessageToolbar: React.FC<VoiceMessageToolbarProps> = ({
 
         {!canSendVoice && (
           <View style={styles.premiumBadge}>
-            <Text style={styles.premiumBadgeText}>PRO</Text>
+            <Text
+              style={[
+                styles.premiumBadgeText,
+                { color: theme.colors.text.inverse },
+              ]}
+            >
+              PRO
+            </Text>
           </View>
         )}
       </TouchableOpacity>
@@ -241,8 +264,8 @@ const styles = StyleSheet.create({
   },
   recorder: {
     marginHorizontal: 16,
-    backgroundColor: "#ffffff",
-    shadowColor: "#000",
+    backgroundColor: "transparent",
+    shadowColor: undefined,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -258,36 +281,26 @@ const styles = StyleSheet.create({
   },
   slideHintText: {
     fontSize: 14,
-    color: "#666",
+    color: undefined,
     fontStyle: "italic",
   },
   voiceButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#007AFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
-    shadowColor: "#000",
+    shadowColor: undefined,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 4,
   },
-  voiceButtonActive: {
-    backgroundColor: "#FF3B30",
-  },
-  voiceButtonDisabled: {
-    backgroundColor: "#C7C7CC",
-    opacity: 0.6,
-  },
-  voiceButtonRestricted: {
-    backgroundColor: "#FF9500",
-  },
   voiceButtonIcon: {
     fontSize: 20,
-    color: "#ffffff",
+    color: undefined,
   },
   voiceButtonIconActive: {
     fontSize: 16,
@@ -307,6 +320,6 @@ const styles = StyleSheet.create({
   premiumBadgeText: {
     fontSize: 8,
     fontWeight: "bold",
-    color: "#000",
+    color: undefined,
   },
 });

@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
@@ -17,23 +17,26 @@ interface OnboardingCompleteScreenProps {
   navigation: any;
 }
 
-export default function OnboardingCompleteScreen({ navigation }: OnboardingCompleteScreenProps) {
+export default function OnboardingCompleteScreen({
+  navigation,
+}: OnboardingCompleteScreenProps) {
+  const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
 
   const handleContinue = () => {
-    navigation.navigate('Main');
+    navigation.navigate("Main");
   };
 
   const handleAddPhotos = () => {
     // Navigate to photo upload screen (to be implemented)
-    navigation.navigate('Main', { openProfile: true });
+    navigation.navigate("Main", { openProfile: true });
   };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     content: {
       flex: 1,
@@ -51,7 +54,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       width: 100,
       height: 100,
       borderRadius: 50,
-      backgroundColor: Colors.success[100],
+      backgroundColor: theme.colors.success[100],
       justifyContent: "center",
       alignItems: "center",
       marginBottom: spacing.xl,
@@ -62,13 +65,13 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     successTitle: {
       fontFamily: "Boldonse-Regular",
       fontSize: fontSize.xl,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.md,
       textAlign: "center",
     },
     successSubtitle: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       textAlign: "center",
       lineHeight: spacing.xl,
     },
@@ -79,7 +82,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     nextStepsTitle: {
       fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg + 2,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xl,
       textAlign: "center",
     },
@@ -93,7 +96,7 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       justifyContent: "center",
       alignItems: "center",
       marginRight: spacing.md,
@@ -107,45 +110,45 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     stepTitle: {
       fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs / 2,
     },
     stepDescription: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       lineHeight: spacing.lg,
     },
     actionsContainer: {
       paddingVertical: spacing.lg,
     },
     primaryButton: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       paddingVertical: spacing.md,
       borderRadius: 12,
       alignItems: "center",
       marginBottom: spacing.md,
     },
     primaryButtonText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: fontSize.lg,
       fontWeight: "600",
     },
     secondaryButton: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       paddingVertical: spacing.md,
       borderRadius: 12,
       alignItems: "center",
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       marginBottom: spacing.lg,
     },
     secondaryButtonText: {
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       fontSize: fontSize.base,
       fontWeight: "500",
     },
     tipsContainer: {
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       padding: spacing.lg,
       borderRadius: 12,
       marginBottom: spacing.lg,
@@ -153,12 +156,12 @@ export default function OnboardingCompleteScreen({ navigation }: OnboardingCompl
     tipsTitle: {
       fontSize: fontSize.base,
       fontWeight: "600",
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.md,
     },
     tipText: {
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       lineHeight: spacing.lg,
       marginBottom: spacing.xs / 2,
     },

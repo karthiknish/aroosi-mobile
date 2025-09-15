@@ -29,10 +29,11 @@ import {
 import PlatformHaptics from "@utils/PlatformHaptics";
 import { useApiClient } from "@utils/api";
 import { ProfileImage, IMAGE_VALIDATION } from "../../types/image";
-import { Colors, Layout } from "../../constants";
+import { Layout } from "../../constants";
 import { useToast } from "../../providers/ToastContext";
 import ConfirmModal from "../../components/ui/ConfirmModal";
 import { rgbaHex } from "@utils/color";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 
 function getImageId(image: ProfileImage): string {
   return (
@@ -60,6 +61,219 @@ export default function ImageUpload({
   onImagesChange,
   mode = "remote",
 }: ImageUploadProps) {
+  const { theme } = useTheme();
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      container: {
+        marginVertical: Layout.spacing.md,
+      },
+      header: {
+        marginBottom: Layout.spacing.md,
+      },
+      title: {
+        fontSize: Layout.typography.fontSize.lg,
+        fontWeight: "600",
+        color: t.colors.text.primary,
+        marginBottom: Layout.spacing.xs,
+      },
+      required: {
+        color: t.colors.error[500],
+      },
+      subtitle: {
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.secondary,
+        marginBottom: Layout.spacing.xs,
+      },
+      count: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.text.tertiary,
+      },
+      loadingContainer: {
+        alignItems: "center",
+        paddingVertical: Layout.spacing.xl,
+      },
+      loadingText: {
+        marginTop: Layout.spacing.sm,
+        fontSize: Layout.typography.fontSize.base,
+        color: t.colors.text.secondary,
+      },
+      imageList: {
+        paddingVertical: Layout.spacing.sm,
+        gap: Layout.spacing.md,
+      },
+      imageContainer: {
+        position: "relative",
+        width: imageSize,
+        height: imageSize,
+      },
+      dragActive: {
+        opacity: 0.9,
+        transform: [{ scale: 1.02 }],
+      },
+      reorderControls: {
+        position: "absolute",
+        left: Layout.spacing.xs,
+        bottom: Layout.spacing.xs,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: Layout.spacing.xs,
+      },
+      makeMainBtn: {
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.6),
+        borderRadius: Layout.radius.sm,
+        paddingHorizontal: Layout.spacing.xs,
+        paddingVertical: 2,
+      },
+      reorderBtn: {
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      reorderBtnText: {
+        color: t.colors.text.inverse,
+        fontWeight: "700",
+      },
+      arrowRow: {
+        flexDirection: "row",
+        gap: Layout.spacing.xs,
+      },
+      reorderArrow: {
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.6),
+        borderRadius: Layout.radius.sm,
+        paddingHorizontal: Layout.spacing.xs,
+        paddingVertical: 2,
+      },
+      image: {
+        width: "100%",
+        height: "100%",
+        borderRadius: Layout.radius.md,
+        backgroundColor: t.colors.background.secondary,
+      },
+      progressOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.35),
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      progressText: {
+        marginTop: 6,
+        color: t.colors.background.primary,
+        fontWeight: "600",
+      },
+      mainBadge: {
+        position: "absolute",
+        top: Layout.spacing.xs,
+        left: Layout.spacing.xs,
+        backgroundColor: t.colors.primary[500],
+        paddingHorizontal: Layout.spacing.xs,
+        paddingVertical: 2,
+        borderRadius: Layout.radius.sm,
+      },
+      mainBadgeText: {
+        fontSize: Layout.typography.fontSize.xs,
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+      },
+      deleteButton: {
+        position: "absolute",
+        top: Layout.spacing.xs,
+        right: Layout.spacing.xs,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: t.colors.error[500],
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      deleteButtonText: {
+        color: t.colors.text.inverse,
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "bold",
+        lineHeight: 16,
+      },
+      indexBadge: {
+        position: "absolute",
+        bottom: Layout.spacing.xs,
+        right: Layout.spacing.xs,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.7),
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      indexText: {
+        color: t.colors.text.inverse,
+        fontSize: Layout.typography.fontSize.xs,
+        fontWeight: "600",
+      },
+      checkbox: {
+        position: "absolute",
+        top: Layout.spacing.xs,
+        left: Layout.spacing.xs,
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        backgroundColor: rgbaHex(t.colors.text.primary, 0.5),
+        alignItems: "center",
+        justifyContent: "center",
+      },
+      checkboxText: {
+        color: t.colors.text.inverse,
+        fontWeight: "700",
+      },
+      addButton: {
+        width: imageSize,
+        height: imageSize,
+        borderRadius: Layout.radius.md,
+        borderWidth: 2,
+        borderColor: t.colors.primary[500],
+        borderStyle: "dashed",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: t.colors.background.secondary,
+      },
+      addButtonIcon: {
+        fontSize: Layout.typography.fontSize["2xl"],
+        color: t.colors.primary[500],
+        marginBottom: Layout.spacing.xs,
+      },
+      addButtonText: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.primary[500],
+        fontWeight: "500",
+      },
+      uploadingContainer: {
+        alignItems: "center",
+      },
+      uploadingText: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.primary[500],
+        marginTop: Layout.spacing.xs,
+      },
+      guidelines: {
+        marginTop: Layout.spacing.md,
+        padding: Layout.spacing.md,
+        backgroundColor: t.colors.background.secondary,
+        borderRadius: Layout.radius.md,
+      },
+      guidelinesTitle: {
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "600",
+        color: t.colors.text.primary,
+        marginBottom: Layout.spacing.sm,
+      },
+      guidelinesText: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.text.secondary,
+        marginBottom: Layout.spacing.xs,
+      },
+      errorText: {
+        fontSize: Layout.typography.fontSize.sm,
+        color: t.colors.error[500],
+        marginTop: Layout.spacing.xs,
+      },
+    })
+  );
   const remote = useImageUpload();
   const local = useLocalPhotoManagement();
   const isLocal = mode === "local";
@@ -387,7 +601,7 @@ export default function ImageUpload({
         <View key={item.key} style={styles.imageContainer}>
           <Image source={{ uri: item.uri }} style={styles.image} />
           <View style={styles.progressOverlay}>
-            <ActivityIndicator color={Colors.background.primary} />
+            <ActivityIndicator color={theme.colors.background.primary} />
             <Text style={styles.progressText}>
               {Math.min(100, Math.max(0, Math.round(item.progress)))}%
             </Text>
@@ -457,7 +671,7 @@ export default function ImageUpload({
     >
       {isUploading ? (
         <View style={styles.uploadingContainer}>
-          <ActivityIndicator size="small" color={Colors.primary[500]} />
+          <ActivityIndicator size="small" color={theme.colors.primary[500]} />
           <Text style={styles.uploadingText}>{uploadProgress}%</Text>
         </View>
       ) : (
@@ -474,7 +688,7 @@ export default function ImageUpload({
       <View style={styles.container}>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary[500]} />
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
           <Text style={styles.loadingText}>Loading images...</Text>
         </View>
       </View>
@@ -536,7 +750,7 @@ export default function ImageUpload({
         }}
       >
         <TouchableOpacity onPress={toggleSelectionMode}>
-          <Text style={{ color: Colors.primary[500], fontWeight: "600" }}>
+          <Text style={{ color: theme.colors.primary[500], fontWeight: "600" }}>
             {selectionMode ? "Cancel" : "Select"}
           </Text>
         </TouchableOpacity>
@@ -549,8 +763,8 @@ export default function ImageUpload({
               style={{
                 color:
                   selectedIds.size === 0
-                    ? Colors.text.tertiary
-                    : Colors.error[500],
+                    ? theme.colors.text.tertiary
+                    : theme.colors.error[500],
                 fontWeight: "600",
               }}
             >
@@ -604,213 +818,4 @@ export default function ImageUpload({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    marginVertical: Layout.spacing.md,
-  },
-  header: {
-    marginBottom: Layout.spacing.md,
-  },
-  title: {
-    fontSize: Layout.typography.fontSize.lg,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.xs,
-  },
-  required: {
-    color: Colors.error[500],
-  },
-  subtitle: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
-  },
-  count: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.tertiary,
-  },
-  loadingContainer: {
-    alignItems: "center",
-    paddingVertical: Layout.spacing.xl,
-  },
-  loadingText: {
-    marginTop: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-  },
-  imageList: {
-    paddingVertical: Layout.spacing.sm,
-    gap: Layout.spacing.md,
-  },
-  imageContainer: {
-    position: "relative",
-    width: imageSize,
-    height: imageSize,
-  },
-  dragActive: {
-    opacity: 0.9,
-    transform: [{ scale: 1.02 }],
-  },
-  reorderControls: {
-    position: "absolute",
-    left: Layout.spacing.xs,
-    bottom: Layout.spacing.xs,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Layout.spacing.xs,
-  },
-  makeMainBtn: {
-    backgroundColor: rgbaHex(Colors.text.primary, 0.6),
-    borderRadius: Layout.radius.sm,
-    paddingHorizontal: Layout.spacing.xs,
-    paddingVertical: 2,
-  },
-  reorderBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reorderBtnText: {
-    color: Colors.text.inverse,
-    fontWeight: "700",
-  },
-  arrowRow: {
-    flexDirection: "row",
-    gap: Layout.spacing.xs,
-  },
-  reorderArrow: {
-    backgroundColor: rgbaHex(Colors.text.primary, 0.6),
-    borderRadius: Layout.radius.sm,
-    paddingHorizontal: Layout.spacing.xs,
-    paddingVertical: 2,
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    borderRadius: Layout.radius.md,
-    backgroundColor: Colors.background.secondary,
-  },
-  progressOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.35),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  progressText: {
-    marginTop: 6,
-    color: Colors.background.primary,
-    fontWeight: "600",
-  },
-  mainBadge: {
-    position: "absolute",
-    top: Layout.spacing.xs,
-    left: Layout.spacing.xs,
-    backgroundColor: Colors.primary[500],
-    paddingHorizontal: Layout.spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Layout.radius.sm,
-  },
-  mainBadgeText: {
-    fontSize: Layout.typography.fontSize.xs,
-    color: Colors.text.inverse,
-    fontWeight: "600",
-  },
-  deleteButton: {
-    position: "absolute",
-    top: Layout.spacing.xs,
-    right: Layout.spacing.xs,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: Colors.error[500],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  deleteButtonText: {
-    color: Colors.text.inverse,
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "bold",
-    lineHeight: 16,
-  },
-  indexBadge: {
-    position: "absolute",
-    bottom: Layout.spacing.xs,
-    right: Layout.spacing.xs,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.7),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  indexText: {
-    color: Colors.text.inverse,
-    fontSize: Layout.typography.fontSize.xs,
-    fontWeight: "600",
-  },
-  checkbox: {
-    position: "absolute",
-    top: Layout.spacing.xs,
-    left: Layout.spacing.xs,
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    backgroundColor: rgbaHex(Colors.text.primary, 0.5),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxText: {
-    color: Colors.text.inverse,
-    fontWeight: "700",
-  },
-  addButton: {
-    width: imageSize,
-    height: imageSize,
-    borderRadius: Layout.radius.md,
-    borderWidth: 2,
-    borderColor: Colors.primary[500],
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.background.secondary,
-  },
-  addButtonIcon: {
-    fontSize: Layout.typography.fontSize["2xl"],
-    color: Colors.primary[500],
-    marginBottom: Layout.spacing.xs,
-  },
-  addButtonText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.primary[500],
-    fontWeight: "500",
-  },
-  uploadingContainer: {
-    alignItems: "center",
-  },
-  uploadingText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.primary[500],
-    marginTop: Layout.spacing.xs,
-  },
-  guidelines: {
-    marginTop: Layout.spacing.md,
-    padding: Layout.spacing.md,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Layout.radius.md,
-  },
-  guidelinesTitle: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "600",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.sm,
-  },
-  guidelinesText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
-  },
-  errorText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.error[500],
-    marginTop: Layout.spacing.xs,
-  },
-});
+// Remove static styles; styles are now theme-driven via useThemedStyles above

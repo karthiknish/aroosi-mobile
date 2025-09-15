@@ -4,7 +4,7 @@ import {
   PixelRatio,
   Platform,
 } from "react-native";
-import { Colors } from "@constants";
+// Note: avoid importing Colors here to keep hook theme-agnostic.
 
 /**
  * Canonical responsive hooks expected by consumers:
@@ -177,11 +177,13 @@ export const useResponsive = () => {
   }), [scale, config.isTablet]);
 
   // Shadows
-  const shadows = useMemo(
-    () => ({
+  const shadows = useMemo(() => {
+    // Use neutral dark gray as default shadow; components can override with theme.colors.shadow if needed
+    const defaultShadowColor = "#0B0B0D"; // deep neutral; override in components via theme where possible
+    return {
       small: Platform.select({
         ios: {
-          shadowColor: Colors.neutral[900],
+          shadowColor: defaultShadowColor,
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: 0.1,
           shadowRadius: scale.radius(2),
@@ -192,7 +194,7 @@ export const useResponsive = () => {
       }),
       medium: Platform.select({
         ios: {
-          shadowColor: Colors.neutral[900],
+          shadowColor: defaultShadowColor,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.1,
           shadowRadius: scale.radius(4),
@@ -203,7 +205,7 @@ export const useResponsive = () => {
       }),
       large: Platform.select({
         ios: {
-          shadowColor: Colors.neutral[900],
+          shadowColor: defaultShadowColor,
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.15,
           shadowRadius: scale.radius(8),
@@ -212,9 +214,8 @@ export const useResponsive = () => {
           elevation: scale.spacing(8),
         },
       }),
-    }),
-    [scale]
-  );
+    };
+  }, [scale]);
 
   // Utility functions
   const utils = useMemo(() => ({

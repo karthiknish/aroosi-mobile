@@ -43,18 +43,30 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
     trackFeatureUsage,
   } = subscriptionResult;
 
-  // Access properties from the subscription result
   const hasActiveSubscription = subscriptionResult.hasActiveSubscription;
+  const currentPlan = subscriptionResult.subscription?.plan;
+
+  // Explicit mapping from boolean gate features to server-side usage counters
+  // Avoid brittle substring checks; keep parity with server feature keys
+  const usageFeatureByGate: Partial<
+    Record<keyof SubscriptionFeatures, keyof FeatureUsage | string>
+  > = {
+    canBoostProfile: "profileBoosts",
+    // Messaging usage is tracked per send action elsewhere (messagesSent),
+    // we don't couple it to canInitiateChat here to avoid false positives.
+    // Example mappings you can enable when integrating in the respective flows:
+    // canChatWithMatches: "messagesSent",
+    // canInitiateChat: "messagesSent",
+    // Advanced filters are not usage-counted; no mapping here.
+  };
 
   const checkFeatureAccess = useCallback(
     async (
       feature: keyof SubscriptionFeatures
     ): Promise<FeatureAccessResult> => {
       try {
-        // First check if the feature is available for the current tier
-        const hasFeatureAccess = canAccessFeature(feature);
-
-        if (!hasFeatureAccess) {
+        const hasFeature = canAccessFeature(feature);
+        if (!hasFeature) {
           return {
             allowed: false,
             reason: getFeatureUpgradeMessage(feature),
@@ -63,33 +75,23 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
           };
         }
 
-        // For usage-based features, check real-time limits
-        const usageFeatures = [
-          "maxMessages",
-          "maxInterests",
-          "maxProfileViews",
-          "maxSearches",
-          "maxProfileBoosts",
-        ];
-
-        if (
-          usageFeatures.some((uf) =>
-            feature.toString().includes(uf.replace("max", "").toLowerCase())
-          )
-        ) {
-          const featureName = mapFeatureToUsageName(feature);
-          if (featureName) {
-            const usageStatus = await canUseFeatureNow(String(featureName));
-
-            if (!usageStatus.canUse) {
-              return {
-                allowed: false,
-                reason: usageStatus.reason || "Usage limit reached",
-                showUpgradePrompt: !hasActiveSubscription,
-                upgradeRequired: !hasActiveSubscription,
-                remainingUsage: 0,
-              };
-            }
+        const mappedUsageFeature = usageFeatureByGate[feature];
+        if (mappedUsageFeature) {
+          const usageStatus = await canUseFeatureNow(
+            String(mappedUsageFeature)
+          );
+          if (!usageStatus.canUse) {
+            const requiresPlanUpgrade = Boolean(
+              usageStatus.requiredPlan &&
+                usageStatus.requiredPlan !== currentPlan
+            );
+            return {
+              allowed: false,
+              reason: usageStatus.reason || "Usage limit reached",
+              showUpgradePrompt: requiresPlanUpgrade || !hasActiveSubscription,
+              upgradeRequired: requiresPlanUpgrade || !hasActiveSubscription,
+              remainingUsage: 0,
+            };
           }
         }
 
@@ -102,7 +104,7 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
         };
       }
     },
-    [canAccessFeature, canUseFeatureNow, hasActiveSubscription]
+    [canAccessFeature, canUseFeatureNow, hasActiveSubscription, currentPlan]
   );
 
   const validateAndExecute = useCallback(
@@ -123,7 +125,6 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
 
       try {
         const accessResult = await checkFeatureAccess(feature);
-
         if (!accessResult.allowed) {
           const message =
             customErrorMessage ||
@@ -144,21 +145,17 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
               Alert.alert("Feature Unavailable", message, [{ text: "OK" }]);
             }
           }
-
           return null;
         }
 
-        // Execute the action and track usage
         const result = await action();
 
-        // Track feature usage for analytics
-        const featureName = mapFeatureToUsageName(feature);
-        if (featureName) {
+        const mappedUsageFeature = usageFeatureByGate[feature];
+        if (mappedUsageFeature) {
           try {
-            await trackFeatureUsage(String(featureName));
+            await trackFeatureUsage(String(mappedUsageFeature));
           } catch (trackingError) {
             console.warn("Failed to track feature usage:", trackingError);
-            // Don't fail the main action due to tracking errors
           }
         }
 
@@ -169,11 +166,9 @@ export function useFeatureAccess(): UseFeatureAccessReturn {
           action: "validateAndExecute",
           metadata: { feature },
         });
-
         if (showErrorAlert) {
           errorHandler.showError(appError);
         }
-
         return null;
       }
     },
@@ -203,10 +198,8 @@ function getFeatureUpgradeMessage(feature: keyof SubscriptionFeatures): string {
       "Upgrade to Premium to start conversations with your matches",
     canSendUnlimitedLikes: "Upgrade to Premium for unlimited likes",
     canViewFullProfiles: "Upgrade to Premium to view complete profiles",
-    // Boosting available on Premium (limited) and unlimited on Premium Plus
     canBoostProfile:
       "Upgrade to Premium for monthly boosts or Premium Plus for unlimited boosts",
-    // Align with web: profile viewers available starting at Premium
     canViewProfileViewers: "Upgrade to Premium to see who viewed your profile",
     canUseAdvancedFilters: "Upgrade to Premium for advanced search filters",
     canUseIncognitoMode: "Upgrade to Premium Plus for incognito browsing",
@@ -222,25 +215,3 @@ function getFeatureUpgradeMessage(feature: keyof SubscriptionFeatures): string {
   );
 }
 
-function mapFeatureToUsageName(
-  feature: keyof SubscriptionFeatures
-): keyof FeatureUsage | null {
-  const mapping: Record<string, keyof FeatureUsage> = {
-    maxMessages: "messagesSent",
-    maxInterests: "interestsSent",
-    maxProfileViews: "profileViews",
-    maxSearches: "searchesPerformed",
-    maxProfileBoosts: "profileBoosts",
-  };
-
-  // Handle both direct feature names and derived names
-  for (const [featureKey, usageName] of Object.entries(mapping)) {
-    if (
-      feature.toString().includes(featureKey.replace("max", "").toLowerCase())
-    ) {
-      return usageName;
-    }
-  }
-
-  return null;
-}

@@ -255,21 +255,39 @@ export class MessageSyncManager extends EventEmitter {
         throw new Error("Failed to get conversations list");
       }
 
-      const conversations = conversationsResponse.data || [];
+      // Normalize conversations payload into an array
+      const payload: any = conversationsResponse.data;
+      let conversations: any[] = [];
+      if (Array.isArray(payload)) {
+        conversations = payload;
+      } else if (payload && typeof payload === "object") {
+        if (Array.isArray(payload.conversations)) {
+          conversations = payload.conversations;
+        } else if (Array.isArray(payload.data?.conversations)) {
+          conversations = payload.data.conversations;
+        } else if (Array.isArray(payload.items)) {
+          conversations = payload.items;
+        } else if (Array.isArray(payload.results)) {
+          conversations = payload.results;
+        } else {
+          conversations = [];
+        }
+      }
 
-      // Sync each conversation
-      for (const conversation of conversations) {
+      // Sync each conversation (defensively derive the ID)
+      for (const c of conversations) {
+        const convId = c?.conversationId || c?._id || c?.id;
+        if (!convId) continue;
         try {
-          await this.syncConversation(conversation.id);
+          await this.syncConversation(convId);
         } catch (error) {
-          console.error(
-            `Failed to sync conversation ${conversation.id}:`,
-            error
-          );
+          console.error(`Failed to sync conversation ${convId}:`, error);
           this.addSyncError(
             "network",
             `Failed to sync conversation: ${error}`,
-            { conversationId: conversation.id }
+            {
+              conversationId: convId,
+            }
           );
         }
       }
@@ -310,9 +328,9 @@ export class MessageSyncManager extends EventEmitter {
           ? Math.max(...cachedMessages.map((m) => m.createdAt || 0))
           : syncState.lastMessageTimestamp;
 
-      // Fetch new messages from server
+      // Fetch latest messages from server (API supports 'before' for older pages, not 'after')
+      // We'll request the latest batch and then filter by timestamp > lastCachedTimestamp
       const response = await this.apiClient.getMessages(conversationId, {
-        after: lastCachedTimestamp,
         limit: this.options.batchSize,
       });
 
@@ -320,7 +338,9 @@ export class MessageSyncManager extends EventEmitter {
         throw new Error(response.error?.message || "Failed to fetch messages");
       }
 
-      const serverMessages = response.data || [];
+      const serverMessages = (response.data || []).filter(
+        (m: Message) => (m.createdAt || 0) > (lastCachedTimestamp || 0)
+      );
 
       if (serverMessages.length > 0) {
         // Check for conflicts

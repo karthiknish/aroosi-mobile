@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   Dimensions,
   Platform,
 } from "react-native";
-import { Colors, Layout } from "@constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import {
   useResponsiveSpacing,
   useResponsiveTypography,
@@ -31,11 +33,13 @@ const getBoldonseFontFamily = () => {
 };
 
 export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
+  const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const { user, signOut } = useAuth();
   const hasProfile = !!user?.profile;
   const isProfileLoading = !user?.profile && !!user;
+  const [snapshotStep, setSnapshotStep] = useState<number | null>(null);
 
   // Note: The RootNavigator handles the main navigation logic
   // This screen should only be shown when onboarding is needed
@@ -45,6 +49,42 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     // The ProfileSetupScreen will handle the specific step logic
     navigation.navigate("ProfileSetup");
   };
+
+  const handleResume = () => {
+    if (snapshotStep && snapshotStep >= 1) {
+      navigation.navigate("ProfileSetup", { step: snapshotStep });
+    } else {
+      navigation.navigate("ProfileSetup");
+    }
+  };
+
+  const handleStartOver = async () => {
+    try {
+      await AsyncStorage.removeItem("PROFILE_CREATION_MOBILE");
+    } catch {}
+    navigation.navigate("ProfileSetup", { step: 1 });
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem("PROFILE_CREATION_MOBILE");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const step = Number(parsed?.step);
+          if (Number.isFinite(step) && step >= 1 && step <= 9) {
+            setSnapshotStep(step);
+          } else {
+            setSnapshotStep(null);
+          }
+        } else {
+          setSnapshotStep(null);
+        }
+      } catch {
+        setSnapshotStep(null);
+      }
+    })();
+  }, []);
 
   const handleDevLogout = async () => {
     try {
@@ -59,7 +99,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     content: {
       paddingHorizontal: spacing.xl,
@@ -74,7 +114,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: Colors.primary[100],
+      backgroundColor: theme.colors.primary[100],
       justifyContent: "center",
       alignItems: "center",
       marginBottom: spacing.xl,
@@ -85,20 +125,20 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     welcomeTitle: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.xl,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.md,
       textAlign: "center",
     },
     welcomeSubtitle: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       textAlign: "center",
       lineHeight: spacing.xl,
     },
     connectText: {
       fontFamily: Layout.typography.fontFamily.sansBold,
       fontSize: fontSize.lg,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       textAlign: "center",
       fontWeight: "700",
       marginTop: spacing.md,
@@ -118,13 +158,13 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     featureTitle: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.lg,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs,
       textAlign: "center",
     },
     featureDescription: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       textAlign: "center",
       lineHeight: spacing.lg + 2,
     },
@@ -134,7 +174,7 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
       marginTop: "auto", // Push to bottom
     },
     primaryButton: {
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       paddingVertical: spacing.md,
       borderRadius: 12,
       alignItems: "center",
@@ -142,18 +182,48 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     },
     primaryButtonText: {
       fontFamily: Layout.typography.fontFamily.sansSemiBold,
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: fontSize.lg,
+      fontWeight: "600",
+    },
+    secondaryButton: {
+      backgroundColor: theme.colors.background.secondary,
+      paddingVertical: spacing.md,
+      borderRadius: 12,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      marginBottom: spacing.sm,
+    },
+    secondaryButtonText: {
+      fontFamily: Layout.typography.fontFamily.sansSemiBold,
+      color: theme.colors.text.primary,
+      fontSize: fontSize.base,
       fontWeight: "600",
     },
     disclaimerText: {
       fontSize: fontSize.xs,
-      color: Colors.text.tertiary,
+      color: theme.colors.text.tertiary,
       textAlign: "center",
       lineHeight: spacing.lg,
     },
+    helperText: {
+      fontSize: fontSize.xs,
+      color: theme.colors.text.tertiary,
+      textAlign: "center",
+      marginTop: spacing.xs,
+    },
+    linkButton: {
+      alignItems: "center",
+      paddingVertical: spacing.sm,
+    },
+    linkButtonText: {
+      color: theme.colors.primary[500],
+      fontSize: fontSize.base,
+      fontWeight: "600",
+    },
     devLogoutButton: {
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       borderRadius: 6,
@@ -162,14 +232,14 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
     },
     devLogoutText: {
       fontFamily: Layout.typography.fontFamily.sansSemiBold,
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: fontSize.xs,
       fontWeight: "600",
     },
     fontTest: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize.lg,
-      color: Colors.primary[500],
+      color: theme.colors.primary[500],
       position: "absolute",
       top: spacing.md * 3,
       left: spacing.md,
@@ -239,18 +309,75 @@ export default function WelcomeScreen({ navigation }: WelcomeScreenProps) {
 
       {/* Call to Action */}
       <View style={styles.ctaContainer}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={handleGetStarted}
-        >
-          <Text style={styles.primaryButtonText}>
-            {hasProfile ? "Continue Setup" : "Complete Your Profile"}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.disclaimerText}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </Text>
+        {snapshotStep ? (
+          <>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Resume Profile Setup"
+              accessibilityHint={`Continue from step ${snapshotStep} of 9`}
+              style={styles.primaryButton}
+              onPress={handleResume}
+            >
+              <Text style={styles.primaryButtonText}>
+                Resume Profile Setup (Step {snapshotStep}/9)
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Start over"
+              accessibilityHint="Restart profile setup from step 1"
+              style={[styles.secondaryButton]}
+              onPress={handleStartOver}
+            >
+              <Text style={styles.secondaryButtonText}>Start Over</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open onboarding checklist"
+              accessibilityHint="See all steps and jump to a specific one"
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("OnboardingChecklist")}
+            >
+              <Text style={styles.linkButtonText}>
+                Open Onboarding Checklist
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.helperText}>
+              We saved your progress. You can resume anytime.
+            </Text>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={
+                hasProfile ? "Continue setup" : "Complete your profile"
+              }
+              accessibilityHint="Start the onboarding process"
+              style={styles.primaryButton}
+              onPress={handleGetStarted}
+            >
+              <Text style={styles.primaryButtonText}>
+                {hasProfile ? "Continue Setup" : "Complete Your Profile"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open onboarding checklist"
+              accessibilityHint="See all steps and jump to a specific one"
+              style={styles.linkButton}
+              onPress={() => navigation.navigate("OnboardingChecklist")}
+            >
+              <Text style={styles.linkButtonText}>
+                View Onboarding Checklist
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.disclaimerText}>
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy
+            </Text>
+          </>
+        )}
 
         {/* Move DEV: Logout button here, below the CTA */}
         {__DEV__ && (

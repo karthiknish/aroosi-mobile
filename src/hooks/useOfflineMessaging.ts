@@ -83,9 +83,12 @@ export function useOfflineMessaging(options: UseOfflineMessagingOptions = {}) {
           }));
         });
 
-        service.on("connection_status_changed", ({ online }: { online: boolean }) => {
-          setState((prev) => ({ ...prev, isOnline: online }));
-        });
+        service.on(
+          "connection_status_changed",
+          ({ online }: { online: boolean }) => {
+            setState((prev) => ({ ...prev, isOnline: online }));
+          }
+        );
 
         service.on("message_sent", (message: Message) => {
           updateServiceState();
@@ -265,6 +268,15 @@ export function useOfflineMessaging(options: UseOfflineMessagingOptions = {}) {
     []
   );
 
+  // Retry by queue id or optimistic id
+  const retryMessageByAnyId = useCallback(
+    async (lookupId: string): Promise<boolean> => {
+      if (!serviceRef.current) return false;
+      return await serviceRef.current.retryMessageByAnyId(lookupId);
+    },
+    []
+  );
+
   // Retry all failed messages
   const retryAllFailed = useCallback(async (): Promise<void> => {
     if (!serviceRef.current) {
@@ -345,6 +357,7 @@ export function useOfflineMessaging(options: UseOfflineMessagingOptions = {}) {
     sendMessage,
     getMessages,
     retryMessage,
+      retryMessageByAnyId,
     retryAllFailed,
     clearFailedMessages,
     syncAllConversations,
@@ -373,6 +386,7 @@ export function useConversationMessaging(conversationId: string) {
     syncConversation,
     isOnline,
     isInitialized,
+    retryMessageByAnyId,
   } = useOfflineMessaging();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -470,6 +484,7 @@ export function useConversationMessaging(conversationId: string) {
     sendMessage,
     loadMessages,
     sync,
+    retryMessageById: retryMessageByAnyId,
 
     // Computed
     hasMessages: messages.length > 0,

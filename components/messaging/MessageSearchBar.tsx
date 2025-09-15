@@ -12,7 +12,9 @@ import {
 } from "react-native";
 import { useMessageSearch } from "@/hooks/useMessageSearch";
 import { SearchResult } from "../../utils/messageSearch";
-import { Colors } from "@constants";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
+import { Theme } from "@constants/Theme";
+import { StyleProp, ViewStyle, TextStyle } from "react-native";
 
 interface MessageSearchBarProps {
   conversationId: string;
@@ -35,6 +37,8 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
   showSuggestions = true,
   maxSuggestions = 5,
 }) => {
+  const { theme } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [isFocused, setIsFocused] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const inputRef = useRef<TextInput>(null);
@@ -164,7 +168,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
     if (isSearching) {
       return (
         <View style={styles.emptyState}>
-          <ActivityIndicator size="small" color={Colors.info[500]} />
+          <ActivityIndicator size="small" color={theme.colors.info[500]} />
           <Text style={styles.emptyText}>Searching...</Text>
         </View>
       );
@@ -205,7 +209,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
           ref={inputRef}
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={Colors.text.secondary}
+          placeholderTextColor={theme.colors.text.secondary}
           value={query}
           onChangeText={handleTextChange}
           onFocus={handleFocus}
@@ -223,7 +227,7 @@ export const MessageSearchBar: React.FC<MessageSearchBarProps> = ({
 
         {isSearching && (
           <View style={styles.loadingIndicator}>
-            <ActivityIndicator size="small" color={Colors.info[500]} />
+            <ActivityIndicator size="small" color={theme.colors.info[500]} />
           </View>
         )}
       </View>
@@ -276,6 +280,7 @@ export const MessageSearchResults: React.FC<MessageSearchResultsProps> = ({
   style,
   showScore = false,
 }) => {
+  const styles = useThemedStyles(createStyles);
   const renderResult = ({ item }: { item: SearchResult }) => (
     <TouchableOpacity
       style={styles.resultItem}
@@ -322,139 +327,168 @@ export const MessageSearchResults: React.FC<MessageSearchResultsProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: Colors.background.primary,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchIconText: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text.primary,
-    paddingVertical: 0,
-  },
-  clearButton: {
-    marginLeft: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.neutral[300],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clearButtonText: {
-    fontSize: 12,
-    color: Colors.background.primary,
-    fontWeight: "bold",
-  },
-  loadingIndicator: {
-    marginLeft: 8,
-  },
-  resultsContainer: {
-    backgroundColor: Colors.background.primary,
-    borderRadius: 8,
-    marginTop: 4,
-    overflow: "hidden",
-    shadowColor: Colors.neutral[900],
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  resultsContainerVisible: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-  },
-  resultsList: {
-    flex: 1,
-  },
-  suggestionItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  suggestionIcon: {
-    fontSize: 14,
-    marginRight: 12,
-    color: Colors.text.secondary,
-  },
-  suggestionText: {
-    fontSize: 16,
-    color: Colors.text.primary,
-  },
-  resultItem: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.neutral[200],
-  },
-  resultContent: {
-    flex: 1,
-  },
-  resultText: {
-    fontSize: 14,
-    color: Colors.text.primary,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  resultMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  resultTime: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-  },
-  resultScoreContainer: {
-    minWidth: 32,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: Colors.info[50],
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resultScore: {
-    fontSize: 12,
-    color: Colors.info[600],
-    fontWeight: "500",
-  },
-  scoreText: {
-    fontSize: 12,
-    color: Colors.info[600],
-    fontWeight: "500",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: Colors.text.secondary,
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: Colors.neutral[500],
-  },
-});
+type Styles = {
+  container: ViewStyle;
+  inputContainer: ViewStyle;
+  searchIcon: ViewStyle;
+  searchIconText: TextStyle;
+  input: TextStyle;
+  clearButton: ViewStyle;
+  clearButtonText: TextStyle;
+  loadingIndicator: ViewStyle;
+  resultsContainer: ViewStyle;
+  resultsContainerVisible: ViewStyle;
+  resultsList: ViewStyle;
+  suggestionItem: ViewStyle;
+  suggestionIcon: TextStyle;
+  suggestionText: TextStyle;
+  resultItem: ViewStyle;
+  resultContent: ViewStyle;
+  resultText: TextStyle;
+  resultMeta: ViewStyle;
+  resultTime: TextStyle;
+  resultScoreContainer: ViewStyle;
+  resultScore: TextStyle;
+  scoreText: TextStyle;
+  emptyState: ViewStyle;
+  emptyText: TextStyle;
+  emptySubtext: TextStyle;
+};
+
+const createStyles = (theme: Theme) =>
+  StyleSheet.create<Styles>({
+    container: {
+      backgroundColor: theme.colors.background.primary,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      height: 40,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchIconText: {
+      fontSize: 16,
+      color: theme.colors.text.secondary,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: theme.colors.text.primary,
+      paddingVertical: 0,
+    },
+    clearButton: {
+      marginLeft: 8,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: theme.colors.neutral[300],
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    clearButtonText: {
+      fontSize: 12,
+      color: theme.colors.background.primary,
+      fontWeight: "bold",
+    },
+    loadingIndicator: {
+      marginLeft: 8,
+    },
+    resultsContainer: {
+      backgroundColor: theme.colors.background.primary,
+      borderRadius: 8,
+      marginTop: 4,
+      overflow: "hidden",
+      shadowColor: theme.colors.neutral[900],
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    resultsContainerVisible: {
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+    },
+    resultsList: {
+      flex: 1,
+    },
+    suggestionItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.neutral[200],
+    },
+    suggestionIcon: {
+      fontSize: 14,
+      marginRight: 12,
+      color: theme.colors.text.secondary,
+    },
+    suggestionText: {
+      fontSize: 16,
+      color: theme.colors.text.primary,
+    },
+    resultItem: {
+      flexDirection: "row",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.neutral[200],
+    },
+    resultContent: {
+      flex: 1,
+    },
+    resultText: {
+      fontSize: 14,
+      color: theme.colors.text.primary,
+      lineHeight: 20,
+      marginBottom: 4,
+    },
+    resultMeta: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    resultTime: {
+      fontSize: 12,
+      color: theme.colors.text.secondary,
+    },
+    resultScoreContainer: {
+      minWidth: 32,
+      paddingHorizontal: 6,
+      paddingVertical: 4,
+      borderRadius: 12,
+      backgroundColor: theme.colors.info[50],
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    resultScore: {
+      fontSize: 12,
+      color: theme.colors.info[600],
+      fontWeight: "500",
+    },
+    scoreText: {
+      fontSize: 12,
+      color: theme.colors.info[600],
+      fontWeight: "500",
+    },
+    emptyState: {
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: 32,
+    },
+    emptyText: {
+      fontSize: 16,
+      color: theme.colors.text.secondary,
+      marginBottom: 4,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: theme.colors.neutral[500],
+    },
+  });

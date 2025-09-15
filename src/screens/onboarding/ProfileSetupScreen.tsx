@@ -50,7 +50,8 @@ import {
   StepValidationSchemas,
   normalizeForSchema,
 } from "@/validation/onboardingSchemas";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants"; // Using theme instead of legacy Colors in this file
+import { useTheme } from "@contexts/ThemeContext";
 import ImageUpload from "@components/profile/ImageUpload";
 import ScreenContainer from "@components/common/ScreenContainer";
 import SearchableSelect from "@components/SearchableSelect";
@@ -62,6 +63,7 @@ import {
 } from "../../../constants/languages";
 import { VerificationBanner } from "@/components/ui";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
+import * as Haptics from "expo-haptics";
 
 // Local component for Step 9: Create Account (signup embedded)
 function CreateAccountStep({
@@ -84,6 +86,8 @@ function CreateAccountStep({
   };
   onVerificationStarted: (email: string) => void;
 }) {
+  const { theme } = useTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -91,6 +95,33 @@ function CreateAccountStep({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Password strength evaluation (simple heuristic)
+  const getPasswordStrength = (pw: string) => {
+    let score = 0;
+    const hasLower = /[a-z]/.test(pw);
+    const hasUpper = /[A-Z]/.test(pw);
+    const hasDigit = /\d/.test(pw);
+    const hasSymbol = /[^A-Za-z0-9]/.test(pw);
+    const long = pw.length >= 12;
+    score += hasLower ? 1 : 0;
+    score += hasUpper ? 1 : 0;
+    score += hasDigit ? 1 : 0;
+    score += hasSymbol ? 1 : 0;
+    score += long ? 1 : 0;
+    const clamped = Math.max(0, Math.min(5, score));
+    const labels = ["Very weak", "Weak", "Fair", "Good", "Strong", "Excellent"];
+    const colors = [
+      theme.colors.error[500],
+      theme.colors.error[400],
+      theme.colors.warning[500] || theme.colors.primary[300],
+      theme.colors.primary[400],
+      theme.colors.primary[500],
+      theme.colors.primary[600] || theme.colors.primary[500],
+    ];
+    return { score: clamped, label: labels[clamped], color: colors[clamped] };
+  };
+  const strength = getPasswordStrength(password);
 
   const {
     signUp,
@@ -192,8 +223,8 @@ function CreateAccountStep({
       {missing.length > 0 ? (
         <View
           style={{
-            backgroundColor: Colors.error[50],
-            borderColor: Colors.error[200],
+            backgroundColor: theme.colors.error[50],
+            borderColor: theme.colors.error[200],
             borderWidth: 1,
             borderRadius: 8,
             padding: Layout.spacing.md,
@@ -202,18 +233,22 @@ function CreateAccountStep({
         >
           <Text
             style={{
-              color: Colors.error[600],
+              color: theme.colors.error[600],
               fontWeight: "600",
               marginBottom: 4,
             }}
           >
             Cannot create account - Profile incomplete
           </Text>
-          <Text style={{ color: Colors.error[500], marginBottom: 8 }}>
+          <Text style={{ color: theme.colors.error[500], marginBottom: 8 }}>
             You must complete all profile sections before creating an account.
           </Text>
           <Text
-            style={{ color: Colors.error[300], fontSize: 12, marginBottom: 8 }}
+            style={{
+              color: theme.colors.error[300],
+              fontSize: 12,
+              marginBottom: 8,
+            }}
           >
             Missing: {missing.slice(0, 5).join(", ")}
             {missing.length > 5 ? ` and ${missing.length - 5} more fields` : ""}
@@ -237,7 +272,7 @@ function CreateAccountStep({
                 fieldErrors.emailAddress && styles.inputError,
               ]}
               placeholder="Enter your email"
-              placeholderTextColor={Colors.text.secondary}
+              placeholderTextColor={theme.colors.text.secondary}
               value={emailAddress}
               onChangeText={(t) => {
                 setEmailAddress(t);
@@ -259,6 +294,11 @@ function CreateAccountStep({
               At least 12 characters, including upper, lower, number, and
               symbol.
             </Text>
+            {/* Examples / tips */}
+            <Text style={styles.helperText}>
+              Tip: Use a memorable phrase with numbers and symbols (e.g.,
+              "BlueSky!2024").
+            </Text>
             <View style={{ position: "relative" }}>
               <TextInput
                 style={[
@@ -267,7 +307,7 @@ function CreateAccountStep({
                   fieldErrors.password && styles.inputError,
                 ]}
                 placeholder="Create a strong password"
-                placeholderTextColor={Colors.text.secondary}
+                placeholderTextColor={theme.colors.text.secondary}
                 value={password}
                 onChangeText={(t) => {
                   setPassword(t);
@@ -287,10 +327,66 @@ function CreateAccountStep({
                 }}
                 onPress={() => setShowPassword((s) => !s)}
               >
-                <Text style={{ color: Colors.text.secondary }}>
+                <Text style={{ color: theme.colors.text.secondary }}>
                   {showPassword ? "Hide" : "Show"}
                 </Text>
               </TouchableOpacity>
+            </View>
+            {/* Strength meter */}
+            <View style={{ marginTop: Layout.spacing.xs }}>
+              <View
+                style={{
+                  height: 6,
+                  backgroundColor: theme.colors.background.secondary,
+                  borderRadius: 3,
+                  overflow: "hidden",
+                }}
+                accessibilityRole="progressbar"
+                accessibilityLabel={`Password strength: ${strength.label}`}
+              >
+                <View
+                  style={{
+                    width: `${(strength.score / 5) * 100}%`,
+                    height: "100%",
+                    backgroundColor: strength.color,
+                  }}
+                />
+              </View>
+              <Text
+                style={{
+                  marginTop: Layout.spacing.xs,
+                  color: theme.colors.text.secondary,
+                  fontSize: Layout.typography.fontSize.sm,
+                }}
+              >
+                {strength.label}
+              </Text>
+              {/* Live requirement checklist */}
+              <View style={{ marginTop: Layout.spacing.xs }}>
+                {[
+                  { ok: password.length >= 12, label: "12+ characters" },
+                  { ok: /[a-z]/.test(password), label: "Lowercase letter" },
+                  { ok: /[A-Z]/.test(password), label: "Uppercase letter" },
+                  { ok: /\d/.test(password), label: "Number" },
+                  { ok: /[^A-Za-z0-9]/.test(password), label: "Symbol" },
+                ].map((req) => (
+                  <Text
+                    key={req.label}
+                    style={{
+                      color: req.ok
+                        ? theme.colors.success?.[600] ||
+                          theme.colors.primary[500]
+                        : theme.colors.text.tertiary,
+                      fontSize: Layout.typography.fontSize.xs,
+                    }}
+                    accessibilityLabel={`${req.label} ${
+                      req.ok ? "met" : "not met"
+                    }`}
+                  >
+                    {req.ok ? "✓" : "•"} {req.label}
+                  </Text>
+                ))}
+              </View>
             </View>
             {!!fieldErrors.password && (
               <Text style={styles.errorText}>{fieldErrors.password}</Text>
@@ -308,7 +404,7 @@ function CreateAccountStep({
                   fieldErrors.confirmPassword && styles.inputError,
                 ]}
                 placeholder="Confirm your password"
-                placeholderTextColor={Colors.text.secondary}
+                placeholderTextColor={theme.colors.text.secondary}
                 value={confirmPassword}
                 onChangeText={(t) => {
                   setConfirmPassword(t);
@@ -328,7 +424,7 @@ function CreateAccountStep({
                 }}
                 onPress={() => setShowConfirmPassword((s) => !s)}
               >
-                <Text style={{ color: Colors.text.secondary }}>
+                <Text style={{ color: theme.colors.text.secondary }}>
                   {showConfirmPassword ? "Hide" : "Show"}
                 </Text>
               </TouchableOpacity>
@@ -354,7 +450,7 @@ function CreateAccountStep({
             style={{ marginTop: Layout.spacing.md, alignItems: "center" }}
             onPress={() => navigation.navigate("Auth", { screen: "Login" })}
           >
-            <Text style={{ color: Colors.primary[500] }}>
+            <Text style={{ color: theme.colors.primary[500] }}>
               Already have an account? Sign In
             </Text>
           </TouchableOpacity>
@@ -393,6 +489,9 @@ export default function ProfileSetupScreen({
   navigation,
   route,
 }: ProfileSetupScreenProps) {
+  const { theme } = useTheme();
+  // Dynamic themed styles
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { user, refreshUser, resendEmailVerification, verifyEmailCode } =
     useAuth();
   const apiClient = useApiClient();
@@ -571,7 +670,15 @@ export default function ProfileSetupScreen({
 
   const handleNext = () => {
     if (validateCurrentStep()) {
+      Haptics.selectionAsync().catch(() => {});
       if (currentStep < STEPS.length) {
+        // Soft guidance for Photos step: recommend at least 3 photos
+        if (currentStep === 8 && (formData.localImageIds?.length ?? 0) < 3) {
+          toast.show(
+            "We recommend adding at least 3 photos for better matches. You can add more later.",
+            "info"
+          );
+        }
         setCurrentStep(currentStep + 1);
       } else {
         // At final step we don't submit here; Create Account step controls flow
@@ -581,6 +688,7 @@ export default function ProfileSetupScreen({
   };
 
   const handleBack = () => {
+    Haptics.selectionAsync().catch(() => {});
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
     }
@@ -648,7 +756,7 @@ export default function ProfileSetupScreen({
                   style={[
                     styles.stepCircleText,
                     (status === "active" || status === "done") && {
-                      color: Colors.text.inverse,
+                      color: theme.colors.text.inverse,
                     },
                   ]}
                 >
@@ -668,6 +776,18 @@ export default function ProfileSetupScreen({
           );
         })}
       </ScrollView>
+      <View
+        style={styles.progressBar}
+        accessible
+        accessibilityLabel={`Progress: Step ${currentStep} of ${STEPS.length}`}
+      >
+        <View
+          style={[
+            styles.progressFill,
+            { width: `${Math.round((currentStep / STEPS.length) * 100)}%` },
+          ]}
+        />
+      </View>
       <Text style={styles.progressText}>
         Step {currentStep} of {STEPS.length}
       </Text>
@@ -733,381 +853,6 @@ export default function ProfileSetupScreen({
       default:
         return null;
     }
-  };
-
-  const renderCreateAccountStep = () => {
-    // Determine if required fields are present like web Step7AccountCreation
-    const requiredFields: (keyof CreateProfileData)[] = [
-      "fullName",
-      "dateOfBirth",
-      "gender",
-      "city",
-      "aboutMe",
-      "occupation",
-      "education",
-      "height",
-      "maritalStatus",
-      "phoneNumber",
-    ];
-    const missing = requiredFields.filter((f) => {
-      const v = (formData as any)[f];
-      return !v || (typeof v === "string" && v.trim() === "");
-    });
-
-    // Inline signup state and handlers
-    const [emailAddress, setEmailAddress] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [awaitingEmailVerification, setAwaitingEmailVerification] =
-      useState(false);
-    const [resendLoading, setResendLoading] = useState(false);
-    const [secondsLeft, setSecondsLeft] = useState(0);
-    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-    const {
-      signUp,
-      verifyEmailCode,
-      resendEmailVerification,
-      startEmailVerificationPolling,
-    } = useAuth();
-    const toastCtx = useToast();
-
-    useEffect(() => {
-      if (secondsLeft <= 0) return;
-      const timer = setInterval(
-        () => setSecondsLeft((s) => (s <= 1 ? 0 : s - 1)),
-        1000
-      );
-      return () => clearInterval(timer);
-    }, [secondsLeft]);
-
-    const handleResend = async () => {
-      if (!awaitingEmailVerification || secondsLeft > 0) return;
-      setResendLoading(true);
-      try {
-        const resp = await resendEmailVerification?.();
-        if (!resp?.success) {
-          toastCtx.show(resp?.error || "Unable to resend email", "error");
-          return;
-        }
-        toastCtx.show("Verification email sent again", "info");
-        setSecondsLeft(60);
-      } finally {
-        setResendLoading(false);
-      }
-    };
-
-    const handleIHaveVerified = async () => {
-      setLoading(true);
-      try {
-        const res = await verifyEmailCode?.();
-        if (res?.success) {
-          toastCtx.show(
-            "Email verified! Finalizing your profile...",
-            "success"
-          );
-          // Profile submission will be triggered by outer effect when user is authenticated
-        } else {
-          toastCtx.show(
-            res?.error || "Still not verified. Try again shortly.",
-            "error"
-          );
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const onCreateAccount = async () => {
-      const errs: Record<string, string> = {};
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const normalizedEmail = emailAddress.trim().toLowerCase();
-      if (!normalizedEmail) errs.emailAddress = "Email is required";
-      else if (!emailRegex.test(normalizedEmail))
-        errs.emailAddress = "Please enter a valid email address";
-      if (!password) errs.password = "Password is required";
-      else if (password.length < 12)
-        errs.password =
-          "Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.";
-      else {
-        const hasLower = /[a-z]/.test(password);
-        const hasUpper = /[A-Z]/.test(password);
-        const hasDigit = /\d/.test(password);
-        const hasSymbol = /[^A-Za-z0-9]/.test(password);
-        if (!(hasLower && hasUpper && hasDigit && hasSymbol))
-          errs.password =
-            "Password must include uppercase, lowercase, number, and symbol.";
-      }
-      if (!confirmPassword) errs.confirmPassword = "Confirm your password";
-      else if (password !== confirmPassword)
-        errs.confirmPassword = "Passwords do not match";
-      setFieldErrors(errs);
-      if (Object.keys(errs).length > 0) {
-        const labels: Record<string, string> = {
-          emailAddress: "Email",
-          password: "Password",
-          confirmPassword: "Confirm Password",
-        };
-        const summary = `Please fix: ${Object.keys(errs)
-          .map((k) => labels[k] || k)
-          .join(", ")}.`;
-        toastCtx.show(summary, "error");
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const fullName = normalizedEmail.split("@")[0];
-        const result = await signUp(normalizedEmail, password, fullName);
-        if (result.success) {
-          if (result.emailVerified) {
-            toastCtx.show(
-              "Account created! Finalizing your profile...",
-              "success"
-            );
-            // Auto-submit handled by outer effect
-          } else {
-            setAwaitingEmailVerification(true);
-            toastCtx.show(
-              "Verification email sent. Please check your inbox.",
-              "info"
-            );
-            setSecondsLeft(60);
-            startEmailVerificationPolling?.();
-          }
-        } else {
-          toastCtx.show(result.error || "Sign up failed", "error");
-        }
-      } catch (e) {
-        toastCtx.show("An unexpected error occurred during sign up", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    return (
-      <View style={styles.stepContainer}>
-        <Text style={styles.stepTitle}>Create Account</Text>
-        <Text style={styles.stepSubtitle}>Finish and create your account</Text>
-
-        {missing.length > 0 ? (
-          <View
-            style={{
-              backgroundColor: Colors.error[50],
-              borderColor: Colors.error[200],
-              borderWidth: 1,
-              borderRadius: 8,
-              padding: Layout.spacing.md,
-              marginBottom: Layout.spacing.lg,
-            }}
-          >
-            <Text
-              style={{
-                color: Colors.error[600],
-                fontWeight: "600",
-                marginBottom: 4,
-              }}
-            >
-              Cannot create account - Profile incomplete
-            </Text>
-            <Text style={{ color: Colors.error[500], marginBottom: 8 }}>
-              You must complete all profile sections before creating an account.
-            </Text>
-            <Text
-              style={{
-                color: Colors.error[300],
-                fontSize: 12,
-                marginBottom: 8,
-              }}
-            >
-              Missing: {missing.slice(0, 5).join(", ")}
-              {missing.length > 5
-                ? ` and ${missing.length - 5} more fields`
-                : ""}
-            </Text>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => setCurrentStep(1)}
-            >
-              <Text style={styles.backButtonText}>
-                Go back to complete profile
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ) : awaitingEmailVerification ? (
-          <View>
-            <Text style={styles.stepSubtitle}>
-              We sent a verification link to {emailAddress}. Once verified, tap
-              below.
-            </Text>
-            <TouchableOpacity
-              style={[styles.nextButton, loading && { opacity: 0.7 }]}
-              onPress={handleIHaveVerified}
-              disabled={loading}
-            >
-              <Text style={styles.nextButtonText}>
-                {loading ? "Checking..." : "I have verified"}
-              </Text>
-            </TouchableOpacity>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                marginTop: Layout.spacing.md,
-              }}
-            >
-              <Text style={{ color: Colors.text.secondary }}>
-                {secondsLeft > 0
-                  ? `Resend available in ${secondsLeft}s`
-                  : "Need a new email?"}
-              </Text>
-              <TouchableOpacity
-                disabled={secondsLeft > 0 || resendLoading || loading}
-                onPress={handleResend}
-              >
-                <Text style={{ color: Colors.primary[500], fontWeight: "500" }}>
-                  {resendLoading
-                    ? "Resending..."
-                    : secondsLeft > 0
-                    ? "Waiting"
-                    : "Resend email"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  fieldErrors.emailAddress && styles.inputError,
-                ]}
-                placeholder="Enter your email"
-                placeholderTextColor={Colors.text.secondary}
-                value={emailAddress}
-                onChangeText={(t) => {
-                  setEmailAddress(t);
-                  if (fieldErrors.emailAddress)
-                    setFieldErrors((e) => ({ ...e, emailAddress: "" }));
-                }}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                editable={!loading}
-              />
-              {!!fieldErrors.emailAddress && (
-                <Text style={styles.errorText}>{fieldErrors.emailAddress}</Text>
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Password</Text>
-              <View style={{ position: "relative" }}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { paddingRight: Layout.spacing.xl * 2 },
-                    fieldErrors.password && styles.inputError,
-                  ]}
-                  placeholder="Create a strong password"
-                  placeholderTextColor={Colors.text.secondary}
-                  value={password}
-                  onChangeText={(t) => {
-                    setPassword(t);
-                    if (fieldErrors.password)
-                      setFieldErrors((e) => ({ ...e, password: "" }));
-                  }}
-                  secureTextEntry={!showPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={{
-                    position: "absolute",
-                    right: Layout.spacing.md,
-                    top: 0,
-                    bottom: 0,
-                    justifyContent: "center",
-                  }}
-                  onPress={() => setShowPassword((s) => !s)}
-                >
-                  <Text style={{ color: Colors.text.secondary }}>
-                    {showPassword ? "Hide" : "Show"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {!!fieldErrors.password && (
-                <Text style={styles.errorText}>{fieldErrors.password}</Text>
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <View style={{ position: "relative" }}>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { paddingRight: Layout.spacing.xl * 2 },
-                    fieldErrors.confirmPassword && styles.inputError,
-                  ]}
-                  placeholder="Confirm your password"
-                  placeholderTextColor={Colors.text.secondary}
-                  value={confirmPassword}
-                  onChangeText={(t) => {
-                    setConfirmPassword(t);
-                    if (fieldErrors.confirmPassword)
-                      setFieldErrors((e) => ({ ...e, confirmPassword: "" }));
-                  }}
-                  secureTextEntry={!showConfirmPassword}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={{
-                    position: "absolute",
-                    right: Layout.spacing.md,
-                    top: 0,
-                    bottom: 0,
-                    justifyContent: "center",
-                  }}
-                  onPress={() => setShowConfirmPassword((s) => !s)}
-                >
-                  <Text style={{ color: Colors.text.secondary }}>
-                    {showConfirmPassword ? "Hide" : "Show"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {!!fieldErrors.confirmPassword && (
-                <Text style={styles.errorText}>
-                  {fieldErrors.confirmPassword}
-                </Text>
-              )}
-            </View>
-
-            <TouchableOpacity
-              style={[styles.nextButton, loading && { opacity: 0.7 }]}
-              onPress={onCreateAccount}
-              disabled={loading}
-            >
-              <Text style={styles.nextButtonText}>
-                {loading ? "Creating Account..." : "Create Account"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ marginTop: Layout.spacing.md, alignItems: "center" }}
-              onPress={() => navigation.navigate("Auth", { screen: "Login" })}
-            >
-              <Text style={{ color: Colors.primary[500] }}>
-                Already have an account? Sign In
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
   };
 
   const renderBasicInfoStep = () => {
@@ -1703,6 +1448,54 @@ export default function ProfileSetupScreen({
       <Text style={styles.stepSubtitle}>
         Add photos to showcase your personality
       </Text>
+      {/* Recommended photos badge */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: Layout.spacing.sm,
+          gap: Layout.spacing.sm,
+        }}
+        accessible
+        accessibilityLabel="Recommendation: Add at least 3 photos"
+      >
+        <View
+          style={{
+            paddingHorizontal: Layout.spacing.sm,
+            paddingVertical: 4,
+            borderRadius: 999,
+            backgroundColor:
+              (formData.localImageIds?.length ?? 0) >= 3
+                ? theme.colors.success?.[100] || theme.colors.primary[100]
+                : theme.colors.warning?.[100] ||
+                  theme.colors.background.secondary,
+            borderWidth: 1,
+            borderColor:
+              (formData.localImageIds?.length ?? 0) >= 3
+                ? theme.colors.success?.[300] || theme.colors.primary[300]
+                : theme.colors.warning?.[300] || theme.colors.border.primary,
+          }}
+        >
+          <Text
+            style={{
+              color:
+                (formData.localImageIds?.length ?? 0) >= 3
+                  ? theme.colors.success?.[700] || theme.colors.primary[600]
+                  : theme.colors.warning?.[700] || theme.colors.text.secondary,
+              fontSize: Layout.typography.fontSize.sm,
+              fontWeight: "600",
+            }}
+          >
+            {(formData.localImageIds?.length ?? 0) >= 3
+              ? "Great! 3+ photos added"
+              : "Recommended: Add at least 3 photos"}
+          </Text>
+        </View>
+      </View>
+      <Text style={styles.helperText}>
+        Tip: Long-press a photo to drag and reorder. Your first photo will be
+        your main picture.
+      </Text>
 
       <ImageUpload
         mode="local"
@@ -1804,7 +1597,13 @@ export default function ProfileSetupScreen({
       footer={
         <View style={styles.navigationContainer}>
           {currentStep > 1 && (
-            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBack}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              accessibilityHint={`Return to step ${currentStep - 1}`}
+            >
               <Text style={styles.backButtonText}>Back</Text>
             </TouchableOpacity>
           )}
@@ -1818,15 +1617,39 @@ export default function ProfileSetupScreen({
               ]}
               onPress={handleNext}
               disabled={createProfileMutation.isPending || !isCurrentStepValid}
+              accessibilityRole="button"
+              accessibilityLabel="Next"
+              accessibilityHint={`Go to step ${currentStep + 1}`}
             >
               {createProfileMutation.isPending ? (
-                <ActivityIndicator size="small" color={Colors.text.inverse} />
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.text.inverse}
+                />
               ) : (
                 <Text style={styles.nextButtonText}>Next</Text>
               )}
             </TouchableOpacity>
           )}
           {currentStep === STEPS.length && <View style={{ flex: 2 }} />}
+
+          {/* Save & Exit button */}
+          <TouchableOpacity
+            style={styles.saveExitButton}
+            accessibilityRole="button"
+            accessibilityLabel="Save and exit"
+            accessibilityHint="Save your progress and go back"
+            onPress={() => {
+              persistSnapshot(formData as any, currentStep).finally(() => {
+                Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Success
+                ).catch(() => {});
+                if (navigation?.goBack) navigation.goBack();
+              });
+            }}
+          >
+            <Text style={styles.saveExitText}>Save & Exit</Text>
+          </TouchableOpacity>
         </View>
       }
     >
@@ -1917,266 +1740,282 @@ export default function ProfileSetupScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background.primary,
-  },
-  contentStyle: {
-    flexGrow: 1,
-    paddingBottom: Layout.spacing.xl * 3,
-  },
-  header: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
-  },
-  headerTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.xl,
-    color: Colors.text.primary,
-    textAlign: "center",
-  },
-  headerSubtitle: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    marginTop: Layout.spacing.xs,
-  },
-  progressContainer: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  stepperContainer: {
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  stepperScroll: {
-    alignItems: "center",
-    gap: Layout.spacing.md,
-    paddingVertical: Layout.spacing.xs,
-  },
-  stepperItem: {
-    alignItems: "center",
-    width: 80,
-  },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: Colors.border.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.background.secondary,
-  },
-  stepCircleActive: {
-    backgroundColor: Colors.primary[500],
-    borderColor: Colors.primary[500],
-  },
-  stepCircleDone: {
-    backgroundColor: Colors.primary[400],
-    borderColor: Colors.primary[400],
-  },
-  stepCircleText: {
-    fontSize: 12,
-    color: Colors.text.secondary,
-    fontWeight: "600",
-  },
-  stepperLabel: {
-    marginTop: 4,
-    fontSize: 11,
-    color: Colors.text.secondary,
-    textAlign: "center",
-  },
-  stepperLabelActive: {
-    color: Colors.text.primary,
-    fontWeight: "600",
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: Colors.primary[500],
-    borderRadius: 2,
-  },
-  progressText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    textAlign: "center",
-    marginTop: Layout.spacing.xs,
-  },
-  content: {
-    paddingHorizontal: Layout.spacing.lg,
-  },
-  stepContainer: {
-    paddingBottom: Layout.spacing.xl,
-  },
-  stepTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.lg,
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.xs,
-  },
-  stepSubtitle: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.lg,
-  },
-  sectionTitle: {
-    fontFamily: Layout.typography.fontFamily.serif,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.md,
-  },
-  formGroup: {
-    marginBottom: Layout.spacing.md,
-  },
-  label: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "500",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.sm,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    backgroundColor: Colors.background.secondary,
-  },
-  inputError: {
-    borderColor: Colors.error[500],
-  },
-  textArea: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-    backgroundColor: Colors.background.secondary,
-    height: 120,
-  },
-  dateInput: {
-    justifyContent: "center",
-  },
-  dateText: {
-    color: Colors.text.primary,
-  },
-  placeholderText: {
-    color: Colors.text.tertiary,
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    backgroundColor: Colors.background.secondary,
-  },
-  picker: {
-    height: 50,
-    color: Colors.text.primary,
-  },
-  heightSliders: {
-    flexDirection: "row",
-    gap: Layout.spacing.md,
-  },
-  sliderGroup: {
-    flex: 1,
-  },
-  sliderLabel: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    marginBottom: Layout.spacing.xs,
-  },
-  partnerPreferences: {
-    marginTop: Layout.spacing.lg,
-  },
-  ageRange: {
-    flexDirection: "row",
-  },
-  errorText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.error[500],
-    marginTop: Layout.spacing.xs,
-  },
-  navigationContainer: {
-    flexDirection: "row",
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border.primary,
-    gap: Layout.spacing.md,
-  },
-  backButton: {
-    flex: 1,
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    alignItems: "center",
-  },
-  backButtonText: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
-    fontWeight: "500",
-  },
-  nextButton: {
-    flex: 2,
-    backgroundColor: Colors.primary[500],
-    paddingVertical: Layout.spacing.md,
-    borderRadius: Layout.radius.md,
-    alignItems: "center",
-  },
-  nextButtonFull: {
-    flex: 1,
-  },
-  nextButtonText: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.inverse,
-    fontWeight: "600",
-  },
-  photoGuidelines: {
-    marginTop: Layout.spacing.lg,
-    padding: Layout.spacing.md,
-    backgroundColor: Colors.background.secondary,
-    borderRadius: Layout.radius.md,
-  },
-  photoGuidelinesText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.secondary,
-    lineHeight: 20,
-  },
-  section: {
-    marginBottom: Layout.spacing.lg,
-  },
-  helperText: {
-    fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.tertiary,
-    marginBottom: Layout.spacing.xs,
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Layout.spacing.md,
-    marginTop: Layout.spacing.md,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: Colors.border.primary,
-  },
-  dividerText: {
-    color: Colors.text.secondary,
-    fontSize: Layout.typography.fontSize.sm,
-  },
-});
+function createStyles(theme: any) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background.primary,
+    },
+    contentStyle: {
+      flexGrow: 1,
+      paddingBottom: Layout.spacing.xl * 3,
+    },
+    header: {
+      paddingHorizontal: Layout.spacing.lg,
+      paddingVertical: Layout.spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border.primary,
+    },
+    headerTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
+      fontSize: Layout.typography.fontSize.xl,
+      color: theme.colors.text.primary,
+      textAlign: "center",
+    },
+    headerSubtitle: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      textAlign: "center",
+      marginTop: Layout.spacing.xs,
+    },
+    progressContainer: {
+      paddingHorizontal: Layout.spacing.lg,
+      paddingVertical: Layout.spacing.md,
+    },
+    stepperContainer: {
+      paddingHorizontal: Layout.spacing.lg,
+      paddingVertical: Layout.spacing.md,
+    },
+    stepperScroll: {
+      alignItems: "center",
+      gap: Layout.spacing.md,
+      paddingVertical: Layout.spacing.xs,
+    },
+    stepperItem: {
+      alignItems: "center",
+      width: 80,
+    },
+    stepCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      borderWidth: 2,
+      borderColor: theme.colors.border.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: theme.colors.background.secondary,
+    },
+    stepCircleActive: {
+      backgroundColor: theme.colors.primary[500],
+      borderColor: theme.colors.primary[500],
+    },
+    stepCircleDone: {
+      backgroundColor: theme.colors.primary[400],
+      borderColor: theme.colors.primary[400],
+    },
+    stepCircleText: {
+      fontSize: 12,
+      color: theme.colors.text.secondary,
+      fontWeight: "600",
+    },
+    stepperLabel: {
+      marginTop: 4,
+      fontSize: 11,
+      color: theme.colors.text.secondary,
+      textAlign: "center",
+    },
+    stepperLabelActive: {
+      color: theme.colors.text.primary,
+      fontWeight: "600",
+    },
+    progressBar: {
+      height: 4,
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: 2,
+      overflow: "hidden",
+    },
+    progressFill: {
+      height: "100%",
+      backgroundColor: theme.colors.primary[500],
+      borderRadius: 2,
+    },
+    progressText: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      textAlign: "center",
+      marginTop: Layout.spacing.xs,
+    },
+    content: {
+      paddingHorizontal: Layout.spacing.lg,
+    },
+    stepContainer: {
+      paddingBottom: Layout.spacing.xl,
+    },
+    stepTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
+      fontSize: Layout.typography.fontSize.lg,
+      color: theme.colors.text.primary,
+      marginBottom: Layout.spacing.xs,
+    },
+    stepSubtitle: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.secondary,
+      marginBottom: Layout.spacing.lg,
+    },
+    sectionTitle: {
+      fontFamily: Layout.typography.fontFamily.serif,
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.primary,
+      marginBottom: Layout.spacing.md,
+    },
+    formGroup: {
+      marginBottom: Layout.spacing.md,
+    },
+    label: {
+      fontSize: Layout.typography.fontSize.base,
+      fontWeight: "500",
+      color: theme.colors.text.primary,
+      marginBottom: Layout.spacing.sm,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      borderRadius: Layout.radius.md,
+      paddingHorizontal: Layout.spacing.md,
+      paddingVertical: Layout.spacing.sm,
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.background.secondary,
+    },
+    inputError: {
+      borderColor: theme.colors.error[500],
+    },
+    textArea: {
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      borderRadius: Layout.radius.md,
+      paddingHorizontal: Layout.spacing.md,
+      paddingVertical: Layout.spacing.sm,
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.background.secondary,
+      height: 120,
+    },
+    dateInput: {
+      justifyContent: "center",
+    },
+    dateText: {
+      color: theme.colors.text.primary,
+    },
+    placeholderText: {
+      color: theme.colors.text.tertiary,
+    },
+    pickerContainer: {
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      borderRadius: Layout.radius.md,
+      backgroundColor: theme.colors.background.secondary,
+    },
+    picker: {
+      height: 50,
+      color: theme.colors.text.primary,
+    },
+    heightSliders: {
+      flexDirection: "row",
+      gap: Layout.spacing.md,
+    },
+    sliderGroup: {
+      flex: 1,
+    },
+    sliderLabel: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      marginBottom: Layout.spacing.xs,
+    },
+    partnerPreferences: {
+      marginTop: Layout.spacing.lg,
+    },
+    ageRange: {
+      flexDirection: "row",
+    },
+    errorText: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.error[500],
+      marginTop: Layout.spacing.xs,
+    },
+    navigationContainer: {
+      flexDirection: "row",
+      paddingHorizontal: Layout.spacing.lg,
+      paddingVertical: Layout.spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border.primary,
+      gap: Layout.spacing.md,
+    },
+    backButton: {
+      flex: 1,
+      paddingVertical: Layout.spacing.md,
+      borderRadius: Layout.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      alignItems: "center",
+    },
+    backButtonText: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.secondary,
+      fontWeight: "500",
+    },
+    nextButton: {
+      flex: 2,
+      backgroundColor: theme.colors.primary[500],
+      paddingVertical: Layout.spacing.md,
+      borderRadius: Layout.radius.md,
+      alignItems: "center",
+    },
+    nextButtonFull: {
+      flex: 1,
+    },
+    nextButtonText: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.inverse,
+      fontWeight: "600",
+    },
+    photoGuidelines: {
+      marginTop: Layout.spacing.lg,
+      padding: Layout.spacing.md,
+      backgroundColor: theme.colors.background.secondary,
+      borderRadius: Layout.radius.md,
+    },
+    photoGuidelinesText: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.secondary,
+      lineHeight: 20,
+    },
+    section: {
+      marginBottom: Layout.spacing.lg,
+    },
+    helperText: {
+      fontSize: Layout.typography.fontSize.sm,
+      color: theme.colors.text.tertiary,
+      marginBottom: Layout.spacing.xs,
+    },
+    dividerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: Layout.spacing.md,
+      marginTop: Layout.spacing.md,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: theme.colors.border.primary,
+    },
+    dividerText: {
+      color: theme.colors.text.secondary,
+      fontSize: Layout.typography.fontSize.sm,
+    },
+    saveExitButton: {
+      flex: 1,
+      paddingVertical: Layout.spacing.md,
+      borderRadius: Layout.radius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border.primary,
+      alignItems: "center",
+      backgroundColor: theme.colors.background.secondary,
+    },
+    saveExitText: {
+      fontSize: Layout.typography.fontSize.base,
+      color: theme.colors.text.primary,
+      fontWeight: "600",
+    },
+  });
+}

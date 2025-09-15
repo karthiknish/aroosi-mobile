@@ -103,7 +103,7 @@ const generateiOSConfig = () => {
 
 <!-- Status Bar -->
 <key>UIViewControllerBasedStatusBarAppearance</key>
-<true/>
+<false/>
 <key>UIStatusBarStyle</key>
 <string>UIStatusBarStyleDefault</string>
 

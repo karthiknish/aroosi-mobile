@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useVoiceMessageLimits } from "@/hooks/useMessagingFeatures";
+import { useTheme } from "@contexts/ThemeContext";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 
 interface VoiceDurationIndicatorProps {
   currentDuration: number;
@@ -19,6 +21,7 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
   isRecording,
   style,
 }) => {
+  const { theme } = useTheme();
   const {
     maxDuration,
     canSendVoice,
@@ -27,6 +30,7 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
   } = useVoiceMessageLimits();
 
   const [pulseAnim] = useState(new Animated.Value(1));
+  const { reduceMotion } = useReduceMotion();
 
   const remainingDuration = getRemainingDuration(currentDuration);
   const isNearLimit = isNearDurationLimit(currentDuration);
@@ -35,7 +39,7 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
 
   // Pulse animation when near limit
   useEffect(() => {
-    if (isNearLimit && isRecording) {
+    if (isNearLimit && isRecording && !reduceMotion) {
       const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -55,7 +59,7 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
     } else {
       pulseAnim.setValue(1);
     }
-  }, [isNearLimit, isRecording, pulseAnim]);
+  }, [isNearLimit, isRecording, reduceMotion, pulseAnim]);
 
   if (!canSendVoice || maxDuration === 0) {
     return null;
@@ -68,9 +72,9 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
   };
 
   const getIndicatorColor = () => {
-    if (remainingDuration <= 0) return "#f44336";
-    if (isNearLimit) return "#ff9800";
-    return "#4caf50";
+    if (remainingDuration <= 0) return theme.colors.error[500];
+    if (isNearLimit) return theme.colors.warning[500];
+    return theme.colors.success[500];
   };
 
   const getStatusText = () => {
@@ -89,11 +93,21 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
 
   return (
     <Animated.View
-      style={[styles.container, style, { transform: [{ scale: pulseAnim }] }]}
+      style={[
+        styles.container,
+        { backgroundColor: theme.colors.background.secondary },
+        style,
+        { transform: [{ scale: pulseAnim }] },
+      ]}
     >
       {/* Progress Circle */}
       <View style={styles.progressContainer}>
-        <View style={styles.progressBackground}>
+        <View
+          style={[
+            styles.progressBackground,
+            { backgroundColor: theme.colors.neutral[300] },
+          ]}
+        >
           <View
             style={[
               styles.progressFill,
@@ -120,7 +134,14 @@ export const VoiceDurationIndicator: React.FC<VoiceDurationIndicatorProps> = ({
                 { backgroundColor: getIndicatorColor() },
               ]}
             />
-            <Text style={styles.recordingText}>Recording</Text>
+            <Text
+              style={[
+                styles.recordingText,
+                { color: theme.colors.text.secondary },
+              ]}
+            >
+              Recording
+            </Text>
           </View>
         )}
       </View>
@@ -140,6 +161,7 @@ export const VoiceDurationWarning: React.FC<VoiceDurationWarningProps> = ({
   onUpgradePress,
 }) => {
   if (!visible) return null;
+  const { theme } = useTheme();
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -158,19 +180,39 @@ export const VoiceDurationWarning: React.FC<VoiceDurationWarningProps> = ({
   };
 
   return (
-    <View style={styles.warningContainer}>
+    <View
+      style={[
+        styles.warningContainer,
+        {
+          backgroundColor: theme.colors.warning[100],
+          borderColor: theme.colors.warning[200],
+        },
+      ]}
+    >
       <View style={styles.warningContent}>
         <Text style={styles.warningIcon}>🎤</Text>
-        <Text style={styles.warningText}>{getWarningText()}</Text>
+        <Text
+          style={[styles.warningText, { color: theme.colors.warning[700] }]}
+        >
+          {getWarningText()}
+        </Text>
       </View>
 
       {onUpgradePress && (
         <View style={styles.warningActions}>
           <TouchableOpacity
-            style={styles.warningUpgradeButton}
+            style={[
+              styles.warningUpgradeButton,
+              { backgroundColor: theme.colors.primary[600] },
+            ]}
             onPress={onUpgradePress}
           >
-            <Text style={styles.warningUpgradeText}>
+            <Text
+              style={[
+                styles.warningUpgradeText,
+                { color: theme.colors.text.inverse },
+              ]}
+            >
               Upgrade to Premium Plus
             </Text>
           </TouchableOpacity>
@@ -182,7 +224,7 @@ export const VoiceDurationWarning: React.FC<VoiceDurationWarningProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "transparent",
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
@@ -192,7 +234,7 @@ const styles = StyleSheet.create({
   },
   progressBackground: {
     height: 6,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: "transparent",
     borderRadius: 3,
     overflow: "hidden",
   },
@@ -220,14 +262,14 @@ const styles = StyleSheet.create({
   },
   recordingText: {
     fontSize: 14,
-    color: "#666",
+    color: undefined,
     fontWeight: "500",
   },
 
   // Warning styles
   warningContainer: {
-    backgroundColor: "#fff3cd",
-    borderColor: "#ffeaa7",
+    backgroundColor: "transparent",
+    borderColor: "transparent",
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
@@ -245,20 +287,20 @@ const styles = StyleSheet.create({
   warningText: {
     flex: 1,
     fontSize: 16,
-    color: "#856404",
+    color: undefined,
     lineHeight: 22,
   },
   warningActions: {
     alignItems: "flex-end",
   },
   warningUpgradeButton: {
-    backgroundColor: "#1976d2",
+    backgroundColor: "transparent",
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
   },
   warningUpgradeText: {
-    color: "white",
+    color: undefined,
     fontSize: 14,
     fontWeight: "600",
   },

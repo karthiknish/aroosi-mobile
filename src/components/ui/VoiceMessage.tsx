@@ -25,7 +25,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 // Import Colors and typography scale (fontSize) from constants; if fontSize isn't exported, fallback to inline sizes
-import { Colors } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import { useToast } from "@providers/ToastContext";
 import { API_BASE_URL } from "@constants";
 import {
@@ -34,6 +34,7 @@ import {
 } from "@/hooks/useResponsive";
 import { Responsive } from "@constants/responsive";
 import { rgbaHex } from "@utils/color";
+import { useReduceMotion } from "@/hooks/useReduceMotion";
 
 interface VoiceMessageProps {
   audioUri?: string;
@@ -63,6 +64,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
   style,
 }) => {
   const toast = useToast();
+  const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const [player, setPlayer] = useState<AudioPlayer | null>(null);
@@ -74,6 +76,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
 
   const playbackProgress = useSharedValue(0);
   const waveformScale = useSharedValue(1);
+  const { reduceMotion } = useReduceMotion();
 
   useEffect(() => {
     return () => {
@@ -125,14 +128,18 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
         player.play();
         setIsPlaying(true);
         onPlay?.();
-        waveformScale.value = withRepeat(
-          withSequence(
-            withTiming(1.2, { duration: 300 }),
-            withTiming(0.8, { duration: 300 })
-          ),
-          -1,
-          true
-        );
+        if (!reduceMotion) {
+          waveformScale.value = withRepeat(
+            withSequence(
+              withTiming(1.1, { duration: 400 }),
+              withTiming(1, { duration: 400 })
+            ),
+            -1,
+            true
+          );
+        } else {
+          waveformScale.value = withTiming(1, { duration: 200 });
+        }
       }
     } catch (error) {
       console.error("Error controlling playback:", error);
@@ -200,7 +207,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       width: spacing.xl * 2,
       height: spacing.xl * 2,
       borderRadius: spacing.xl,
-      backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+      backgroundColor: rgbaHex(theme.colors.background.primary, 0.2),
       justifyContent: "center",
       alignItems: "center",
       marginRight: spacing.sm,
@@ -220,12 +227,12 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: rgbaHex(Colors.background.primary, 0.2),
+      backgroundColor: rgbaHex(theme.colors.background.primary, 0.2),
       borderRadius: spacing.xl,
     },
     waveformProgress: {
       height: "100%",
-      backgroundColor: rgbaHex(Colors.background.primary, 0.4),
+      backgroundColor: rgbaHex(theme.colors.background.primary, 0.4),
       borderRadius: spacing.xl,
     },
     waveform: {
@@ -258,12 +265,12 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       width: spacing.xl * 1.25,
       height: spacing.xl * 1.25,
       borderRadius: spacing.xl * 0.625,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
       justifyContent: "center",
       alignItems: "center",
     },
     cancelButtonText: {
-      color: Colors.background.primary,
+      color: theme.colors.background.primary,
       fontSize: fontSize.base,
       fontWeight: "600",
     },
@@ -277,13 +284,13 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       width: spacing.xl * 5,
       height: spacing.xl * 5,
       borderRadius: spacing.xl * 2.5,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
     },
     recordButton: {
       width: spacing.xl * 3.75,
       height: spacing.xl * 3.75,
       borderRadius: spacing.xl * 1.875,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
       justifyContent: "center",
       alignItems: "center",
     },
@@ -291,25 +298,25 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       width: spacing.md * 1.25,
       height: spacing.md * 1.25,
       borderRadius: spacing.md * 0.625,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     stopButton: {
       width: spacing.xl * 1.25,
       height: spacing.xl * 1.25,
       borderRadius: spacing.xl * 0.625,
-      backgroundColor: Colors.success[500],
+      backgroundColor: theme.colors.success[500],
       justifyContent: "center",
       alignItems: "center",
     },
     stopButtonText: {
-      color: Colors.background.primary,
+      color: theme.colors.background.primary,
       fontSize: fontSize.base,
     },
     startRecordButton: {
       width: spacing.xl * 1.875,
       height: spacing.xl * 1.875,
       borderRadius: spacing.xl * 0.9375,
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       justifyContent: "center",
       alignItems: "center",
     },
@@ -319,7 +326,7 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
     recordingDuration: {
       marginTop: spacing.sm,
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       fontWeight: "500",
     },
   });
@@ -335,8 +342,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
       <LinearGradient
         colors={
           isOwnMessage
-            ? [Colors.primary[500], Colors.primary[600]]
-            : [Colors.background.primary, Colors.neutral[100]]
+            ? [theme.colors.primary[500], theme.colors.primary[600]]
+            : [theme.colors.background.primary, theme.colors.neutral[100]]
         }
         style={styles.messageGradient}
         start={{ x: 0, y: 0 }}
@@ -366,8 +373,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
                   {
                     height: Math.random() * 20 + 10,
                     backgroundColor: isOwnMessage
-                      ? Colors.background.primary
-                      : Colors.primary[500],
+                      ? theme.colors.background.primary
+                      : theme.colors.primary[500],
                   },
                 ]}
               />
@@ -380,8 +387,8 @@ export const VoiceMessage: React.FC<VoiceMessageProps> = ({
             styles.durationText,
             {
               color: isOwnMessage
-                ? Colors.background.primary
-                : Colors.text.secondary,
+                ? theme.colors.background.primary
+                : theme.colors.text.secondary,
             },
           ]}
         >
@@ -400,6 +407,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
   style,
 }) => {
   const toast = useToast();
+  const { theme } = useTheme();
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -574,12 +582,12 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       width: spacing.xl * 1.25,
       height: spacing.xl * 1.25,
       borderRadius: spacing.xl * 0.625,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
       justifyContent: "center",
       alignItems: "center",
     },
     cancelButtonText: {
-      color: Colors.background.primary,
+      color: theme.colors.background.primary,
       fontSize: fontSize.base,
       fontWeight: "600",
     },
@@ -593,13 +601,13 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       width: spacing.xl * 5,
       height: spacing.xl * 5,
       borderRadius: spacing.xl * 2.5,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
     },
     recordButton: {
       width: spacing.xl * 3.75,
       height: spacing.xl * 3.75,
       borderRadius: spacing.xl * 1.875,
-      backgroundColor: Colors.error[500],
+      backgroundColor: theme.colors.error[500],
       justifyContent: "center",
       alignItems: "center",
     },
@@ -607,25 +615,25 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       width: spacing.md * 1.25,
       height: spacing.md * 1.25,
       borderRadius: spacing.md * 0.625,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     stopButton: {
       width: spacing.xl * 1.25,
       height: spacing.xl * 1.25,
       borderRadius: spacing.xl * 0.625,
-      backgroundColor: Colors.success[500],
+      backgroundColor: theme.colors.success[500],
       justifyContent: "center",
       alignItems: "center",
     },
     stopButtonText: {
-      color: Colors.background.primary,
+      color: theme.colors.background.primary,
       fontSize: fontSize.base,
     },
     startRecordButton: {
       width: spacing.xl * 1.875,
       height: spacing.xl * 1.875,
       borderRadius: spacing.xl * 0.9375,
-      backgroundColor: Colors.primary[500],
+      backgroundColor: theme.colors.primary[500],
       justifyContent: "center",
       alignItems: "center",
     },
@@ -635,7 +643,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     recordingDuration: {
       marginTop: spacing.sm,
       fontSize: fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       fontWeight: "500",
     },
   });

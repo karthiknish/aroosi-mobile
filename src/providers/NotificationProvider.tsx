@@ -6,7 +6,7 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { useAuth } from "@contexts/AuthProvider";
-// import { useOneSignal } from '../../hooks/useOneSignal'; // Temporarily disabled
+import { useOneSignal } from "@/hooks/useOneSignal";
 import { NotificationHandler } from "@utils/notificationHandler";
 import { logger } from "@utils/logger";
 import { NotificationPermissionsManager } from "@utils/notificationPermissions";
@@ -35,18 +35,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const { isAuthenticated, user } = useAuth();
   const userId = user?.id;
 
-  // Temporary mock for OneSignal until we fix the integration
-  const oneSignalData = {
-    isInitialized: false,
-    playerId: null,
-    permissionStatus: "undetermined",
-    isRegistered: false,
-    requestPermission: async () => false,
-    registerForPushNotifications: async () => false,
-    unregisterFromPushNotifications: async () => false,
-    setExternalUserId: (id: string) => {},
-    clearExternalUserId: () => {},
-  };
+  // Use real OneSignal hook for native push notifications
+  const oneSignalData = useOneSignal();
 
   const initializationRef = useRef(false);
 
@@ -115,6 +105,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       // Set external user ID for targeting
       if (userId) {
         oneSignalData.setExternalUserId(userId);
+        if (oneSignalData.playerId) {
+          logger.debug("NOTIFICATIONS", "OneSignal playerId", {
+            playerId: oneSignalData.playerId,
+          });
+        }
       }
     } catch (error) {
       logger.error("NOTIFICATIONS", "Error on user sign in", error);

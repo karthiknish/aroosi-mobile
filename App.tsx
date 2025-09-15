@@ -1,7 +1,19 @@
 import React, { useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator } from "react-native";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  StyleSheet,
+  View,
+  ActivityIndicator,
+  Platform,
+  UIManager,
+} from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryCache,
+  MutationCache,
+} from "@tanstack/react-query";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -17,17 +29,56 @@ import { AuthProvider } from "./contexts";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastProvider } from "@providers/ToastContext";
 import { FontLoader } from "@components/FontLoader";
-import { Colors } from "@constants/Colors";
+import { useTheme } from "@contexts/ThemeContext";
 import { photoService } from "./services/PhotoService";
 import ErrorBoundary from "./providers/ErrorBoundary";
+import { initSentry, Sentry } from "./utils/sentry";
+import useConnectivityToasts from "./hooks/useConnectivityToasts";
+import useOTAUpdates from "./hooks/useOTAUpdates";
 
-// Initialize React Query client
+// Initialize React Query client with global error handling
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      try {
+        const { normalizeError, showErrorToast } = require("@/utils/toast");
+        const n = normalizeError(error);
+        if (n.isAuth) return;
+        showErrorToast(n.message);
+      } catch (e) {
+        console.error("Query error:", error);
+      }
+    },
+  }),
+  mutationCache: new MutationCache({
+    onError: (error) => {
+      try {
+        const { normalizeError, showErrorToast } = require("@/utils/toast");
+        const n = normalizeError(error);
+        if (n.isAuth) return;
+        showErrorToast(n.message);
+      } catch (e) {
+        console.error("Mutation error:", error);
+      }
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 2,
+      retry: (failureCount, error: any) => {
+        // Backoff retries for transient issues only
+        const message = (error as any)?.message || "";
+        const status = (error as any)?.status;
+        const isNetwork =
+          /network|timeout/i.test(message) ||
+          (error as any)?.code === "NETWORK_ERROR";
+        const isServer = typeof status === "number" && status >= 500;
+        const isRateLimit = status === 429;
+        return failureCount < 2 && (isNetwork || isServer || isRateLimit);
+      },
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
     },
+    mutations: {},
   },
 });
 
@@ -40,16 +91,24 @@ export default function App() {
     photoService.initializeOfflineQueue();
 
     // Add any other initialization logic here
+    try {
+      initSentry();
+    } catch {}
+    // Enable LayoutAnimation on Android
+    try {
+      if (
+        Platform.OS === "android" &&
+        UIManager.setLayoutAnimationEnabledExperimental
+      ) {
+        UIManager.setLayoutAnimationEnabledExperimental(true);
+      }
+    } catch {}
     setIsReady(true);
   }, []);
 
-  if (!isReady) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={Colors.primary[500]} />
-      </View>
-    );
-  }
+  // Global UX hooks
+  useConnectivityToasts();
+  useOTAUpdates();
 
   return (
     <FontLoader>
@@ -57,24 +116,17 @@ export default function App() {
         <ThemeProvider>
           <AuthProvider>
             <ToastProvider>
-              <SafeAreaProvider>
-                <LinearGradient
-                  colors={Colors.gradient.secondary as any}
-                  style={{ flex: 1 }}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <ErrorBoundary>
-                    <NavigationContainer ref={navigationRef}>
-                      <NotificationProvider navigationRef={navigationRef}>
-                        <StatusBar style="auto" />
-                        <EmailVerificationBanner />
-                        <RootNavigator />
-                      </NotificationProvider>
-                    </NavigationContainer>
-                  </ErrorBoundary>
-                </LinearGradient>
-              </SafeAreaProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                  {isReady ? (
+                    <ThemedShell navigationRef={navigationRef} />
+                  ) : (
+                    <View style={styles.container}>
+                      <LoaderSpinner />
+                    </View>
+                  )}
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
             </ToastProvider>
           </AuthProvider>
         </ThemeProvider>
@@ -83,24 +135,80 @@ export default function App() {
   );
 }
 
+const LoaderSpinner = () => {
+  const { theme } = useTheme();
+  return <ActivityIndicator size="large" color={theme.colors.primary[500]} />;
+};
+
+const ThemedShell = ({
+  navigationRef,
+}: {
+  navigationRef: React.MutableRefObject<NavigationContainerRef<any>>;
+}) => {
+  const { theme } = useTheme();
+  const routeNameRef = useRef<string | undefined>(undefined);
+  return (
+    <LinearGradient
+      colors={theme.colors.gradient.secondary as any}
+      style={{ flex: 1 }}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <ErrorBoundary>
+        <NavigationContainer
+          ref={navigationRef}
+          onReady={() => {
+            try {
+              routeNameRef.current =
+                navigationRef.current?.getCurrentRoute?.()?.name;
+            } catch {}
+          }}
+          onStateChange={() => {
+            try {
+              const previous = routeNameRef.current;
+              const current = navigationRef.current?.getCurrentRoute?.()?.name;
+              if (current && previous !== current) {
+                Sentry.addBreadcrumb({
+                  category: "navigation",
+                  type: "navigation",
+                  level: "info",
+                  message: `Navigated to ${current}`,
+                  data: { from: previous, to: current },
+                });
+              }
+              routeNameRef.current = current;
+            } catch {}
+          }}
+        >
+          <NotificationProvider navigationRef={navigationRef}>
+            <StatusBar style="auto" />
+            <EmailVerificationBanner />
+            <RootNavigator />
+          </NotificationProvider>
+        </NavigationContainer>
+      </ErrorBoundary>
+    </LinearGradient>
+  );
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
     padding: 20,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10,
-    textAlign: 'center',
-    color: Colors.text.primary,
+    textAlign: "center",
+    color: undefined as any,
   },
   subtitle: {
     fontSize: 16,
-    color: Colors.text.secondary,
-    textAlign: 'center',
+    color: undefined as any,
+    textAlign: "center",
   },
 });

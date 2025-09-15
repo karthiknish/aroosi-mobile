@@ -31,11 +31,23 @@ Optional (local builds/debugging):
 
 2) Google services files
 - Required paths (defaults):
-  - iOS: `ios/Aroosi/GoogleService-Info.plist`
+  - iOS: `GoogleService-Info.plist` (project root; recommended for EAS)
   - Android: `android/app/google-services.json`
 - If your files live elsewhere, set these env vars in `.env` or environment:
   - `GOOGLE_SERVICE_INFO_PLIST=./path/to/GoogleService-Info.plist`
   - `GOOGLE_SERVICES_JSON=./path/to/google-services.json`
+
+  5) (Optional) Provide google services via EAS file env vars
+  If you prefer not to commit these files locally, upload them as secret file variables on EAS and rely on the env fallback in `app.config.js`:
+
+  ```bash
+  # iOS plist as a file variable
+  eas env:create --name GOOGLE_SERVICE_INFO_PLIST --type file --value ./GoogleService-Info.plist --environment development --visibility secret
+
+  # Android json as a file variable
+  eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./android/app/google-services.json --environment development --visibility secret
+  ```
+  Then run builds with the matching `environment` (our dev profiles already use `development`).
 
 3) Verify files are present
 ```bash
@@ -117,9 +129,15 @@ Or install via `adb install <path-to-apk>` when applicable.
   - Ensure device is registered: `eas device:create`
   - Verify Apple Team/App IDs and bundle identifier `com.aroosi.mobile`.
 
+- Calendar permission crash (ExpoCalendar.MissingCalendarPListValueException)
+  - Cause: Missing iOS Info.plist keys for Calendar/Reminders when using `expo-calendar`.
+  - Fix: Ensure app config includes `NSCalendarsUsageDescription` and `NSRemindersUsageDescription`, or add the `expo-calendar` plugin with `calendarPermission` and `remindersPermission`.
+  - Rebuild the dev client for changes to take effect.
+
 - Google sign-in fails or crashes
   - Verify `GoogleService-Info.plist` and `google-services.json` match your app IDs.
   - Ensure `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` (and iOS client ID if needed) are correct.
+  - Tip: Align the Web Client ID in `.env` with the OAuth client (type 3) inside `android/app/google-services.json` to avoid token mismatch errors.
   - Rebuild dev client after any native/config changes.
 
 - Clear caches (if bundler acts up)

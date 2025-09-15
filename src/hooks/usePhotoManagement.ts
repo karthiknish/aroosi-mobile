@@ -3,7 +3,7 @@ import { useApiClient } from "@utils/api";
 import { photoService, PhotoUploadResult } from "@services/PhotoService";
 import { ProfileImage } from "@/types/image";
 import { useAuth } from "@contexts/AuthProvider";
-import { useToast } from "@contexts/ToastContext";
+import { useToast } from "@providers/ToastContext";
 
 export interface UsePhotoManagementResult {
   // Data
@@ -62,7 +62,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
       }
     } catch (error) {
       console.error("Error loading images:", error);
-      toast.showError("Failed to load images.");
+      toast.show("Failed to load images.", "error");
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
   // Add a new photo
   const addPhoto = useCallback(async (): Promise<boolean> => {
     if (uploading || images.length >= MAX_PHOTOS) {
-      toast.showInfo(`You can only upload up to ${MAX_PHOTOS} photos.`);
+      toast.show(`You can only upload up to ${MAX_PHOTOS} photos.`, "info");
       return false;
     }
 
@@ -82,15 +82,15 @@ export function usePhotoManagement(): UsePhotoManagementResult {
 
       if (result.success && result.imageId) {
         await loadImages();
-        toast.showSuccess("Photo added.");
+        toast.show("Photo added.", "success");
         return true;
       } else {
-        toast.showError("Failed to add photo.");
+        toast.show("Failed to add photo.", "error");
         return false;
       }
     } catch (error) {
       console.error("Error adding photo:", error);
-      toast.showError("An error occurred while adding photo.");
+      toast.show("An error occurred while adding photo.", "error");
       return false;
     } finally {
       setUploading(false);
@@ -111,15 +111,15 @@ export function usePhotoManagement(): UsePhotoManagementResult {
 
         if (response.success) {
           setImages((prev) => prev.filter((img) => img.id !== imageId));
-          toast.showSuccess("Photo deleted.");
+          toast.show("Photo deleted.", "success");
           return true;
         } else {
-          toast.showError("Failed to delete photo.");
+          toast.show("Failed to delete photo.", "error");
           return false;
         }
       } catch (error) {
         console.error("Error deleting photo:", error);
-        toast.showError("An error occurred while deleting photo.");
+        toast.show("An error occurred while deleting photo.", "error");
         return false;
       } finally {
         setDeleting(null);
@@ -151,7 +151,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
 
         if (!response.success) {
           await loadImages();
-          toast.showError("Failed to reorder photos.");
+          toast.show("Failed to reorder photos.", "error");
           return false;
         }
 
@@ -159,7 +159,7 @@ export function usePhotoManagement(): UsePhotoManagementResult {
       } catch (error) {
         console.error("Error reordering photos:", error);
         await loadImages();
-        toast.showError("An error occurred while reordering.");
+        toast.show("An error occurred while reordering.", "error");
         return false;
       } finally {
         setReordering(false);
@@ -181,15 +181,15 @@ export function usePhotoManagement(): UsePhotoManagementResult {
               isMain: img.id === imageId,
             }))
           );
-          toast.showSuccess("Set as main photo.");
+          toast.show("Set as main photo.", "success");
           return true;
         } else {
-          toast.showError("Failed to set main photo.");
+          toast.show("Failed to set main photo.", "error");
           return false;
         }
       } catch (error) {
         console.error("Error setting main photo:", error);
-        toast.showError("An error occurred while setting main photo.");
+        toast.show("An error occurred while setting main photo.", "error");
         return false;
       }
     },
@@ -219,15 +219,15 @@ export function usePhotoManagement(): UsePhotoManagementResult {
           setImages((prev) =>
             prev.filter((img) => img.id && !imageIds.includes(img.id))
           );
-          toast.showSuccess("Selected photos deleted.");
+          toast.show("Selected photos deleted.", "success");
           return true;
         } else {
-          toast.showError("Batch delete failed.");
+          toast.show("Batch delete failed.", "error");
           return false;
         }
       } catch (error) {
         console.error("Error batch deleting photos:", error);
-        toast.showError("An error occurred while deleting photos.");
+        toast.show("An error occurred while deleting photos.", "error");
         return false;
       } finally {
         setDeleting(null);

@@ -10,12 +10,18 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
+import { ActivityIndicator } from "react-native";
+import { Image } from "react-native";
 import { Colors, Layout } from "../../constants";
 import TypingIndicator from "./TypingIndicator";
 import VoiceMessage from "./VoiceMessage";
 import MessageStatusIndicator from "./MessageStatusIndicator";
 import { RefreshControl } from "react-native";
+import { ImageViewer } from "@components/ImageViewer";
+import { ApiErrorDisplay } from "@/components/ui/ErrorHandling";
 
 type BaseMessage = {
   _id: string;
@@ -42,6 +48,12 @@ type BaseMessage = {
   audioUrl?: string;
   durationSeconds?: number;
   peaks?: number[];
+  // image fields (optional)
+  imageStorageId?: string;
+  fileUrl?: string; // direct url if provided by API
+  thumbnailUrl?: string;
+  width?: number;
+  height?: number;
   // Align with core Message status (no 'sending'); treat local transient 'pending' as the only pre-send state
   status?: "pending" | "sent" | "delivered" | "read" | "failed";
   deliveryReceipts?: any[];
@@ -62,6 +74,11 @@ interface MessagesListProps {
   onScrollToBottom?: (smooth?: boolean) => void;
   onRefresh?: () => void | Promise<void>;
   refreshing?: boolean;
+  // Inline error surface
+  error?: any;
+  onRetry?: () => void | Promise<void>;
+  // Notify parent when user is at bottom or not, to decide FAB visibility
+  onAtBottomChange?: (atBottom: boolean) => void;
   // Actions
   onLongPressMessage?: (message: BaseMessage) => void;
   // New explicit action callbacks to align with web: reply/edit/delete
@@ -70,18 +87,25 @@ interface MessagesListProps {
   onDeleteMessage?: (message: BaseMessage) => void;
   onToggleReaction?: (messageId: string, emoji: string) => void;
   // Get reactions for a message (returns reactions with user info)
-  getReactionsForMessage?: (
-    messageId: string
-  ) => Array<{
+  getReactionsForMessage?: (messageId: string) => Array<{
     emoji: string;
     count: number;
     reactedByMe: boolean;
     userIds: string[];
   }>;
+  // Lazy fetcher for secure image URLs, given a messageId
+  fetchImageUrl?: (messageId: string) => Promise<string | null>;
   // Upgrade chip props
   showUpgradeChip?: boolean;
   upgradeChipText?: string;
   onPressUpgrade?: () => void;
+  // Ephemeral voice actions (for pending/failed bubbles owned by current user)
+  onRetryVoice?: (tempId: string) => void;
+  onCancelVoice?: (tempId: string) => void;
+  onDismissVoice?: (tempId: string) => void;
+  // Failed message actions (text/image) owned by current user
+  onRetryFailedMessage?: (message: BaseMessage) => void | Promise<void>;
+  onDismissFailedMessage?: (messageId: string) => void;
 }
 
 export default function MessagesList({
@@ -105,11 +129,35 @@ export default function MessagesList({
   onDeleteMessage,
   onToggleReaction,
   getReactionsForMessage,
+  fetchImageUrl,
   showUpgradeChip = false,
   upgradeChipText = "Upgrade for unlimited messaging",
   onPressUpgrade,
+  onAtBottomChange,
+  onRetryVoice,
+  onCancelVoice,
+  onDismissVoice,
+  error,
+  onRetry,
+  onRetryFailedMessage,
+  onDismissFailedMessage,
 }: MessagesListProps) {
   const listRef = useRef<FlatList<BaseMessage>>(null);
+  const [imageUrlCache, setImageUrlCache] = useState<Record<string, string>>(
+    {}
+  );
+  const [retryingIds, setRetryingIds] = useState<Record<string, boolean>>({});
+  const [queuedTipFor, setQueuedTipFor] = useState<string | null>(null);
+  const queuedTipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (queuedTipTimeoutRef.current) {
+        clearTimeout(queuedTipTimeoutRef.current);
+        queuedTipTimeoutRef.current = null;
+      }
+    };
+  }, []);
   const [quickReactionState, setQuickReactionState] = useState<{
     messageId: string;
     position: { x: number; y: number };
@@ -123,6 +171,51 @@ export default function MessagesList({
 
   // Quick reaction emojis (same as web)
   const quickReactionEmojis = ["👍", "❤️", "😂", "😮", "🙏"];
+
+  // Full-screen image viewer state
+  const [viewerVisible, setViewerVisible] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+
+  // Build an ordered list of image URLs for the viewer (using cache/inline urls)
+  const imageMessageIds = useMemo(
+    () => messages.filter((m) => m.type === "image").map((m) => m._id),
+    [messages]
+  );
+  const imageUrls = useMemo(() => {
+    return messages
+      .filter((m) => m.type === "image")
+      .map((m) => m.fileUrl || m.thumbnailUrl || imageUrlCache[m._id])
+      .filter((u): u is string => !!u);
+  }, [messages, imageUrlCache]);
+
+  // Lazy-fetch secure image URLs for image messages missing a URL
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!fetchImageUrl) return;
+      const missing = messages.filter(
+        (m) =>
+          m.type === "image" &&
+          !m.fileUrl &&
+          !m.thumbnailUrl &&
+          !imageUrlCache[m._id]
+      );
+      for (const msg of missing) {
+        try {
+          const url = await fetchImageUrl(msg._id);
+          if (!cancelled && url) {
+            setImageUrlCache((prev) => ({ ...prev, [msg._id]: url }));
+          }
+        } catch {
+          // ignore individual failures
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [messages, fetchImageUrl, imageUrlCache]);
 
   // Enhanced reaction toolbar component
   const QuickReactionToolbar = ({
@@ -388,6 +481,8 @@ export default function MessagesList({
     const isVoice =
       item.type === "voice" &&
       (item.audioUrl || item.voiceUrl || (item as any).audioStorageId);
+    const isImage = item.type === "image";
+    const isText = item.type === "text";
 
     const showDeleted = item.deleted === true;
     const showEdited = !!item.edited || !!item.editedAt;
@@ -527,7 +622,61 @@ export default function MessagesList({
                 durationSeconds={item.durationSeconds}
                 isOwnMessage={isMine}
                 showStatus={isMine}
+                uploading={(item as any).__uploading === true}
+                progress={
+                  typeof (item as any).__progress === "number"
+                    ? (item as any).__progress
+                    : undefined
+                }
+                errorText={(item as any).__error}
+                onRetry={
+                  typeof (item as any).__error === "string" &&
+                  item._id.startsWith("v_")
+                    ? () => onRetryVoice?.(item._id)
+                    : undefined
+                }
+                onCancel={
+                  (item as any).__uploading === true &&
+                  item._id.startsWith("v_")
+                    ? () => onCancelVoice?.(item._id)
+                    : undefined
+                }
+                onDismiss={
+                  typeof (item as any).__error === "string" &&
+                  item._id.startsWith("v_")
+                    ? () => onDismissVoice?.(item._id)
+                    : undefined
+                }
               />
+            ) : isImage ? (
+              (() => {
+                const resolvedUrl =
+                  item.fileUrl || item.thumbnailUrl || imageUrlCache[item._id];
+                return (
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => {
+                      // Open viewer at this image's index
+                      const idx = imageMessageIds.indexOf(item._id);
+                      if (idx >= 0) setViewerIndex(idx);
+                      setViewerVisible(true);
+                    }}
+                    style={styles.imageWrapper}
+                  >
+                    {resolvedUrl ? (
+                      <Image
+                        source={{ uri: resolvedUrl }}
+                        style={styles.image}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.imagePlaceholder}>
+                        <Text style={styles.imagePlaceholderText}>Image</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })()
             ) : (
               <Text
                 style={[
@@ -537,6 +686,64 @@ export default function MessagesList({
               >
                 {item.text}
               </Text>
+            )}
+
+            {/* Failed message inline actions (text/image) for own messages */}
+            {isMine && item.status === "failed" && (
+              <View style={styles.failedRow}>
+                <Text style={styles.failedText}>Failed to send</Text>
+                <View style={styles.failedActions}>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      if (!onRetryFailedMessage) return;
+                      try {
+                        setRetryingIds((prev) => ({
+                          ...prev,
+                          [item._id]: true,
+                        }));
+                        const maybe = onRetryFailedMessage(item);
+                        if (typeof (maybe as any)?.then === "function") {
+                          await (maybe as Promise<any>);
+                        }
+                      } finally {
+                        setRetryingIds((prev) => {
+                          const next = { ...prev };
+                          delete next[item._id];
+                          return next;
+                        });
+                      }
+                    }}
+                    disabled={!!retryingIds[item._id]}
+                    style={[
+                      styles.failedBtn,
+                      styles.failedBtnPrimary,
+                      retryingIds[item._id] && { opacity: 0.6 },
+                    ]}
+                    activeOpacity={0.9}
+                  >
+                    <View style={styles.failedBtnContentRow}>
+                      {retryingIds[item._id] && (
+                        <ActivityIndicator
+                          size="small"
+                          color={Colors.background.primary}
+                          style={{ marginRight: 6 }}
+                        />
+                      )}
+                      <Text style={styles.failedBtnText}>
+                        {retryingIds[item._id] ? "Retrying…" : "Retry"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => onDismissFailedMessage?.(item._id)}
+                    disabled={!!retryingIds[item._id]}
+                    style={[styles.failedBtn, styles.failedBtnGhost]}
+                    activeOpacity={0.9}
+                  >
+                    <Text style={styles.failedBtnGhostText}>Dismiss</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
 
             {/* Enhanced Reactions row */}
@@ -589,6 +796,35 @@ export default function MessagesList({
                 isMine ? styles.metaMine : styles.metaTheirs,
               ]}
             >
+              {/* Queued chip for pending own text/image messages */}
+              {isMine && (isText || isImage) && item.status === "pending" && (
+                <>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setQueuedTipFor(item._id);
+                      if (queuedTipTimeoutRef.current) {
+                        clearTimeout(queuedTipTimeoutRef.current);
+                      }
+                      queuedTipTimeoutRef.current = setTimeout(() => {
+                        setQueuedTipFor(null);
+                        queuedTipTimeoutRef.current = null;
+                      }, 1500);
+                    }}
+                    style={styles.queuedChip}
+                    accessibilityLabel="queued-chip"
+                  >
+                    <Text style={styles.queuedChipText}>Queued</Text>
+                  </TouchableOpacity>
+                  {queuedTipFor === item._id && (
+                    <View style={styles.queuedTooltip}>
+                      <Text style={styles.queuedTooltipText}>
+                        Will send when online
+                      </Text>
+                    </View>
+                  )}
+                </>
+              )}
               <Text style={styles.metaTime}>
                 {new Date(item.createdAt).toLocaleTimeString([], {
                   hour: "2-digit",
@@ -608,20 +844,29 @@ export default function MessagesList({
 
   const keyExtractor = (m: BaseMessage) => m._id;
 
-  const ListHeaderComponent = () =>
-    hasMore && !loading && messages.length > 0 ? (
-      <View style={styles.loadOlderWrap}>
-        <TouchableOpacity
-          disabled={loadingOlder}
-          onPress={() => onFetchOlder && onFetchOlder()}
-          style={styles.loadOlderBtn}
-        >
-          <Text style={styles.loadOlderText}>
-            {loadingOlder ? "Loading older..." : "Load older messages"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    ) : null;
+  const ListHeaderComponent = () => (
+    <>
+      {/* Inline error banner at the top of the list */}
+      {error && (
+        <View style={styles.inlineErrorWrap}>
+          <ApiErrorDisplay error={error} onRetry={onRetry || onRefresh} />
+        </View>
+      )}
+      {hasMore && !loading && messages.length > 0 ? (
+        <View style={styles.loadOlderWrap}>
+          <TouchableOpacity
+            disabled={loadingOlder}
+            onPress={() => onFetchOlder && onFetchOlder()}
+            style={styles.loadOlderBtn}
+          >
+            <Text style={styles.loadOlderText}>
+              {loadingOlder ? "Loading older..." : "Load older messages"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+    </>
+  );
 
   const ListFooterComponent = () => (
     <>
@@ -676,10 +921,31 @@ export default function MessagesList({
 
   const empty = !messages || messages.length === 0;
 
+  // Track if user is near the bottom to toggle FAB
+  const [atBottom, setAtBottom] = useState(true);
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const {
+      contentOffset: { y },
+      contentSize: { height: contentHeight },
+      layoutMeasurement: { height: viewportHeight },
+    } = e.nativeEvent;
+    const distanceFromBottom = contentHeight - (y + viewportHeight);
+    const isAtBottom = distanceFromBottom <= 120; // px threshold
+    if (isAtBottom !== atBottom) {
+      setAtBottom(isAtBottom);
+      onAtBottomChange?.(isAtBottom);
+    }
+  };
+
   return (
     <View style={styles.container}>
       {empty ? (
         <View style={styles.emptyWrap}>
+          {error && (
+            <View style={styles.inlineErrorWrap}>
+              <ApiErrorDisplay error={error} onRetry={onRetry || onRefresh} />
+            </View>
+          )}
           <View style={styles.emptyIcon} />
           <Text style={styles.emptyTitle}>Start the conversation!</Text>
           <Text style={styles.emptyText}>Send a message to break the ice</Text>
@@ -696,6 +962,8 @@ export default function MessagesList({
             ListFooterComponent={ListFooterComponent}
             onEndReachedThreshold={0.1}
             keyboardShouldPersistTaps="handled"
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             refreshControl={
               onRefresh ? (
                 <RefreshControl
@@ -735,6 +1003,20 @@ export default function MessagesList({
               />
             </Modal>
           )}
+
+          {/* Full-screen Image Viewer */}
+          {viewerVisible && imageUrls.length > 0 && (
+            <ImageViewer
+              images={imageUrls}
+              initialIndex={Math.max(
+                0,
+                Math.min(viewerIndex, imageUrls.length - 1)
+              )}
+              visible={viewerVisible}
+              onClose={() => setViewerVisible(false)}
+              showControls
+            />
+          )}
         </>
       )}
     </View>
@@ -745,6 +1027,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     position: "relative",
+  },
+  queuedChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: Colors.neutral[200],
+    borderRadius: 8,
+    marginRight: 6,
+  },
+  queuedChipText: {
+    fontSize: 10,
+    color: Colors.neutral[700],
   },
   listContent: {
     padding: Layout.spacing.md,
@@ -788,6 +1081,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
+  },
+  imageWrapper: {
+    width: 220,
+    height: 220,
+    borderRadius: Layout.radius.lg,
+    overflow: "hidden",
+    backgroundColor: Colors.neutral[100],
+  },
+  image: {
+    width: "100%",
+    height: "100%",
+  },
+  imagePlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.neutral[100],
+  },
+  imagePlaceholderText: {
+    color: Colors.text.secondary,
+    fontSize: Layout.typography.fontSize.sm,
   },
   bubbleMine: {
     backgroundColor: Colors.primary[500],
@@ -1016,6 +1330,10 @@ const styles = StyleSheet.create({
     fontSize: Layout.typography.fontSize.sm,
     fontWeight: Layout.typography.fontWeight.medium,
   },
+  inlineErrorWrap: {
+    marginHorizontal: Layout.spacing.md,
+    marginTop: Layout.spacing.sm,
+  },
   loadOlderWrap: {
     alignItems: "center",
     paddingVertical: Layout.spacing.sm,
@@ -1165,5 +1483,59 @@ const styles = StyleSheet.create({
   },
   enhancedReactionCountActive: {
     color: Colors.primary[700],
+  },
+  // Failed inline actions
+  failedRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
+  failedText: {
+    fontSize: Layout.typography.fontSize.xs,
+    color: Colors.error?.[600] || "#dc2626",
+  },
+  failedActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  failedBtn: {
+    borderRadius: Layout.radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  failedBtnContentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  failedBtnPrimary: {
+    backgroundColor: Colors.neutral[900],
+  },
+  failedBtnGhost: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: Colors.border.primary,
+  },
+  failedBtnText: {
+    color: Colors.background.primary,
+    fontSize: Layout.typography.fontSize.xs,
+    fontWeight: Layout.typography.fontWeight.medium,
+  },
+  failedBtnGhostText: {
+    color: Colors.text.primary,
+    fontSize: Layout.typography.fontSize.xs,
+    fontWeight: Layout.typography.fontWeight.medium,
+  },
+  queuedTooltip: {
+    backgroundColor: Colors.neutral[900],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 6,
+  },
+  queuedTooltipText: {
+    color: Colors.background.primary,
+    fontSize: 10,
   },
 });

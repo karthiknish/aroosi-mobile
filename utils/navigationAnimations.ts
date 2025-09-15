@@ -5,7 +5,7 @@ import {
 } from "@react-navigation/stack";
 import { Easing } from "react-native";
 import { ANIMATION_DURATIONS, EASING_PRESETS } from "@/utils/animations";
-import { Colors } from "@constants";
+import type { Theme } from "@constants/Theme";
 import type { StackCardInterpolatedStyle } from "@react-navigation/stack";
 
 // Custom transition configurations
@@ -270,32 +270,32 @@ export const getScreenTransition = (
 };
 
 // Tab bar animation config
-export const tabBarAnimationConfig = {
+export const getTabBarAnimationConfig = (theme: Theme) => ({
   tabBarOptions: {
     tabStyle: {
       opacity: 1,
     },
   },
   screenOptions: {
-    tabBarActiveTintColor: Colors.primary[500],
-    tabBarInactiveTintColor: Colors.neutral[500],
+    tabBarActiveTintColor: theme.colors.primary[500],
+    tabBarInactiveTintColor: theme.colors.neutral[500],
     tabBarStyle: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderTopWidth: 1,
-      borderTopColor: Colors.border.primary,
+      borderTopColor: theme.colors.border.primary,
       paddingBottom: 5,
       paddingTop: 5,
       height: 60,
     },
     tabBarLabelStyle: {
       fontSize: 12,
-      fontWeight: 500,
+      fontWeight: 500 as any,
     },
     tabBarIconStyle: {
       marginBottom: 2,
     },
   },
-};
+});
 
 // Gesture configuration for smooth navigation
 export const gestureConfig = {

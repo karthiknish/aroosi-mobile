@@ -5,6 +5,14 @@ This project is configured to publish a release App Bundle to Google Play's Inte
 ## What’s included
 - Gradle Play Publisher v3.12.1
 - GitHub Actions workflow `.github/workflows/android-play-internal.yml`
+- Or the unified EAS workflow `.github/workflows/eas-build-and-submit.yml` (recommended)
+
+Required repository secrets for the unified workflow:
+
+- EXPO_TOKEN — Expo personal access token
+- GOOGLE_PLAY_SERVICE_ACCOUNT_JSON — Entire JSON of the Google Play service account key
+
+Submitting to Play Console via EAS requires that you have uploaded at least one build manually once. See https://expo.fyi/first-android-submission
 - Play config in `android/app/build.gradle` (defaults to App Bundles, internal track)
 - Optional release signing via `upload.keystore` (CI)
 

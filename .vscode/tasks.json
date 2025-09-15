@@ -10,6 +10,16 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Typecheck aroosi-mobile",
+			"type": "shell",
+			"command": "npm run type-check",
+			"args": [],
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
 		}
 	]
 }

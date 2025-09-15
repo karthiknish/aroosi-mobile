@@ -17,7 +17,8 @@ import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { AuthStackParamList } from "@/navigation/AuthNavigator";
 import SocialAuthButtons from "@components/auth/SocialAuthButtons";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
 import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
@@ -34,6 +35,7 @@ const { width, height } = Dimensions.get("window");
 export default function LoginScreen() {
   const { signIn, isLoading: authLoading } = useAuth();
   const toast = useToast();
+  const { theme } = useTheme();
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
@@ -145,7 +147,7 @@ export default function LoginScreen() {
     title: {
       fontFamily: Layout.typography.fontFamily.serif,
       fontSize: fontSize["2xl"],
-      color: Colors.accent[700], // mapped from gold
+      color: theme.colors.accent[700], // mapped from gold
       marginBottom: spacing.xs,
     },
     titleUnderline: {
@@ -155,20 +157,20 @@ export default function LoginScreen() {
       transform: [{ translateX: -50 }],
       width: 100,
       height: 3,
-      backgroundColor: Colors.primary[300], // soft pink accent
+      backgroundColor: theme.colors.primary[300], // soft pink accent
       borderRadius: 2,
     },
     subtitle: {
       fontSize: fontSize.base,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       textAlign: "center",
       marginTop: spacing.md,
     },
     formContainer: {
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
       borderRadius: 16,
       padding: spacing.lg,
-      shadowColor: Colors.neutral[900],
+      shadowColor: theme.colors.neutral[900],
       shadowOffset: {
         width: 0,
         height: 4,
@@ -189,24 +191,24 @@ export default function LoginScreen() {
     },
     label: {
       fontSize: fontSize.sm,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.xs,
       fontWeight: "500",
     },
     input: {
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
       borderRadius: 8,
       padding: spacing.md,
       fontSize: fontSize.base,
-      color: Colors.text.primary,
-      backgroundColor: Colors.background.primary,
+      color: theme.colors.text.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     inputWithIcon: {
       paddingRight: spacing.xl * 2,
     },
     inputError: {
-      borderColor: Colors.error[500],
+      borderColor: theme.colors.error[500],
     },
     eyeButton: {
       position: "absolute",
@@ -217,7 +219,7 @@ export default function LoginScreen() {
       alignItems: "center",
     },
     button: {
-      backgroundColor: Colors.accent[700],
+      backgroundColor: theme.colors.accent[700],
       borderRadius: 8,
       padding: spacing.md,
       alignItems: "center",
@@ -227,7 +229,7 @@ export default function LoginScreen() {
       opacity: 0.7,
     },
     buttonText: {
-      color: Colors.text.inverse,
+      color: theme.colors.text.inverse,
       fontSize: fontSize.base,
       fontWeight: "600",
     },
@@ -236,7 +238,7 @@ export default function LoginScreen() {
       marginTop: spacing.md,
     },
     forgotPasswordText: {
-      color: Colors.primary[400],
+      color: theme.colors.primary[400],
       fontSize: fontSize.sm,
       fontWeight: "500",
       textDecorationLine: "underline",
@@ -249,11 +251,11 @@ export default function LoginScreen() {
     dividerLine: {
       flex: 1,
       height: 1,
-      backgroundColor: Colors.border.primary,
+      backgroundColor: theme.colors.border.primary,
     },
     dividerText: {
       marginHorizontal: spacing.md,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       fontSize: fontSize.sm,
     },
     linkButton: {
@@ -261,29 +263,29 @@ export default function LoginScreen() {
       alignItems: "center",
     },
     linkText: {
-      color: Colors.accent[700],
+      color: theme.colors.accent[700],
       fontSize: fontSize.sm,
       fontWeight: "500",
     },
     errorText: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
       marginTop: spacing.xs,
       fontSize: fontSize.sm,
     },
     errorMessage: {
-      color: Colors.error[500],
+      color: theme.colors.error[500],
       fontSize: fontSize.sm,
       textAlign: "center",
       marginBottom: spacing.md,
       padding: spacing.sm,
-      backgroundColor: Colors.error[50],
+      backgroundColor: theme.colors.error[50],
       borderRadius: 4,
     },
   });
 
   return (
     <GradientBackground
-      colors={Colors.gradient.secondary as any}
+          colors={theme.colors.gradient.secondary as any}
       style={{ flex: 1 }}
     >
       <SafeAreaView style={styles.safeArea}>
@@ -325,7 +327,7 @@ export default function LoginScreen() {
                         fieldErrors.emailAddress && styles.inputError,
                       ]}
                       placeholder="Enter your email"
-                      placeholderTextColor={Colors.text.secondary}
+                      placeholderTextColor={theme.colors.text.secondary}
                       value={emailAddress}
                       onChangeText={(v) => {
                         setEmailAddress(v);
@@ -357,7 +359,7 @@ export default function LoginScreen() {
                           fieldErrors.password && styles.inputError,
                         ]}
                         placeholder="Enter your password"
-                        placeholderTextColor={Colors.text.secondary}
+                        placeholderTextColor={theme.colors.text.secondary}
                         value={password}
                         onChangeText={(v) => {
                           setPassword(v);
@@ -382,7 +384,7 @@ export default function LoginScreen() {
                         <Ionicons
                           name={showPassword ? "eye-off" : "eye"}
                           size={20}
-                          color={Colors.text.secondary}
+                          color={theme.colors.text.secondary}
                         />
                       </TouchableOpacity>
                     </View>

@@ -1,15 +1,9 @@
 import React, { useEffect, useState, useMemo } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput } from "react-native";
 import { useInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { useApiClient } from "@/utils/api";
 import { useAuth } from "@contexts/AuthProvider";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
 import { useTheme } from "@contexts/ThemeContext";
 import { ProfileCardSkeleton } from "@/components/ui/LoadingStates";
 import { NoSearchResults } from "@/components/ui/EmptyStates";
@@ -22,13 +16,18 @@ import {
 } from "@/components/ui/AnimatedComponents";
 import { SearchFilters, SearchResponse } from "@/types/profile";
 import PaywallModal from "@components/subscription/PaywallModal";
+import { useInterests } from "@/hooks/useInterests";
 import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { getPlans } from "@services/subscriptions";
 import SwipeDeck from "@components/search/SwipeDeck";
+import AppHeader from "@/components/common/AppHeader";
+import HintPopover from "@/components/ui/HintPopover";
+import HapticPressable from "@/components/ui/HapticPressable";
 
 interface SearchScreenProps {
   navigation: any;
+  route?: any;
 }
 
 // Filter options matching main aroosi project
@@ -99,11 +98,12 @@ const languageOptions = [
 
 // Age calculated inside SwipeDeck cards when needed
 
-export default function SearchScreen({ navigation }: SearchScreenProps) {
+export default function SearchScreen({ navigation, route }: SearchScreenProps) {
   const { user } = useAuth();
   const userId = user?.id;
   const { theme } = useTheme();
   const apiClient = useApiClient();
+  const { sentInterests } = useInterests();
 
   // State matching main aroosi project
   const [city, setCity] = useState("");
@@ -168,6 +168,19 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
     }
   }, [showPaywall, plans.length, loadingPlans]);
 
+  // Auto-open advanced filters on mount via route param
+  useEffect(() => {
+    const shouldOpen = !!route?.params?.openAdvancedFilters;
+    if (shouldOpen) {
+      if (advancedAllowed) {
+        setShowFilters(true);
+      } else {
+        setShowPaywall(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.openAdvancedFilters, advancedAllowed]);
+
   // Build filters object
   const filters: SearchFilters = useMemo(
     () => ({
@@ -226,9 +239,18 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
 
   // Locally track uninterested profiles to avoid resurfacing within session
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+  // Exclude users you've already sent interest to
+  const sentToIds = useMemo(
+    () => (sentInterests || []).map((i) => i.toUserId),
+    [sentInterests]
+  );
   const filteredProfiles = useMemo(
-    () => profiles.filter((p: any) => !dismissedIds.includes(p.userId)),
-    [profiles, dismissedIds]
+    () =>
+      profiles.filter(
+        (p: any) =>
+          !dismissedIds.includes(p.userId) && !sentToIds.includes(p.userId)
+      ),
+    [profiles, dismissedIds, sentToIds]
   );
 
   // const handleRefresh = async () => {
@@ -273,7 +295,10 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
       <View
         style={[
           styles.filtersContainer,
-          { backgroundColor: theme.colors.background.primary },
+          {
+            backgroundColor: theme.colors.background.primary,
+            borderBottomColor: theme.colors.border.primary,
+          },
         ]}
       >
         <PremiumFeatureGuard
@@ -320,29 +345,31 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </Text>
           <View style={styles.pickerContainer}>
             {["any", ...commonCountries].map((countryOption) => (
-              <TouchableOpacity
+              <HapticPressable
                 key={countryOption}
                 style={[
                   styles.pickerOption,
                   { borderColor: theme.colors.border.primary },
-                  country === countryOption && [
-                    styles.pickerOptionSelected,
-                    { backgroundColor: theme.colors.primary[500] },
-                  ],
+                  country === countryOption && {
+                    backgroundColor: theme.colors.primary[500],
+                    borderColor: theme.colors.primary[500],
+                  },
                 ]}
                 onPress={() => handleFilterChange("country", countryOption)}
+                haptic="selection"
               >
                 <Text
                   style={[
                     styles.pickerOptionText,
                     { color: theme.colors.text.primary },
-                    country === countryOption &&
-                      styles.pickerOptionTextSelected,
+                    country === countryOption && {
+                      color: theme.colors.text.inverse,
+                    },
                   ]}
                 >
                   {countryOption === "any" ? "Any Country" : countryOption}
                 </Text>
-              </TouchableOpacity>
+              </HapticPressable>
             ))}
           </View>
         </View>
@@ -405,31 +432,33 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </Text>
           <View style={styles.pickerContainer}>
             {ethnicityOptions.map((ethnicityOption) => (
-              <TouchableOpacity
+              <HapticPressable
                 key={ethnicityOption}
                 style={[
                   styles.pickerOption,
                   { borderColor: theme.colors.border.primary },
-                  ethnicity === ethnicityOption && [
-                    styles.pickerOptionSelected,
-                    { backgroundColor: theme.colors.primary[500] },
-                  ],
+                  ethnicity === ethnicityOption && {
+                    backgroundColor: theme.colors.primary[500],
+                    borderColor: theme.colors.primary[500],
+                  },
                 ]}
                 onPress={() => handleFilterChange("ethnicity", ethnicityOption)}
+                haptic="selection"
               >
                 <Text
                   style={[
                     styles.pickerOptionText,
                     { color: theme.colors.text.primary },
-                    ethnicity === ethnicityOption &&
-                      styles.pickerOptionTextSelected,
+                    ethnicity === ethnicityOption && {
+                      color: theme.colors.text.inverse,
+                    },
                   ]}
                 >
                   {ethnicityOption === "any"
                     ? "Any Ethnicity"
                     : ethnicityOption}
                 </Text>
-              </TouchableOpacity>
+              </HapticPressable>
             ))}
           </View>
         </View>
@@ -442,29 +471,31 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </Text>
           <View style={styles.pickerContainer}>
             {motherTongueOptions.map((tongueOption) => (
-              <TouchableOpacity
+              <HapticPressable
                 key={tongueOption}
                 style={[
                   styles.pickerOption,
                   { borderColor: theme.colors.border.primary },
-                  motherTongue === tongueOption && [
-                    styles.pickerOptionSelected,
-                    { backgroundColor: theme.colors.primary[500] },
-                  ],
+                  motherTongue === tongueOption && {
+                    backgroundColor: theme.colors.primary[500],
+                    borderColor: theme.colors.primary[500],
+                  },
                 ]}
                 onPress={() => handleFilterChange("motherTongue", tongueOption)}
+                haptic="selection"
               >
                 <Text
                   style={[
                     styles.pickerOptionText,
                     { color: theme.colors.text.primary },
-                    motherTongue === tongueOption &&
-                      styles.pickerOptionTextSelected,
+                    motherTongue === tongueOption && {
+                      color: theme.colors.text.inverse,
+                    },
                   ]}
                 >
                   {tongueOption === "any" ? "Any Mother Tongue" : tongueOption}
                 </Text>
-              </TouchableOpacity>
+              </HapticPressable>
             ))}
           </View>
         </View>
@@ -477,28 +508,31 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
           </Text>
           <View style={styles.pickerContainer}>
             {languageOptions.map((langOption) => (
-              <TouchableOpacity
+              <HapticPressable
                 key={langOption}
                 style={[
                   styles.pickerOption,
                   { borderColor: theme.colors.border.primary },
-                  language === langOption && [
-                    styles.pickerOptionSelected,
-                    { backgroundColor: theme.colors.primary[500] },
-                  ],
+                  language === langOption && {
+                    backgroundColor: theme.colors.primary[500],
+                    borderColor: theme.colors.primary[500],
+                  },
                 ]}
                 onPress={() => handleFilterChange("language", langOption)}
+                haptic="selection"
               >
                 <Text
                   style={[
                     styles.pickerOptionText,
                     { color: theme.colors.text.primary },
-                    language === langOption && styles.pickerOptionTextSelected,
+                    language === langOption && {
+                      color: theme.colors.text.inverse,
+                    },
                   ]}
                 >
                   {langOption === "any" ? "Any Language" : langOption}
                 </Text>
-              </TouchableOpacity>
+              </HapticPressable>
             ))}
           </View>
         </View>
@@ -534,24 +568,10 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
       <View
         style={[
           styles.container,
-          { backgroundColor: theme.colors.background.primary },
+          { backgroundColor: theme.colors.background.secondary },
         ]}
       >
-        <View
-          style={[
-            styles.header,
-            {
-              backgroundColor: theme.colors.background.primary,
-              borderBottomColor: theme.colors.border.primary,
-            },
-          ]}
-        >
-          <Text
-            style={[styles.headerTitle, { color: theme.colors.text.primary }]}
-          >
-            Search Profiles
-          </Text>
-        </View>
+        <AppHeader title="Search Profiles" />
         <ProfileCardSkeleton count={6} />
       </View>
     );
@@ -566,104 +586,44 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
         ]}
       >
         {/* Header */}
-        <FadeInView>
-          <View
-            style={[
-              styles.header,
-              {
-                backgroundColor: theme.colors.background.primary,
-                borderBottomColor: theme.colors.border.primary,
-              },
-            ]}
-          >
-            <SlideInView direction="left" delay={100}>
-              <Text
-                style={[
-                  styles.headerTitle,
-                  { color: theme.colors.text.primary },
-                ]}
-              >
-                Search Profiles
-              </Text>
-            </SlideInView>
-            <ScaleInView delay={200}>
-              <AnimatedButton
-                style={[
-                  styles.filterButton,
-                  { backgroundColor: theme.colors.primary[50] },
-                ]}
-                onPress={() => {
-                  if (advancedLoading) return;
-                  if (!advancedAllowed) {
-                    setShowPaywall(true);
-                    return;
-                  }
-                  setShowFilters(!showFilters);
-                }}
-                animationType="bounce"
-              >
-                <Text style={styles.filterButtonText}>🔍</Text>
-              </AnimatedButton>
-            </ScaleInView>
+        <AppHeader
+          title="Search Profiles"
+          rightActions={
+            <AnimatedButton
+              style={[
+                styles.filterButton,
+                { backgroundColor: theme.colors.primary[50] },
+              ]}
+              onPress={() => {
+                if (advancedLoading) return;
+                if (!advancedAllowed) {
+                  setShowPaywall(true);
+                  return;
+                }
+                setShowFilters(!showFilters);
+              }}
+              animationType="bounce"
+            >
+              <Text style={styles.filterButtonText}>🔍</Text>
+            </AnimatedButton>
+          }
+        />
+
+        {!advancedAllowed && (
+          <View style={{ paddingHorizontal: Layout.spacing.lg, marginTop: 6 }}>
+            <HintPopover
+              label="Why?"
+              hint={
+                "Advanced filters are a Premium feature. Upgrade to unlock detailed search filters."
+              }
+            />
           </View>
-        </FadeInView>
+        )}
 
         {/* Filters */}
         {showFilters && renderFilters()}
 
-        {/* Icebreaker engagement banner */}
-        {((!user?.profile as any) ||
-          !(user?.profile as any)?.answeredIcebreakersCount ||
-          ((user?.profile as any)?.answeredIcebreakersCount as number) < 3) && (
-          <View
-            style={{
-              marginHorizontal: Layout.spacing.lg,
-              marginTop: Layout.spacing.md,
-              marginBottom: Layout.spacing.sm,
-              padding: Layout.spacing.md,
-              borderRadius: Layout.radius.lg,
-              borderWidth: 1,
-              borderColor: theme.colors.border.primary,
-              backgroundColor: theme.colors.background.primary,
-            }}
-          >
-            <Text
-              style={{
-                color: theme.colors.text.primary,
-                fontFamily: Layout.typography.fontFamily.serif,
-                fontSize: Layout.typography.fontSize.lg,
-                marginBottom: 6,
-              }}
-            >
-              Boost your profile with icebreakers
-            </Text>
-            <Text
-              style={{ color: theme.colors.text.secondary, marginBottom: 10 }}
-            >
-              Answer a few quick questions so your personality shines. Profiles
-              with icebreakers get more interests.
-            </Text>
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate(
-                  "ProfileTab" as any,
-                  { screen: "Icebreakers" } as any
-                )
-              }
-              style={{
-                alignSelf: "flex-start",
-                backgroundColor: theme.colors.primary[500],
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: theme.colors.text.inverse }}>
-                Answer Icebreakers
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Icebreaker engagement banner removed as requested */}
 
         {/* Content: Swipe deck */}
         {filteredProfiles?.length ? (
@@ -680,6 +640,9 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                 prev.includes(id) ? prev : [...prev, id]
               );
             }}
+            onRestore={(id) =>
+              setDismissedIds((prev) => prev.filter((x) => x !== id))
+            }
           />
         ) : (
           <View style={{ padding: 20, alignItems: "center" }}>
@@ -693,7 +656,7 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                 >
                   Error loading profiles. Please try again.
                 </Text>
-                <TouchableOpacity
+                <HapticPressable
                   style={{
                     backgroundColor: theme.colors.primary[500],
                     paddingHorizontal: 20,
@@ -701,11 +664,12 @@ export default function SearchScreen({ navigation }: SearchScreenProps) {
                     borderRadius: 5,
                   }}
                   onPress={() => refetch()}
+                  haptic="light"
                 >
                   <Text style={{ color: theme.colors.text.inverse }}>
                     Retry
                   </Text>
-                </TouchableOpacity>
+                </HapticPressable>
               </>
             ) : (
               <NoSearchResults
@@ -758,35 +722,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.md,
-    backgroundColor: Colors.background.primary,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
   },
   headerTitle: {
     fontFamily: Layout.typography.fontFamily.serif,
     fontSize: Layout.typography.fontSize["2xl"],
     fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
   },
   filterButton: {
     padding: Layout.spacing.sm,
-    backgroundColor: Colors.primary[50],
     borderRadius: Layout.radius.md,
   },
   filterButtonText: {
     fontSize: Layout.typography.fontSize.lg,
   },
   filtersContainer: {
-    backgroundColor: Colors.background.primary,
     paddingHorizontal: Layout.spacing.lg,
     paddingVertical: Layout.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border.primary,
   },
   filtersTitle: {
     fontSize: Layout.typography.fontSize.lg,
     fontWeight: Layout.typography.fontWeight.bold,
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.md,
   },
   filterRow: {
@@ -800,17 +757,14 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontSize: Layout.typography.fontSize.base,
     fontWeight: Layout.typography.fontWeight.medium,
-    color: Colors.text.primary,
     marginBottom: Layout.spacing.xs,
   },
   filterInput: {
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: Layout.radius.md,
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
     fontSize: Layout.typography.fontSize.base,
-    backgroundColor: Colors.background.primary,
   },
   ageRangeContainer: {
     flexDirection: "row",
@@ -819,18 +773,15 @@ const styles = StyleSheet.create({
   ageInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: Layout.radius.md,
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
     fontSize: Layout.typography.fontSize.base,
-    backgroundColor: Colors.background.primary,
     textAlign: "center",
   },
   ageRangeSeparator: {
     marginHorizontal: Layout.spacing.sm,
     fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.secondary,
   },
   pickerContainer: {
     flexDirection: "row",
@@ -841,56 +792,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Layout.spacing.md,
     paddingVertical: Layout.spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.border.primary,
     borderRadius: Layout.radius.md,
     marginRight: Layout.spacing.xs,
     marginBottom: Layout.spacing.xs,
   },
-  pickerOptionSelected: {
-    backgroundColor: Colors.primary[500],
-    borderColor: Colors.primary[500],
-  },
   pickerOptionText: {
     fontSize: Layout.typography.fontSize.sm,
-    color: Colors.text.primary,
-  },
-  pickerOptionTextSelected: {
-    color: Colors.text.inverse,
   },
   applyFiltersButton: {
-    backgroundColor: Colors.primary[500],
     paddingVertical: Layout.spacing.md,
     borderRadius: Layout.radius.md,
     alignItems: "center",
     marginTop: Layout.spacing.md,
   },
   applyFiltersText: {
-    color: Colors.text.inverse,
     fontSize: Layout.typography.fontSize.base,
     fontWeight: Layout.typography.fontWeight.medium,
   },
-  paginationContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: Layout.spacing.lg,
-    paddingVertical: Layout.spacing.md,
-  },
-  paginationButton: {
-    paddingHorizontal: Layout.spacing.md,
-    paddingVertical: Layout.spacing.sm,
-    backgroundColor: Colors.primary[500],
-    borderRadius: Layout.radius.md,
-  },
-  paginationButtonDisabled: {
-    backgroundColor: Colors.neutral[300],
-  },
-  paginationButtonText: {
-    color: Colors.text.inverse,
-    fontSize: Layout.typography.fontSize.base,
-  },
-  paginationText: {
-    fontSize: Layout.typography.fontSize.base,
-    color: Colors.text.primary,
-  },
+  // pagination styles removed; pagination handled by deck
 });

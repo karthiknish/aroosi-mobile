@@ -1,0 +1,48 @@
+name: EAS Build (iOS & Android)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install EAS CLI
+        run: npm i -g eas-cli@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Login to EAS
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: eas whoami || eas login --token "$EAS_TOKEN"
+
+      - name: iOS Build (development)
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: eas build --platform ios --profile development --non-interactive
+
+      - name: Android Build (development)
+        env:
+          EAS_TOKEN: ${{ secrets.EAS_TOKEN }}
+        run: eas build --platform android --profile development --non-interactive
+
+      - name: Upload build URLs
+        if: always()
+        run: |
+          echo "Builds completed. Check EAS dashboard for artifacts: https://expo.dev/accounts/karthiknish/projects/aroosi/builds"

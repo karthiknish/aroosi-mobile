@@ -16,6 +16,7 @@
       "@screens/*": ["src/screens/*"],
       "@services/*": ["services/*"],
       "@contexts/*": ["contexts/*"],
+      "@contexts/NavGuideContext": ["contexts/NavGuideContext"],
       "@constants": ["constants/index"],
       "@constants/*": ["constants/*"],
       "@/constants/*": ["src/constants/*"],

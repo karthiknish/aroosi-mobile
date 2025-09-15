@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Colors, Layout } from '@constants';
+import { Layout } from "@constants";
+import { useThemedStyles } from "@contexts/ThemeContext";
 import SearchableSelect from '@components/SearchableSelect';
 
 // Match the actual SearchableSelect signature:
@@ -39,12 +40,53 @@ export const ValidatedSelect: React.FC<ValidatedSelectProps> = ({
   required,
   hint,
   error,
-  placeholder = 'Select...',
+  placeholder = "Select...",
   containerStyle,
   selectStyle,
   testID,
   disabled,
 }) => {
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      container: {
+        marginBottom: Layout.spacing.md,
+      },
+      label: {
+        fontSize: Layout.typography.fontSize.base,
+        fontWeight: "500",
+        color: t.colors.text.primary,
+        marginBottom: Layout.spacing.xs,
+      },
+      required: {
+        color: t.colors.error[500],
+      },
+      selectWrapper: {
+        borderWidth: 1,
+        borderColor: t.colors.border.primary,
+        borderRadius: Layout.radius.md,
+        backgroundColor: t.colors.background.secondary,
+      },
+      selectWrapperError: {
+        borderColor: t.colors.error[500],
+      },
+      selectWrapperValid: {
+        borderColor: t.colors.success[500],
+      },
+      selectWrapperDisabled: {
+        opacity: 0.6,
+      },
+      hint: {
+        marginTop: Layout.spacing.xs,
+        color: t.colors.text.secondary,
+        fontSize: Layout.typography.fontSize.sm,
+      },
+      error: {
+        marginTop: Layout.spacing.xs,
+        color: t.colors.error[500],
+        fontSize: Layout.typography.fontSize.sm,
+      },
+    })
+  );
   const showError = !!error;
   const labelNode = label ? (
     <Text style={styles.label}>
@@ -89,44 +131,6 @@ export const ValidatedSelect: React.FC<ValidatedSelectProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    marginBottom: Layout.spacing.md,
-  },
-  label: {
-    fontSize: Layout.typography.fontSize.base,
-    fontWeight: "500",
-    color: Colors.text.primary,
-    marginBottom: Layout.spacing.xs,
-  },
-  required: {
-    color: Colors.error[500],
-  },
-  selectWrapper: {
-    borderWidth: 1,
-    borderColor: Colors.border.primary,
-    borderRadius: Layout.radius.md,
-    backgroundColor: Colors.background.secondary,
-  },
-  selectWrapperError: {
-    borderColor: Colors.error[500],
-  },
-  selectWrapperValid: {
-    borderColor: Colors.success[500],
-  },
-  selectWrapperDisabled: {
-    opacity: 0.6,
-  },
-  hint: {
-    marginTop: Layout.spacing.xs,
-    color: Colors.text.secondary,
-    fontSize: Layout.typography.fontSize.sm,
-  },
-  error: {
-    marginTop: Layout.spacing.xs,
-    color: Colors.error[500],
-    fontSize: Layout.typography.fontSize.sm,
-  },
-});
+
 
 export default ValidatedSelect;

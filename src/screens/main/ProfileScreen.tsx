@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { useApiClient } from "@/utils/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Colors, Layout } from "@constants";
+import { Layout } from "@constants";
 import { useToast } from "@/providers/ToastContext";
 import { Profile } from "@/types/profile";
 // Dynamic profile completion calculator (replaces removed isProfileComplete flag)
@@ -39,7 +39,7 @@ function calcCompletion(profile: Profile): number {
   return filled / REQUIRED_FIELDS.length;
 }
 import { ProfileImage } from "@/types/image";
-import { useTheme } from "@contexts/ThemeContext";
+import { useTheme, useThemedStyles } from "@contexts/ThemeContext";
 import useResponsiveSpacing, {
   useResponsiveTypography,
 } from "@/hooks/useResponsive";
@@ -64,14 +64,19 @@ import VerifyEmailInline from "@components/auth/VerifyEmailInline";
 import InlineUpgradeBanner from "@components/subscription/InlineUpgradeBanner";
 import PremiumFeatureGuard from "@components/subscription/PremiumFeatureGuard";
 import { rgbaHex } from "@utils/color";
+import AppHeader from "@/components/common/AppHeader";
 
 const { width } = Dimensions.get("window");
 
 interface ProfileScreenProps {
   navigation: any;
+  route?: any;
 }
 
-export default function ProfileScreen({ navigation }: ProfileScreenProps) {
+export default function ProfileScreen({
+  navigation,
+  route,
+}: ProfileScreenProps) {
   const {
     user,
     needsEmailVerification,
@@ -91,6 +96,9 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { checkFeatureAccess } = useFeatureAccess();
   const queryClient = useQueryClient();
+  const scrollRef = useRef<ScrollView>(null);
+  const [viewersOffset, setViewersOffset] = useState<number | null>(null);
+  const didScrollRef = useRef(false);
   let analyticsTrack: any;
   try {
     // dynamic require to avoid bundling issues if tree-shaken
@@ -105,6 +113,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     daysUntilExpiry,
     loading: subscriptionLoading,
     trackFeatureUsage,
+    canUseFeatureNow,
   } = useSubscription();
 
   const { data: profile, isLoading: profileLoading } = useQuery<Profile | null>(
@@ -195,227 +204,254 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
   const isLoading = profileLoading || subscriptionLoading;
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    loadingText: {
-      marginTop: spacing.md,
-    },
-    header: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      borderBottomWidth: 1,
-    },
-    headerTitle: {
-      fontFamily: Layout.typography.fontFamily.serif,
-      fontWeight: "bold",
-    },
-    settingsButton: {
-      padding: spacing.xs,
-    },
-    settingsText: {},
-    emailBadge: {
-      marginLeft: spacing.sm,
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs / 2,
-      borderRadius: 12,
-    },
-    emailBadgeText: {
-      color: Colors.text.inverse,
-      fontWeight: "600",
-    },
-    actionButtonsRow: {
-      flexDirection: "row",
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.md,
-      gap: spacing.md,
-    },
-    actionBtn: {
-      flex: 1,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.xs,
-      borderRadius: 8,
-      alignItems: "center",
-    },
-    actionBtnText: {
-      color: Colors.text.inverse,
-      fontWeight: "600",
-      textAlign: "center",
-    },
-    section: {
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.lg,
-      padding: spacing.md,
-      borderRadius: 12,
-      shadowColor: Colors.neutral[900],
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 3,
-    },
-    sectionTitle: {
-      fontFamily: Layout.typography.fontFamily.serif,
-      fontWeight: "400",
-      marginBottom: spacing.md,
-    },
-    imageGallery: {
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.lg,
-    },
-    imageContainer: {
-      width: width - 40,
-      marginHorizontal: 4,
-      borderRadius: 12,
-      overflow: "hidden",
-      position: "relative",
-    },
-    profileImage: {
-      width: width - 48,
-      height: (width - 48) * 1.2,
-      resizeMode: "cover",
-    },
-    mainBadge: {
-      position: "absolute",
-      top: spacing.md,
-      right: spacing.md,
-      paddingHorizontal: spacing.xs,
-      paddingVertical: spacing.xs / 2,
-      borderRadius: 12,
-    },
-    mainBadgeText: {
-      color: Colors.text.inverse,
-      fontWeight: "600",
-    },
-    imageIndicators: {
-      flexDirection: "row",
-      justifyContent: "center",
-      marginTop: spacing.md,
-    },
-    indicator: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      marginHorizontal: 4,
-    },
-    infoGrid: {
-      gap: spacing.md,
-    },
-    infoRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      paddingVertical: spacing.xs,
-    },
-    infoLabel: {
-      flex: 1,
-      fontWeight: "500",
-    },
-    infoValue: {
-      flex: 2,
-      textAlign: "right",
-      fontWeight: "500",
-    },
-    premiumBadge: {
-      color: Colors.primary[500],
-      fontWeight: "bold",
-    },
-    aboutText: {
-      lineHeight: spacing.xl,
-    },
-    noDataText: {
-      textAlign: "center",
-      fontStyle: "italic",
-    },
-    subscriptionWidget: {
-      gap: spacing.md,
-    },
-    subscriptionHeader: {
-      alignItems: "center",
-    },
-    subscriptionPlan: {
-      fontWeight: "bold",
-      marginBottom: spacing.xs / 2,
-    },
-    subscriptionExpiry: {},
-    subscriptionActions: {
-      gap: spacing.md,
-    },
-    subscriptionButton: {
-      paddingVertical: spacing.sm,
-      borderRadius: 8,
-      alignItems: "center",
-    },
-    subscriptionButtonText: {
-      color: Colors.text.inverse,
-      fontWeight: "600",
-    },
-    boostButton: {
-      paddingVertical: spacing.sm,
-      borderRadius: 8,
-      alignItems: "center",
-    },
-    viewersList: {
-      gap: spacing.xs,
-    },
-    viewerItem: {
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-      backgroundColor: theme.colors.background.secondary,
-      borderRadius: 8,
-    },
-    viewerText: {},
-    moreViewersText: {
-      fontWeight: "600",
-      textAlign: "center",
-      marginTop: spacing.xs,
-    },
-    statsGrid: {
-      flexDirection: "row",
-      justifyContent: "space-around",
-    },
-    statItem: {
-      alignItems: "center",
-    },
-    statNumber: {
-      fontWeight: "bold",
-      marginBottom: spacing.xs / 2,
-    },
-    statLabel: {},
-    signOutContainer: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.lg,
-    },
-    signOutButton: {
-      paddingVertical: spacing.md,
-      borderRadius: 12,
-      alignItems: "center",
-      borderWidth: 1,
-    },
-    signOutButtonText: {
-      fontWeight: "600",
-    },
-    progressSection: {
-      marginTop: spacing.lg,
-      paddingTop: spacing.md,
-      borderTopWidth: 1,
-      borderTopColor: rgbaHex(Colors.background.primary, 0.1),
-    },
-    contentStyle: {
-      flexGrow: 1,
-    },
-  });
+  // Auto-scroll to viewers section if navigated with param
+  useEffect(() => {
+    const focusTarget = route?.params?.focus;
+    if (
+      focusTarget === "viewers" &&
+      viewersOffset !== null &&
+      scrollRef.current &&
+      !didScrollRef.current
+    ) {
+      didScrollRef.current = true;
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, viewersOffset - 16),
+          animated: true,
+        });
+      }, 50);
+    }
+  }, [route?.params?.focus, viewersOffset]);
+
+  const styles = useThemedStyles((t) =>
+    StyleSheet.create({
+      container: {
+        flex: 1,
+      },
+      scrollView: {
+        flex: 1,
+      },
+      loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+      },
+      loadingText: {
+        marginTop: spacing.md,
+        color: t.colors.text.secondary,
+      },
+      header: {
+        // deprecated: replaced by AppHeader component
+      },
+      headerTitle: {
+        fontFamily: Layout.typography.fontFamily.serif,
+        fontWeight: "bold",
+        color: t.colors.text.primary,
+      },
+      settingsButton: {
+        padding: spacing.xs,
+      },
+      settingsText: {},
+      emailBadge: {
+        marginLeft: spacing.sm,
+        paddingHorizontal: spacing.xs,
+        paddingVertical: spacing.xs / 2,
+        borderRadius: 12,
+      },
+      emailBadgeText: {
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+      },
+      actionButtonsRow: {
+        flexDirection: "row",
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.md,
+        gap: spacing.md,
+      },
+      actionBtn: {
+        flex: 1,
+        paddingVertical: spacing.md,
+        paddingHorizontal: spacing.xs,
+        borderRadius: 8,
+        alignItems: "center",
+      },
+      actionBtnText: {
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+        textAlign: "center",
+      },
+      section: {
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.lg,
+        padding: spacing.md,
+        borderRadius: 12,
+        shadowColor: t.colors.neutral[900],
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+      },
+      sectionTitle: {
+        fontFamily: Layout.typography.fontFamily.serif,
+        fontWeight: "400",
+        marginBottom: spacing.md,
+        color: t.colors.text.primary,
+      },
+      imageGallery: {
+        marginHorizontal: spacing.md,
+        marginBottom: spacing.lg,
+      },
+      imageContainer: {
+        width: width - 40,
+        marginHorizontal: 4,
+        borderRadius: 12,
+        overflow: "hidden",
+        position: "relative",
+      },
+      profileImage: {
+        width: width - 48,
+        height: (width - 48) * 1.2,
+        resizeMode: "cover",
+      },
+      mainBadge: {
+        position: "absolute",
+        top: spacing.md,
+        right: spacing.md,
+        paddingHorizontal: spacing.xs,
+        paddingVertical: spacing.xs / 2,
+        borderRadius: 12,
+        backgroundColor: t.colors.primary[500],
+      },
+      mainBadgeText: {
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+      },
+      imageIndicators: {
+        flexDirection: "row",
+        justifyContent: "center",
+        marginTop: spacing.md,
+      },
+      indicator: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        marginHorizontal: 4,
+      },
+      infoGrid: {
+        gap: spacing.md,
+      },
+      infoRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        paddingVertical: spacing.xs,
+      },
+      infoLabel: {
+        flex: 1,
+        fontWeight: "500",
+        color: t.colors.text.secondary,
+      },
+      infoValue: {
+        flex: 2,
+        textAlign: "right",
+        fontWeight: "500",
+        color: t.colors.text.primary,
+      },
+      premiumBadge: {
+        color: t.colors.primary[500],
+        fontWeight: "bold",
+      },
+      aboutText: {
+        lineHeight: spacing.xl,
+      },
+      noDataText: {
+        textAlign: "center",
+        fontStyle: "italic",
+        color: t.colors.text.secondary,
+      },
+      subscriptionWidget: {
+        gap: spacing.md,
+      },
+      subscriptionHeader: {
+        alignItems: "center",
+      },
+      subscriptionPlan: {
+        fontWeight: "bold",
+        marginBottom: spacing.xs / 2,
+      },
+      subscriptionExpiry: {},
+      subscriptionActions: {
+        gap: spacing.md,
+      },
+      subscriptionButton: {
+        paddingVertical: spacing.sm,
+        borderRadius: 8,
+        alignItems: "center",
+      },
+      subscriptionButtonText: {
+        color: t.colors.text.inverse,
+        fontWeight: "600",
+      },
+      boostButton: {
+        paddingVertical: spacing.sm,
+        borderRadius: 8,
+        alignItems: "center",
+      },
+      viewersList: {
+        gap: spacing.xs,
+      },
+      viewerItem: {
+        paddingVertical: spacing.xs,
+        paddingHorizontal: spacing.md,
+        backgroundColor: t.colors.background.secondary,
+        borderRadius: 8,
+      },
+      viewerText: {},
+      moreViewersText: {
+        fontWeight: "600",
+        textAlign: "center",
+        marginTop: spacing.xs,
+        color: t.colors.primary[500],
+      },
+      statsGrid: {
+        flexDirection: "row",
+        justifyContent: "space-around",
+      },
+      statItem: {
+        alignItems: "center",
+      },
+      statNumber: {
+        fontWeight: "bold",
+        marginBottom: spacing.xs / 2,
+        color: t.colors.text.primary,
+      },
+      statLabel: {},
+      signOutContainer: {
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.lg,
+      },
+      signOutButton: {
+        paddingVertical: spacing.md,
+        borderRadius: 12,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: t.colors.error[500],
+      },
+      signOutButtonText: {
+        fontWeight: "600",
+        color: t.colors.error[500],
+      },
+      progressSection: {
+        marginTop: spacing.lg,
+        paddingTop: spacing.md,
+        borderTopWidth: 1,
+        borderTopColor: rgbaHex(t.colors.background.primary, 0.1),
+      },
+      contentStyle: {
+        flexGrow: 1,
+      },
+    })
+  );
   const handleEditProfile = () => {
     navigation.navigate("EditProfile");
   };
@@ -466,6 +502,24 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
       );
       handleViewSubscription();
       return;
+    }
+    // Extra parity: ask server if we can use a boost right now (catches race conditions)
+    try {
+      const { canUse, reason, requiredPlan } = await canUseFeatureNow(
+        "profileBoosts"
+      );
+      if (!canUse) {
+        const needsUpgrade = requiredPlan && requiredPlan !== plan;
+        if (needsUpgrade) {
+          toast.show("Upgrade required to use another boost.", "info");
+          handleViewSubscription();
+          return;
+        }
+        toast.show(reason || "Boost limit reached. Try again later.", "info");
+        return;
+      }
+    } catch {
+      // Best-effort; fall back to UI-confirm if check fails
     }
     analyticsTrack?.("profile_boost_attempt", {
       from: "pre_confirm",
@@ -518,14 +572,12 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   if (isLoading) {
     return (
       <ScreenContainer
-        containerStyle={{ backgroundColor: Colors.background.primary }}
+        containerStyle={{ backgroundColor: theme.colors.background.primary }}
         contentStyle={styles.contentStyle}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary[500]} />
-          <Text style={[styles.loadingText, { color: Colors.text.secondary }]}>
-            Loading profile...
-          </Text>
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </ScreenContainer>
     );
@@ -581,36 +633,36 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
         }}
       />
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View
-          style={[
-            styles.header,
-            { borderBottomColor: theme.colors.border.primary },
-          ]}
-        >
-          <Text
-            style={[styles.headerTitle, { color: theme.colors.text.primary }]}
-          >
-            My Profile
-          </Text>
-          {needsEmailVerification ? (
-            <VerifyEmailInline variant="badge" />
-          ) : null}
-          <TouchableOpacity
-            onPress={handleViewSettings}
-            style={styles.settingsButton}
-          >
-            <Text
-              style={[
-                styles.settingsText,
-                { color: theme.colors.primary[500] },
-              ]}
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false}>
+        <AppHeader
+          title="My Profile"
+          rightActions={
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing.sm,
+              }}
             >
-              Settings
-            </Text>
-          </TouchableOpacity>
-        </View>
+              {needsEmailVerification ? (
+                <VerifyEmailInline variant="badge" />
+              ) : null}
+              <TouchableOpacity
+                onPress={handleViewSettings}
+                style={styles.settingsButton}
+              >
+                <Text
+                  style={[
+                    styles.settingsText,
+                    { color: theme.colors.primary[500] },
+                  ]}
+                >
+                  Settings
+                </Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
 
         {/* Action Buttons Row */}
         <FadeInView delay={200}>
@@ -836,7 +888,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
                     >
                       <Text
                         style={{
-                          color: Colors.text.inverse,
+                          color: theme.colors.text.inverse,
                           fontWeight: "600",
                         }}
                       >
@@ -1555,6 +1607,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               styles.section,
               { backgroundColor: theme.colors.background.primary },
             ]}
+            onLayout={(e) => setViewersOffset(e.nativeEvent.layout.y)}
           >
             <Text
               style={[
@@ -1610,7 +1663,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           <GlassmorphismCard
             style={[styles.section, { backgroundColor: "transparent" }]}
             intensity={60}
-            borderColor={rgbaHex(Colors.background.primary, 0.1)}
+            borderColor={rgbaHex(theme.colors.background.primary, 0.1)}
           >
             <Text
               style={[

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors } from "../../constants";
 import { MessageStatus } from "../../types/message";
+import { useTheme } from "@contexts/ThemeContext";
 
 interface MessageStatusIndicatorProps {
   status?: MessageStatus;
@@ -16,6 +16,7 @@ export const MessageStatusIndicator: React.FC<MessageStatusIndicatorProps> = ({
   readAt,
   style,
 }) => {
+  const { theme } = useTheme();
   if (!isOwnMessage) {
     return null; // Only show status for own messages
   }
@@ -43,22 +44,22 @@ export const MessageStatusIndicator: React.FC<MessageStatusIndicatorProps> = ({
 
   const getStatusColor = () => {
     if (readAt) {
-      return Colors.primary[400]; // Blue for read
+      return theme.colors.primary[400]; // Blue for read
     }
 
     switch (status) {
       case "pending":
-        return Colors.text.tertiary;
+        return theme.colors.text.tertiary;
       case "sent":
-        return Colors.text.tertiary;
+        return theme.colors.text.tertiary;
       case "delivered":
-        return Colors.text.tertiary;
+        return theme.colors.text.tertiary;
       case "read":
-        return Colors.primary[400];
+        return theme.colors.primary[400];
       case "failed":
-        return Colors.error[500];
+        return theme.colors.error[500];
       default:
-        return Colors.text.tertiary;
+        return theme.colors.text.tertiary;
     }
   };
 

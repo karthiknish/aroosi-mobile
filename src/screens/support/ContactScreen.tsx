@@ -7,8 +7,11 @@ import {
   Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Layout } from "@constants";
-import useResponsiveSpacing, { useResponsiveTypography } from "@/hooks/useResponsive";
+import { Layout } from "@constants";
+import { useTheme } from "@contexts/ThemeContext";
+import useResponsiveSpacing, {
+  useResponsiveTypography,
+} from "@/hooks/useResponsive";
 import ContactForm from "@components/contact/ContactForm";
 import ScreenContainer from "@components/common/ScreenContainer";
 import { useToast } from "@providers/ToastContext";
@@ -19,6 +22,7 @@ interface ContactScreenProps {
 }
 
 export default function ContactScreen({ navigation }: ContactScreenProps) {
+  const { theme } = useTheme();
   const { spacing } = useResponsiveSpacing();
   const { fontSize } = useResponsiveTypography();
   const toast = useToast();
@@ -54,7 +58,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: Colors.background.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     header: {
       flexDirection: "row",
@@ -63,8 +67,8 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.md,
       borderBottomWidth: 1,
-      borderBottomColor: Colors.border.primary,
-      backgroundColor: Colors.background.primary,
+      borderBottomColor: theme.colors.border.primary,
+      backgroundColor: theme.colors.background.primary,
     },
     headerLeft: {
       flexDirection: "row",
@@ -78,7 +82,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
     headerTitle: {
       fontFamily: "Boldonse-Regular",
       fontSize: fontSize.lg,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
     },
     headerRight: {
       flexDirection: "row",
@@ -87,7 +91,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
     emailButton: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: Colors.primary[50],
+      backgroundColor: theme.colors.primary[50],
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.xs,
       borderRadius: Layout.radius.sm,
@@ -95,7 +99,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
     },
     emailButtonText: {
       fontSize: fontSize.sm,
-      color: Colors.primary[600],
+      color: theme.colors.primary[600],
       fontWeight: "500",
     },
     content: {
@@ -105,22 +109,22 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       flexGrow: 1,
     },
     alternativeContact: {
-      backgroundColor: Colors.background.secondary,
+      backgroundColor: theme.colors.background.secondary,
       margin: spacing.lg,
       padding: spacing.lg,
       borderRadius: Layout.radius.md,
       borderWidth: 1,
-      borderColor: Colors.border.primary,
+      borderColor: theme.colors.border.primary,
     },
     alternativeTitle: {
       fontFamily: "Boldonse-Regular",
       fontSize: Layout.typography.fontSize.base,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       marginBottom: spacing.sm,
     },
     alternativeText: {
       fontSize: Layout.typography.fontSize.sm,
-      color: Colors.text.secondary,
+      color: theme.colors.text.secondary,
       lineHeight: 20,
       marginBottom: spacing.md,
     },
@@ -134,12 +138,12 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
     },
     contactMethodText: {
       fontSize: Layout.typography.fontSize.sm,
-      color: Colors.text.primary,
+      color: theme.colors.text.primary,
       flex: 1,
     },
     responseTime: {
-      backgroundColor: Colors.success[50],
-      borderColor: Colors.success[200],
+      backgroundColor: theme.colors.success[50],
+      borderColor: theme.colors.success[200],
       borderWidth: 1,
       borderRadius: Layout.radius.sm,
       padding: spacing.sm,
@@ -147,7 +151,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
     },
     responseTimeText: {
       fontSize: Layout.typography.fontSize.xs,
-      color: Colors.success[700],
+      color: theme.colors.success[700],
       textAlign: "center",
       fontWeight: "500",
     },
@@ -162,7 +166,11 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backButton} onPress={handleCancel}>
-            <Ionicons name="arrow-back" size={24} color={Colors.text.primary} />
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={theme.colors.text.primary}
+            />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Contact Support</Text>
         </View>
@@ -172,7 +180,7 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
             style={styles.emailButton}
             onPress={handleEmailPress}
           >
-            <Ionicons name="mail" size={16} color={Colors.primary[600]} />
+            <Ionicons name="mail" size={16} color={theme.colors.primary[600]} />
             <Text style={styles.emailButtonText}>Email</Text>
           </TouchableOpacity>
         </View>
@@ -198,13 +206,17 @@ export default function ContactScreen({ navigation }: ContactScreenProps) {
             style={styles.contactMethod}
             onPress={handleEmailPress}
           >
-            <Ionicons name="mail" size={16} color={Colors.primary[500]} />
+            <Ionicons name="mail" size={16} color={theme.colors.primary[500]} />
             <Text style={styles.contactMethodText}>support@aroosi.app</Text>
-            <Ionicons name="open" size={14} color={Colors.text.tertiary} />
+            <Ionicons
+              name="open"
+              size={14}
+              color={theme.colors.text.tertiary}
+            />
           </TouchableOpacity>
 
           <View style={styles.contactMethod}>
-            <Ionicons name="time" size={16} color={Colors.success[500]} />
+            <Ionicons name="time" size={16} color={theme.colors.success[500]} />
             <Text style={styles.contactMethodText}>
               Response within 24 hours
             </Text>
