@@ -1,15 +1,26 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-// Apply the Google services Gradle plugin for Firebase
-apply plugin: 'com.google.gms.google-services'
+// Apply the Google services Gradle plugin for Firebase (conditionally for local builds)
+def googleServicesJson = file('google-services.json')
+if (googleServicesJson.exists()) {
+    apply plugin: 'com.google.gms.google-services'
+} else {
+    logger.lifecycle("[android] google-services.json not found -> skipping Google Services plugin for this build")
+}
 // Apply Gradle Play Publisher plugin for Play Store automation
-apply plugin: 'com.github.triplet.play'
+// Apply Gradle Play Publisher only when credentials are provided (avoid config cost locally)
+def HAS_GPP_CREDS = System.getenv('ANDROID_PUBLISHER_CREDENTIALS') != null
+if (HAS_GPP_CREDS) {
+    apply plugin: 'com.github.triplet.play'
+}
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 // Local flag to speed up builds by targeting a single ABI (arm64-v8a)
+// Default to single-ABI for Debug builds to reduce local compile time
+def isDebugTask = gradle.startParameter.taskNames.any { it.toLowerCase().contains('debug') }
 def localSingleAbi = (
-    System.getenv('LOCAL_SINGLE_ABI') ?: (findProperty('LOCAL_SINGLE_ABI') ?: "false")
+    System.getenv('LOCAL_SINGLE_ABI') ?: (findProperty('LOCAL_SINGLE_ABI') ?: (isDebugTask ? "true" : "false"))
 ).toString().toBoolean()
 
 /**
@@ -37,10 +48,8 @@ react {
     // codegenDir = file("../../node_modules/@react-native/codegen")
 
     /* Variants */
-    //   The list of variants to that are debuggable. For those we're going to
-    //   skip the bundling of the JS bundle and the assets. By default is just 'debug'.
-    //   If you add flavors like lite, prod, etc. you'll have to list your debuggableVariants.
-    // debuggableVariants = ["liteDebug", "prodDebug"]
+    // Make sure we skip JS/asset bundling for debuggable variants to speed up debug builds
+    debuggableVariants = ["debug"]
 
     /* Bundling */
     //   A list containing the node command and its flags. Default is just 'node'.
@@ -180,6 +189,29 @@ android {
             ]
         }
     }
+    // Disable unused features to trim configuration and compile time
+    buildFeatures {
+        // React Native doesn’t use these
+        aidl false
+        renderScript false
+        shaders false
+        // Keep buildConfig on (RN/Expo rely on it)
+        buildConfig true
+        // Leave viewBinding/compose off (not used)
+        viewBinding false
+        compose false
+    }
+    // Lint can be expensive locally; keep checks in CI
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+    // PNG crunching is unnecessary for debug
+    buildTypes {
+        debug {
+            crunchPngs false
+        }
+    }
     androidResources {
         ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
     }
@@ -188,20 +220,16 @@ android {
 // Configure Gradle Play Publisher
 // Credentials: prefer environment variable ANDROID_PUBLISHER_CREDENTIALS with JSON key contents
 // Track: publish to internal testing by default; default to App Bundles for Play
-import com.github.triplet.gradle.androidpublisher.ReleaseStatus
-import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
-
-def HAS_GPP_CREDS = System.getenv('ANDROID_PUBLISHER_CREDENTIALS') != null
-play {
-    // Only enable GPP when credentials are present (e.g., on CI)
-    enabled.set(HAS_GPP_CREDS)
-    defaultToAppBundles.set(true)
-    track.set('internal')
-    // Ensure completed release on internal track
-    releaseStatus.set(ReleaseStatus.COMPLETED)
-    if (HAS_GPP_CREDS) {
+if (HAS_GPP_CREDS) {
+    play {
+        // Only enable GPP when credentials are present (e.g., on CI)
+        enabled.set(true)
+        defaultToAppBundles.set(true)
+        track.set('internal')
+        // Ensure completed release on internal track
+        releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
         // Auto-increment versionCode to avoid conflicts on CI
-        resolutionStrategy.set(ResolutionStrategy.AUTO)
+        resolutionStrategy.set(com.github.triplet.gradle.androidpublisher.ResolutionStrategy.AUTO)
     }
 }
 

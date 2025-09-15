@@ -20,6 +20,91 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build Android APK (release)",
+			"type": "shell",
+			"command": "npm run android:apk:release",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Build Android APK (release-local)",
+			"type": "shell",
+			"command": "npm run android:apk:release:local",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Build Android App Bundle (release)",
+			"type": "shell",
+			"command": "npm run build:aab",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			}
+		},
+		{
+			"label": "Gradle: assembleDebug",
+			"type": "shell",
+			"command": "LOCAL_SINGLE_ABI=true ./gradlew assembleDebug -x lint -x test --no-daemon --max-workers=4",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}/android"
+			}
+		},
+		{
+			"label": "Gradle: assembleRelease (local signing)",
+			"type": "shell",
+			"command": "ALLOW_DEBUG_SIGNING_FOR_LOCAL=true LOCAL_SINGLE_ABI=true ./gradlew assembleRelease -x lint -x test --no-daemon --max-workers=4",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}/android"
+			}
+		},
+		{
+			"label": "Gradle: bundleRelease (local signing)",
+			"type": "shell",
+			"command": "ALLOW_DEBUG_SIGNING_FOR_LOCAL=true ./gradlew bundleRelease",
+			"group": "build",
+			"problemMatcher": [],
+			"options": {
+				"cwd": "${workspaceFolder}/android"
+			}
+		}
+		,
+		{
+			"label": "iOS: Pods install",
+			"type": "shell",
+			"command": "npx pod-install",
+			"group": "build",
+			"problemMatcher": [],
+			"options": { "cwd": "${workspaceFolder}" }
+		},
+		{
+			"label": "iOS: build Debug (simulator, fast)",
+			"type": "shell",
+			"command": "xcodebuild -workspace ios/Aroosi.xcworkspace -scheme Aroosi -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' ONLY_ACTIVE_ARCH=YES build",
+			"group": "build",
+			"problemMatcher": [],
+			"options": { "cwd": "${workspaceFolder}" }
+		},
+		{
+			"label": "iOS: expo run (precompiled)",
+			"type": "shell",
+			"command": "npm run -s ios:run:precompiled",
+			"group": "build",
+			"problemMatcher": [],
+			"options": { "cwd": "${workspaceFolder}" }
 		}
 	]
 }

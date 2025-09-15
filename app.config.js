@@ -207,7 +207,8 @@ module.exports = () => {
         null,
     },
     owner: "karthiknish",
-    runtimeVersion: { policy: "appVersion" },
+    // Bare workflow does not support runtime version policies; use a concrete string.
+    runtimeVersion: pkg.version || "1.0.0",
     updates: {
       url: "https://u.expo.dev/90150339-514c-413a-bfa1-9ce4cb689ba8",
     },
